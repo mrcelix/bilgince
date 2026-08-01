@@ -1,7 +1,7 @@
 // Sitenin tek doğruluk kaynağı. İsim, alan adı ve imza burada değişir.
 export const SITE = {
   name: 'bilgince',
-  url: 'https://bilgince.dev',
+  url: 'https://bilgince.com',
   title: 'bilgince — BT rehberleri ve saha ipuçları',
   description:
     'Windows Server, Active Directory, PowerShell ve ağ üzerine üretim ortamında denenmiş rehberler. Her yazının sonunda doğrulama adımı var.',
@@ -13,7 +13,7 @@ export const SITE = {
     jobTitle: 'Kıdemli Sistem Yöneticisi',
     worksFor: 'Anadolu Lojistik A.Ş.',
     location: 'Ankara',
-    email: 'merhaba@bilgince.dev',
+    email: 'merhaba@bilgince.com',
     linkedin: 'https://www.linkedin.com/in/mustafacelik',
     github: 'https://github.com/mrcelix',
     knowsAbout: [

@@ -69,10 +69,12 @@ Slug'ı değiştirmeyin — kalıcı bağlantı kırılır.
 
 Yayına almadan önce değiştirilmesi gerekenler:
 
-- `src/site.js` — site adı, alan adı, ad-soyad, e-posta, sosyal hesaplar, bülten uç noktası
+- `src/site.js` — ad-soyad, e-posta, sosyal hesaplar, bülten uç noktası
 - `src/cv.js` — iş deneyimi, sertifikalar, SSS
-- `public/robots.txt` — site haritası adresi
 - `src/content/projeler/*.md` — proje metrikleri
+
+Alan adı yalnızca `src/site.js` içindeki `url` alanında tanımlı; canonical, OG adresleri,
+RSS, site haritası ve `robots.txt` hepsi oradan türer. Değiştirmek için tek satır yeterli.
 
 **Şu anki kişisel içeriğin tamamı uydurmadır** — iş yerleri, tarihler, sertifikalar ve proje
 sayıları gerçekçi görünsün diye yazıldı. Yayına almadan önce değiştirin.
