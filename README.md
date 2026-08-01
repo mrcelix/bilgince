@@ -89,13 +89,21 @@ etkinleşir; JavaScript varsa sayfadan ayrılmadan gönderir, yoksa normal form 
 
 Statik çıktı, herhangi bir statik sunucuda çalışır.
 
+- **Vercel** — `vercel.json` hazır: `framework: "astro"`, derleme `npm run build`, çıktı `dist`.
+  Proje ön ayarı panelde Next.js'e kilitliyse `vercel.json` bunu geçersiz kılar; yine de hata
+  alırsanız **Project Settings → Build & Deployment → Framework Preset** alanını *Astro* yapın.
 - **Netlify** — `netlify.toml` hazır (`npm run build`, `dist`).
 - **Cloudflare Pages** — derleme komutu `npm run build`, çıktı dizini `dist`.
 - **GitHub Pages** — `src/site.js` içindeki `url` alanını `https://<kullanici>.github.io/<repo>`
   yapın ve `astro.config.mjs`'e `base: '/<repo>'` ekleyin; aksi hâlde bağlantılar ve OG adresleri kayar.
 
-`public/_headers` uzun ömürlü önbellek ve temel güvenlik başlıklarını ayarlar (Netlify ve
-Cloudflare Pages okur).
+Önbellek ve güvenlik başlıkları iki yerde tanımlı çünkü sağlayıcılar farklı biçim okuyor:
+`vercel.json` (Vercel) ve `public/_headers` (Netlify, Cloudflare Pages). Birini değiştirirseniz
+diğerini de güncelleyin.
+
+Adresler eğik çizgisiz (`/hakkimda`). `astro.config.mjs` içindeki `trailingSlash: 'never'`
+ve `vercel.json` içindeki `trailingSlash: false` bu yüzden birlikte duruyor — canonical,
+site haritası ve sunucu aynı biçimi kullanmazsa her adres bir yönlendirmeye takılır.
 
 ## SEO
 

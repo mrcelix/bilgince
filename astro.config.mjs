@@ -4,6 +4,9 @@ import { SITE } from './src/site.js';
 
 export default defineConfig({
   site: SITE.url,
+  // canonical adresler eğik çizgisiz; site haritası da öyle olsun ki
+  // tarayıcı botu her adreste 308 yönlendirmesine takılmasın
+  trailingSlash: 'never',
   integrations: [
     sitemap({
       // noindex sayfaları site haritasına girmemeli
