@@ -3,21 +3,30 @@ import Base from '../../layouts/Base.astro';
 import { getCollection, render } from 'astro:content';
 import { KONULAR, SITE, trTarih } from '../../site.js';
 
-const ipuclari = (await getCollection('ipuclari')).sort((a, b) => +b.data.yayin - +a.data.yayin);
+const ipuclari = (await getCollection('ipuclari')).sort(
+  (a, b) => a.data.populerlik - b.data.populerlik || +b.data.yayin - +a.data.yayin
+);
 const icerikler = await Promise.all(ipuclari.map(async (i) => ({ girdi: i, ...(await render(i)) })));
 const konuAdi = (slug: string) => KONULAR.find((k) => k.slug === slug)?.ad ?? slug;
+const kullanilan = KONULAR.filter((k) => ipuclari.some((i) => i.data.konu === k.slug));
 ---
 
 <Base
   baslik="Hızlı ipuçları"
-  aciklama="Tek ekranda biten, kopyala-çalıştır teknik notlar. Uzun rehberlere girmeden işinizi gören kısa çözümler."
+  aciklama={`İlgi düzeyine göre sıralanmış ${ipuclari.length} teknik ipucu. Tek ekranda biten, kopyala-çalıştır notlar.`}
   ogGorsel="/og/sayfa-ipuclari.png"
   jsonLd={{
     '@context': 'https://schema.org',
-    '@type': 'CollectionPage',
+    '@type': 'ItemList',
     name: 'Hızlı ipuçları',
     url: `${SITE.url}/ipuclari`,
     numberOfItems: ipuclari.length,
+    itemListOrder: 'https://schema.org/ItemListOrderAscending',
+    itemListElement: ipuclari.slice(0, 50).map((i, n) => ({
+      '@type': 'ListItem',
+      position: n + 1,
+      name: i.data.baslik,
+    })),
   }}
 >
   <div class="lavanta">
@@ -27,35 +36,239 @@ const konuAdi = (slug: string) => KONULAR.find((k) => k.slug === slug)?.ad ?? sl
       </nav>
       <div class="konu-bas" style="padding-top:8px">
         <span class="etiket">İpuçları</span>
-        <h1>Hızlı ipuçları</h1>
+        <h1>{ipuclari.length} hızlı ipucu</h1>
         <p class="ozet">
-          Tek ekranda biten notlar. Uzun rehbere girmeye değmeyen ama her seferinde aranan şeyler burada.
+          Uzun rehbere girmeye değmeyen ama her seferinde aranan şeyler. İlgi düzeyine göre sıralı —
+          en çok işe yarayan yukarıda.
         </p>
-        <div class="konu-sayac"><span><b>{ipuclari.length}</b> ipucu</span></div>
+        <div class="konu-sayac">
+          <span><b>{ipuclari.length}</b> ipucu</span>
+          <span><b>{kullanilan.length}</b> konu</span>
+          <span>Ortalama <b>2 dk</b> okuma</span>
+        </div>
       </div>
     </div>
   </div>
 
-  <div class="kap">
-    <div style="display:flex;flex-direction:column;gap:20px;padding-top:30px">
+  <div class="suzgec">
+    <div class="kap">
+      <label class="atla" for="ipucu-ara">İpuçlarında ara</label>
+      <input
+        id="ipucu-ara"
+        class="cip"
+        type="search"
+        placeholder="İpuçlarında ara…"
+        style="min-width:220px;font-family:inherit"
+      />
+      <button class="cip" type="button" data-konu="hepsi" aria-current="page">
+        Tümü <span style="opacity:.7">{ipuclari.length}</span>
+      </button>
       {
-        icerikler.map(({ girdi, Content }) => (
-          <article class="uclu-kart" style="gap:14px">
-            <span style="display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap">
-              <span class="etiket">{konuAdi(girdi.data.konu)}</span>
-              <span style="font-size:11.5px;color:var(--muted);font-family:var(--mono)">
-                {trTarih(girdi.data.yayin)}
-              </span>
+        kullanilan.map((k) => (
+          <button class="cip" type="button" data-konu={k.slug}>
+            {k.ad} <span style="opacity:.6">{ipuclari.filter((i) => i.data.konu === k.slug).length}</span>
+          </button>
+        ))
+      }
+    </div>
+  </div>
+
+  <div class="kap">
+    <div id="ipucu-liste" class="ipucu-listesi">
+      {
+        icerikler.map(({ girdi, Content }, n) => (
+          <article
+            class="ipucu-kart"
+            id={girdi.id}
+            data-konu={girdi.data.konu}
+            data-ara={`${girdi.data.baslik} ${girdi.data.ozet} ${girdi.data.etiketler.join(' ')}`.toLocaleLowerCase('tr')}
+          >
+            <span class="ipucu-no" aria-hidden="true">
+              {n + 1}
             </span>
-            <h2 style="font-size:20px;font-weight:900;letter-spacing:-.03em;line-height:1.2">
-              {girdi.data.baslik}
-            </h2>
-            <div class="metin" style="max-width:none;gap:14px">
-              <Content />
+            <div class="ipucu-govde">
+              <span class="ipucu-ust">
+                <a class="etiket" href={`/konu/${girdi.data.konu}`}>
+                  {konuAdi(girdi.data.konu)}
+                </a>
+                <span class="ipucu-tarih">{trTarih(girdi.data.yayin)}</span>
+              </span>
+              <h2>
+                <a href={`#${girdi.id}`}>{girdi.data.baslik}</a>
+              </h2>
+              <p class="ipucu-ozet">{girdi.data.ozet}</p>
+              <div class="metin ipucu-metin">
+                <Content />
+              </div>
+              {girdi.data.etiketler.length > 0 && (
+                <span class="yigin">
+                  {girdi.data.etiketler.map((e) => (
+                    <a href={`/etiket/${e}`}>{e}</a>
+                  ))}
+                </span>
+              )}
             </div>
           </article>
         ))
       }
     </div>
+
+    <p id="ipucu-bos" hidden style="color:var(--muted);padding:30px 0;font-size:14.5px">
+      Bu süzgeçle eşleşen ipucu yok. <button class="cip" type="button" data-sifirla>Süzgeci temizle</button>
+    </p>
+
+    <section class="bant" style="margin-top:36px">
+      <div>
+        <h2>Yeni ipuçları e-postayla gelsin</h2>
+        <p>Haftalık notta rehberlerin yanında bu listeye eklenenler de yer alıyor.</p>
+      </div>
+      <a class="dg dg-kehribar" href="/#bulten">Bültene katıl</a>
+    </section>
   </div>
 </Base>
+
+<style>
+  .ipucu-listesi {
+    display: flex;
+    flex-direction: column;
+    gap: 18px;
+    padding-top: 30px;
+  }
+  .ipucu-kart {
+    display: grid;
+    grid-template-columns: 44px minmax(0, 1fr);
+    gap: 18px;
+    background: var(--paper);
+    border: 1px solid var(--line);
+    border-radius: var(--r-m);
+    padding: 22px 24px;
+    scroll-margin-top: 110px;
+  }
+  .ipucu-kart:target {
+    border-color: var(--indigo);
+    box-shadow: 0 0 0 3px rgba(58, 69, 224, 0.12);
+  }
+  .ipucu-no {
+    font-size: 19px;
+    font-weight: 900;
+    letter-spacing: -0.03em;
+    color: var(--indigo-d);
+    background: var(--tint);
+    border-radius: 10px;
+    width: 44px;
+    height: 44px;
+    display: grid;
+    place-items: center;
+    font-variant-numeric: tabular-nums;
+  }
+  .ipucu-govde {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    min-width: 0;
+  }
+  .ipucu-ust {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    flex-wrap: wrap;
+  }
+  .ipucu-tarih {
+    font-family: var(--mono);
+    font-size: 11.5px;
+    color: var(--muted);
+  }
+  .ipucu-kart h2 {
+    font-size: 20px;
+    font-weight: 900;
+    letter-spacing: -0.03em;
+    line-height: 1.22;
+  }
+  .ipucu-kart h2 a:hover {
+    color: var(--indigo);
+  }
+  .ipucu-ozet {
+    font-size: 14.5px;
+    color: var(--muted);
+    line-height: 1.55;
+  }
+  .ipucu-metin {
+    max-width: none;
+    gap: 14px;
+  }
+  .ipucu-metin p {
+    font-size: 15px;
+  }
+  @media (max-width: 620px) {
+    .ipucu-kart {
+      grid-template-columns: minmax(0, 1fr);
+      gap: 12px;
+      padding: 18px;
+    }
+    .ipucu-no {
+      width: 36px;
+      height: 36px;
+      font-size: 16px;
+    }
+  }
+</style>
+
+<script>
+  const girdi = document.getElementById('ipucu-ara') as HTMLInputElement | null;
+  const dugmeler = [...document.querySelectorAll<HTMLButtonElement>('[data-konu]')];
+  const kartlar = [...document.querySelectorAll<HTMLElement>('.ipucu-kart')];
+  const bos = document.getElementById('ipucu-bos');
+  let etkinKonu = 'hepsi';
+
+  function suz() {
+    const q = (girdi?.value ?? '').trim().toLocaleLowerCase('tr');
+    let gorunen = 0;
+    kartlar.forEach((k) => {
+      const goster =
+        (etkinKonu === 'hepsi' || k.dataset.konu === etkinKonu) &&
+        (!q || (k.dataset.ara ?? '').includes(q));
+      k.hidden = !goster;
+      if (goster) gorunen++;
+    });
+    if (bos) bos.hidden = gorunen > 0;
+  }
+
+  dugmeler.forEach((d) =>
+    d.addEventListener('click', () => {
+      etkinKonu = d.dataset.konu ?? 'hepsi';
+      dugmeler.forEach((x) =>
+        x === d ? x.setAttribute('aria-current', 'page') : x.removeAttribute('aria-current')
+      );
+      suz();
+    })
+  );
+  girdi?.addEventListener('input', suz);
+  document.querySelector('[data-sifirla]')?.addEventListener('click', () => {
+    if (girdi) girdi.value = '';
+    dugmeler[0]?.click();
+  });
+
+  // kod bloklarına kopyala düğmesi
+  document.querySelectorAll<HTMLPreElement>('.ipucu-metin pre').forEach((pre) => {
+    const dugme = document.createElement('button');
+    dugme.type = 'button';
+    dugme.className = 'kopyala';
+    dugme.textContent = 'Kopyala';
+    pre.style.position = 'relative';
+    pre.appendChild(dugme);
+    dugme.addEventListener('click', async () => {
+      try {
+        await navigator.clipboard.writeText(pre.querySelector('code')?.textContent ?? '');
+        dugme.textContent = 'Kopyalandı';
+        dugme.dataset.durum = 'kopyalandi';
+      } catch {
+        dugme.textContent = 'Kopyalanamadı';
+      }
+      setTimeout(() => {
+        dugme.textContent = 'Kopyala';
+        delete dugme.dataset.durum;
+      }, 1800);
+    });
+  });
+</script>

@@ -29,6 +29,9 @@ const ipuclari = defineCollection({
     yayin: z.coerce.date(),
     sure: z.number().default(2),
     gununIpucu: z.boolean().default(false),
+    // 1 = en çok ilgi gören. /ipuclari sayfası buna göre sıralar.
+    populerlik: z.number().default(999),
+    etiketler: z.array(z.string()).default([]),
     // ana sayfadaki terminal kutusu için
     komut: z.string().optional(),
     cikti: z.string().optional(),

@@ -376,19 +376,67 @@ code {
 }
 .mega .kap {
   display: grid;
-  grid-template-columns: 1.05fr 1.05fr 0.85fr 0.95fr;
   gap: 0;
   padding: 0 28px;
 }
+.mega-konular .kap {
+  grid-template-columns: 0.95fr 1fr 0.95fr 0.95fr 0.95fr;
+}
+.mega-kaynaklar .kap {
+  grid-template-columns: 1.1fr 1fr 0.85fr;
+}
 .mega-sutun {
-  padding: 26px 30px 26px 0;
+  padding: 24px 22px 24px 0;
   display: flex;
   flex-direction: column;
-  gap: 16px;
+  gap: 13px;
   border-right: 1px solid var(--line);
 }
 .mega-sutun + .mega-sutun {
-  padding-left: 30px;
+  padding-left: 22px;
+}
+.mega-grup-ozet {
+  font-size: 12px;
+  color: var(--muted);
+  margin-top: -8px;
+  line-height: 1.4;
+}
+.mega-bag .ad .say {
+  font-family: var(--mono);
+  font-size: 10.5px;
+  font-weight: 600;
+  color: var(--muted);
+  background: var(--bg);
+  border-radius: 5px;
+  padding: 1px 6px;
+}
+.mega-seri {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.mega-seri .ad {
+  font-size: 13.5px;
+  font-weight: 800;
+  letter-spacing: -0.015em;
+  line-height: 1.3;
+}
+.mega-seri .ac {
+  font-size: 11.5px;
+  color: var(--muted);
+}
+.mega-seri:hover .ad {
+  color: var(--indigo);
+}
+.mega-tum {
+  font-size: 12.5px;
+  font-weight: 800;
+  color: var(--indigo);
+  margin-top: auto;
+  padding-top: 6px;
+}
+.gizle-dar {
+  color: #8792ab;
 }
 .mega-etiket {
   font-size: 10.5px;
@@ -1042,6 +1090,31 @@ code {
   letter-spacing: 0.04em;
 }
 
+/* kod bloğu kopyalama düğmesi */
+.kopyala {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  font-family: inherit;
+  font-size: 11.5px;
+  font-weight: 800;
+  padding: 6px 11px;
+  border-radius: 7px;
+  border: 1px solid rgba(255, 255, 255, 0.22);
+  background: rgba(255, 255, 255, 0.1);
+  color: #d5dcec;
+  cursor: pointer;
+}
+.kopyala:hover {
+  background: rgba(255, 255, 255, 0.18);
+  color: #fff;
+}
+.kopyala[data-durum='kopyalandi'] {
+  background: rgba(21, 162, 74, 0.9);
+  border-color: transparent;
+  color: #fff;
+}
+
 /* kod blokları — her yerde lacivert */
 .kod {
   background: linear-gradient(165deg, var(--navy), var(--navy-2));
@@ -1077,6 +1150,74 @@ code {
 .terminal-cikti b {
   color: #5fd08a;
   font-weight: 700;
+}
+
+/* ------------------------------------------------------------- konu keşfi */
+.konu-izgara {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 16px;
+}
+.konu-kart {
+  background: var(--paper);
+  border: 1px solid var(--line);
+  border-radius: var(--r-m);
+  padding: 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 9px;
+  transition: box-shadow 0.2s ease, transform 0.2s ease;
+}
+.konu-kart:hover {
+  box-shadow: 0 16px 30px -22px rgba(22, 32, 58, 0.45);
+  transform: translateY(-2px);
+}
+.konu-kart .ikon {
+  width: 34px;
+  height: 34px;
+  border-radius: 10px;
+  background: var(--tint);
+  color: var(--indigo);
+  display: grid;
+  place-items: center;
+}
+.konu-kart h3 {
+  font-size: 15.5px;
+  font-weight: 800;
+  letter-spacing: -0.02em;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.konu-kart h3 .say {
+  font-family: var(--mono);
+  font-size: 10.5px;
+  font-weight: 600;
+  color: var(--muted);
+  background: var(--bg);
+  border-radius: 5px;
+  padding: 1px 6px;
+}
+.konu-kart p {
+  font-size: 12.5px;
+  color: var(--muted);
+  line-height: 1.5;
+}
+.konu-kart .grup {
+  font-size: 10.5px;
+  font-weight: 800;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--muted);
+  margin-top: auto;
+  padding-top: 4px;
+}
+
+.seri-serit {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+  gap: 16px;
 }
 
 /* ---------------------------------------------------------------- portfolyo */
@@ -2527,7 +2668,8 @@ code {
   .logo {
     flex: 1;
   }
-  .ust-serit .sag {
+  .ust-serit .sag,
+  .gizle-dar {
     display: none;
   }
   .hero,
@@ -2546,7 +2688,8 @@ code {
   .projeler,
   .uclu,
   .kanallar,
-  .uc-kutu {
+  .uc-kutu,
+  .konu-izgara {
     grid-template-columns: repeat(2, 1fr);
   }
   .guven .kap,
@@ -2589,6 +2732,7 @@ code {
   .uclu,
   .kanallar,
   .uc-kutu,
+  .konu-izgara,
   .guven .kap,
   .sonuclar {
     grid-template-columns: minmax(0, 1fr);

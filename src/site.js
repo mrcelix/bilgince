@@ -39,14 +39,38 @@ export const SITE = {
   },
 };
 
-// Mega menüdeki konu sütunları. slug'lar /konu/<slug> adresine karşılık gelir.
+/**
+ * Konu taksonomisi. Mega menüde GRUPLAR sırasına göre sütunlara bölünür,
+ * /konu/<slug> adreslerine karşılık gelir.
+ * `ikon` değerleri src/components/KonuIkon.astro içinde tanımlı.
+ */
+export const GRUPLAR = [
+  { ad: 'Bulut', ozet: 'Üç sağlayıcı, operasyon gözüyle' },
+  { ad: 'Altyapı', ozet: 'Sunucu, istemci, otomasyon' },
+  { ad: 'Ağ & Güvenlik', ozet: 'Bağlantı ve kimlik' },
+  { ad: 'Süreç & Süreklilik', ozet: 'İşin devam etmesini sağlayan taraf' },
+];
+
 export const KONULAR = [
-  { slug: 'powershell', ad: 'PowerShell', ozet: 'Otomasyon, raporlama, zamanlanmış görev', grup: 'Altyapı' },
-  { slug: 'windows-server', ad: 'Windows Server', ozet: 'Rol kurulumu, güncelleme, sertleştirme', grup: 'Altyapı' },
-  { slug: 'sanallastirma', ad: 'Sanallaştırma', ozet: 'Hyper-V, depolama, checkpoint yönetimi', grup: 'Altyapı' },
-  { slug: 'ag', ad: 'Ağ', ozet: 'Yönlendirme, VPN, güvenlik duvarı kuralları', grup: 'Ağ, kimlik ve süreklilik' },
-  { slug: 'guvenlik', ad: 'Güvenlik & Entra ID', ozet: 'MFA, koşullu erişim, kimlik göçü', grup: 'Ağ, kimlik ve süreklilik' },
-  { slug: 'yedekleme', ad: 'Yedekleme & kurtarma', ozet: 'Doğrulama rutini, RPO/RTO, tatbikat', grup: 'Ağ, kimlik ve süreklilik' },
+  // --- Bulut ---
+  { slug: 'azure', ad: 'Microsoft Azure', ozet: 'Kimlik, ağ, maliyet ve yönetişim', grup: 'Bulut', ikon: 'bulut' },
+  { slug: 'aws', ad: 'AWS', ozet: 'IAM, VPC, maliyet ve dayanıklılık', grup: 'Bulut', ikon: 'bulut' },
+  { slug: 'google-cloud', ad: 'Google Cloud', ozet: 'Proje hiyerarşisi, IAM, GKE', grup: 'Bulut', ikon: 'bulut' },
+
+  // --- Altyapı ---
+  { slug: 'windows-server', ad: 'Windows Server', ozet: 'Rol kurulumu, güncelleme, sertleştirme', grup: 'Altyapı', ikon: 'sunucu' },
+  { slug: 'windows', ad: 'Windows İstemci', ozet: 'Masaüstü ipuçları ve sorun giderme', grup: 'Altyapı', ikon: 'pencere' },
+  { slug: 'powershell', ad: 'PowerShell', ozet: 'Otomasyon, raporlama, zamanlanmış görev', grup: 'Altyapı', ikon: 'terminal' },
+  { slug: 'sanallastirma', ad: 'Sanallaştırma', ozet: 'Hyper-V, depolama, checkpoint yönetimi', grup: 'Altyapı', ikon: 'kutu' },
+
+  // --- Ağ & Güvenlik ---
+  { slug: 'ag', ad: 'Ağ', ozet: 'Yönlendirme, VPN, güvenlik duvarı kuralları', grup: 'Ağ & Güvenlik', ikon: 'kure' },
+  { slug: 'sd-wan', ad: 'SD-WAN', ozet: 'Şube bağlantısı, yol seçimi, SASE', grup: 'Ağ & Güvenlik', ikon: 'dugum' },
+  { slug: 'guvenlik', ad: 'Güvenlik & Entra ID', ozet: 'MFA, koşullu erişim, kimlik göçü', grup: 'Ağ & Güvenlik', ikon: 'kalkan' },
+
+  // --- Süreç & Süreklilik ---
+  { slug: 'itsm', ad: 'ITSM', ozet: 'Olay, değişiklik, problem ve SLA yönetimi', grup: 'Süreç & Süreklilik', ikon: 'akis' },
+  { slug: 'yedekleme', ad: 'Yedekleme & kurtarma', ozet: 'Doğrulama rutini, RPO/RTO, tatbikat', grup: 'Süreç & Süreklilik', ikon: 'geri' },
 ];
 
 export const POPULER_ARAMALAR = [
@@ -57,8 +81,8 @@ export const POPULER_ARAMALAR = [
   'GPO yedekleme',
 ];
 
-// Arşiv sayfası başına yazı sayısı. İçerik büyüdükçe yükseltin.
-export const SAYFA_BASI = 4;
+// Arşiv sayfası başına yazı sayısı.
+export const SAYFA_BASI = 12;
 
 /**
  * Türkçe karakterleri koruyarak URL parçası üretir.

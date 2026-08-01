@@ -2,8 +2,10 @@
 baslik: "Kilitlenen hesabın kaynağını tahminle aramayı bırakın"
 ozet: "4740 olayı yalnızca PDC emulator'de güvenilir. Caller Computer Name alanı kaynağı doğrudan söyler."
 konu: "powershell"
+etiketler: ["active-directory", "olay-gunlugu"]
 yayin: 2026-08-01
 sure: 2
+populerlik: 6
 gununIpucu: true
 terminalBaslik: "PowerShell 7 · DC01"
 komut: |

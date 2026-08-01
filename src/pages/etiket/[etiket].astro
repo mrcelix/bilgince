@@ -7,11 +7,13 @@ import { SITE } from '../../site.js';
 export async function getStaticPaths() {
   const rehberler = (await getCollection('rehberler')).filter((r) => !r.data.taslak);
   const komutlar = await getCollection('komutlar');
+  const ipuclari = await getCollection('ipuclari');
 
   const etiketler = [
     ...new Set([
       ...rehberler.flatMap((r) => r.data.etiketler),
       ...komutlar.flatMap((k) => k.data.etiketler),
+      ...ipuclari.flatMap((i) => i.data.etiketler),
     ]),
   ];
 
@@ -23,17 +25,20 @@ export async function getStaticPaths() {
         .filter((r) => r.data.etiketler.includes(etiket))
         .sort((a, b) => +b.data.yayin - +a.data.yayin),
       komutlar: komutlar.filter((k) => k.data.etiketler.includes(etiket)),
+      ipuclari: ipuclari
+        .filter((i) => i.data.etiketler.includes(etiket))
+        .sort((a, b) => a.data.populerlik - b.data.populerlik),
     },
   }));
 }
 
-const { etiket, yazilar, komutlar } = Astro.props;
-const toplam = yazilar.length + komutlar.length;
+const { etiket, yazilar, komutlar, ipuclari } = Astro.props;
+const toplam = yazilar.length + komutlar.length + ipuclari.length;
 ---
 
 <Base
   baslik={`#${etiket}`}
-  aciklama={`${etiket} etiketli ${toplam} içerik: ${yazilar.length} rehber, ${komutlar.length} komut.`}
+  aciklama={`${etiket} etiketli ${toplam} içerik: ${yazilar.length} rehber, ${ipuclari.length} ipucu, ${komutlar.length} komut.`}
   jsonLd={{
     '@context': 'https://schema.org',
     '@type': 'CollectionPage',
@@ -54,6 +59,7 @@ const toplam = yazilar.length + komutlar.length;
         <h1 style="font-family:var(--mono);font-size:30px;letter-spacing:-.02em">#{etiket}</h1>
         <div class="konu-sayac">
           {yazilar.length > 0 && <span><b>{yazilar.length}</b> rehber</span>}
+          {ipuclari.length > 0 && <span><b>{ipuclari.length}</b> ipucu</span>}
           {komutlar.length > 0 && <span><b>{komutlar.length}</b> komut</span>}
         </div>
       </div>
@@ -80,6 +86,27 @@ const toplam = yazilar.length + komutlar.length;
                 sure={r.data.sure}
                 etiketler={r.data.etiketler}
               />
+            ))}
+          </div>
+        </section>
+      )
+    }
+
+    {
+      ipuclari.length > 0 && (
+        <section class="bolum">
+          <div class="bolum-bas">
+            <div>
+              <h2>Hızlı ipuçları</h2>
+            </div>
+            <a href="/ipuclari">Tüm ipuçları →</a>
+          </div>
+          <div style="display:flex;flex-direction:column;gap:14px">
+            {ipuclari.map((i) => (
+              <a class="uclu-kart" href={`/ipuclari#${i.id}`} style="gap:8px">
+                <span class="etiket">{i.data.baslik}</span>
+                <p style="font-size:14px;color:var(--muted);line-height:1.6">{i.data.ozet}</p>
+              </a>
             ))}
           </div>
         </section>

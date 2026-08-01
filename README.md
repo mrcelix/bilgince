@@ -44,6 +44,13 @@ sayfası bunu belirten bir not gösterir.
 Markdown dosyaları `src/content/` altında. Şema `src/content.config.ts` içinde tanımlı;
 zorunlu bir alanı unutursanız derleme hata verir — bu kasıtlı.
 
+Koleksiyonlar: `rehberler` (uzun rehberler), `ipuclari` (tek ekranlık notlar),
+`komutlar` (komut kütüphanesi), `projeler` (portfolyo).
+
+Konu taksonomisi `src/site.js` içindeki `KONULAR` dizisinde; dört küme (`GRUPLAR`)
+altında 12 konu var ve mega menü bu diziden üretilir. Yeni konu eklemek için diziye
+bir satır eklemek yeterlidir — menü, konu sayfası ve OG kartı kendiliğinden oluşur.
+
 Yeni rehber: `src/content/rehberler/<slug>.md`
 
 ```yaml

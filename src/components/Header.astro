@@ -1,25 +1,37 @@
 ---
 import { getCollection } from 'astro:content';
-import { SITE, KONULAR, POPULER_ARAMALAR, sayi } from '../site.js';
+import KonuIkon from './KonuIkon.astro';
+import { SITE, KONULAR, GRUPLAR, POPULER_ARAMALAR, slugla, sayi } from '../site.js';
 
 const rehberler = (await getCollection('rehberler')).filter((r) => !r.data.taslak);
-const say = (slug: string) => rehberler.filter((r) => r.data.konu === slug).length;
-const komutSayisi = (await getCollection('komutlar')).length;
+const ipuclari = await getCollection('ipuclari');
+const komutlar = await getCollection('komutlar');
+
+const say = (slug: string) =>
+  rehberler.filter((r) => r.data.konu === slug).length +
+  ipuclari.filter((i) => i.data.konu === slug).length;
 
 const oneCikan =
   rehberler.find((r) => r.data.oneCikan) ??
-  rehberler.sort((a, b) => +b.data.yayin - +a.data.yayin)[0];
+  [...rehberler].sort((a, b) => +b.data.yayin - +a.data.yayin)[0];
+
+const seriler = [...new Set(rehberler.map((r) => r.data.seri).filter(Boolean))].map((ad) => {
+  const bolumler = rehberler.filter((r) => r.data.seri === ad);
+  const planlanan = Math.max(...bolumler.map((b) => b.data.seriSira ?? 0), bolumler.length);
+  return { ad: ad as string, yayinda: bolumler.length, planlanan };
+});
 
 const yol = Astro.url.pathname.replace(/\/$/, '') || '/';
 const etkin = (p: string) => (yol === p || yol.startsWith(p + '/') ? 'page' : undefined);
-
-const gruplar = [...new Set(KONULAR.map((k) => k.grup))];
 ---
 
 <div class="ust-serit">
   <div class="kap">
     <span class="sol">
-      <span class="canli"><i></i>{SITE.newsletter.cadence} · <b>{sayi(SITE.newsletter.subscribers)} abone</b></span>
+      <span class="canli"
+        ><i></i>{SITE.newsletter.cadence} · <b>{sayi(SITE.newsletter.subscribers)} abone</b></span
+      >
+      <span class="gizle-dar">{rehberler.length} rehber · {ipuclari.length} ipucu · {komutlar.length} komut</span>
     </span>
     <span class="sag">
       <a href="/rss.xml">RSS</a>
@@ -38,15 +50,22 @@ const gruplar = [...new Set(KONULAR.map((k) => k.grup))];
 
     <nav aria-label="Ana menü" style="display:contents">
       <ul class="gez">
-        <li class="gez-oge">
-          <button class="gez-bag" type="button" aria-expanded="false" aria-controls="mega-konular" data-mega>
+        <li>
+          <button class="gez-bag" type="button" aria-expanded="false" aria-controls="mega-konular" data-mega="konular">
             Konular
             <svg class="ok" width="11" height="11" viewBox="0 0 12 12" fill="none" aria-hidden="true"
               ><path d="M3 4.5L6 7.5L9 4.5" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"></path></svg
             >
           </button>
         </li>
-        <li><a class="gez-bag" href="/rehberler" aria-current={etkin('/rehberler')}>Rehberler</a></li>
+        <li>
+          <button class="gez-bag" type="button" aria-expanded="false" aria-controls="mega-kaynaklar" data-mega="kaynaklar">
+            Kaynaklar
+            <svg class="ok" width="11" height="11" viewBox="0 0 12 12" fill="none" aria-hidden="true"
+              ><path d="M3 4.5L6 7.5L9 4.5" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"></path></svg
+            >
+          </button>
+        </li>
         <li><a class="gez-bag" href="/portfolyo" aria-current={etkin('/portfolyo')}>Portfolyo</a></li>
         <li><a class="gez-bag" href="/ozgecmis" aria-current={etkin('/ozgecmis')}>Özgeçmiş</a></li>
         <li><a class="gez-bag" href="/hakkimda" aria-current={etkin('/hakkimda')}>Hakkımda</a></li>
@@ -72,75 +91,31 @@ const gruplar = [...new Set(KONULAR.map((k) => k.grup))];
     </button>
   </div>
 
-  <div class="mega" id="mega-konular" data-acik="hayir">
+  <!-- ------------------------------------------------ Konular mega menüsü -->
+  <div class="mega mega-konular" id="mega-konular" data-acik="hayir">
     <div class="kap">
       {
-        gruplar.map((grup) => (
+        GRUPLAR.map((grup) => (
           <div class="mega-sutun">
-            <span class="mega-etiket">{grup}</span>
-            {KONULAR.filter((k) => k.grup === grup).map((k) => (
+            <span class="mega-etiket">{grup.ad}</span>
+            <span class="mega-grup-ozet">{grup.ozet}</span>
+            {KONULAR.filter((k) => k.grup === grup.ad).map((k) => (
               <a class="mega-bag" href={`/konu/${k.slug}`}>
                 <span class="ikon" aria-hidden="true">
-                  <svg width="16" height="16" viewBox="0 0 18 18" fill="none">
-                    <rect x="2.5" y="2.5" width="13" height="13" rx="2.4" stroke="currentColor" stroke-width="1.5" />
-                    <path d="M5.5 9h7M5.5 6h7M5.5 12h4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" />
-                  </svg>
+                  <KonuIkon ad={k.ikon} />
                 </span>
                 <span>
-                  <span class="ad">{k.ad}</span>
-                  <span class="ac">
-                    {k.ozet} · {say(k.slug)} yazı
+                  <span class="ad">
+                    {k.ad}
+                    <span class="say">{say(k.slug)}</span>
                   </span>
+                  <span class="ac">{k.ozet}</span>
                 </span>
               </a>
             ))}
           </div>
         ))
       }
-
-      <div class="mega-sutun">
-        <span class="mega-etiket">Araçlar</span>
-        <a class="mega-bag" href="/komutlar">
-          <span class="ikon" aria-hidden="true">
-            <svg width="16" height="16" viewBox="0 0 18 18" fill="none"
-              ><path d="M4 6L7 9l-3 3M9.5 12h4.5" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"></path><rect
-                x="2.5"
-                y="2.5"
-                width="13"
-                height="13"
-                rx="2.4"
-                stroke="currentColor"
-                stroke-width="1.5"></rect></svg
-            >
-          </span>
-          <span>
-            <span class="ad">Komut kütüphanesi</span>
-            <span class="ac">{komutSayisi} denenmiş tek satır</span>
-          </span>
-        </a>
-        <a class="mega-bag" href="/ipuclari">
-          <span class="ikon" aria-hidden="true">
-            <svg width="16" height="16" viewBox="0 0 18 18" fill="none"
-              ><path d="M2.5 9.5l3 3 8-8" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"></path></svg
-            >
-          </span>
-          <span>
-            <span class="ad">Hızlı ipuçları</span>
-            <span class="ac">Tek ekranda biten notlar</span>
-          </span>
-        </a>
-        <a class="mega-bag" href="/rss.xml">
-          <span class="ikon" aria-hidden="true">
-            <svg width="16" height="16" viewBox="0 0 18 18" fill="none"
-              ><path d="M4 13.5h.01M4 9a5 5 0 015 5M4 4.5a9 9 0 019 9" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"></path></svg
-            >
-          </span>
-          <span>
-            <span class="ad">RSS akışı</span>
-            <span class="ac">Bültene alternatif</span>
-          </span>
-        </a>
-      </div>
 
       <div class="mega-tanitim">
         <span class="mega-etiket">Bu ayın rehberi</span>
@@ -157,11 +132,72 @@ const gruplar = [...new Set(KONULAR.map((k) => k.grup))];
         <span class="cipler">
           {POPULER_ARAMALAR.map((q) => <a href={`/ara?q=${encodeURIComponent(q)}`}>{q}</a>)}
         </span>
+        <a class="mega-tum" href="/rehberler">Tüm arşiv · {rehberler.length} rehber →</a>
+      </div>
+    </div>
+  </div>
+
+  <!-- ---------------------------------------------- Kaynaklar mega menüsü -->
+  <div class="mega mega-kaynaklar" id="mega-kaynaklar" data-acik="hayir">
+    <div class="kap">
+      <div class="mega-sutun">
+        <span class="mega-etiket">Araçlar</span>
+        <span class="mega-grup-ozet">Kopyala ve çalıştır</span>
+        <a class="mega-bag" href="/komutlar">
+          <span class="ikon" aria-hidden="true"><KonuIkon ad="terminal" /></span>
+          <span>
+            <span class="ad">Komut kütüphanesi<span class="say">{komutlar.length}</span></span>
+            <span class="ac">Denenmiş tek satırlar, uyarısıyla birlikte</span>
+          </span>
+        </a>
+        <a class="mega-bag" href="/ipuclari">
+          <span class="ikon" aria-hidden="true"><KonuIkon ad="pencere" /></span>
+          <span>
+            <span class="ad">Hızlı ipuçları<span class="say">{ipuclari.length}</span></span>
+            <span class="ac">Tek ekranda biten notlar</span>
+          </span>
+        </a>
+        <a class="mega-bag" href="/rss.xml">
+          <span class="ikon" aria-hidden="true"><KonuIkon ad="geri" /></span>
+          <span>
+            <span class="ad">RSS akışı</span>
+            <span class="ac">Bültene alternatif</span>
+          </span>
+        </a>
+      </div>
+
+      <div class="mega-sutun">
+        <span class="mega-etiket">Seriler</span>
+        <span class="mega-grup-ozet">Sırayla okunmak üzere</span>
+        {
+          seriler.map((s) => (
+            <a class="mega-seri" href={`/seri/${slugla(s.ad)}`}>
+              <span class="ad">{s.ad}</span>
+              <span class="ilerleme">
+                <span style={`width:${Math.round((s.yayinda / Math.max(s.planlanan, 1)) * 100)}%`} />
+              </span>
+              <span class="ac">
+                {s.planlanan} bölümün {s.yayinda} tanesi yayında
+              </span>
+            </a>
+          ))
+        }
+      </div>
+
+      <div class="mega-tanitim">
+        <span class="mega-etiket">Bülten</span>
+        <div class="mega-kart">
+          <h3>Her pazartesi bir teknik not</h3>
+          <span class="alt">{sayi(SITE.newsletter.subscribers)} abone · reklam yok</span>
+        </div>
+        <a class="dg" href="/#bulten">Bültene katıl</a>
+        <a class="mega-tum" href="/hakkimda">Bu site neden var? →</a>
       </div>
     </div>
   </div>
 </header>
 
+<!-- ------------------------------------------------------- mobil çekmece -->
 <div class="cekmece" id="cekmece" data-acik="hayir">
   <div class="cekmece-ust">
     <a class="logo" href="/"><span class="logo-mk" aria-hidden="true">bc</span>{SITE.name}</a>
@@ -173,27 +209,29 @@ const gruplar = [...new Set(KONULAR.map((k) => k.grup))];
   </div>
 
   <nav class="akordeon" aria-label="Mobil menü">
-    <details open>
-      <summary>
-        Konular
-        <svg class="ok" width="12" height="12" viewBox="0 0 12 12" fill="none" aria-hidden="true"
-          ><path d="M3 4.5L6 7.5L9 4.5" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"></path></svg
-        >
-      </summary>
-      <div class="alt-liste">
-        {
-          KONULAR.map((k) => (
-            <a href={`/konu/${k.slug}`}>
-              {k.ad}
-              <span class="say">{say(k.slug)}</span>
-            </a>
-          ))
-        }
-      </div>
-    </details>
-    <a href="/rehberler">Rehberler</a>
-    <a href="/komutlar">Komut kütüphanesi</a>
-    <a href="/ipuclari">Hızlı ipuçları</a>
+    {
+      GRUPLAR.map((grup, i) => (
+        <details open={i === 0}>
+          <summary>
+            {grup.ad}
+            <svg class="ok" width="12" height="12" viewBox="0 0 12 12" fill="none" aria-hidden="true">
+              <path d="M3 4.5L6 7.5L9 4.5" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" />
+            </svg>
+          </summary>
+          <div class="alt-liste">
+            {KONULAR.filter((k) => k.grup === grup.ad).map((k) => (
+              <a href={`/konu/${k.slug}`}>
+                {k.ad}
+                <span class="say">{say(k.slug)}</span>
+              </a>
+            ))}
+          </div>
+        </details>
+      ))
+    }
+    <a href="/rehberler">Tüm rehberler <span class="say">{rehberler.length}</span></a>
+    <a href="/komutlar">Komut kütüphanesi <span class="say">{komutlar.length}</span></a>
+    <a href="/ipuclari">Hızlı ipuçları <span class="say">{ipuclari.length}</span></a>
     <a href="/portfolyo">Portfolyo</a>
     <a href="/ozgecmis">Özgeçmiş</a>
     <a href="/hakkimda">Hakkımda</a>
@@ -207,30 +245,34 @@ const gruplar = [...new Set(KONULAR.map((k) => k.grup))];
 </div>
 
 <script>
-  const megaDugme = document.querySelector<HTMLButtonElement>('[data-mega]');
-  const mega = document.getElementById('mega-konular');
   const bas = document.querySelector('.bas');
+  const dugmeler = [...document.querySelectorAll<HTMLButtonElement>('[data-mega]')];
 
-  function megaAyarla(acik: boolean) {
-    if (!megaDugme || !mega) return;
-    megaDugme.setAttribute('aria-expanded', String(acik));
-    mega.dataset.acik = acik ? 'evet' : 'hayir';
+  function megaAyarla(hangi: string | null) {
+    dugmeler.forEach((d) => {
+      const acik = d.dataset.mega === hangi;
+      d.setAttribute('aria-expanded', String(acik));
+      const panel = document.getElementById(d.getAttribute('aria-controls') ?? '');
+      if (panel) panel.dataset.acik = acik ? 'evet' : 'hayir';
+    });
   }
 
-  megaDugme?.addEventListener('click', () => {
-    megaAyarla(megaDugme.getAttribute('aria-expanded') !== 'true');
+  dugmeler.forEach((d) => {
+    d.addEventListener('click', () =>
+      megaAyarla(d.getAttribute('aria-expanded') === 'true' ? null : (d.dataset.mega ?? null))
+    );
+    // fareyle üzerine gelince aç — mega menüde beklenen davranış
+    d.addEventListener('mouseenter', () => megaAyarla(d.dataset.mega ?? null));
+    d.addEventListener('focus', () => megaAyarla(d.dataset.mega ?? null));
   });
-  // fareyle üzerine gelince de açılsın — mega menüde beklenen davranış bu
-  megaDugme?.addEventListener('mouseenter', () => megaAyarla(true));
 
-  // fare menüden çıkınca kapat, dışarı tıklayınca kapat, Esc ile kapat
-  bas?.addEventListener('mouseleave', () => megaAyarla(false));
+  bas?.addEventListener('mouseleave', () => megaAyarla(null));
   document.addEventListener('click', (e) => {
-    if (!bas?.contains(e.target as Node)) megaAyarla(false);
+    if (!bas?.contains(e.target as Node)) megaAyarla(null);
   });
   document.addEventListener('keydown', (e) => {
     if (e.key === 'Escape') {
-      megaAyarla(false);
+      megaAyarla(null);
       cekmeceAyarla(false);
     }
   });
@@ -240,9 +282,9 @@ const gruplar = [...new Set(KONULAR.map((k) => k.grup))];
   let oncekiOdak: HTMLElement | null = null;
 
   function odaklanabilirler() {
-    return [
-      ...(cekmece?.querySelectorAll<HTMLElement>('a[href], button, summary, input') ?? []),
-    ].filter((e) => e.offsetParent !== null);
+    return [...(cekmece?.querySelectorAll<HTMLElement>('a[href], button, summary, input') ?? [])].filter(
+      (e) => e.offsetParent !== null
+    );
   }
 
   function cekmeceAyarla(acik: boolean) {
@@ -250,7 +292,6 @@ const gruplar = [...new Set(KONULAR.map((k) => k.grup))];
     cekmece.dataset.acik = acik ? 'evet' : 'hayir';
     acDugme?.setAttribute('aria-expanded', String(acik));
     document.documentElement.style.overflow = acik ? 'hidden' : '';
-
     if (acik) {
       oncekiOdak = document.activeElement as HTMLElement;
       odaklanabilirler()[0]?.focus();
@@ -260,12 +301,11 @@ const gruplar = [...new Set(KONULAR.map((k) => k.grup))];
     }
   }
 
-  // çekmece açıkken Tab dışarı kaçmasın
   cekmece?.addEventListener('keydown', (e) => {
     if (e.key !== 'Tab') return;
     const sira = odaklanabilirler();
-    if (sira.length === 0) return;
-    const ilk = sira[0];
+    if (!sira.length) return;
+    const [ilk] = sira;
     const son = sira[sira.length - 1];
     if (e.shiftKey && document.activeElement === ilk) {
       e.preventDefault();
