@@ -12,20 +12,20 @@ interface Props {
 const { href, baslik, ozet, tarih, sure, etiketler = [] } = Astro.props;
 ---
 
-<a class="satir" href={href}>
+<article class="satir">
   <span class="tarih">{trKisaTarih(tarih)}</span>
-  <span>
-    <h3>{baslik}</h3>
+  <div>
+    <h3><a href={href}>{baslik}</a></h3>
     <p>{ozet}</p>
     {
       etiketler.length > 0 && (
         <span class="yigin" style="margin-top:9px">
           {etiketler.map((e) => (
-            <span>{e}</span>
+            <a href={`/etiket/${e}`}>{e}</a>
           ))}
         </span>
       )
     }
-  </span>
+  </div>
   <span class="sure">{sure} dk</span>
-</a>
+</article>

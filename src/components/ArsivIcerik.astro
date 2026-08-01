@@ -1,0 +1,126 @@
+---
+import Satir from './Satir.astro';
+import Sayfalama from './Sayfalama.astro';
+import { KONULAR, slugla, trTarih } from '../site.js';
+import type { CollectionEntry } from 'astro:content';
+
+interface Props {
+  hepsi: CollectionEntry<'rehberler'>[];
+  dilim: CollectionEntry<'rehberler'>[];
+  simdiki: number;
+  toplamSayfa: number;
+}
+const { hepsi, dilim, simdiki, toplamSayfa } = Astro.props;
+
+const ortalama = Math.round(hepsi.reduce((t, r) => t + r.data.sure, 0) / hepsi.length);
+const seriler = [...new Set(hepsi.map((r) => r.data.seri).filter(Boolean))] as string[];
+const sonGuncelleme = hepsi.map((r) => r.data.guncelleme ?? r.data.yayin).sort((a, b) => +b - +a)[0];
+const etiketler = [...new Set(hepsi.flatMap((r) => r.data.etiketler))].sort((a, b) =>
+  a.localeCompare(b, 'tr')
+);
+---
+
+<div class="lavanta">
+  <div class="kap">
+    <nav class="kirinti" aria-label="Kırıntı yolu">
+      <a href="/">Ana sayfa</a><span class="ayrac">/</span>
+      {
+        simdiki === 1 ? (
+          <span aria-current="page">Rehberler</span>
+        ) : (
+          <>
+            <a href="/rehberler">Rehberler</a>
+            <span class="ayrac">/</span>
+            <span aria-current="page">Sayfa {simdiki}</span>
+          </>
+        )
+      }
+    </nav>
+    <div class="konu-bas" style="padding-top:8px">
+      <span class="etiket">Arşiv</span>
+      <h1>Tüm rehberler{simdiki > 1 ? ` — sayfa ${simdiki}` : ''}</h1>
+      <p class="ozet">
+        Her rehber tek bir görevi baştan sona bitirir. Komutlar üretim ortamında denendi ve her yazının
+        sonunda çalıştığını doğrulayacağınız bir adım var.
+      </p>
+      <div class="konu-sayac">
+        <span><b>{hepsi.length}</b> rehber</span>
+        <span><b>{seriler.length}</b> seri</span>
+        <span>Ortalama <b>{ortalama} dk</b> okuma</span>
+        <span>Son güncelleme <b>{trTarih(sonGuncelleme)}</b></span>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="suzgec">
+  <div class="kap">
+    <a class="cip" href="/rehberler" aria-current="page">Tümü <span style="opacity:.7">{hepsi.length}</span></a>
+    {
+      KONULAR.map((k) => {
+        const n = hepsi.filter((r) => r.data.konu === k.slug).length;
+        return n > 0 ? (
+          <a class="cip" href={`/konu/${k.slug}`}>
+            {k.ad} <span style="opacity:.6">{n}</span>
+          </a>
+        ) : null;
+      })
+    }
+  </div>
+</div>
+
+<div class="kap">
+  <div class="arsiv">
+    <div>
+      <div class="liste">
+        {
+          dilim.map((r) => (
+            <Satir
+              href={`/rehberler/${r.id}`}
+              baslik={r.data.baslik}
+              ozet={r.data.ozet}
+              tarih={r.data.yayin}
+              sure={r.data.sure}
+              etiketler={r.data.etiketler}
+            />
+          ))
+        }
+      </div>
+      <Sayfalama simdiki={simdiki} toplam={toplamSayfa} taban="/rehberler" />
+    </div>
+
+    <aside class="yan">
+      {
+        seriler.map((s) => {
+          const bolumler = hepsi.filter((r) => r.data.seri === s);
+          const planlanan = Math.max(...bolumler.map((b) => b.data.seriSira ?? 0), bolumler.length);
+          return (
+            <a class="seri-kutu" href={`/seri/${slugla(s)}`}>
+              <span class="yan-etiket">Seri</span>
+              <h3>{s}</h3>
+              <span class="ilerleme">
+                <span style={`width:${Math.round((bolumler.length / Math.max(planlanan, 1)) * 100)}%`} />
+              </span>
+              <span style="font-size:12px;color:var(--muted);font-weight:600">
+                {planlanan} bölümün {bolumler.length} tanesi yayında
+              </span>
+            </a>
+          );
+        })
+      }
+
+      <div class="yan-kutu">
+        <span class="yan-etiket">Etiketler</span>
+        <span class="yigin">
+          {etiketler.map((e) => <a href={`/etiket/${e}`}>{e}</a>)}
+        </span>
+      </div>
+
+      <div class="yan-tanitim">
+        <h3>Haftada bir teknik not</h3>
+        <p>Yeni rehberler ve komut kütüphanesi girdileri e-postayla.</p>
+        <a class="dg" href="/#bulten">Bültene katıl</a>
+      </div>
+    </aside>
+  </div>
+</div>

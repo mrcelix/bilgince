@@ -2,7 +2,7 @@
 import Base from '../../layouts/Base.astro';
 import Bulten from '../../components/Bulten.astro';
 import { getCollection, render } from 'astro:content';
-import { SITE, KONULAR, trTarih, sayi } from '../../site.js';
+import { SITE, KONULAR, slugla, trTarih, sayi } from '../../site.js';
 
 export async function getStaticPaths() {
   const rehberler = (await getCollection('rehberler'))
@@ -88,7 +88,19 @@ const h2ler = headings.filter((h) => h.depth === 2);
     </nav>
 
     <header class="yazi-bas">
-      <span class="etiket">{konu?.ad ?? d.konu}{d.seri ? ` · ${d.seri}` : ''}</span>
+      <span class="etiket">
+        <a href={`/konu/${d.konu}`}>{konu?.ad ?? d.konu}</a>{
+          d.seri && (
+            <>
+              {' · '}
+              <a href={`/seri/${slugla(d.seri)}`}>
+                {d.seri}
+                {d.seriSira ? ` · ${d.seriSira}. bölüm` : ''}
+              </a>
+            </>
+          )
+        }
+      </span>
       <h1>{d.baslik}</h1>
       <p class="ozet">{d.ozet}</p>
 
@@ -147,6 +159,17 @@ const h2ler = headings.filter((h) => h.depth === 2);
 
       <aside class="yan">
         {
+          d.seri && (
+            <a class="seri-kutu" href={`/seri/${slugla(d.seri)}`}>
+              <span class="yan-etiket">Bu yazı bir serinin parçası</span>
+              <h3>{d.seri}</h3>
+              <span style="font-size:12px;color:var(--muted);font-weight:600">
+                {d.seriSira ? `${d.seriSira}. bölümü okuyorsunuz` : 'Seriyi baştan gör'} →
+              </span>
+            </a>
+          )
+        }
+        {
           h2ler.length > 1 && (
             <nav class="icindekiler" aria-label="İçindekiler">
               <span class="yan-etiket">İçindekiler</span>
@@ -176,6 +199,19 @@ const h2ler = headings.filter((h) => h.depth === 2);
         }
       </aside>
     </div>
+
+    {
+      d.etiketler.length > 0 && (
+        <div class="etiket-satiri">
+          <span class="yan-etiket">Etiketler</span>
+          <span class="yigin">
+            {d.etiketler.map((e) => (
+              <a href={`/etiket/${e}`}>{e}</a>
+            ))}
+          </span>
+        </div>
+      )
+    }
 
     <section class="yazar-kutu">
       <span class="mk" aria-hidden="true">{SITE.author.initials}</span>

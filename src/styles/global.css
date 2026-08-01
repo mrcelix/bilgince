@@ -1582,8 +1582,18 @@ code {
   line-height: 1.5;
 }
 
+.etiket-satiri {
+  margin-top: 30px;
+  padding-top: 20px;
+  border-top: 1px solid var(--line);
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+
 .yazar-kutu {
-  margin-top: 34px;
+  margin-top: 24px;
   border: 1px solid var(--line);
   border-radius: var(--r-m);
   background: var(--paper);
@@ -1770,8 +1780,55 @@ code {
   padding-top: 4px;
   font-variant-numeric: tabular-nums;
 }
-.satir:hover h3 {
+.satir h3 a:hover {
   color: var(--indigo);
+}
+.yigin a {
+  font-family: var(--mono);
+  font-size: 10.5px;
+  color: var(--muted);
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  padding: 3px 7px;
+}
+.yigin a:hover {
+  color: var(--indigo);
+  border-color: var(--indigo);
+}
+
+.sayfalama {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  padding: 24px 0 4px;
+  flex-wrap: wrap;
+}
+.sayfalama a,
+.sayfalama span {
+  min-width: 36px;
+  height: 36px;
+  padding: 0 12px;
+  border-radius: var(--r-s);
+  border: 1px solid var(--line);
+  background: var(--paper);
+  display: grid;
+  place-items: center;
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+}
+.sayfalama a:hover {
+  color: var(--ink);
+  border-color: var(--muted);
+}
+.sayfalama [aria-current='page'] {
+  background: var(--indigo);
+  border-color: var(--indigo);
+  color: #fff;
+}
+.sayfalama .ileri {
+  margin-left: auto;
 }
 .seri-kutu {
   border: 1px solid var(--line);

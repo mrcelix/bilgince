@@ -1,0 +1,136 @@
+---
+import Base from '../../layouts/Base.astro';
+import { getCollection } from 'astro:content';
+import { SITE, KONULAR, slugla, trTarih } from '../../site.js';
+
+export async function getStaticPaths() {
+  const rehberler = (await getCollection('rehberler')).filter((r) => !r.data.taslak);
+  const adlar = [...new Set(rehberler.map((r) => r.data.seri).filter(Boolean))] as string[];
+
+  return adlar.map((ad) => ({
+    params: { seri: slugla(ad) },
+    props: {
+      ad,
+      bolumler: rehberler
+        .filter((r) => r.data.seri === ad)
+        .sort((a, b) => (a.data.seriSira ?? 99) - (b.data.seriSira ?? 99)),
+    },
+  }));
+}
+
+const { ad, bolumler } = Astro.props;
+const slug = slugla(ad);
+const konuAdi = (k: string) => KONULAR.find((x) => x.slug === k)?.ad ?? k;
+const enSon = bolumler.map((b) => b.data.guncelleme ?? b.data.yayin).sort((a, b) => +b - +a)[0];
+const toplamSure = bolumler.reduce((t, b) => t + b.data.sure, 0);
+// Sıra numarası dizideki en büyük değer; eksik bölümler bu sayıdan anlaşılıyor
+const planlanan = Math.max(...bolumler.map((b) => b.data.seriSira ?? 0), bolumler.length);
+---
+
+<Base
+  baslik={ad}
+  aciklama={`${ad} serisi: ${bolumler.length} bölüm yayında. Sırayla okunmak üzere yazıldı.`}
+  ogGorsel={`/og/seri-${slug}.png`}
+  jsonLd={[
+    {
+      '@context': 'https://schema.org',
+      '@type': 'ItemList',
+      name: ad,
+      url: `${SITE.url}/seri/${slug}`,
+      numberOfItems: bolumler.length,
+      itemListOrder: 'https://schema.org/ItemListOrderAscending',
+      itemListElement: bolumler.map((b, i) => ({
+        '@type': 'ListItem',
+        position: i + 1,
+        name: b.data.baslik,
+        url: `${SITE.url}/rehberler/${b.id}`,
+      })),
+    },
+    {
+      '@context': 'https://schema.org',
+      '@type': 'BreadcrumbList',
+      itemListElement: [
+        { '@type': 'ListItem', position: 1, name: 'Ana sayfa', item: SITE.url },
+        { '@type': 'ListItem', position: 2, name: 'Rehberler', item: `${SITE.url}/rehberler` },
+        { '@type': 'ListItem', position: 3, name: ad, item: `${SITE.url}/seri/${slug}` },
+      ],
+    },
+  ]}
+>
+  <div class="lavanta">
+    <div class="kap">
+      <nav class="kirinti" aria-label="Kırıntı yolu">
+        <a href="/">Ana sayfa</a><span class="ayrac">/</span>
+        <a href="/rehberler">Rehberler</a><span class="ayrac">/</span>
+        <span aria-current="page">{ad}</span>
+      </nav>
+      <div class="konu-bas" style="padding-top:8px">
+        <span class="etiket">Seri</span>
+        <h1>{ad}</h1>
+        <p class="ozet">
+          Bu yazılar sırayla okunmak üzere yazıldı. Her bölüm bir öncekinin bıraktığı yerden devam eder;
+          tek tek de okunabilir ama sıra takip edilirse boşluk kalmaz.
+        </p>
+        <div class="konu-sayac">
+          <span><b>{bolumler.length}</b> bölüm yayında</span>
+          {planlanan > bolumler.length && <span><b>{planlanan - bolumler.length}</b> bölüm hazırlanıyor</span>}
+          <span>Toplam <b>{toplamSure} dk</b> okuma</span>
+          <span>Son güncelleme <b>{trTarih(enSon)}</b></span>
+        </div>
+        <span class="ilerleme" style="max-width:340px;margin-top:18px">
+          <span style={`width:${Math.round((bolumler.length / Math.max(planlanan, 1)) * 100)}%`}></span>
+        </span>
+      </div>
+    </div>
+  </div>
+
+  <div class="kap">
+    <section class="asamalar" style="margin-top:30px">
+      <span class="yan-etiket">Bölümler</span>
+      {
+        bolumler.map((b, i) => (
+          <a class="asama" href={`/rehberler/${b.id}`}>
+            <span class="no">{b.data.seriSira ?? i + 1}</span>
+            <div>
+              <span class="ad">{b.data.baslik}</span>
+              <span class="ac">{b.data.ozet}</span>
+            </div>
+            <span class="zaman">{b.data.sure} dk</span>
+          </a>
+        ))
+      }
+    </section>
+
+    {
+      planlanan > bolumler.length && (
+        <div class="bulunamadi" style="margin-top:22px">
+          <div>
+            <h2>Kalan bölümler yolda</h2>
+            <p>
+              Yayınlandığında haber vermemi isterseniz bültene katılın — seri bitene kadar her bölüm
+              e-postayla gider.
+            </p>
+          </div>
+          <a class="dg" href="/#bulten">
+            Bültene katıl
+          </a>
+        </div>
+      )
+    }
+
+    <section class="bolum">
+      <div class="bolum-bas">
+        <div>
+          <h2>Serideki konular</h2>
+        </div>
+      </div>
+      <span class="cipler">
+        {
+          [...new Set(bolumler.map((b) => b.data.konu))].map((k) => (
+            <a href={`/konu/${k}`}>{konuAdi(k)}</a>
+          ))
+        }
+      </span>
+    </section>
+  </div>
+</Base>

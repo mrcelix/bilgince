@@ -4,7 +4,7 @@ import satori from 'satori';
 import sharp from 'sharp';
 import fs from 'node:fs/promises';
 import path from 'node:path';
-import { SITE, KONULAR } from '../../site.js';
+import { SITE, KONULAR, slugla } from '../../site.js';
 
 /* --------------------------------------------------------------------------
    1200×630 paylaşım kartı. Yazı tipi TTF/WOFF olmak zorunda (satori woff2
@@ -56,10 +56,11 @@ function kart({ ust, baslik, alt }: { ust: string; baslik: string; alt: string }
             fontSize: 24,
             fontWeight: 800,
             letterSpacing: '0.12em',
-            textTransform: 'uppercase',
             color: '#AEB7FF',
           },
-          ust
+          // satori'nin textTransform'u Türkçe'yi bilmez: "Seri" → "SERI" olurdu.
+          // Büyütmeyi burada Türkçe kurallarıyla yapıyoruz ("SERİ").
+          ust.toLocaleUpperCase('tr')
         ),
         e(
           'div',
@@ -101,7 +102,10 @@ function kart({ ust, baslik, alt }: { ust: string; baslik: string; alt: string }
 export async function getStaticPaths() {
   const rehberler = (await getCollection('rehberler')).filter((r) => !r.data.taslak);
   const projeler = await getCollection('projeler');
+  const komutlar = await getCollection('komutlar');
   const konuAdi = (slug: string) => KONULAR.find((k) => k.slug === slug)?.ad ?? slug;
+  const alanAdi = SITE.url.replace('https://', '');
+  const seriler = [...new Set(rehberler.map((r) => r.data.seri).filter(Boolean))] as string[];
 
   return [
     {
@@ -109,7 +113,7 @@ export async function getStaticPaths() {
       props: {
         ust: 'BT rehberleri ve saha ipuçları',
         baslik: 'Üretim ortamında denenmiş teknik rehberler',
-        alt: `· ${SITE.url.replace('https://', '')}`,
+        alt: `· ${alanAdi}`,
       },
     },
     ...rehberler.map((r) => ({
@@ -117,17 +121,65 @@ export async function getStaticPaths() {
       props: {
         ust: `Rehber · ${konuAdi(r.data.konu)}`,
         baslik: r.data.baslik,
-        alt: `· ${SITE.url.replace('https://', '')} · ${r.data.sure} dk`,
+        alt: `· ${alanAdi} · ${r.data.sure} dk`,
       },
     })),
     ...projeler.map((p) => ({
       params: { slug: `proje-${p.id}` },
+      props: { ust: `Proje · ${p.data.yil}`, baslik: p.data.baslik, alt: `· ${alanAdi}` },
+    })),
+    ...KONULAR.map((k) => ({
+      params: { slug: `konu-${k.slug}` },
       props: {
-        ust: `Proje · ${p.data.yil}`,
-        baslik: p.data.baslik,
-        alt: `· ${SITE.url.replace('https://', '')}`,
+        ust: 'Konu',
+        baslik: k.ad,
+        alt: `· ${alanAdi} · ${rehberler.filter((r) => r.data.konu === k.slug).length} rehber`,
       },
     })),
+    ...seriler.map((s) => ({
+      params: { slug: `seri-${slugla(s)}` },
+      props: {
+        ust: 'Seri',
+        baslik: s,
+        alt: `· ${alanAdi} · ${rehberler.filter((r) => r.data.seri === s).length} bölüm`,
+      },
+    })),
+    {
+      params: { slug: 'sayfa-rehberler' },
+      props: { ust: 'Arşiv', baslik: 'Tüm rehberler', alt: `· ${alanAdi} · ${rehberler.length} yazı` },
+    },
+    {
+      params: { slug: 'sayfa-komutlar' },
+      props: {
+        ust: 'Araçlar',
+        baslik: 'Komut kütüphanesi',
+        alt: `· ${alanAdi} · ${komutlar.length} komut`,
+      },
+    },
+    {
+      params: { slug: 'sayfa-portfolyo' },
+      props: { ust: 'Portfolyo', baslik: 'Ölçülebilir sonuçla kapanan projeler', alt: `· ${alanAdi}` },
+    },
+    {
+      params: { slug: 'sayfa-hakkimda' },
+      props: {
+        ust: 'Hakkımda',
+        baslik: 'Sunucu odasında öğrendiklerimi saklamıyorum',
+        alt: `· ${alanAdi}`,
+      },
+    },
+    {
+      params: { slug: 'sayfa-ozgecmis' },
+      props: {
+        ust: `Özgeçmiş · ${SITE.author.jobTitle}`,
+        baslik: SITE.author.name,
+        alt: `· ${alanAdi} · 12 yıl saha`,
+      },
+    },
+    {
+      params: { slug: 'sayfa-ipuclari' },
+      props: { ust: 'İpuçları', baslik: 'Tek ekranda biten teknik notlar', alt: `· ${alanAdi}` },
+    },
   ];
 }
 

@@ -57,6 +57,30 @@ export const POPULER_ARAMALAR = [
   'GPO yedekleme',
 ];
 
+// Arşiv sayfası başına yazı sayısı. İçerik büyüdükçe yükseltin.
+export const SAYFA_BASI = 4;
+
+/**
+ * Türkçe karakterleri koruyarak URL parçası üretir.
+ * "Sıfırdan Active Directory" → "sifirdan-active-directory"
+ * @param {string} metin
+ */
+export function slugla(metin) {
+  // Türkçe harfleri KÜÇÜLTMEDEN ÖNCE çevir: 'I' Türkçe kurallarla 'ı' olur ve
+  // sonraki filtrede elenir — "Entra ID" → "entra d" gibi bir sonuç çıkardı.
+  const harita = {
+    ç: 'c', Ç: 'c', ğ: 'g', Ğ: 'g', ı: 'i', I: 'i', İ: 'i',
+    ö: 'o', Ö: 'o', ş: 's', Ş: 's', ü: 'u', Ü: 'u',
+  };
+  return metin
+    .replace(/[çÇğĞıIİöÖşŞüÜ]/g, (h) => harita[h] ?? h)
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/[̀-ͯ]/g, '')
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '');
+}
+
 /** @param {Date} d */
 export function trTarih(d) {
   return new Intl.DateTimeFormat('tr-TR', { day: 'numeric', month: 'long', year: 'numeric' }).format(d);

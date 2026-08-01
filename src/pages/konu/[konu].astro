@@ -2,7 +2,7 @@
 import Base from '../../layouts/Base.astro';
 import Satir from '../../components/Satir.astro';
 import { getCollection } from 'astro:content';
-import { KONULAR, SITE, trTarih } from '../../site.js';
+import { KONULAR, SITE, slugla, trTarih } from '../../site.js';
 
 export async function getStaticPaths() {
   const rehberler = (await getCollection('rehberler')).filter((r) => !r.data.taslak);
@@ -31,6 +31,7 @@ const sonGuncelleme = yazilar.length
 <Base
   baslik={konu.ad}
   aciklama={`${konu.ad} üzerine ${yazilar.length} rehber: ${konu.ozet}. Hepsi üretim ortamında denendi.`}
+  ogGorsel={`/og/konu-${konu.slug}.png`}
   jsonLd={[
     {
       '@context': 'https://schema.org',
@@ -111,7 +112,7 @@ const sonGuncelleme = yazilar.length
       <aside class="yan">
         {
           seriler.map((s) => (
-            <div class="seri-kutu">
+            <a class="seri-kutu" href={`/seri/${slugla(s)}`}>
               <span class="yan-etiket">Bu konudaki seri</span>
               <h3>{s}</h3>
               <span class="ilerleme">
@@ -120,7 +121,7 @@ const sonGuncelleme = yazilar.length
               <span style="font-size:12px;color:var(--muted);font-weight:600">
                 {yazilar.filter((r) => r.data.seri === s).length} bölüm yayında
               </span>
-            </div>
+            </a>
           ))
         }
         {
@@ -129,7 +130,7 @@ const sonGuncelleme = yazilar.length
               <span class="yan-etiket">Etiketler</span>
               <span class="yigin">
                 {etiketler.map((e) => (
-                  <span>{e}</span>
+                  <a href={`/etiket/${e}`}>{e}</a>
                 ))}
               </span>
             </div>

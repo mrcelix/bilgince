@@ -9,6 +9,8 @@ npm install
 npm run dev        # http://localhost:4321
 npm run build      # dist/ üretir + Pagefind arama dizinini kurar
 npm run preview    # derlenmiş çıktıyı yerel olarak sunar
+
+npm run baglanti-kontrol   # dist/ içindeki kırık iç bağlantıları listeler (build sonrası)
 ```
 
 Arama (Pagefind) yalnızca `npm run build` sonrası çalışır; `npm run dev` sırasında `/ara`
@@ -21,7 +23,10 @@ sayfası bunu belirten bir not gösterir.
 | `/` | `src/pages/index.astro` | Hero, güven şeridi, öne çıkanlar, günün ipucu, son rehberler, portfolyo, bülten |
 | `/rehberler` | `src/pages/rehberler/index.astro` | Tüm rehberlerin arşivi |
 | `/rehberler/<slug>` | `src/pages/rehberler/[...slug].astro` | Yazı detayı: içindekiler, okuma çubuğu, önceki/sonraki |
+| `/rehberler/sayfa/<n>` | `src/pages/rehberler/sayfa/[sayfa].astro` | Arşivin 2. ve sonraki sayfaları (`SAYFA_BASI`, `src/site.js`) |
 | `/konu/<slug>` | `src/pages/konu/[konu].astro` | Konu arşivi ve seri ilerlemesi |
+| `/seri/<slug>` | `src/pages/seri/[seri].astro` | Serinin bölümleri sırayla, `ItemList` şemasıyla |
+| `/etiket/<slug>` | `src/pages/etiket/[etiket].astro` | Etiketin geçtiği rehberler ve komutlar |
 | `/ipuclari` | `src/pages/ipuclari/index.astro` | Hızlı ipuçları |
 | `/komutlar` | `src/pages/komutlar.astro` | Komut kütüphanesi: konuya göre süzme, metin arama, kopyala düğmesi |
 | `/ozgecmis/yazdir` | `src/pages/ozgecmis/yazdir.astro` | Yazdırma düzeni — tarayıcıdan "PDF olarak kaydet" |

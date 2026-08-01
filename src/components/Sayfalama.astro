@@ -1,0 +1,37 @@
+---
+interface Props {
+  simdiki: number;
+  toplam: number;
+  /** sayfa 1 için taban adres, sonraki sayfalar <taban>/sayfa/<n> */
+  taban: string;
+}
+const { simdiki, toplam, taban } = Astro.props;
+const adres = (n: number) => (n === 1 ? taban : `${taban}/sayfa/${n}`);
+const sayfalar = Array.from({ length: toplam }, (_, i) => i + 1);
+---
+
+{
+  toplam > 1 && (
+    <nav class="sayfalama" aria-label="Sayfalar">
+      {simdiki > 1 && (
+        <a href={adres(simdiki - 1)} rel="prev" aria-label="Önceki sayfa">
+          ← Önceki
+        </a>
+      )}
+      {sayfalar.map((n) =>
+        n === simdiki ? (
+          <span aria-current="page">{n}</span>
+        ) : (
+          <a href={adres(n)} aria-label={`Sayfa ${n}`}>
+            {n}
+          </a>
+        )
+      )}
+      {simdiki < toplam && (
+        <a class="ileri" href={adres(simdiki + 1)} rel="next" aria-label="Sonraki sayfa">
+          Sonraki →
+        </a>
+      )}
+    </nav>
+  )
+}

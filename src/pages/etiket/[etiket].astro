@@ -1,0 +1,111 @@
+---
+import Base from '../../layouts/Base.astro';
+import Satir from '../../components/Satir.astro';
+import { getCollection } from 'astro:content';
+import { SITE } from '../../site.js';
+
+export async function getStaticPaths() {
+  const rehberler = (await getCollection('rehberler')).filter((r) => !r.data.taslak);
+  const komutlar = await getCollection('komutlar');
+
+  const etiketler = [
+    ...new Set([
+      ...rehberler.flatMap((r) => r.data.etiketler),
+      ...komutlar.flatMap((k) => k.data.etiketler),
+    ]),
+  ];
+
+  return etiketler.map((etiket) => ({
+    params: { etiket },
+    props: {
+      etiket,
+      yazilar: rehberler
+        .filter((r) => r.data.etiketler.includes(etiket))
+        .sort((a, b) => +b.data.yayin - +a.data.yayin),
+      komutlar: komutlar.filter((k) => k.data.etiketler.includes(etiket)),
+    },
+  }));
+}
+
+const { etiket, yazilar, komutlar } = Astro.props;
+const toplam = yazilar.length + komutlar.length;
+---
+
+<Base
+  baslik={`#${etiket}`}
+  aciklama={`${etiket} etiketli ${toplam} içerik: ${yazilar.length} rehber, ${komutlar.length} komut.`}
+  jsonLd={{
+    '@context': 'https://schema.org',
+    '@type': 'CollectionPage',
+    name: etiket,
+    url: `${SITE.url}/etiket/${etiket}`,
+    numberOfItems: toplam,
+  }}
+>
+  <div class="lavanta">
+    <div class="kap">
+      <nav class="kirinti" aria-label="Kırıntı yolu">
+        <a href="/">Ana sayfa</a><span class="ayrac">/</span>
+        <a href="/rehberler">Rehberler</a><span class="ayrac">/</span>
+        <span aria-current="page">{etiket}</span>
+      </nav>
+      <div class="konu-bas" style="padding-top:8px">
+        <span class="etiket">Etiket</span>
+        <h1 style="font-family:var(--mono);font-size:30px;letter-spacing:-.02em">#{etiket}</h1>
+        <div class="konu-sayac">
+          {yazilar.length > 0 && <span><b>{yazilar.length}</b> rehber</span>}
+          {komutlar.length > 0 && <span><b>{komutlar.length}</b> komut</span>}
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="kap">
+    {
+      yazilar.length > 0 && (
+        <section class="bolum">
+          <div class="bolum-bas">
+            <div>
+              <h2>Rehberler</h2>
+            </div>
+            <a href="/rehberler">Tüm rehberler →</a>
+          </div>
+          <div class="liste">
+            {yazilar.map((r) => (
+              <Satir
+                href={`/rehberler/${r.id}`}
+                baslik={r.data.baslik}
+                ozet={r.data.ozet}
+                tarih={r.data.yayin}
+                sure={r.data.sure}
+                etiketler={r.data.etiketler}
+              />
+            ))}
+          </div>
+        </section>
+      )
+    }
+
+    {
+      komutlar.length > 0 && (
+        <section class="bolum">
+          <div class="bolum-bas">
+            <div>
+              <h2>Komutlar</h2>
+            </div>
+            <a href="/komutlar">Komut kütüphanesi →</a>
+          </div>
+          <div style="display:flex;flex-direction:column;gap:16px">
+            {komutlar.map((k) => (
+              <a class="uclu-kart" href="/komutlar" style="gap:10px">
+                <span class="etiket">{k.data.baslik}</span>
+                <p style="font-size:14px;color:var(--muted);line-height:1.6">{k.data.ozet}</p>
+                <pre class="kod" style="font-size:11.5px"><code>{k.data.kod.trim().split('\n')[0]}</code></pre>
+              </a>
+            ))}
+          </div>
+        </section>
+      )
+    }
+  </div>
+</Base>

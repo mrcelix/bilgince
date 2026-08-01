@@ -237,13 +237,44 @@ const gruplar = [...new Set(KONULAR.map((k) => k.grup))];
 
   const cekmece = document.getElementById('cekmece');
   const acDugme = document.querySelector<HTMLButtonElement>('[data-cekmece-ac]');
+  let oncekiOdak: HTMLElement | null = null;
+
+  function odaklanabilirler() {
+    return [
+      ...(cekmece?.querySelectorAll<HTMLElement>('a[href], button, summary, input') ?? []),
+    ].filter((e) => e.offsetParent !== null);
+  }
 
   function cekmeceAyarla(acik: boolean) {
     if (!cekmece) return;
     cekmece.dataset.acik = acik ? 'evet' : 'hayir';
     acDugme?.setAttribute('aria-expanded', String(acik));
     document.documentElement.style.overflow = acik ? 'hidden' : '';
+
+    if (acik) {
+      oncekiOdak = document.activeElement as HTMLElement;
+      odaklanabilirler()[0]?.focus();
+    } else {
+      oncekiOdak?.focus();
+      oncekiOdak = null;
+    }
   }
+
+  // çekmece açıkken Tab dışarı kaçmasın
+  cekmece?.addEventListener('keydown', (e) => {
+    if (e.key !== 'Tab') return;
+    const sira = odaklanabilirler();
+    if (sira.length === 0) return;
+    const ilk = sira[0];
+    const son = sira[sira.length - 1];
+    if (e.shiftKey && document.activeElement === ilk) {
+      e.preventDefault();
+      son.focus();
+    } else if (!e.shiftKey && document.activeElement === son) {
+      e.preventDefault();
+      ilk.focus();
+    }
+  });
 
   acDugme?.addEventListener('click', () => cekmeceAyarla(true));
   document.querySelector('[data-cekmece-kapat]')?.addEventListener('click', () => cekmeceAyarla(false));

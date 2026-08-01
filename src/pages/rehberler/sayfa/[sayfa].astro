@@ -1,0 +1,45 @@
+---
+import Base from '../../../layouts/Base.astro';
+import ArsivIcerik from '../../../components/ArsivIcerik.astro';
+import { getCollection } from 'astro:content';
+import { SITE, SAYFA_BASI } from '../../../site.js';
+
+export async function getStaticPaths() {
+  const hepsi = (await getCollection('rehberler'))
+    .filter((r) => !r.data.taslak)
+    .sort((a, b) => +b.data.yayin - +a.data.yayin);
+
+  const toplamSayfa = Math.ceil(hepsi.length / SAYFA_BASI);
+
+  // 1. sayfa /rehberler adresinde duruyor; burada yalnızca 2 ve sonrası üretilir
+  return Array.from({ length: Math.max(0, toplamSayfa - 1) }, (_, i) => {
+    const sayfa = i + 2;
+    return {
+      params: { sayfa: String(sayfa) },
+      props: {
+        hepsi,
+        dilim: hepsi.slice((sayfa - 1) * SAYFA_BASI, sayfa * SAYFA_BASI),
+        simdiki: sayfa,
+        toplamSayfa,
+      },
+    };
+  });
+}
+
+const { hepsi, dilim, simdiki, toplamSayfa } = Astro.props;
+---
+
+<Base
+  baslik={`Tüm rehberler — sayfa ${simdiki}`}
+  aciklama={`Rehber arşivinin ${simdiki}. sayfası. Toplam ${hepsi.length} rehber.`}
+  ogGorsel="/og/sayfa-rehberler.png"
+  jsonLd={{
+    '@context': 'https://schema.org',
+    '@type': 'CollectionPage',
+    name: `Tüm rehberler — sayfa ${simdiki}`,
+    url: `${SITE.url}/rehberler/sayfa/${simdiki}`,
+    numberOfItems: dilim.length,
+  }}
+>
+  <ArsivIcerik hepsi={hepsi} dilim={dilim} simdiki={simdiki} toplamSayfa={toplamSayfa} />
+</Base>
