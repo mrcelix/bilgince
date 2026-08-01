@@ -1,0 +1,290 @@
+---
+// Yazdırılabilir özgeçmiş. Tarayıcının "PDF olarak kaydet" seçeneği metin katmanı
+// olan, aranabilir bir PDF üretir — taranmış görüntüden farklı olarak indekslenebilir.
+// İçerik src/cv.js'ten gelir, yani sitedeki özgeçmişle asla ayrışmaz.
+import '../../styles/global.css';
+import { SITE } from '../../site.js';
+import { DENEYIM, SERTIFIKALAR } from '../../cv.js';
+---
+
+<!doctype html>
+<html lang={SITE.lang}>
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>{SITE.author.name} — Özgeçmiş</title>
+    <meta name="description" content={`${SITE.author.name}, ${SITE.author.jobTitle}. Özgeçmiş.`} />
+    <meta name="robots" content="noindex, follow" />
+    <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
+    <link rel="preload" href="/fonts/nunito-latin.woff2" as="font" type="font/woff2" crossorigin />
+    <link rel="preload" href="/fonts/nunito-latin-ext.woff2" as="font" type="font/woff2" crossorigin />
+  </head>
+
+  <body class="yazdir-govde">
+    <div class="yazdir-cubuk">
+      <span>Tarayıcınızın yazdırma penceresinden <strong>"Hedef: PDF olarak kaydet"</strong> seçin.</span>
+      <span style="display:flex;gap:10px">
+        <button class="dg" type="button" id="yazdir-dugme">Yazdır / PDF kaydet</button>
+        <a class="dg dg-hayalet" href="/ozgecmis">Siteye dön</a>
+      </span>
+    </div>
+
+    <main class="sayfa">
+      <header class="cv-bas">
+        <div>
+          <h1>{SITE.author.name}</h1>
+          <p class="unvan-satiri">{SITE.author.jobTitle} · {SITE.author.location}</p>
+        </div>
+        <ul class="iletisim">
+          <li>{SITE.author.email}</li>
+          <li>{SITE.url.replace('https://', '')}</li>
+          <li>{SITE.author.linkedin.replace('https://www.', '')}</li>
+        </ul>
+      </header>
+
+      <section>
+        <h2>Özet</h2>
+        <p class="ozet-metin">
+          12 yıllık sistem yöneticisi. Windows Server, Active Directory ve hibrit kimlik altyapılarında
+          göç, otomasyon ve süreklilik projeleri yürütüyor. Dağınık altyapıları envanterleyip
+          belgelemek, tekrar eden işleri script'e çevirmek ve kesintisiz geçiş planlamak üzerine
+          uzmanlaşmış.
+        </p>
+      </section>
+
+      <section>
+        <h2>Deneyim</h2>
+        {
+          DENEYIM.map((d) => (
+            <article class="gorev-blok">
+              <div class="gorev-ust">
+                <span class="gorev-ad">{d.gorev}</span>
+                <span class="gorev-zaman">{d.tarih}</span>
+              </div>
+              <div class="gorev-ust">
+                <span class="gorev-kurum">{d.kurum}</span>
+                <span class="gorev-yer">{d.yer}</span>
+              </div>
+              <p class="gorev-metin">{d.aciklama}</p>
+            </article>
+          ))
+        }
+      </section>
+
+      <section class="ikili">
+        <div>
+          <h2>Yetkinlikler</h2>
+          <ul class="madde">
+            {SITE.author.knowsAbout.map((y) => <li>{y}</li>)}
+          </ul>
+        </div>
+        <div>
+          <h2>Sertifikalar</h2>
+          <ul class="madde">
+            {
+              SERTIFIKALAR.map((s) => (
+                <li>
+                  {s.ad} <span class="yil-notu">· {s.kurum}, {s.yil}</span>
+                </li>
+              ))
+            }
+          </ul>
+        </div>
+      </section>
+
+      <footer class="cv-alt">
+        Bu özgeçmişin güncel sürümü: {SITE.url.replace('https://', '')}/ozgecmis
+      </footer>
+    </main>
+
+    <script is:inline>
+      document.getElementById('yazdir-dugme').addEventListener('click', () => window.print());
+      if (new URLSearchParams(location.search).has('yazdir')) window.addEventListener('load', () => window.print());
+    </script>
+  </body>
+</html>
+
+<style>
+  .yazdir-govde {
+    background: var(--bg);
+  }
+  .yazdir-cubuk {
+    background: var(--navy);
+    color: #b4bdd1;
+    font-size: 13px;
+    padding: 14px 28px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 20px;
+    flex-wrap: wrap;
+  }
+  .yazdir-cubuk strong {
+    color: #fff;
+  }
+
+  .sayfa {
+    max-width: 780px;
+    margin: 28px auto;
+    background: var(--paper);
+    border: 1px solid var(--line);
+    border-radius: var(--r-m);
+    padding: 46px 52px 40px;
+  }
+
+  .cv-bas {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    gap: 30px;
+    padding-bottom: 18px;
+    border-bottom: 2px solid var(--indigo);
+  }
+  .cv-bas h1 {
+    font-size: 32px;
+    font-weight: 900;
+    letter-spacing: -0.035em;
+  }
+  .unvan-satiri {
+    font-size: 15px;
+    color: var(--muted);
+    font-weight: 600;
+    margin-top: 4px;
+  }
+  .iletisim {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    text-align: right;
+    font-size: 12.5px;
+    color: var(--muted);
+    line-height: 1.75;
+  }
+
+  .sayfa section {
+    margin-top: 26px;
+  }
+  .sayfa h2 {
+    font-size: 11.5px;
+    font-weight: 800;
+    letter-spacing: 0.16em;
+    text-transform: uppercase;
+    color: var(--indigo);
+    margin-bottom: 12px;
+  }
+  .ozet-metin {
+    font-size: 14px;
+    line-height: 1.65;
+    color: var(--ink-soft);
+  }
+
+  .gorev-blok {
+    padding-bottom: 16px;
+  }
+  .gorev-blok + .gorev-blok {
+    border-top: 1px solid var(--line);
+    padding-top: 16px;
+  }
+  .gorev-ust {
+    display: flex;
+    justify-content: space-between;
+    gap: 20px;
+    align-items: baseline;
+  }
+  .gorev-ad {
+    font-size: 16px;
+    font-weight: 800;
+    letter-spacing: -0.02em;
+  }
+  .gorev-zaman {
+    font-size: 12.5px;
+    color: var(--muted);
+    font-variant-numeric: tabular-nums;
+    white-space: nowrap;
+  }
+  .gorev-kurum {
+    font-size: 13.5px;
+    color: var(--indigo);
+    font-weight: 700;
+  }
+  .gorev-yer {
+    font-size: 12.5px;
+    color: var(--muted);
+  }
+  .gorev-metin {
+    font-size: 13.5px;
+    line-height: 1.6;
+    color: var(--ink-soft);
+    margin-top: 7px;
+  }
+
+  .ikili {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 34px;
+  }
+  .madde {
+    margin: 0;
+    padding-left: 18px;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+  }
+  .madde li {
+    font-size: 13.5px;
+    color: var(--ink-soft);
+    line-height: 1.5;
+  }
+  .madde li::marker {
+    color: var(--indigo);
+  }
+  .yil-notu {
+    color: var(--muted);
+    font-size: 12.5px;
+  }
+
+  .cv-alt {
+    margin-top: 30px;
+    padding-top: 14px;
+    border-top: 1px solid var(--line);
+    font-size: 11.5px;
+    color: var(--muted);
+  }
+
+  @media print {
+    .yazdir-cubuk {
+      display: none;
+    }
+    .yazdir-govde {
+      background: #fff;
+    }
+    .sayfa {
+      margin: 0;
+      max-width: none;
+      border: 0;
+      border-radius: 0;
+      padding: 0;
+    }
+    .gorev-blok {
+      break-inside: avoid;
+    }
+    @page {
+      margin: 18mm 16mm;
+    }
+  }
+
+  @media (max-width: 700px) {
+    .sayfa {
+      padding: 28px 22px;
+      margin: 18px 14px;
+    }
+    .cv-bas,
+    .ikili {
+      grid-template-columns: 1fr;
+      flex-direction: column;
+    }
+    .iletisim {
+      text-align: left;
+    }
+  }
+</style>

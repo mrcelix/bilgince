@@ -1,0 +1,83 @@
+---
+import Base from '../layouts/Base.astro';
+import { POPULER_ARAMALAR } from '../site.js';
+---
+
+<Base
+  baslik="Ara"
+  aciklama="Rehberler, hızlı ipuçları ve projeler içinde arama yapın."
+  noindex={true}
+  aramaya={false}
+>
+  <link rel="stylesheet" href="/pagefind/pagefind-ui.css" />
+
+  <div class="arama-bas">
+    <div class="kap">
+      <nav class="kirinti" aria-label="Kırıntı yolu" style="padding-top:0">
+        <a href="/">Ana sayfa</a><span class="ayrac">/</span><span aria-current="page">Ara</span>
+      </nav>
+      <h1>Arama</h1>
+      <p style="color:var(--muted);font-size:14px;margin-top:8px">
+        Rehberler, hızlı ipuçları ve proje sayfaları taranır.
+      </p>
+    </div>
+  </div>
+
+  <div class="kap">
+    <div id="arama" style="padding-top:24px"></div>
+
+    <div class="bulunamadi">
+      <div>
+        <h2>Aradığınızı bulamadınız mı?</h2>
+        <p>Konuyu yazın — sık gelen sorular yeni rehberlere dönüşüyor. Son üç rehber böyle çıktı.</p>
+      </div>
+      <a class="dg" href="/hakkimda#iletisim">Konu öner</a>
+    </div>
+
+    <section class="bolum">
+      <div class="bolum-bas"><div><h2>Popüler aramalar</h2></div></div>
+      <span class="cipler">
+        {POPULER_ARAMALAR.map((q) => <a href={`/ara?q=${encodeURIComponent(q)}`}>{q}</a>)}
+      </span>
+    </section>
+  </div>
+
+  <script is:inline src="/pagefind/pagefind-ui.js"></script>
+  <script is:inline>
+    window.addEventListener('DOMContentLoaded', () => {
+      if (typeof PagefindUI === 'undefined') {
+        document.getElementById('arama').innerHTML =
+          '<p style="color:var(--muted);font-size:14px">Arama dizini yalnızca üretim derlemesinde oluşur. ' +
+          '<code>npm run build &amp;&amp; npm run preview</code> ile deneyin.</p>';
+        return;
+      }
+      new PagefindUI({
+        element: '#arama',
+        showSubResults: true,
+        showImages: false,
+        translations: {
+          placeholder: 'Rehberlerde ara…',
+          clear_search: 'Temizle',
+          load_more: 'Daha fazla sonuç',
+          search_label: 'Bu sitede ara',
+          filters_label: 'Süzgeçler',
+          zero_results: '[SEARCH_TERM] için sonuç bulunamadı',
+          many_results: '[SEARCH_TERM] için [COUNT] sonuç',
+          one_result: '[SEARCH_TERM] için [COUNT] sonuç',
+          alt_search: '[SEARCH_TERM] için sonuç yok. Bunun yerine [DIFFERENT_TERM] gösteriliyor',
+          search_suggestion: '[SEARCH_TERM] için sonuç yok. Şunları deneyin:',
+          searching: '[SEARCH_TERM] aranıyor…',
+        },
+      });
+
+      const q = new URLSearchParams(location.search).get('q');
+      if (q) {
+        const girdi = document.querySelector('#arama input');
+        if (girdi) {
+          girdi.value = q;
+          girdi.dispatchEvent(new Event('input', { bubbles: true }));
+        }
+      }
+    });
+  </script>
+</Base>

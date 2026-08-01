@@ -1,0 +1,212 @@
+---
+import Base from '../layouts/Base.astro';
+import { getCollection } from 'astro:content';
+import { KONULAR, SITE } from '../site.js';
+
+const komutlar = (await getCollection('komutlar')).sort((a, b) =>
+  a.data.baslik.localeCompare(b.data.baslik, 'tr')
+);
+const konuAdi = (slug: string) => KONULAR.find((k) => k.slug === slug)?.ad ?? slug;
+const kullanilan = KONULAR.filter((k) => komutlar.some((c) => c.data.konu === k.slug));
+---
+
+<Base
+  baslik="Komut kütüphanesi"
+  aciklama={`${komutlar.length} denenmiş PowerShell ve komut satırı tek satırı. Her birinin ne yaptığı ve nerede patlayabileceği yazıyor.`}
+  jsonLd={{
+    '@context': 'https://schema.org',
+    '@type': 'CollectionPage',
+    name: 'Komut kütüphanesi',
+    url: `${SITE.url}/komutlar`,
+    numberOfItems: komutlar.length,
+  }}
+>
+  <div class="lavanta">
+    <div class="kap">
+      <nav class="kirinti" aria-label="Kırıntı yolu">
+        <a href="/">Ana sayfa</a><span class="ayrac">/</span><span aria-current="page">Komut kütüphanesi</span>
+      </nav>
+      <div class="konu-bas" style="padding-top:8px">
+        <span class="etiket">Araçlar</span>
+        <h1>Komut kütüphanesi</h1>
+        <p class="ozet">
+          Sahada denenmiş komutlar. Her birinin ne yaptığı ve nerede patlayabileceği yazıyor — kopyalayın,
+          ama uyarıyı okumadan çalıştırmayın.
+        </p>
+        <div class="konu-sayac">
+          <span><b>{komutlar.length}</b> komut</span>
+          <span><b>{kullanilan.length}</b> konu</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="suzgec">
+    <div class="kap">
+      <label class="atla" for="komut-ara">Komutlarda ara</label>
+      <input
+        id="komut-ara"
+        class="cip"
+        type="search"
+        placeholder="Komutlarda ara…"
+        style="min-width:220px;font-family:inherit"
+      />
+      <button class="cip" type="button" data-konu="hepsi" aria-current="page">
+        Tümü <span style="opacity:.7">{komutlar.length}</span>
+      </button>
+      {
+        kullanilan.map((k) => (
+          <button class="cip" type="button" data-konu={k.slug}>
+            {k.ad} <span style="opacity:.6">{komutlar.filter((c) => c.data.konu === k.slug).length}</span>
+          </button>
+        ))
+      }
+    </div>
+  </div>
+
+  <div class="kap">
+    <div id="komut-liste" style="display:flex;flex-direction:column;gap:20px;padding-top:30px">
+      {
+        komutlar.map((c) => (
+          <article
+            class="uclu-kart komut"
+            data-konu={c.data.konu}
+            data-ara={`${c.data.baslik} ${c.data.ozet} ${c.data.kod} ${c.data.etiketler.join(' ')}`.toLowerCase()}
+            style="gap:14px"
+          >
+            <span style="display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap">
+              <span class="etiket">{konuAdi(c.data.konu)}</span>
+              <span class="yigin">
+                {c.data.etiketler.map((e) => (
+                  <span>{e}</span>
+                ))}
+              </span>
+            </span>
+
+            <h2 style="font-size:19px;font-weight:900;letter-spacing:-.03em;line-height:1.22">
+              {c.data.baslik}
+            </h2>
+            <p style="font-size:14px;color:var(--muted);line-height:1.6">{c.data.ozet}</p>
+
+            <div style="position:relative">
+              <pre class="kod"><code>{c.data.kod.trim()}</code></pre>
+              <button class="kopyala" type="button" data-kopyala>
+                Kopyala
+              </button>
+            </div>
+
+            {c.data.dikkat && (
+              <div class="uyari">
+                <span class="ikon" aria-hidden="true">
+                  <svg width="17" height="17" viewBox="0 0 18 18" fill="none">
+                    <path
+                      d="M9 5.5v4.2M9 12.3v.01M9 2.2l6.5 11.3H2.5L9 2.2z"
+                      stroke="currentColor"
+                      stroke-width="1.6"
+                      stroke-linecap="round"
+                      stroke-linejoin="round"
+                    />
+                  </svg>
+                </span>
+                <p>{c.data.dikkat}</p>
+              </div>
+            )}
+
+            {c.data.ilgiliRehber && (
+              <a
+                href={`/rehberler/${c.data.ilgiliRehber}`}
+                style="font-size:13.5px;font-weight:800;color:var(--indigo)"
+              >
+                Ayrıntılı rehberi oku →
+              </a>
+            )}
+          </article>
+        ))
+      }
+    </div>
+
+    <p id="komut-bos" hidden style="color:var(--muted);padding:30px 0;font-size:14.5px">
+      Bu süzgeçle eşleşen komut yok. <button class="cip" type="button" data-sifirla>Süzgeci temizle</button>
+    </p>
+  </div>
+</Base>
+
+<style>
+  .kopyala {
+    position: absolute;
+    top: 10px;
+    right: 10px;
+    font-family: inherit;
+    font-size: 11.5px;
+    font-weight: 800;
+    padding: 6px 11px;
+    border-radius: 7px;
+    border: 1px solid rgba(255, 255, 255, 0.22);
+    background: rgba(255, 255, 255, 0.1);
+    color: #d5dcec;
+    cursor: pointer;
+  }
+  .kopyala:hover {
+    background: rgba(255, 255, 255, 0.18);
+    color: #fff;
+  }
+  .kopyala[data-durum='kopyalandi'] {
+    background: rgba(21, 162, 74, 0.9);
+    border-color: transparent;
+    color: #fff;
+  }
+</style>
+
+<script>
+  const girdi = document.getElementById('komut-ara') as HTMLInputElement | null;
+  const dugmeler = [...document.querySelectorAll<HTMLButtonElement>('[data-konu]')];
+  const kartlar = [...document.querySelectorAll<HTMLElement>('.komut')];
+  const bos = document.getElementById('komut-bos');
+  let etkinKonu = 'hepsi';
+
+  function suz() {
+    const q = (girdi?.value ?? '').trim().toLocaleLowerCase('tr');
+    let gorunen = 0;
+    kartlar.forEach((k) => {
+      const konuUyar = etkinKonu === 'hepsi' || k.dataset.konu === etkinKonu;
+      const metinUyar = !q || (k.dataset.ara ?? '').includes(q);
+      const goster = konuUyar && metinUyar;
+      k.hidden = !goster;
+      if (goster) gorunen++;
+    });
+    if (bos) bos.hidden = gorunen > 0;
+  }
+
+  dugmeler.forEach((d) =>
+    d.addEventListener('click', () => {
+      etkinKonu = d.dataset.konu ?? 'hepsi';
+      dugmeler.forEach((x) =>
+        x === d ? x.setAttribute('aria-current', 'page') : x.removeAttribute('aria-current')
+      );
+      suz();
+    })
+  );
+  girdi?.addEventListener('input', suz);
+  document.querySelector('[data-sifirla]')?.addEventListener('click', () => {
+    if (girdi) girdi.value = '';
+    dugmeler[0]?.click();
+  });
+
+  document.querySelectorAll<HTMLButtonElement>('[data-kopyala]').forEach((d) => {
+    d.addEventListener('click', async () => {
+      const kod = d.parentElement?.querySelector('code')?.textContent ?? '';
+      try {
+        await navigator.clipboard.writeText(kod);
+        d.dataset.durum = 'kopyalandi';
+        d.textContent = 'Kopyalandı';
+        setTimeout(() => {
+          delete d.dataset.durum;
+          d.textContent = 'Kopyala';
+        }, 1800);
+      } catch {
+        d.textContent = 'Kopyalanamadı';
+        setTimeout(() => (d.textContent = 'Kopyala'), 1800);
+      }
+    });
+  });
+</script>

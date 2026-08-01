@@ -1,0 +1,172 @@
+---
+import Base from '../../layouts/Base.astro';
+import { getCollection, render } from 'astro:content';
+import { SITE, KONULAR, trKisaTarih } from '../../site.js';
+
+export async function getStaticPaths() {
+  const projeler = await getCollection('projeler');
+  const rehberler = (await getCollection('rehberler')).filter((r) => !r.data.taslak);
+  return projeler.map((p) => ({
+    params: { slug: p.id },
+    props: {
+      proje: p,
+      rehberler: p.data.ilgiliRehberler
+        .map((slug) => rehberler.find((r) => r.id === slug))
+        .filter((r): r is (typeof rehberler)[number] => Boolean(r)),
+    },
+  }));
+}
+
+const { proje, rehberler } = Astro.props;
+const { Content } = await render(proje);
+const d = proje.data;
+const url = `${SITE.url}/portfolyo/${proje.id}`;
+const konuAdi = (slug: string) => KONULAR.find((k) => k.slug === slug)?.ad ?? slug;
+const renk = ['#3A45E0', '#EFA013', '#15A24A'];
+---
+
+<Base
+  baslik={d.baslik}
+  aciklama={d.ozet}
+  ogGorsel={`/og/proje-${proje.id}.png`}
+  jsonLd={[
+    {
+      '@context': 'https://schema.org',
+      '@type': 'CreativeWork',
+      name: d.baslik,
+      description: d.ozet,
+      inLanguage: 'tr-TR',
+      url,
+      creator: { '@type': 'Person', name: SITE.author.name, url: `${SITE.url}/hakkimda` },
+      keywords: d.teknolojiler.join(', '),
+    },
+    {
+      '@context': 'https://schema.org',
+      '@type': 'BreadcrumbList',
+      itemListElement: [
+        { '@type': 'ListItem', position: 1, name: 'Ana sayfa', item: SITE.url },
+        { '@type': 'ListItem', position: 2, name: 'Portfolyo', item: `${SITE.url}/portfolyo` },
+        { '@type': 'ListItem', position: 3, name: d.baslik, item: url },
+      ],
+    },
+  ]}
+>
+  <div class="lavanta">
+    <div class="kap">
+      <nav class="kirinti" aria-label="Kırıntı yolu">
+        <a href="/">Ana sayfa</a><span class="ayrac">/</span>
+        <a href="/portfolyo">Portfolyo</a><span class="ayrac">/</span>
+        <span aria-current="page">{d.baslik}</span>
+      </nav>
+      <header class="proje-bas" style="padding-top:8px">
+        <span class="etiket">Proje</span>
+        <h1>{d.baslik}</h1>
+        <p class="ozet">{d.ozet}</p>
+        <div class="proje-kunye">
+          <div><span class="e">Rol</span><span class="d">{d.rol}</span></div>
+          <div><span class="e">Süre</span><span class="d">{d.sureMetni}</span></div>
+          <div><span class="e">Yıl</span><span class="d">{d.yil}</span></div>
+          <div><span class="e">Kapsam</span><span class="d">{d.kapsam}</span></div>
+        </div>
+      </header>
+    </div>
+  </div>
+
+  <div class="kap">
+    <div class="uclu">
+      <article class="uclu-kart">
+        <span class="serit" style="background:var(--clay)"></span>
+        <span class="lab" style="color:var(--clay-ink)">Sorun</span>
+        <p>{d.sorun}</p>
+      </article>
+      <article class="uclu-kart">
+        <span class="serit" style="background:var(--indigo)"></span>
+        <span class="lab" style="color:var(--indigo-d)">Yaklaşım</span>
+        <p>{d.yaklasim}</p>
+      </article>
+      <article class="uclu-kart">
+        <span class="serit" style="background:var(--green)"></span>
+        <span class="lab" style="color:var(--green-ink)">Sonuç</span>
+        <p>{d.sonuc}</p>
+      </article>
+    </div>
+
+    {
+      d.asamalar.length > 0 && (
+        <section class="asamalar">
+          <span class="yan-etiket">Uygulama sırası</span>
+          {d.asamalar.map((a, i) => (
+            <div class="asama">
+              <span class="no">{i + 1}</span>
+              <div>
+                <span class="ad">{a.baslik}</span>
+                <span class="ac">{a.aciklama}</span>
+              </div>
+              <span class="zaman">{a.zaman}</span>
+            </div>
+          ))}
+        </section>
+      )
+    }
+
+    {
+      d.metrikler.length > 0 && (
+        <div class="sonuclar">
+          {d.metrikler.map((m) => (
+            <div class="sonuc">
+              <p class="d">{m.deger}</p>
+              <span class="e">{m.etiket}</span>
+            </div>
+          ))}
+        </div>
+      )
+    }
+
+    <section class="bolum">
+      <div class="bolum-bas"><div><h2>Notlar</h2></div></div>
+      <article class="metin">
+        <Content />
+      </article>
+    </section>
+
+    {
+      rehberler.length > 0 && (
+        <section class="bolum">
+          <div class="bolum-bas">
+            <div>
+              <h2>Bu projeden çıkan yazılar</h2>
+              <p>Sahada karşılaşılan her engel bir rehbere dönüştü.</p>
+            </div>
+            <a href="/rehberler">Tüm rehberler →</a>
+          </div>
+          <div class="izgara">
+            {rehberler.map((r, i) => (
+              <a class="kart" href={`/rehberler/${r.id}`}>
+                <span class="kart-serit" style={`background:${renk[i % renk.length]}`} />
+                <div class="kart-govde">
+                  <span class="etiket">{konuAdi(r.data.konu)}</span>
+                  <h3>{r.data.baslik}</h3>
+                  <p>{r.data.ozet}</p>
+                </div>
+                <span class="kart-alt">
+                  <span>
+                    {trKisaTarih(r.data.yayin)} · {r.data.sure} dk
+                  </span>
+                  <b>Oku →</b>
+                </span>
+              </a>
+            ))}
+          </div>
+        </section>
+      )
+    }
+
+    <section class="bant">
+      <div>
+        <h2>Benzer bir proje mi planlıyorsunuz?</h2>
+        <p>Envanter çıkarma ve risk değerlendirmesi için kısa bir görüşme yeterli.</p>
+      </div>
+      <a class="dg dg-kehribar" href="/hakkimda#iletisim">Danışmanlık talebi</a>
+    </section>
+  </div>
+</Base>

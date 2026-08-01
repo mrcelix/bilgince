@@ -1,0 +1,89 @@
+---
+import { SITE, sayi } from '../site.js';
+
+interface Props {
+  baslik?: string;
+  aciklama?: string;
+  id?: string;
+}
+
+const {
+  baslik = 'Her pazartesi sabahı, sahadan bir teknik not.',
+  aciklama = `${sayi(SITE.newsletter.subscribers)} BT çalışanı okuyor. Reklam yok, sponsor yok, dilediğiniz an çıkabilirsiniz.`,
+  id = 'bulten',
+} = Astro.props;
+
+const { endpoint, alanAdi } = SITE.newsletter;
+const bagli = Boolean(endpoint);
+---
+
+<section class="bant" id={id}>
+  <div>
+    <h2>{baslik}</h2>
+    <p>{aciklama}</p>
+  </div>
+
+  {
+    bagli ? (
+      <form method="post" action={endpoint} target="_blank" data-bulten>
+        <label class="atla" for={`${id}-eposta`}>
+          E-posta adresiniz
+        </label>
+        <input
+          id={`${id}-eposta`}
+          type="email"
+          name={alanAdi}
+          placeholder="e-posta adresiniz"
+          autocomplete="email"
+          required
+        />
+        <button class="dg dg-kehribar" type="submit">
+          Abone ol
+        </button>
+        <p class="bulten-durum" role="status" aria-live="polite" />
+      </form>
+    ) : (
+      <p class="bulten-yok">
+        Bülten sağlayıcısı henüz bağlanmadı. Bağlanana kadar
+        <a href={`mailto:${SITE.author.email}?subject=Bültene%20abone%20olmak%20istiyorum`}>
+          e-posta ile yazabilirsiniz
+        </a>
+        ya da <a href="/rss.xml">RSS akışını</a> takip edebilirsiniz.
+      </p>
+    )
+  }
+</section>
+
+<script>
+  // Form sağlayıcıya normal POST ile de çalışır; JS varsa sayfadan ayrılmadan gönderir.
+  document.querySelectorAll<HTMLFormElement>('[data-bulten]').forEach((form) => {
+    const durum = form.querySelector<HTMLElement>('.bulten-durum');
+    const dugme = form.querySelector<HTMLButtonElement>('button');
+
+    form.addEventListener('submit', async (olay) => {
+      if (!durum || !dugme) return;
+      olay.preventDefault();
+      dugme.disabled = true;
+      durum.textContent = 'Gönderiliyor…';
+      durum.dataset.tur = 'bekliyor';
+
+      try {
+        const yanit = await fetch(form.action, {
+          method: 'POST',
+          body: new FormData(form),
+          mode: 'no-cors',
+        });
+        // no-cors yanıtı okunamaz; hata fırlatmadıysa istek gitmiştir.
+        void yanit;
+        durum.textContent = 'Kaydedildi. Gelen kutunuzdaki onay bağlantısına tıklayın.';
+        durum.dataset.tur = 'oldu';
+        form.reset();
+      } catch {
+        durum.textContent = 'Gönderilemedi. Bağlantınızı kontrol edip tekrar deneyin.';
+        durum.dataset.tur = 'hata';
+      } finally {
+        dugme.disabled = false;
+      }
+    });
+  });
+</script>

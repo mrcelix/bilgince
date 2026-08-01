@@ -1,0 +1,39 @@
+---
+import { SITE, KONULAR } from '../site.js';
+const yil = new Date().getFullYear();
+---
+
+<footer class="alt">
+  <div class="kap">
+    <div class="marka">
+      <span class="logo"><span class="logo-mk" aria-hidden="true">bc</span>{SITE.name}</span>
+      <span>
+        {SITE.author.name} · {SITE.author.jobTitle}. Üretim ortamında denenmiş BT rehberleri.
+      </span>
+    </div>
+    <div class="alt-sutunlar">
+      <div class="alt-sutun">
+        <b>Konular</b>
+        {KONULAR.slice(0, 4).map((k) => <a href={`/konu/${k.slug}`}>{k.ad}</a>)}
+      </div>
+      <div class="alt-sutun">
+        <b>İçerik</b>
+        <a href="/rehberler">Tüm rehberler</a>
+        <a href="/komutlar">Komut kütüphanesi</a>
+        <a href="/ipuclari">Hızlı ipuçları</a>
+        <a href="/portfolyo">Portfolyo</a>
+        <a href="/rss.xml">RSS</a>
+      </div>
+      <div class="alt-sutun">
+        <b>Site</b>
+        <a href="/hakkimda">Hakkımda</a>
+        <a href="/ozgecmis">Özgeçmiş</a>
+        <a href="/hakkimda#iletisim">İletişim</a>
+        <a href="/sitemap-index.xml">Site haritası</a>
+      </div>
+    </div>
+  </div>
+  <div class="alt-cizgi">
+    <div class="kap">© {yil} {SITE.name} · Reklam yok, sponsor yok.</div>
+  </div>
+</footer>

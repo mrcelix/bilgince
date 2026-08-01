@@ -1,0 +1,53 @@
+---
+import Base from '../layouts/Base.astro';
+import { getCollection } from 'astro:content';
+import { KONULAR } from '../site.js';
+
+const oneriler = (await getCollection('rehberler'))
+  .filter((r) => !r.data.taslak)
+  .sort((a, b) => +b.data.yayin - +a.data.yayin)
+  .slice(0, 3);
+const konuAdi = (slug: string) => KONULAR.find((k) => k.slug === slug)?.ad ?? slug;
+---
+
+<Base baslik="Sayfa bulunamadı" aciklama="Bu adreste bir sayfa yok." noindex={true} aramaya={false}>
+  <div class="lavanta">
+    <div class="kap">
+      <section class="hata-404">
+        <div>
+          <p class="kod-no">404</p>
+          <h1>Bu adreste bir sayfa yok.</h1>
+          <p>
+            Bağlantı eski olabilir ya da adres yanlış yazılmış olabilir. Aşağıdan arayabilir veya doğrudan
+            konulara gidebilirsiniz.
+          </p>
+          <div class="eylemler">
+            <a class="dg" href="/">Ana sayfaya dön</a>
+            <a class="dg dg-hayalet" href="/rehberler">Tüm rehberler</a>
+            <a class="dg dg-hayalet" href="/ara">Ara</a>
+          </div>
+          <p style="font-size:12.5px;color:var(--muted);margin-top:16px">
+            Bu bağlantıyı bir yerde gördüyseniz <a href="/hakkimda#iletisim" style="color:var(--indigo);font-weight:800"
+              >bana bildirin</a
+            > — kırık bağlantıları düzeltiyorum.
+          </p>
+        </div>
+
+        <div class="oneriler">
+          <span class="yan-etiket">Belki bunu arıyordunuz</span>
+          {
+            oneriler.map((r) => (
+              <a href={`/rehberler/${r.id}`}>
+                {r.data.baslik}
+                <span>
+                  {konuAdi(r.data.konu)} · {r.data.sure} dk
+                </span>
+              </a>
+            ))
+          }
+          <a href="/rehberler">Tüm rehberler<span>arşivin tamamı</span></a>
+        </div>
+      </section>
+    </div>
+  </div>
+</Base>

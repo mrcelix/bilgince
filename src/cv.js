@@ -1,0 +1,63 @@
+// Özgeçmiş verisi — /ozgecmis ve /hakkimda sayfaları ile Person şeması buradan beslenir.
+// YER TUTUCU: gerçek bilgilerinizle değiştirin.
+export const DENEYIM = [
+  {
+    gorev: 'Kıdemli Sistem Yöneticisi',
+    kurum: 'Anadolu Lojistik A.Ş.',
+    tarih: '2021 — devam ediyor',
+    yer: 'Ankara',
+    baslangic: '2021-03',
+    bitis: null,
+    aciklama:
+      '3 lokasyon, 400 kullanıcı, 60 sunucu. Kimlik göçü, yedekleme stratejisi ve olay müdahale süreçlerinin sahibi.',
+  },
+  {
+    gorev: 'Sistem Yöneticisi',
+    kurum: 'Vektör Bilişim',
+    tarih: '2017 — 2021',
+    yer: 'Ankara',
+    baslangic: '2017-01',
+    bitis: '2021-02',
+    aciklama:
+      '18 müşteri kurumun Windows Server ve sanallaştırma altyapısının yönetimi; 7/24 nöbet rotasyonu.',
+  },
+  {
+    gorev: 'Sistem Destek Uzmanı',
+    kurum: 'Kent Teknoloji',
+    tarih: '2014 — 2017',
+    yer: 'Eskişehir',
+    baslangic: '2014-06',
+    bitis: '2016-12',
+    aciklama:
+      'Son kullanıcı desteği, ağ kurulumu ve ilk otomasyon denemeleri — bu blogun başlangıç noktası.',
+  },
+];
+
+export const SERTIFIKALAR = [
+  { ad: 'Microsoft AZ-104', kurum: 'Microsoft', yil: '2025' },
+  { ad: 'Microsoft MS-102', kurum: 'Microsoft', yil: '2024' },
+  { ad: 'Fortinet NSE 4', kurum: 'Fortinet', yil: '2023' },
+];
+
+export const SSS = [
+  {
+    soru: 'Yazdığınız komutları doğrudan üretimde çalıştırabilir miyim?',
+    cevap:
+      'Hayır — ve ben de öyle yapmıyorum. Her rehberde önce test ortamı adımı var. Komutlar gerçek ortamda denendi ama sizin ortamınız benimkine benzemek zorunda değil. Doğrulama adımını atlamayın.',
+  },
+  {
+    soru: 'Sponsorlu içerik yayınlıyor musunuz?',
+    cevap:
+      'Hayır. Reklam, sponsor ve bağlı bağlantı yok. Bir ürünü öneriyorsam parasını kendim ödedim ya da işyerinde kullandım; ikisi de yazının içinde açıkça belirtiliyor.',
+  },
+  {
+    soru: 'Danışmanlık veriyor musunuz?',
+    cevap:
+      'Sınırlı sayıda. Genelde kimlik göçü, yedekleme stratejisi ve altyapı envanteri konularında kısa süreli projeler alıyorum. İlk görüşme ücretsiz ve 30 dakika.',
+  },
+  {
+    soru: 'Bir hata bulursam ne yapmalıyım?',
+    cevap:
+      'Yazın, lütfen. Düzeltmeyi yaparım ve yazının altına düzeltme notu düşerim. Sessizce değiştirmiyorum; düzeltme geçmişi görünür kalır.',
+  },
+];

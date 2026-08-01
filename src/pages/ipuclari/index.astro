@@ -1,0 +1,60 @@
+---
+import Base from '../../layouts/Base.astro';
+import { getCollection, render } from 'astro:content';
+import { KONULAR, SITE, trTarih } from '../../site.js';
+
+const ipuclari = (await getCollection('ipuclari')).sort((a, b) => +b.data.yayin - +a.data.yayin);
+const icerikler = await Promise.all(ipuclari.map(async (i) => ({ girdi: i, ...(await render(i)) })));
+const konuAdi = (slug: string) => KONULAR.find((k) => k.slug === slug)?.ad ?? slug;
+---
+
+<Base
+  baslik="Hızlı ipuçları"
+  aciklama="Tek ekranda biten, kopyala-çalıştır teknik notlar. Uzun rehberlere girmeden işinizi gören kısa çözümler."
+  jsonLd={{
+    '@context': 'https://schema.org',
+    '@type': 'CollectionPage',
+    name: 'Hızlı ipuçları',
+    url: `${SITE.url}/ipuclari`,
+    numberOfItems: ipuclari.length,
+  }}
+>
+  <div class="lavanta">
+    <div class="kap">
+      <nav class="kirinti" aria-label="Kırıntı yolu">
+        <a href="/">Ana sayfa</a><span class="ayrac">/</span><span aria-current="page">Hızlı ipuçları</span>
+      </nav>
+      <div class="konu-bas" style="padding-top:8px">
+        <span class="etiket">İpuçları</span>
+        <h1>Hızlı ipuçları</h1>
+        <p class="ozet">
+          Tek ekranda biten notlar. Uzun rehbere girmeye değmeyen ama her seferinde aranan şeyler burada.
+        </p>
+        <div class="konu-sayac"><span><b>{ipuclari.length}</b> ipucu</span></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="kap">
+    <div style="display:flex;flex-direction:column;gap:20px;padding-top:30px">
+      {
+        icerikler.map(({ girdi, Content }) => (
+          <article class="uclu-kart" style="gap:14px">
+            <span style="display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap">
+              <span class="etiket">{konuAdi(girdi.data.konu)}</span>
+              <span style="font-size:11.5px;color:var(--muted);font-family:var(--mono)">
+                {trTarih(girdi.data.yayin)}
+              </span>
+            </span>
+            <h2 style="font-size:20px;font-weight:900;letter-spacing:-.03em;line-height:1.2">
+              {girdi.data.baslik}
+            </h2>
+            <div class="metin" style="max-width:none;gap:14px">
+              <Content />
+            </div>
+          </article>
+        ))
+      }
+    </div>
+  </div>
+</Base>

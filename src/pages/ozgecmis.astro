@@ -1,0 +1,139 @@
+---
+import Base from '../layouts/Base.astro';
+import { SITE } from '../site.js';
+import { DENEYIM, SERTIFIKALAR } from '../cv.js';
+---
+
+<Base
+  baslik="Özgeçmiş"
+  aciklama={`${SITE.author.name} — ${SITE.author.jobTitle}. 12 yıllık saha deneyimi, sertifikalar ve indirilebilir CV.`}
+  tur="profile"
+  jsonLd={{
+    '@context': 'https://schema.org',
+    '@type': 'ProfilePage',
+    mainEntity: {
+      '@type': 'Person',
+      name: SITE.author.name,
+      jobTitle: SITE.author.jobTitle,
+      worksFor: { '@type': 'Organization', name: SITE.author.worksFor },
+      url: `${SITE.url}/ozgecmis`,
+      sameAs: [SITE.author.linkedin, SITE.author.github],
+      knowsAbout: SITE.author.knowsAbout,
+      hasCredential: SERTIFIKALAR.map((s) => ({
+        '@type': 'EducationalOccupationalCredential',
+        name: s.ad,
+        credentialCategory: 'certificate',
+        recognizedBy: { '@type': 'Organization', name: s.kurum },
+        dateCreated: s.yil,
+      })),
+      hasOccupation: DENEYIM.map((d) => ({
+        '@type': 'Role',
+        roleName: d.gorev,
+        startDate: d.baslangic,
+        ...(d.bitis ? { endDate: d.bitis } : {}),
+      })),
+    },
+  }}
+>
+  <div class="lavanta">
+    <div class="kap">
+      <nav class="kirinti" aria-label="Kırıntı yolu">
+        <a href="/">Ana sayfa</a><span class="ayrac">/</span><span aria-current="page">Özgeçmiş</span>
+      </nav>
+      <div class="konu-bas" style="padding-top:8px">
+        <span class="etiket">Özgeçmiş</span>
+        <h1>12 yıllık saha deneyiminin özeti</h1>
+        <p class="ozet">
+          Aşağıdaki özet güncel tutuluyor. Yazdırılabilir sürümü tek tıkla PDF olarak kaydedebilir ya da
+          LinkedIn profiline bakabilirsiniz.
+        </p>
+      </div>
+    </div>
+  </div>
+
+  <div class="kap">
+    <div class="cv-duzen" style="padding-top:30px">
+      <div class="cv-ana">
+        <span class="yan-etiket">Deneyim</span>
+        <ol class="zaman-cizelgesi">
+          {
+            DENEYIM.map((d, i) => (
+              <li class={i === 0 ? 'simdi' : ''}>
+                <span class="nokta" aria-hidden="true">
+                  <span />
+                </span>
+                <div>
+                  <span class="gorev">
+                    {d.gorev}
+                    {i === 0 && <span class="simdi-rozet">Şu an</span>}
+                  </span>
+                  <span class="kurum">{d.kurum}</span>
+                  <span class="gorev-tarih">
+                    {d.tarih} · {d.yer}
+                  </span>
+                  <span class="gorev-ac">{d.aciklama}</span>
+                </div>
+              </li>
+            ))
+          }
+        </ol>
+      </div>
+
+      <div class="cv-yan">
+        <div class="cv-kart">
+          <span class="cv-kisi">
+            <span class="yuz" aria-hidden="true">{SITE.author.initials}</span>
+            <span>
+              <span class="ad" style="font-size:17px;font-weight:900;letter-spacing:-.025em">
+                {SITE.author.name}
+              </span>
+              <span class="unvan" style="font-size:13px;color:var(--muted);display:block;margin-top:1px">
+                {SITE.author.jobTitle} · {SITE.author.location}
+              </span>
+            </span>
+          </span>
+          <span class="yetenekler">
+            {SITE.author.knowsAbout.map((y) => <span>{y}</span>)}
+          </span>
+          <a class="dg" href="/ozgecmis/yazdir">
+            <svg width="15" height="15" viewBox="0 0 16 16" fill="none" aria-hidden="true"
+              ><path
+                d="M8 2v8m0 0L5 7m3 3l3-3M3 13h10"
+                stroke="currentColor"
+                stroke-width="1.7"
+                stroke-linecap="round"
+                stroke-linejoin="round"></path></svg
+            >
+            CV'yi PDF olarak kaydet
+          </a>
+          <a class="dg dg-hayalet" href="/hakkimda#iletisim">Benimle iletişime geç</a>
+        </div>
+
+        <div class="sertifikalar">
+          <span class="yan-etiket">Sertifikalar</span>
+          {
+            SERTIFIKALAR.map((s) => (
+              <span class="sertifika">
+                <span class="ikon" aria-hidden="true">
+                  <svg width="15" height="15" viewBox="0 0 16 16" fill="none">
+                    <path d="M3 8.2l3 3 7-7" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" />
+                  </svg>
+                </span>
+                {s.ad}
+                <span class="yil">{s.yil}</span>
+              </span>
+            ))
+          }
+        </div>
+      </div>
+    </div>
+
+    <section class="bant">
+      <div>
+        <h2>Kısa bir projeye mi ihtiyacınız var?</h2>
+        <p>Kimlik göçü, yedekleme stratejisi ve altyapı envanteri. İlk görüşme 30 dakika ve ücretsiz.</p>
+      </div>
+      <a class="dg dg-kehribar" href="/hakkimda#iletisim">İletişime geç</a>
+    </section>
+  </div>
+</Base>

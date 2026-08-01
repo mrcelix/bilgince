@@ -1,0 +1,77 @@
+---
+import Base from '../../layouts/Base.astro';
+import { getCollection } from 'astro:content';
+import { SITE } from '../../site.js';
+
+const projeler = (await getCollection('projeler')).sort((a, b) => a.data.sira - b.data.sira);
+---
+
+<Base
+  baslik="Portfolyo"
+  aciklama="Kimlik göçü, yedekleme otomasyonu ve ağ segmentasyonu. Her proje ölçülebilir bir sonuçla kapandı."
+  jsonLd={{
+    '@context': 'https://schema.org',
+    '@type': 'CollectionPage',
+    name: 'Portfolyo',
+    url: `${SITE.url}/portfolyo`,
+    numberOfItems: projeler.length,
+  }}
+>
+  <div class="lavanta">
+    <div class="kap">
+      <nav class="kirinti" aria-label="Kırıntı yolu">
+        <a href="/">Ana sayfa</a><span class="ayrac">/</span><span aria-current="page">Portfolyo</span>
+      </nav>
+      <div class="konu-bas" style="padding-top:8px">
+        <span class="etiket">Projeler</span>
+        <h1>Portfolyo</h1>
+        <p class="ozet">
+          Yazdıklarımın çoğu bu projelerden çıktı. Her biri bir sorunla başladı ve ölçülebilir bir sonuçla
+          kapandı — süresi, kapsamı ve sayılarıyla birlikte.
+        </p>
+      </div>
+    </div>
+  </div>
+
+  <div class="kap">
+    <div class="projeler" style="padding-top:30px">
+      {
+        projeler.map((p) => (
+          <a class="proje" href={`/portfolyo/${p.id}`}>
+            <span class="ust">
+              <span class="proje-ikon" aria-hidden="true">
+                <svg width="17" height="17" viewBox="0 0 18 18" fill="none">
+                  <rect x="2.5" y="2.5" width="13" height="13" rx="2.6" stroke="currentColor" stroke-width="1.5" />
+                  <path d="M6 9.2l2 2 4-4.4" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" />
+                </svg>
+              </span>
+              <span class="yil">{p.data.yil}</span>
+            </span>
+            <h2 style="font-size:17px;font-weight:800;letter-spacing:-.025em;line-height:1.25">{p.data.baslik}</h2>
+            <p>{p.data.ozet}</p>
+            <span class="metrikler">
+              {p.data.metrikler.slice(0, 3).map((m, i) => (
+                <span class={i === 2 ? 'metrik metrik-notr' : 'metrik'}>
+                  {m.deger} {m.etiket.toLowerCase()}
+                </span>
+              ))}
+            </span>
+            <span class="yigin">
+              {p.data.teknolojiler.map((t) => (
+                <span>{t}</span>
+              ))}
+            </span>
+          </a>
+        ))
+      }
+    </div>
+
+    <section class="bant">
+      <div>
+        <h2>Benzer bir proje mi planlıyorsunuz?</h2>
+        <p>Envanter çıkarma ve risk değerlendirmesi için kısa bir görüşme yeterli.</p>
+      </div>
+      <a class="dg dg-kehribar" href="/hakkimda#iletisim">Danışmanlık talebi</a>
+    </section>
+  </div>
+</Base>

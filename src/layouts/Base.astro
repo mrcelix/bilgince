@@ -1,0 +1,89 @@
+---
+import '../styles/global.css';
+import Header from '../components/Header.astro';
+import Footer from '../components/Footer.astro';
+import { SITE } from '../site.js';
+
+interface Props {
+  baslik: string;
+  aciklama: string;
+  /** /og/<slug>.png — verilmezse site geneli kart kullanılır */
+  ogGorsel?: string;
+  tur?: 'website' | 'article' | 'profile';
+  jsonLd?: Record<string, unknown> | Record<string, unknown>[];
+  noindex?: boolean;
+  /** false ise sayfa site içi aramaya (Pagefind) girmez */
+  aramaya?: boolean;
+}
+
+const {
+  baslik,
+  aciklama,
+  ogGorsel = '/og/site.png',
+  tur = 'website',
+  jsonLd,
+  noindex = false,
+  aramaya = true,
+} = Astro.props;
+
+const kanonik = new URL(Astro.url.pathname.replace(/\/$/, '') || '/', Astro.site).href;
+const ogMutlak = new URL(ogGorsel, Astro.site).href;
+const tamBaslik = baslik === SITE.name ? SITE.title : `${baslik} | ${SITE.name}`;
+
+const temelSema = {
+  '@context': 'https://schema.org',
+  '@type': 'WebSite',
+  name: SITE.name,
+  url: SITE.url,
+  inLanguage: 'tr-TR',
+  publisher: { '@type': 'Person', name: SITE.author.name, url: `${SITE.url}/hakkimda` },
+};
+
+const semalar = [temelSema, ...(Array.isArray(jsonLd) ? jsonLd : jsonLd ? [jsonLd] : [])];
+---
+
+<!doctype html>
+<html lang={SITE.lang}>
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>{tamBaslik}</title>
+    <meta name="description" content={aciklama} />
+    <link rel="canonical" href={kanonik} />
+    {noindex && <meta name="robots" content="noindex, follow" />}
+
+    <meta name="theme-color" content="#16203a" />
+    <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
+    <link rel="alternate" type="application/rss+xml" title={`${SITE.name} — RSS`} href="/rss.xml" />
+
+    <!-- yazı tipi ilk boyamadan önce hazır olsun, düzen kaymasın -->
+    <link rel="preload" href="/fonts/nunito-latin.woff2" as="font" type="font/woff2" crossorigin />
+    <link rel="preload" href="/fonts/nunito-latin-ext.woff2" as="font" type="font/woff2" crossorigin />
+
+    <meta property="og:type" content={tur} />
+    <meta property="og:site_name" content={SITE.name} />
+    <meta property="og:locale" content={SITE.locale} />
+    <meta property="og:title" content={baslik} />
+    <meta property="og:description" content={aciklama} />
+    <meta property="og:url" content={kanonik} />
+    <meta property="og:image" content={ogMutlak} />
+    <meta property="og:image:width" content="1200" />
+    <meta property="og:image:height" content="630" />
+
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:title" content={baslik} />
+    <meta name="twitter:description" content={aciklama} />
+    <meta name="twitter:image" content={ogMutlak} />
+
+    <script type="application/ld+json" set:html={JSON.stringify(semalar)} />
+  </head>
+
+  <body>
+    <a class="atla" href="#icerik">İçeriğe geç</a>
+    <Header />
+    <main id="icerik" data-pagefind-body={aramaya ? '' : undefined}>
+      <slot />
+    </main>
+    <Footer />
+  </body>
+</html>

@@ -1,0 +1,146 @@
+---
+import Base from '../../layouts/Base.astro';
+import Satir from '../../components/Satir.astro';
+import { getCollection } from 'astro:content';
+import { KONULAR, SITE, trTarih } from '../../site.js';
+
+export async function getStaticPaths() {
+  const rehberler = (await getCollection('rehberler')).filter((r) => !r.data.taslak);
+  return KONULAR.map((k) => ({
+    params: { konu: k.slug },
+    props: {
+      konu: k,
+      yazilar: rehberler
+        .filter((r) => r.data.konu === k.slug)
+        .sort((a, b) => +b.data.yayin - +a.data.yayin),
+    },
+  }));
+}
+
+const { konu, yazilar } = Astro.props;
+const ortalama = yazilar.length
+  ? Math.round(yazilar.reduce((t, r) => t + r.data.sure, 0) / yazilar.length)
+  : 0;
+const seriler = [...new Set(yazilar.map((r) => r.data.seri).filter(Boolean))] as string[];
+const etiketler = [...new Set(yazilar.flatMap((r) => r.data.etiketler))];
+const sonGuncelleme = yazilar.length
+  ? yazilar.map((r) => r.data.guncelleme ?? r.data.yayin).sort((a, b) => +b - +a)[0]
+  : null;
+---
+
+<Base
+  baslik={konu.ad}
+  aciklama={`${konu.ad} üzerine ${yazilar.length} rehber: ${konu.ozet}. Hepsi üretim ortamında denendi.`}
+  jsonLd={[
+    {
+      '@context': 'https://schema.org',
+      '@type': 'CollectionPage',
+      name: konu.ad,
+      description: konu.ozet,
+      url: `${SITE.url}/konu/${konu.slug}`,
+      numberOfItems: yazilar.length,
+    },
+    {
+      '@context': 'https://schema.org',
+      '@type': 'BreadcrumbList',
+      itemListElement: [
+        { '@type': 'ListItem', position: 1, name: 'Ana sayfa', item: SITE.url },
+        { '@type': 'ListItem', position: 2, name: 'Konular', item: `${SITE.url}/rehberler` },
+        { '@type': 'ListItem', position: 3, name: konu.ad, item: `${SITE.url}/konu/${konu.slug}` },
+      ],
+    },
+  ]}
+>
+  <div class="lavanta">
+    <div class="kap">
+      <nav class="kirinti" aria-label="Kırıntı yolu">
+        <a href="/">Ana sayfa</a><span class="ayrac">/</span>
+        <a href="/rehberler">Konular</a><span class="ayrac">/</span>
+        <span aria-current="page">{konu.ad}</span>
+      </nav>
+      <div class="konu-bas" style="padding-top:8px">
+        <span class="etiket">Konu</span>
+        <h1>{konu.ad}</h1>
+        <p class="ozet">{konu.ozet}. Komutlar üretim ortamında denendi; her yazının sonunda doğrulama adımı var.</p>
+        <div class="konu-sayac">
+          <span><b>{yazilar.length}</b> rehber</span>
+          {seriler.length > 0 && <span><b>{seriler.length}</b> seri</span>}
+          {ortalama > 0 && <span>Ortalama <b>{ortalama} dk</b> okuma</span>}
+          {sonGuncelleme && <span>Son güncelleme <b>{trTarih(sonGuncelleme)}</b></span>}
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="suzgec">
+    <div class="kap">
+      <a class="cip" href="/rehberler">Tümü</a>
+      {
+        KONULAR.map((k) => (
+          <a class="cip" href={`/konu/${k.slug}`} aria-current={k.slug === konu.slug ? 'page' : undefined}>
+            {k.ad}
+          </a>
+        ))
+      }
+    </div>
+  </div>
+
+  <div class="kap">
+    <div class="arsiv">
+      <div class="liste">
+        {
+          yazilar.length === 0 ? (
+            <p style="color:var(--muted);padding:24px 0">
+              Bu konuda henüz yayınlanmış rehber yok. <a href="/rehberler">Tüm rehberlere</a> göz atın.
+            </p>
+          ) : (
+            yazilar.map((r) => (
+              <Satir
+                href={`/rehberler/${r.id}`}
+                baslik={r.data.baslik}
+                ozet={r.data.ozet}
+                tarih={r.data.yayin}
+                sure={r.data.sure}
+                etiketler={r.data.etiketler}
+              />
+            ))
+          )
+        }
+      </div>
+
+      <aside class="yan">
+        {
+          seriler.map((s) => (
+            <div class="seri-kutu">
+              <span class="yan-etiket">Bu konudaki seri</span>
+              <h3>{s}</h3>
+              <span class="ilerleme">
+                <span style={`width:${Math.min(100, yazilar.filter((r) => r.data.seri === s).length * 20)}%`} />
+              </span>
+              <span style="font-size:12px;color:var(--muted);font-weight:600">
+                {yazilar.filter((r) => r.data.seri === s).length} bölüm yayında
+              </span>
+            </div>
+          ))
+        }
+        {
+          etiketler.length > 0 && (
+            <div class="yan-kutu">
+              <span class="yan-etiket">Etiketler</span>
+              <span class="yigin">
+                {etiketler.map((e) => (
+                  <span>{e}</span>
+                ))}
+              </span>
+            </div>
+          )
+        }
+        <div class="yan-tanitim">
+          <h3>{konu.ad} notları</h3>
+          <p>Yeni rehberler ve komut kütüphanesi girdileri haftalık e-postada.</p>
+          <a class="dg" href="/#bulten">Bültene katıl</a>
+        </div>
+      </aside>
+    </div>
+  </div>
+</Base>

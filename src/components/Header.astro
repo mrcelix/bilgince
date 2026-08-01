@@ -1,0 +1,251 @@
+---
+import { getCollection } from 'astro:content';
+import { SITE, KONULAR, POPULER_ARAMALAR, sayi } from '../site.js';
+
+const rehberler = (await getCollection('rehberler')).filter((r) => !r.data.taslak);
+const say = (slug: string) => rehberler.filter((r) => r.data.konu === slug).length;
+const komutSayisi = (await getCollection('komutlar')).length;
+
+const oneCikan =
+  rehberler.find((r) => r.data.oneCikan) ??
+  rehberler.sort((a, b) => +b.data.yayin - +a.data.yayin)[0];
+
+const yol = Astro.url.pathname.replace(/\/$/, '') || '/';
+const etkin = (p: string) => (yol === p || yol.startsWith(p + '/') ? 'page' : undefined);
+
+const gruplar = [...new Set(KONULAR.map((k) => k.grup))];
+---
+
+<div class="ust-serit">
+  <div class="kap">
+    <span class="sol">
+      <span class="canli"><i></i>{SITE.newsletter.cadence} · <b>{sayi(SITE.newsletter.subscribers)} abone</b></span>
+    </span>
+    <span class="sag">
+      <a href="/rss.xml">RSS</a>
+      <a href={SITE.author.github} rel="me noopener">GitHub</a>
+      <a href={SITE.author.linkedin} rel="me noopener">LinkedIn</a>
+      <a href="/hakkimda#iletisim">İletişim</a>
+    </span>
+  </div>
+</div>
+
+<header class="bas">
+  <div class="kap">
+    <a class="logo" href="/" aria-label={`${SITE.name} ana sayfa`}>
+      <span class="logo-mk" aria-hidden="true">bc</span>{SITE.name}
+    </a>
+
+    <nav aria-label="Ana menü" style="display:contents">
+      <ul class="gez">
+        <li class="gez-oge">
+          <button class="gez-bag" type="button" aria-expanded="false" aria-controls="mega-konular" data-mega>
+            Konular
+            <svg class="ok" width="11" height="11" viewBox="0 0 12 12" fill="none" aria-hidden="true"
+              ><path d="M3 4.5L6 7.5L9 4.5" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"></path></svg
+            >
+          </button>
+        </li>
+        <li><a class="gez-bag" href="/rehberler" aria-current={etkin('/rehberler')}>Rehberler</a></li>
+        <li><a class="gez-bag" href="/portfolyo" aria-current={etkin('/portfolyo')}>Portfolyo</a></li>
+        <li><a class="gez-bag" href="/ozgecmis" aria-current={etkin('/ozgecmis')}>Özgeçmiş</a></li>
+        <li><a class="gez-bag" href="/hakkimda" aria-current={etkin('/hakkimda')}>Hakkımda</a></li>
+      </ul>
+    </nav>
+
+    <a class="ara-kutu" href="/ara">
+      <svg width="13" height="13" viewBox="0 0 14 14" fill="none" aria-hidden="true"
+        ><circle cx="6.2" cy="6.2" r="4.2" stroke="currentColor" stroke-width="1.6"></circle><path
+          d="M9.4 9.4L12 12"
+          stroke="currentColor"
+          stroke-width="1.6"
+          stroke-linecap="round"></path></svg
+      >
+      Ara
+    </a>
+    <a class="dg" href="/#bulten">Bültene katıl</a>
+
+    <button class="hamburger" type="button" aria-label="Menüyü aç" aria-expanded="false" data-cekmece-ac>
+      <svg width="18" height="18" viewBox="0 0 18 18" fill="none" aria-hidden="true"
+        ><path d="M3 5h12M3 9h12M3 13h12" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"></path></svg
+      >
+    </button>
+  </div>
+
+  <div class="mega" id="mega-konular" data-acik="hayir">
+    <div class="kap">
+      {
+        gruplar.map((grup) => (
+          <div class="mega-sutun">
+            <span class="mega-etiket">{grup}</span>
+            {KONULAR.filter((k) => k.grup === grup).map((k) => (
+              <a class="mega-bag" href={`/konu/${k.slug}`}>
+                <span class="ikon" aria-hidden="true">
+                  <svg width="16" height="16" viewBox="0 0 18 18" fill="none">
+                    <rect x="2.5" y="2.5" width="13" height="13" rx="2.4" stroke="currentColor" stroke-width="1.5" />
+                    <path d="M5.5 9h7M5.5 6h7M5.5 12h4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" />
+                  </svg>
+                </span>
+                <span>
+                  <span class="ad">{k.ad}</span>
+                  <span class="ac">
+                    {k.ozet} · {say(k.slug)} yazı
+                  </span>
+                </span>
+              </a>
+            ))}
+          </div>
+        ))
+      }
+
+      <div class="mega-sutun">
+        <span class="mega-etiket">Araçlar</span>
+        <a class="mega-bag" href="/komutlar">
+          <span class="ikon" aria-hidden="true">
+            <svg width="16" height="16" viewBox="0 0 18 18" fill="none"
+              ><path d="M4 6L7 9l-3 3M9.5 12h4.5" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"></path><rect
+                x="2.5"
+                y="2.5"
+                width="13"
+                height="13"
+                rx="2.4"
+                stroke="currentColor"
+                stroke-width="1.5"></rect></svg
+            >
+          </span>
+          <span>
+            <span class="ad">Komut kütüphanesi</span>
+            <span class="ac">{komutSayisi} denenmiş tek satır</span>
+          </span>
+        </a>
+        <a class="mega-bag" href="/ipuclari">
+          <span class="ikon" aria-hidden="true">
+            <svg width="16" height="16" viewBox="0 0 18 18" fill="none"
+              ><path d="M2.5 9.5l3 3 8-8" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"></path></svg
+            >
+          </span>
+          <span>
+            <span class="ad">Hızlı ipuçları</span>
+            <span class="ac">Tek ekranda biten notlar</span>
+          </span>
+        </a>
+        <a class="mega-bag" href="/rss.xml">
+          <span class="ikon" aria-hidden="true">
+            <svg width="16" height="16" viewBox="0 0 18 18" fill="none"
+              ><path d="M4 13.5h.01M4 9a5 5 0 015 5M4 4.5a9 9 0 019 9" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"></path></svg
+            >
+          </span>
+          <span>
+            <span class="ad">RSS akışı</span>
+            <span class="ac">Bültene alternatif</span>
+          </span>
+        </a>
+      </div>
+
+      <div class="mega-tanitim">
+        <span class="mega-etiket">Bu ayın rehberi</span>
+        {
+          oneCikan && (
+            <a class="mega-kart" href={`/rehberler/${oneCikan.id}`}>
+              <span class="ust">{KONULAR.find((k) => k.slug === oneCikan.data.konu)?.ad ?? oneCikan.data.konu}</span>
+              <h3>{oneCikan.data.baslik}</h3>
+              <span class="alt">{oneCikan.data.sure} dk okuma</span>
+            </a>
+          )
+        }
+        <span class="mega-etiket" style="margin-top:4px">Popüler aramalar</span>
+        <span class="cipler">
+          {POPULER_ARAMALAR.map((q) => <a href={`/ara?q=${encodeURIComponent(q)}`}>{q}</a>)}
+        </span>
+      </div>
+    </div>
+  </div>
+</header>
+
+<div class="cekmece" id="cekmece" data-acik="hayir">
+  <div class="cekmece-ust">
+    <a class="logo" href="/"><span class="logo-mk" aria-hidden="true">bc</span>{SITE.name}</a>
+    <button class="cekmece-kapat" type="button" aria-label="Menüyü kapat" data-cekmece-kapat>
+      <svg width="15" height="15" viewBox="0 0 16 16" fill="none" aria-hidden="true"
+        ><path d="M4 4l8 8M12 4l-8 8" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"></path></svg
+      >
+    </button>
+  </div>
+
+  <nav class="akordeon" aria-label="Mobil menü">
+    <details open>
+      <summary>
+        Konular
+        <svg class="ok" width="12" height="12" viewBox="0 0 12 12" fill="none" aria-hidden="true"
+          ><path d="M3 4.5L6 7.5L9 4.5" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"></path></svg
+        >
+      </summary>
+      <div class="alt-liste">
+        {
+          KONULAR.map((k) => (
+            <a href={`/konu/${k.slug}`}>
+              {k.ad}
+              <span class="say">{say(k.slug)}</span>
+            </a>
+          ))
+        }
+      </div>
+    </details>
+    <a href="/rehberler">Rehberler</a>
+    <a href="/komutlar">Komut kütüphanesi</a>
+    <a href="/ipuclari">Hızlı ipuçları</a>
+    <a href="/portfolyo">Portfolyo</a>
+    <a href="/ozgecmis">Özgeçmiş</a>
+    <a href="/hakkimda">Hakkımda</a>
+    <a href="/ara">Ara</a>
+  </nav>
+
+  <div class="cekmece-alt">
+    <a class="dg" href="/#bulten">Bültene katıl</a>
+    <span>{sayi(SITE.newsletter.subscribers)} abone · {SITE.newsletter.cadence.toLowerCase()}</span>
+  </div>
+</div>
+
+<script>
+  const megaDugme = document.querySelector<HTMLButtonElement>('[data-mega]');
+  const mega = document.getElementById('mega-konular');
+  const bas = document.querySelector('.bas');
+
+  function megaAyarla(acik: boolean) {
+    if (!megaDugme || !mega) return;
+    megaDugme.setAttribute('aria-expanded', String(acik));
+    mega.dataset.acik = acik ? 'evet' : 'hayir';
+  }
+
+  megaDugme?.addEventListener('click', () => {
+    megaAyarla(megaDugme.getAttribute('aria-expanded') !== 'true');
+  });
+  // fareyle üzerine gelince de açılsın — mega menüde beklenen davranış bu
+  megaDugme?.addEventListener('mouseenter', () => megaAyarla(true));
+
+  // fare menüden çıkınca kapat, dışarı tıklayınca kapat, Esc ile kapat
+  bas?.addEventListener('mouseleave', () => megaAyarla(false));
+  document.addEventListener('click', (e) => {
+    if (!bas?.contains(e.target as Node)) megaAyarla(false);
+  });
+  document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape') {
+      megaAyarla(false);
+      cekmeceAyarla(false);
+    }
+  });
+
+  const cekmece = document.getElementById('cekmece');
+  const acDugme = document.querySelector<HTMLButtonElement>('[data-cekmece-ac]');
+
+  function cekmeceAyarla(acik: boolean) {
+    if (!cekmece) return;
+    cekmece.dataset.acik = acik ? 'evet' : 'hayir';
+    acDugme?.setAttribute('aria-expanded', String(acik));
+    document.documentElement.style.overflow = acik ? 'hidden' : '';
+  }
+
+  acDugme?.addEventListener('click', () => cekmeceAyarla(true));
+  document.querySelector('[data-cekmece-kapat]')?.addEventListener('click', () => cekmeceAyarla(false));
+  cekmece?.querySelectorAll('a').forEach((a) => a.addEventListener('click', () => cekmeceAyarla(false)));
+</script>

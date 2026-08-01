@@ -1,0 +1,182 @@
+---
+import Base from '../layouts/Base.astro';
+import { SITE } from '../site.js';
+import { SSS } from '../cv.js';
+---
+
+<Base
+  baslik="Hakkımda"
+  aciklama="Eskişehir'de bir bilgi işlem masasında başladım, bugün 400 kullanıcılı bir altyapıdan sorumluyum. Bu blog neden var, nasıl çalışıyorum ve nasıl ulaşırsınız."
+  tur="profile"
+  jsonLd={[
+    {
+      '@context': 'https://schema.org',
+      '@type': 'ProfilePage',
+      mainEntity: {
+        '@type': 'Person',
+        name: SITE.author.name,
+        jobTitle: SITE.author.jobTitle,
+        worksFor: { '@type': 'Organization', name: SITE.author.worksFor },
+        address: { '@type': 'PostalAddress', addressLocality: SITE.author.location },
+        email: `mailto:${SITE.author.email}`,
+        url: `${SITE.url}/hakkimda`,
+        sameAs: [SITE.author.linkedin, SITE.author.github],
+        knowsAbout: SITE.author.knowsAbout,
+      },
+    },
+    {
+      '@context': 'https://schema.org',
+      '@type': 'FAQPage',
+      mainEntity: SSS.map((s) => ({
+        '@type': 'Question',
+        name: s.soru,
+        acceptedAnswer: { '@type': 'Answer', text: s.cevap },
+      })),
+    },
+  ]}
+>
+  <div class="kap">
+    <section class="tanitim-duzen">
+      <div class="portre">
+        <span class="yuz" aria-hidden="true">{SITE.author.initials}</span>
+        <div>
+          <span class="ad">{SITE.author.name}</span>
+          <span class="unvan">{SITE.author.jobTitle} · {SITE.author.location}</span>
+        </div>
+        <span class="yetenekler">
+          {SITE.author.knowsAbout.map((y) => <span>{y}</span>)}
+        </span>
+      </div>
+
+      <div>
+        <span class="rozet"><i></i>2014'ten beri sahada</span>
+        <h1>Sunucu odasında öğrendiklerimi saklamıyorum.</h1>
+        <p class="giris">
+          Eskişehir'de bir bilgi işlem masasında başladım. İlk yıllarda her sorunun cevabını forumlarda
+          aradım; bulduklarımın yarısı çalışmıyordu, çalışanların da neden çalıştığı yazmıyordu.
+          <strong>Bu blog o boşluğu kapatmak için var.</strong>
+        </p>
+        <p class="giris">
+          Bugün 400 kullanıcılı bir lojistik şirketinin altyapısından sorumluyum. Yazdığım her rehber önce
+          üretim ortamında çalıştı, sonra buraya geldi — tersi olmadı.
+        </p>
+        <div class="eylemler" style="display:flex;gap:12px;margin-top:26px;flex-wrap:wrap">
+          <a class="dg" href="/ozgecmis">Özgeçmişi gör</a>
+          <a class="dg dg-hayalet" href="#iletisim">Bana yazın</a>
+        </div>
+      </div>
+    </section>
+
+    <section class="uc-kutu">
+      <div>
+        <span class="ikon" aria-hidden="true">
+          <svg width="17" height="17" viewBox="0 0 18 18" fill="none"
+            ><rect x="2.5" y="2.5" width="13" height="13" rx="2.4" stroke="currentColor" stroke-width="1.5"
+            ></rect><path d="M5.5 8L7.5 10l-2 2M10 12h3" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"
+            ></path></svg
+          >
+        </span>
+        <h3>Şu an ne yapıyorum</h3>
+        <p>
+          Entra ID geçişinin son bölümlerini yazıyorum ve komut kütüphanesini 200 girdiye çıkarmaya
+          çalışıyorum.
+        </p>
+      </div>
+      <div>
+        <span class="ikon" aria-hidden="true">
+          <svg width="17" height="17" viewBox="0 0 18 18" fill="none"
+            ><path
+              d="M9 2.5l1.9 4 4.4.6-3.2 3.1.8 4.3L9 12.5l-3.9 2 .8-4.3L2.7 7.1l4.4-.6L9 2.5z"
+              stroke="currentColor"
+              stroke-width="1.5"
+              stroke-linejoin="round"></path></svg
+          >
+        </span>
+        <h3>Neyi iyi yaparım</h3>
+        <p>
+          Dağınık bir altyapıyı envanterleyip belgelemek, tekrar eden işleri script'e çevirmek ve göçleri
+          kesintisiz planlamak.
+        </p>
+      </div>
+      <div>
+        <span class="ikon" aria-hidden="true">
+          <svg width="17" height="17" viewBox="0 0 18 18" fill="none"
+            ><circle cx="9" cy="9" r="6.5" stroke="currentColor" stroke-width="1.5"></circle><path
+              d="M9 5.5v4l2.5 1.6"
+              stroke="currentColor"
+              stroke-width="1.6"
+              stroke-linecap="round"></path></svg
+          >
+        </span>
+        <h3>Neye vakit ayırmam</h3>
+        <p>Ürün karşılaştırması ve "en iyi 10" listeleri. Kullanmadığım bir ürün hakkında yazmıyorum.</p>
+      </div>
+    </section>
+
+    <section class="bolum">
+      <div class="bolum-bas"><div><h2>Sık sorulanlar</h2></div></div>
+      <div class="sss">
+        {
+          SSS.map((s) => (
+            <div>
+              <h3>{s.soru}</h3>
+              <p>{s.cevap}</p>
+            </div>
+          ))
+        }
+      </div>
+    </section>
+
+    <section class="bolum" id="iletisim">
+      <div class="bolum-bas">
+        <div>
+          <h2>Nasıl ulaşırsınız</h2>
+          <p>En hızlısı e-posta. Genelde iki iş günü içinde dönüyorum.</p>
+        </div>
+      </div>
+      <div class="kanallar">
+        <a class="kanal" href={`mailto:${SITE.author.email}`}>
+          <span class="ikon" aria-hidden="true">
+            <svg width="16" height="16" viewBox="0 0 16 16" fill="none"
+              ><rect x="2" y="3.5" width="12" height="9" rx="1.8" stroke="currentColor" stroke-width="1.6"
+              ></rect><path d="M2.6 4.6L8 8.6l5.4-4" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"
+                stroke-linejoin="round"></path></svg
+            >
+          </span>
+          <span>
+            <span class="ad">E-posta</span>
+            <span class="ac">{SITE.author.email} · iki iş günü içinde yanıt</span>
+          </span>
+        </a>
+        <a class="kanal" href={SITE.author.linkedin} rel="me noopener">
+          <span class="ikon" aria-hidden="true">
+            <svg width="16" height="16" viewBox="0 0 16 16" fill="none"
+              ><rect x="2.5" y="2.5" width="11" height="11" rx="2" stroke="currentColor" stroke-width="1.5"
+              ></rect><path
+                d="M5.2 6.8v4M5.2 5.1v.01M8 10.8V8.4a1.5 1.5 0 013 0v2.4"
+                stroke="currentColor"
+                stroke-width="1.5"
+                stroke-linecap="round"></path></svg
+            >
+          </span>
+          <span>
+            <span class="ad">LinkedIn</span>
+            <span class="ac">İş teklifleri ve danışmanlık için</span>
+          </span>
+        </a>
+        <a class="kanal" href={SITE.author.github} rel="me noopener">
+          <span class="ikon" aria-hidden="true">
+            <svg width="16" height="16" viewBox="0 0 16 16" fill="none"
+              ><path d="M3 4.5L6 8l-3 3.5M8 11.5h5" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"
+                stroke-linejoin="round"></path></svg
+            >
+          </span>
+          <span>
+            <span class="ad">GitHub</span>
+            <span class="ac">Komut kütüphanesi ve script şablonları</span>
+          </span>
+        </a>
+      </div>
+    </section>
+  </div>
+</Base>

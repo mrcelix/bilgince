@@ -1,0 +1,229 @@
+---
+import Base from '../layouts/Base.astro';
+import Bulten from '../components/Bulten.astro';
+import { getCollection } from 'astro:content';
+import { SITE, KONULAR, trKisaTarih, trTarih, sayi } from '../site.js';
+
+const hepsi = (await getCollection('rehberler'))
+  .filter((r) => !r.data.taslak)
+  .sort((a, b) => +b.data.yayin - +a.data.yayin);
+
+const bas = hepsi.find((r) => r.data.oneCikan) ?? hepsi[0];
+const takipler = hepsi.filter((r) => r.id !== bas.id).slice(0, 2);
+const sonlar = hepsi.filter((r) => r.id !== bas.id && !takipler.includes(r)).slice(0, 3);
+
+const ipuclari = (await getCollection('ipuclari')).sort((a, b) => +b.data.yayin - +a.data.yayin);
+const gunun = ipuclari.find((i) => i.data.gununIpucu) ?? ipuclari[0];
+
+const projeler = (await getCollection('projeler')).sort((a, b) => a.data.sira - b.data.sira);
+
+const konuAdi = (slug: string) => KONULAR.find((k) => k.slug === slug)?.ad ?? slug;
+const renk = ['#3A45E0', '#EFA013', '#15A24A'];
+const enSonGuncelleme = hepsi
+  .map((r) => r.data.guncelleme ?? r.data.yayin)
+  .sort((a, b) => +b - +a)[0];
+---
+
+<Base
+  baslik={SITE.name}
+  aciklama={SITE.description}
+  jsonLd={{
+    '@context': 'https://schema.org',
+    '@type': 'ProfilePage',
+    mainEntity: {
+      '@type': 'Person',
+      name: SITE.author.name,
+      jobTitle: SITE.author.jobTitle,
+      url: `${SITE.url}/hakkimda`,
+      knowsAbout: SITE.author.knowsAbout,
+    },
+  }}
+>
+  <div class="kap">
+    <section class="hero">
+      <div>
+        <span class="rozet"><i></i>Yeni seri · Entra ID'ye geçiş günlüğü</span>
+        <h1>BT altyapısını <em>anlaşılır</em> hale getiren teknik kaynak.</h1>
+        <p class="giris">
+          12 yıllık sistem yöneticiliğinden çıkarılmış {hepsi.length} rehber. Her biri üretim ortamında
+          denenmiş, adımları doğrulanmış ve güncel tutuluyor.
+        </p>
+        <div class="eylemler">
+          <a class="dg" href="/rehberler">Rehberlere göz at</a>
+          <a class="dg dg-hayalet" href="/hakkimda#iletisim">Danışmanlık talebi</a>
+        </div>
+        <p class="not">
+          <i></i>Son güncelleme: {trTarih(enSonGuncelleme)}
+        </p>
+      </div>
+
+      <div class="panel">
+        <span class="panel-etiket">Son yayınlanan</span>
+        <a class="panel-kart" href={`/rehberler/${hepsi[0].id}`}>
+          <span class="etiket">{konuAdi(hepsi[0].data.konu)}</span>
+          <h3>{hepsi[0].data.baslik}</h3>
+          <span class="alt">{trTarih(hepsi[0].data.yayin)} · {hepsi[0].data.sure} dk</span>
+        </a>
+        <div class="panel-mini">
+          <div><p class="d">{hepsi.length}</p><span class="e">rehber</span></div>
+          <div><p class="d">{KONULAR.length}</p><span class="e">konu</span></div>
+          <div><p class="d">{projeler.length}</p><span class="e">proje</span></div>
+        </div>
+      </div>
+    </section>
+  </div>
+
+  <div class="guven">
+    <div class="kap">
+      <div><p class="d">{hepsi.length}</p><span class="e">Yayınlanan rehber</span></div>
+      <div>
+        <p class="d">{sayi(SITE.newsletter.subscribers)}<small>+6%</small></p><span class="e">Bülten abonesi</span>
+      </div>
+      <div><p class="d">{sayi(21480)}</p><span class="e">Aylık okuma</span></div>
+      <div><p class="d">12 yıl</p><span class="e">Saha deneyimi</span></div>
+    </div>
+  </div>
+
+  <div class="kap">
+    <section class="bolum">
+      <div class="bolum-bas">
+        <div>
+          <h2>Öne çıkanlar</h2>
+          <p>Bu ay en çok okunan ve en çok soru alan yazılar.</p>
+        </div>
+        <a href="/rehberler">Tüm arşiv →</a>
+      </div>
+
+      <div class="one-cikan">
+        <a class="bas-yazi" href={`/rehberler/${bas.id}`}>
+          <div class="ust">
+            <span style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">
+              <span class="etiket">{konuAdi(bas.data.konu)}</span>
+              <span class="rozet" style="padding:3px 9px;font-size:11px">Editör seçimi</span>
+            </span>
+            <h3>{bas.data.baslik}</h3>
+            <p>{bas.data.ozet}</p>
+          </div>
+          <span class="kart-alt">
+            <span>{trTarih(bas.data.yayin)} · {bas.data.sure} dk</span>
+            <b>Rehberi oku →</b>
+          </span>
+        </a>
+
+        <div class="takipler">
+          {
+            takipler.map((r) => (
+              <a class="takip" href={`/rehberler/${r.id}`}>
+                <span class="etiket">{konuAdi(r.data.konu)}</span>
+                <h3>{r.data.baslik}</h3>
+                <span class="alt">
+                  {trKisaTarih(r.data.yayin)} · {r.data.sure} dk
+                </span>
+              </a>
+            ))
+          }
+        </div>
+      </div>
+
+      {
+        gunun && (
+          <section class="ipucu">
+            <div class="ipucu-sol">
+              <span class="lab">
+                <i /> Günün ipucu
+              </span>
+              <h3>{gunun.data.baslik}</h3>
+              <p>{gunun.data.ozet}</p>
+              <a class="bag" href="/ipuclari">
+                Tüm hızlı ipuçları →
+              </a>
+            </div>
+            <div class="ipucu-sag">
+              <span class="terminal-bas">
+                <i />
+                <i />
+                <i />
+                <span>{gunun.data.terminalBaslik}</span>
+              </span>
+              {gunun.data.komut && <pre class="kod"><code>{gunun.data.komut.trim()}</code></pre>}
+              {gunun.data.cikti && <div class="terminal-cikti">{gunun.data.cikti.trim()}</div>}
+            </div>
+          </section>
+        )
+      }
+    </section>
+
+    <section class="bolum">
+      <div class="bolum-bas">
+        <div>
+          <h2>Son rehberler</h2>
+          <p>Her rehber tek bir görevi baştan sona bitirir ve sonunda doğrulama adımı içerir.</p>
+        </div>
+        <a href="/rehberler">Tüm rehberler →</a>
+      </div>
+      <div class="izgara">
+        {
+          sonlar.map((r, i) => (
+            <a class="kart" href={`/rehberler/${r.id}`}>
+              <span class="kart-serit" style={`background:${renk[i % renk.length]}`} />
+              <div class="kart-govde">
+                <span class="etiket">{konuAdi(r.data.konu)}</span>
+                <h3>{r.data.baslik}</h3>
+                <p>{r.data.ozet}</p>
+              </div>
+              <span class="kart-alt">
+                <span>
+                  {trKisaTarih(r.data.yayin)} · {r.data.sure} dk
+                </span>
+                <b>Oku →</b>
+              </span>
+            </a>
+          ))
+        }
+      </div>
+    </section>
+
+    <section class="bolum">
+      <div class="bolum-bas">
+        <div>
+          <h2>Portfolyo</h2>
+          <p>Yazdıklarımın çoğu bu projelerden çıktı. Her biri ölçülebilir bir sonuçla kapandı.</p>
+        </div>
+        <a href="/portfolyo">Tüm projeler →</a>
+      </div>
+      <div class="projeler">
+        {
+          projeler.map((p) => (
+            <a class="proje" href={`/portfolyo/${p.id}`}>
+              <span class="ust">
+                <span class="proje-ikon" aria-hidden="true">
+                  <svg width="17" height="17" viewBox="0 0 18 18" fill="none">
+                    <rect x="2.5" y="2.5" width="13" height="13" rx="2.6" stroke="currentColor" stroke-width="1.5" />
+                    <path d="M6 9.2l2 2 4-4.4" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" />
+                  </svg>
+                </span>
+                <span class="yil">{p.data.yil}</span>
+              </span>
+              <h3>{p.data.baslik}</h3>
+              <p>{p.data.ozet}</p>
+              <span class="metrikler">
+                {p.data.metrikler.slice(0, 3).map((m, i) => (
+                  <span class={i === 2 ? 'metrik metrik-notr' : 'metrik'}>
+                    {m.deger} {m.etiket.toLowerCase()}
+                  </span>
+                ))}
+              </span>
+              <span class="yigin">
+                {p.data.teknolojiler.slice(0, 3).map((t) => (
+                  <span>{t}</span>
+                ))}
+              </span>
+            </a>
+          ))
+        }
+      </div>
+    </section>
+
+    <Bulten />
+  </div>
+</Base>

@@ -1,0 +1,249 @@
+---
+import Base from '../../layouts/Base.astro';
+import Bulten from '../../components/Bulten.astro';
+import { getCollection, render } from 'astro:content';
+import { SITE, KONULAR, trTarih, sayi } from '../../site.js';
+
+export async function getStaticPaths() {
+  const rehberler = (await getCollection('rehberler'))
+    .filter((r) => !r.data.taslak)
+    .sort((a, b) => +b.data.yayin - +a.data.yayin);
+
+  return rehberler.map((r, i) => ({
+    params: { slug: r.id },
+    props: {
+      girdi: r,
+      onceki: rehberler[i + 1] ?? null,
+      sonraki: rehberler[i - 1] ?? null,
+      ilgili: rehberler.filter((d) => d.id !== r.id && d.data.konu === r.data.konu).slice(0, 3),
+    },
+  }));
+}
+
+const { girdi, onceki, sonraki, ilgili } = Astro.props;
+const { Content, headings } = await render(girdi);
+const d = girdi.data;
+
+const konu = KONULAR.find((k) => k.slug === d.konu);
+const url = `${SITE.url}/rehberler/${girdi.id}`;
+const paylasMetni = encodeURIComponent(d.baslik);
+const paylasUrl = encodeURIComponent(url);
+
+const gunFarki = d.guncelleme
+  ? Math.round((Date.now() - +d.guncelleme) / 86400000)
+  : null;
+
+const semalar = [
+  {
+    '@context': 'https://schema.org',
+    '@type': 'TechArticle',
+    headline: d.baslik,
+    description: d.ozet,
+    inLanguage: 'tr-TR',
+    datePublished: d.yayin.toISOString(),
+    dateModified: (d.guncelleme ?? d.yayin).toISOString(),
+    timeRequired: `PT${d.sure}M`,
+    articleSection: konu?.ad ?? d.konu,
+    keywords: d.etiketler.join(', '),
+    mainEntityOfPage: { '@type': 'WebPage', '@id': url },
+    image: `${SITE.url}/og/${girdi.id}.png`,
+    author: {
+      '@type': 'Person',
+      name: SITE.author.name,
+      jobTitle: SITE.author.jobTitle,
+      url: `${SITE.url}/hakkimda`,
+    },
+    publisher: { '@type': 'Person', name: SITE.author.name, url: SITE.url },
+  },
+  {
+    '@context': 'https://schema.org',
+    '@type': 'BreadcrumbList',
+    itemListElement: [
+      { '@type': 'ListItem', position: 1, name: 'Ana sayfa', item: SITE.url },
+      { '@type': 'ListItem', position: 2, name: 'Rehberler', item: `${SITE.url}/rehberler` },
+      { '@type': 'ListItem', position: 3, name: konu?.ad ?? d.konu, item: `${SITE.url}/konu/${d.konu}` },
+      { '@type': 'ListItem', position: 4, name: d.baslik, item: url },
+    ],
+  },
+];
+
+const h2ler = headings.filter((h) => h.depth === 2);
+---
+
+<Base
+  baslik={d.seoBaslik ?? d.baslik}
+  aciklama={d.ozet}
+  tur="article"
+  ogGorsel={`/og/${girdi.id}.png`}
+  jsonLd={semalar}
+>
+  <div class="okuma-cubugu" aria-hidden="true"><span id="okuma"></span></div>
+
+  <div class="kap">
+    <nav class="kirinti" aria-label="Kırıntı yolu">
+      <a href="/">Ana sayfa</a><span class="ayrac">/</span>
+      <a href="/rehberler">Rehberler</a><span class="ayrac">/</span>
+      <a href={`/konu/${d.konu}`}>{konu?.ad ?? d.konu}</a><span class="ayrac">/</span>
+      <span aria-current="page">{d.baslik}</span>
+    </nav>
+
+    <header class="yazi-bas">
+      <span class="etiket">{konu?.ad ?? d.konu}{d.seri ? ` · ${d.seri}` : ''}</span>
+      <h1>{d.baslik}</h1>
+      <p class="ozet">{d.ozet}</p>
+
+      <div class="imza">
+        <span class="kisi">
+          <span class="mk" aria-hidden="true">{SITE.author.initials}</span>
+          <span>
+            <span class="ad">{SITE.author.name}</span>
+            <span class="tarih">{trTarih(d.yayin)} · {d.sure} dk okuma</span>
+          </span>
+        </span>
+        {
+          gunFarki !== null && (
+            <span class="rozet rozet-yesil">
+              <i />
+              Son güncelleme: {gunFarki === 0 ? 'bugün' : `${gunFarki} gün önce`}
+            </span>
+          )
+        }
+        <span class="bosluk"></span>
+        <span class="paylas">
+          <a
+            href={`https://www.linkedin.com/sharing/share-offsite/?url=${paylasUrl}`}
+            rel="noopener"
+            target="_blank"
+            aria-label="LinkedIn'de paylaş"
+          >
+            <svg width="15" height="15" viewBox="0 0 16 16" fill="none" aria-hidden="true"
+              ><rect x="2.5" y="2.5" width="11" height="11" rx="2" stroke="currentColor" stroke-width="1.5"
+              ></rect><path
+                d="M5.2 6.8v4M5.2 5.1v.01M8 10.8V8.4a1.5 1.5 0 013 0v2.4"
+                stroke="currentColor"
+                stroke-width="1.5"
+                stroke-linecap="round"></path></svg
+            >
+          </a>
+          <a
+            href={`https://x.com/intent/tweet?text=${paylasMetni}&url=${paylasUrl}`}
+            rel="noopener"
+            target="_blank"
+            aria-label="X'te paylaş"
+          >
+            <svg width="15" height="15" viewBox="0 0 16 16" fill="none" aria-hidden="true"
+              ><path d="M3.5 3.5l9 9M12.5 3.5l-9 9" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"
+              ></path></svg
+            >
+          </a>
+        </span>
+      </div>
+    </header>
+
+    <div class="yazi-duzen">
+      <article class="metin">
+        <Content />
+      </article>
+
+      <aside class="yan">
+        {
+          h2ler.length > 1 && (
+            <nav class="icindekiler" aria-label="İçindekiler">
+              <span class="yan-etiket">İçindekiler</span>
+              {h2ler.map((h) => (
+                <a href={`#${h.slug}`}>{h.text}</a>
+              ))}
+            </nav>
+          )
+        }
+        <div class="yan-tanitim">
+          <h3>Haftada bir teknik not</h3>
+          <p>{sayi(SITE.newsletter.subscribers)} BT çalışanı okuyor. Reklam yok, sponsor yok.</p>
+          <a class="dg" href="/#bulten">Bültene katıl</a>
+        </div>
+        {
+          ilgili.length > 0 && (
+            <div class="yan-kutu">
+              <span class="yan-etiket">İlgili rehberler</span>
+              {ilgili.map((r) => (
+                <a class="baslikli" href={`/rehberler/${r.id}`}>
+                  {r.data.baslik}
+                  <span>{r.data.sure} dk</span>
+                </a>
+              ))}
+            </div>
+          )
+        }
+      </aside>
+    </div>
+
+    <section class="yazar-kutu">
+      <span class="mk" aria-hidden="true">{SITE.author.initials}</span>
+      <div>
+        <span class="ad">{SITE.author.name}</span>
+        <p>
+          {SITE.author.jobTitle}, {SITE.author.location}. 12 yıldır Windows Server, Active Directory ve ağ
+          altyapısıyla uğraşıyor; öğrendiklerini bu blogda üretim ortamında denenmiş rehberlere çeviriyor.
+        </p>
+      </div>
+      <a class="dg dg-hayalet" href="/hakkimda">Hakkımda</a>
+    </section>
+
+    <nav class="onceki-sonraki" aria-label="Diğer yazılar">
+      {
+        onceki ? (
+          <a class="os-kart" href={`/rehberler/${onceki.id}`}>
+            <span class="yon">← Önceki</span>
+            <h3>{onceki.data.baslik}</h3>
+          </a>
+        ) : (
+          <span />
+        )
+      }
+      {
+        sonraki && (
+          <a class="os-kart sonraki" href={`/rehberler/${sonraki.id}`}>
+            <span class="yon">Sonraki →</span>
+            <h3>{sonraki.data.baslik}</h3>
+          </a>
+        )
+      }
+    </nav>
+
+    <Bulten
+      baslik="Bu rehber işinize yaradıysa, haftalık notu kaçırmayın."
+      aciklama="Her pazartesi sabahı sahadan bir teknik not. Dilediğiniz an çıkabilirsiniz."
+    />
+  </div>
+</Base>
+
+<script>
+  // okuma ilerleme çubuğu + içindekilerde etkin başlık
+  const cubuk = document.getElementById('okuma');
+  const metin = document.querySelector('.metin');
+  const baglar = [...document.querySelectorAll<HTMLAnchorElement>('.icindekiler a')];
+
+  function guncelle() {
+    if (!cubuk || !metin) return;
+    const kutu = metin.getBoundingClientRect();
+    const toplam = kutu.height - window.innerHeight;
+    const gecilen = Math.min(Math.max(-kutu.top, 0), Math.max(toplam, 1));
+    cubuk.style.width = `${(gecilen / Math.max(toplam, 1)) * 100}%`;
+  }
+
+  const basliklar = [...document.querySelectorAll<HTMLElement>('.metin h2[id]')];
+  const gozlemci = new IntersectionObserver(
+    (girisler) => {
+      girisler.forEach((g) => {
+        if (!g.isIntersecting) return;
+        baglar.forEach((b) => b.classList.toggle('etkin', b.hash === `#${g.target.id}`));
+      });
+    },
+    { rootMargin: '-100px 0px -70% 0px' }
+  );
+  basliklar.forEach((b) => gozlemci.observe(b));
+
+  addEventListener('scroll', guncelle, { passive: true });
+  addEventListener('resize', guncelle);
+  guncelle();
+</script>

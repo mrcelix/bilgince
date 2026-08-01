@@ -1,0 +1,31 @@
+---
+import { trKisaTarih } from '../site.js';
+
+interface Props {
+  href: string;
+  baslik: string;
+  ozet: string;
+  tarih: Date;
+  sure: number;
+  etiketler?: string[];
+}
+const { href, baslik, ozet, tarih, sure, etiketler = [] } = Astro.props;
+---
+
+<a class="satir" href={href}>
+  <span class="tarih">{trKisaTarih(tarih)}</span>
+  <span>
+    <h3>{baslik}</h3>
+    <p>{ozet}</p>
+    {
+      etiketler.length > 0 && (
+        <span class="yigin" style="margin-top:9px">
+          {etiketler.map((e) => (
+            <span>{e}</span>
+          ))}
+        </span>
+      )
+    }
+  </span>
+  <span class="sure">{sure} dk</span>
+</a>
