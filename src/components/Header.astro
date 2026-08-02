@@ -44,9 +44,7 @@ const etkin = (p: string) => (yol === p || yol.startsWith(p + '/') ? 'page' : un
 
 <header class="bas">
   <div class="kap">
-    <a class="logo" href="/" aria-label={`${SITE.name} ana sayfa`}>
-      <span class="logo-mk" aria-hidden="true">bc</span>{SITE.name}
-    </a>
+    <a class="logo" href="/" aria-label={`${SITE.name} ana sayfa`}>{SITE.name}</a>
 
     <nav aria-label="Ana menü" style="display:contents">
       <ul class="gez">
@@ -187,8 +185,8 @@ const etkin = (p: string) => (yol === p || yol.startsWith(p + '/') ? 'page' : un
       <div class="mega-tanitim">
         <span class="mega-etiket">Bülten</span>
         <div class="mega-kart">
-          <h3>Her pazartesi bir teknik not</h3>
-          <span class="alt">{sayi(SITE.newsletter.subscribers)} abone · reklam yok</span>
+          <h3>Yeni yazı çıkınca haber ver</h3>
+          <span class="alt">{sayi(SITE.newsletter.subscribers)} abone · takvim yok, reklam yok</span>
         </div>
         <a class="dg" href="/#bulten">Bültene katıl</a>
         <a class="mega-tum" href="/hakkimda">Bu site neden var? →</a>
@@ -200,7 +198,7 @@ const etkin = (p: string) => (yol === p || yol.startsWith(p + '/') ? 'page' : un
 <!-- ------------------------------------------------------- mobil çekmece -->
 <div class="cekmece" id="cekmece" data-acik="hayir">
   <div class="cekmece-ust">
-    <a class="logo" href="/"><span class="logo-mk" aria-hidden="true">bc</span>{SITE.name}</a>
+    <a class="logo" href="/">{SITE.name}</a>
     <button class="cekmece-kapat" type="button" aria-label="Menüyü kapat" data-cekmece-kapat>
       <svg width="15" height="15" viewBox="0 0 16 16" fill="none" aria-hidden="true"
         ><path d="M4 4l8 8M12 4l-8 8" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"></path></svg

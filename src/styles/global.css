@@ -268,26 +268,27 @@ code {
   align-items: center;
   gap: 10px;
 }
+/* Simgesiz, renkli kelime logo. Degrade palet içinde kalıyor:
+   indigo (eylem) → menekşe → kehribar (dikkat). */
 .logo {
-  display: flex;
-  align-items: center;
-  gap: 11px;
-  font-size: 19px;
-  font-weight: 900;
-  letter-spacing: -0.035em;
-  padding-right: 12px;
+  display: inline-block;
+  font-size: 22px;
+  font-weight: 1000;
+  letter-spacing: -0.045em;
+  padding-right: 14px;
+  color: var(--indigo);
+  background-image: linear-gradient(96deg, #3a45e0 0%, #7b3fd4 42%, #e8901a 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
 }
-.logo-mk {
-  width: 32px;
-  height: 32px;
-  border-radius: 9px;
-  display: grid;
-  place-items: center;
-  flex: none;
-  background: linear-gradient(150deg, var(--indigo), var(--indigo-d));
-  color: #fff;
-  font-size: 13px;
-  font-weight: 900;
+.logo:hover {
+  background-image: linear-gradient(96deg, #2730a8 0%, #6a2fc4 42%, #d17f0f 100%);
+}
+/* koyu zeminde (altlık, çekmece alt bandı) daha açık duraklar */
+.site-alt .logo,
+.mega-tanitim .logo {
+  background-image: linear-gradient(96deg, #8fa0ff 0%, #cba0ff 42%, #ffc44d 100%);
 }
 
 .gez {
@@ -651,13 +652,15 @@ code {
 }
 
 /* ------------------------------------------------------------------- altlık */
-.alt {
+/* Altlık: sınıf adı bilerek `.site-alt`. Kartların içindeki `.alt`
+   (meta satırı) ile çakışıyordu ve o satırlara lacivert zemin sızıyordu. */
+.site-alt {
   background: var(--navy);
   color: #9fa9bf;
   font-size: 12.5px;
   margin-top: 56px;
 }
-.alt .kap {
+.site-alt .kap {
   display: flex;
   justify-content: space-between;
   gap: 40px;
@@ -665,15 +668,20 @@ code {
   padding-bottom: 34px;
   flex-wrap: wrap;
 }
-.alt .marka {
+.site-alt .marka {
   display: flex;
   flex-direction: column;
   gap: 10px;
   max-width: 34ch;
 }
-.alt .marka .logo {
-  color: #fff;
+.site-alt .marka .logo {
   padding: 0;
+}
+
+/* kart içi meta satırı — zemin devralmaz */
+.alt {
+  background: none;
+  color: var(--muted);
 }
 .alt-sutunlar {
   display: flex;

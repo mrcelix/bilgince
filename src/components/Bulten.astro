@@ -8,8 +8,8 @@ interface Props {
 }
 
 const {
-  baslik = 'Her pazartesi sabahı, sahadan bir teknik not.',
-  aciklama = `${sayi(SITE.newsletter.subscribers)} BT çalışanı okuyor. Reklam yok, sponsor yok, dilediğiniz an çıkabilirsiniz.`,
+  baslik = 'Yeni yazı yayınlandığında haberiniz olsun.',
+  aciklama = `${SITE.newsletter.vaat} ${sayi(SITE.newsletter.subscribers)} BT çalışanı abone. Reklam yok, sponsor yok, dilediğiniz an çıkabilirsiniz.`,
   id = 'bulten',
 } = Astro.props;
 

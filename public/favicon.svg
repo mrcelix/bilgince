@@ -2,10 +2,11 @@
   <defs>
     <linearGradient id="g" x1="0" y1="0" x2="1" y2="1">
       <stop offset="0" stop-color="#3A45E0" />
-      <stop offset="1" stop-color="#2730A8" />
+      <stop offset="0.45" stop-color="#7B3FD4" />
+      <stop offset="1" stop-color="#E8901A" />
     </linearGradient>
   </defs>
-  <rect width="32" height="32" rx="9" fill="url(#g)" />
-  <text x="16" y="22" text-anchor="middle" font-family="Nunito, system-ui, sans-serif" font-size="15"
-        font-weight="900" letter-spacing="-0.5" fill="#fff">bc</text>
+  <rect width="32" height="32" rx="8" fill="#FFFFFF" />
+  <text x="16" y="24" text-anchor="middle" font-family="Nunito, system-ui, sans-serif" font-size="26"
+        font-weight="1000" letter-spacing="-1" fill="url(#g)">b</text>
 </svg>

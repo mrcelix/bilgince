@@ -75,24 +75,14 @@ function kart({ ust, baslik, alt }: { ust: string; baslik: string; alt: string }
           baslik
         ),
       ]),
+      // Simge yok: renkli kelime logo. Satori background-clip:text desteklemediği
+      // için degrade yerine iki parçalı renklendirme kullanılıyor.
       e('div', { display: 'flex', alignItems: 'center' }, [
-        e(
-          'div',
-          {
-            width: 56,
-            height: 56,
-            borderRadius: 16,
-            backgroundColor: '#3A45E0',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            fontSize: 22,
-            fontWeight: 800,
-            letterSpacing: '-0.03em',
-          },
-          'bc'
-        ),
-        e('div', { marginLeft: 20, fontSize: 26, fontWeight: 800 }, SITE.author.name),
+        e('div', { display: 'flex', fontSize: 32, fontWeight: 800, letterSpacing: '-0.04em' }, [
+          e('div', { color: '#9FA6FF' }, 'bilgi'),
+          e('div', { color: '#F0A93A' }, 'nce'),
+        ]),
+        e('div', { marginLeft: 26, fontSize: 26, fontWeight: 800 }, SITE.author.name),
         e('div', { marginLeft: 16, fontSize: 26, fontWeight: 400, color: '#9FA9BF' }, alt),
       ]),
     ]
@@ -104,7 +94,6 @@ export async function getStaticPaths() {
   const projeler = await getCollection('projeler');
   const komutlar = await getCollection('komutlar');
   const konuAdi = (slug: string) => KONULAR.find((k) => k.slug === slug)?.ad ?? slug;
-  const alanAdi = SITE.url.replace('https://', '');
   const seriler = [...new Set(rehberler.map((r) => r.data.seri).filter(Boolean))] as string[];
 
   return [
@@ -113,7 +102,7 @@ export async function getStaticPaths() {
       props: {
         ust: 'BT rehberleri ve saha ipuçları',
         baslik: 'Üretim ortamında denenmiş teknik rehberler',
-        alt: `· ${alanAdi}`,
+        alt: '',
       },
     },
     ...rehberler.map((r) => ({
@@ -121,19 +110,19 @@ export async function getStaticPaths() {
       props: {
         ust: `Rehber · ${konuAdi(r.data.konu)}`,
         baslik: r.data.baslik,
-        alt: `· ${alanAdi} · ${r.data.sure} dk`,
+        alt: `· ${r.data.sure} dk okuma`,
       },
     })),
     ...projeler.map((p) => ({
       params: { slug: `proje-${p.id}` },
-      props: { ust: `Proje · ${p.data.yil}`, baslik: p.data.baslik, alt: `· ${alanAdi}` },
+      props: { ust: `Proje · ${p.data.yil}`, baslik: p.data.baslik, alt: `· ${p.data.kapsam}` },
     })),
     ...KONULAR.map((k) => ({
       params: { slug: `konu-${k.slug}` },
       props: {
-        ust: 'Konu',
+        ust: `Konu · ${k.grup}`,
         baslik: k.ad,
-        alt: `· ${alanAdi} · ${rehberler.filter((r) => r.data.konu === k.slug).length} rehber`,
+        alt: `· ${rehberler.filter((r) => r.data.konu === k.slug).length} rehber`,
       },
     })),
     ...seriler.map((s) => ({
@@ -141,44 +130,36 @@ export async function getStaticPaths() {
       props: {
         ust: 'Seri',
         baslik: s,
-        alt: `· ${alanAdi} · ${rehberler.filter((r) => r.data.seri === s).length} bölüm`,
+        alt: `· ${rehberler.filter((r) => r.data.seri === s).length} bölüm`,
       },
     })),
     {
       params: { slug: 'sayfa-rehberler' },
-      props: { ust: 'Arşiv', baslik: 'Tüm rehberler', alt: `· ${alanAdi} · ${rehberler.length} yazı` },
+      props: { ust: 'Arşiv', baslik: 'Tüm rehberler', alt: `· ${rehberler.length} yazı` },
     },
     {
       params: { slug: 'sayfa-komutlar' },
-      props: {
-        ust: 'Araçlar',
-        baslik: 'Komut kütüphanesi',
-        alt: `· ${alanAdi} · ${komutlar.length} komut`,
-      },
+      props: { ust: 'Araçlar', baslik: 'Komut kütüphanesi', alt: `· ${komutlar.length} komut` },
     },
     {
       params: { slug: 'sayfa-portfolyo' },
-      props: { ust: 'Portfolyo', baslik: 'Ölçülebilir sonuçla kapanan projeler', alt: `· ${alanAdi}` },
+      props: { ust: 'Portfolyo', baslik: 'Ölçülebilir sonuçla kapanan projeler', alt: '' },
     },
     {
       params: { slug: 'sayfa-hakkimda' },
-      props: {
-        ust: 'Hakkımda',
-        baslik: 'Sunucu odasında öğrendiklerimi saklamıyorum',
-        alt: `· ${alanAdi}`,
-      },
+      props: { ust: 'Hakkımda', baslik: 'Sunucu odasında öğrendiklerimi saklamıyorum', alt: '' },
     },
     {
       params: { slug: 'sayfa-ozgecmis' },
       props: {
         ust: `Özgeçmiş · ${SITE.author.jobTitle}`,
         baslik: SITE.author.name,
-        alt: `· ${alanAdi} · 12 yıl saha`,
+        alt: '· 12 yıl saha',
       },
     },
     {
       params: { slug: 'sayfa-ipuclari' },
-      props: { ust: 'İpuçları', baslik: 'Tek ekranda biten teknik notlar', alt: `· ${alanAdi}` },
+      props: { ust: 'İpuçları', baslik: 'Tek ekranda biten teknik notlar', alt: '' },
     },
   ];
 }

@@ -27,7 +27,9 @@ export const SITE = {
   },
   newsletter: {
     subscribers: 4812,
-    cadence: 'Haftada bir e-posta',
+    // Sabit takvim yok: e-posta yalnızca yeni yazı yayınlandığında gider.
+    cadence: 'Yeni yazı çıkınca e-posta',
+    vaat: 'Yeni yazı yayınlandığında tek e-posta. Takvim yok, doldurma içerik yok.',
     // Bülten sağlayıcısının form uç noktası. Boş bırakılırsa form yerine
     // "henüz bağlanmadı" notu görünür — sessizce yutulan kayıt olmaz.
     // Buttondown:  https://buttondown.com/api/emails/embed-subscribe/<kullanici>
