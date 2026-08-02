@@ -1,0 +1,84 @@
+---
+baslik: "Sıfır güven, 200 kişilik bir şirkette ne demek?"
+ozet: "Büyük kurumlar için yazılmış bir çerçeveyi olduğu gibi uygulamaya çalışmak boşa emektir. Aynı ilkeleri ölçeğinize göre kurmak mümkün."
+konu: "guvenlik"
+etiketler: ["sifir-guven", "mimari", "kimlik"]
+yayin: 2026-05-01
+sure: 12
+---
+
+Sıfır güven, satıcı sunumlarında bir ürün gibi anlatılıyor. Değil. Tek cümlelik bir ilkedir: **ağ konumu güven üretmez.**
+
+Klasik model şöyleydi: ofis ağının içindeysen güvenilirsin, dışındaysan VPN ile içeri gel. Bu model iki şey yüzünden çöktü — uygulamalar buluta taşındı ve kullanıcılar her yerden çalışmaya başladı.
+
+## Küçük kurumda uygulanabilir hâli
+
+Büyük kurum mimarileri onlarca bileşen içerir. Küçük ve orta ölçekte aynı ilkeyi dört adımda kurabilirsiniz ve dördü de zaten sahip olduğunuz araçlarla mümkündür.
+
+**1. Kimlik yeni sınır.**
+Erişim kararı IP adresine değil kullanıcıya ve cihaza bakmalı. Bu, kimlik sağlayıcınızın merkezde olması demektir: tüm uygulamalar oraya bağlanır, kimlik doğrulama tek yerde olur.
+
+Pratik ilk iş: uygulamaları SSO'ya bağlamak ve yerel hesapları kapatmak. Yerel hesap açık kaldığı sürece kimlik sınırınız yoktur.
+
+**2. Güçlü kimlik doğrulama.**
+MFA zorunlu, tercihen kimlik avına dayanıklı yöntemlerle. Bu adım olmadan geri kalanı anlamsızdır.
+
+**3. Cihaz durumu koşul olsun.**
+Erişim yalnızca kim olduğunuza değil, hangi cihazdan geldiğinize de bağlı olmalı: cihaz yönetimli mi, diski şifreli mi, uç nokta koruması çalışıyor mu.
+
+Bu, koşullu erişim politikalarıyla yapılır ve modern kimlik platformlarında hazır gelir.
+
+**4. En az yetki.**
+Kullanıcı yalnızca ihtiyacı olana erişsin. Bu, dosya paylaşımlarından uygulama rollerine kadar her yerde geçerlidir ve genelde en çok emek isteyen adımdır.
+
+## VPN'i tamamen kaldırmak zorunda değilsiniz
+
+Sıfır güven konuşmalarında sık duyulan "VPN öldü" cümlesi, küçük ortamlar için abartılıdır.
+
+Gerçekçi hedef şudur: **yeni erişim ihtiyaçları için VPN'e ekleme yapmayı bırakmak.** Web tabanlı bir uygulamayı VPN arkasına koymak yerine kimlik sağlayıcıya bağlayıp doğrudan yayınlayın. VPN, yalnızca eski protokollerle çalışan ve başka türlü yayınlanamayan sistemler için kalsın.
+
+Zamanla VPN'in arkasındaki sistem listesi kısalır. Bu, gerçekçi ve ölçülebilir bir hedeftir.
+
+## Segmentasyon: ağ tarafındaki karşılığı
+
+Sıfır güven ağı tamamen görmezden gelmez; ağın **tek başına güven üretmemesini** ister. Pratikte bu, yanal hareketi zorlaştırmak demektir.
+
+Küçük ortamda en yüksek getirili üç segment: yönetim arayüzleri, sunucular, IoT/kameralar. Kullanıcı ağından bu üçüne erişim varsayılan olarak kapalı olmalı, ihtiyaç duyulan portlar açık listeyle tanımlanmalı.
+
+Windows tarafında yerel güvenlik duvarını açık tutmak da bu kapsamdadır ve bedava bir kazançtır.
+
+## Sırayla ve ölçerek
+
+Hepsini birden yapmaya çalışmak, projeyi ilk engelde durdurur. İşleyen sıra:
+
+1. MFA'yı herkese, kimlik avına dayanıklı yöntemi yöneticilere
+2. Uygulamaları SSO'ya taşı, yerel hesapları kapat
+3. Cihaz uyumluluğu koşulunu önce pilot gruba, sonra herkese
+4. Yönetim arayüzlerini segmentle
+5. Erişim gözden geçirmesini rutinleştir
+
+Her adımın bir ölçüsü olsun. Örneğin ikinci adım için: **SSO'ya bağlı uygulama sayısı / toplam uygulama sayısı.** Bu oran, projenin gerçek ilerlemesini gösteren tek sayıdır.
+
+## Ne satın almanız gerekmiyor
+
+Küçük ölçekte şunlar genelde gereksizdir ve bütçeyi erken tüketir: ayrı bir mikro-segmentasyon ürünü, ağ erişim kontrolü (NAC) donanımı, ayrı bir sıfır güven ağ geçidi.
+
+Bunların çoğu, kimlik ve uç nokta tarafını halletmeden alındığında hiçbir şey çözmez. Elinizdeki kimlik platformunun koşullu erişim yeteneklerini sonuna kadar kullanmadan yeni ürün almayın.
+
+## En sık atlanan parça: servis hesapları
+
+Kullanıcılar için sıfır güven kurup servis hesaplarını eski hâlde bırakmak, kapıyı kilitleyip pencereyi açık bırakmaktır.
+
+Servis hesapları MFA yapamaz. Bu yüzden onlar için farklı kontroller gerekir: iş yükü kimlikleri, sertifika tabanlı doğrulama, kaynak IP kısıtlaması ve kesinlikle interaktif oturum açma yasağı.
+
+Envanterinizi çıkarın ve her servis hesabı için "bu nereden bağlanır" sorusuna cevap yazın. Cevabı olmayan hesaplar, saldırganın en sevdiği yoldur.
+
+## Doğrulama adımı
+
+Üç testi yapın.
+
+**Ağ konumu testi:** Ofis ağındaki bir cihazdan, yönetilmeyen bir kişisel cihazla kurumsal bir uygulamaya erişmeyi deneyin. Ofiste olmak tek başına erişim sağlıyorsa, ağ hâlâ güven üretiyor demektir.
+
+**MFA kapsam testi:** MFA'sız oturum açabilen hesap sayısını sorgulayın. Sıfır değilse istisnaları listeleyin ve her birinin gerekçesini yazın.
+
+**Yanal hareket testi:** Kullanıcı ağındaki bir makineden bir sunucunun yönetim portuna bağlanmayı deneyin — **başarısız olmalı**. Başarılıysa segmentasyon kâğıt üzerindedir.

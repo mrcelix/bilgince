@@ -1,0 +1,113 @@
+---
+baslik: "Tedarikçiye erişim vermenin doğru yolu"
+ozet: "Kalıcı VPN hesabı ve paylaşılan parola en yaygın iki hatadır. Zamanla sınırlı, izlenebilir ve kapatılabilir erişim kurmak."
+konu: "guvenlik"
+etiketler: ["tedarikci", "erisim", "risk"]
+yayin: 2026-05-22
+sure: 11
+---
+
+Bir denetimde tedarikçi erişimlerini listelemem istendi. On dört aktif VPN hesabı buldum. Altısının bağlı olduğu proje bitmişti. İkisinin hangi firmaya ait olduğunu kimse hatırlamıyordu.
+
+Tedarikçi erişimi, kurumsal güvenlikte en çok ihmal edilen alandır — çünkü kimsenin doğrudan sahibi değildir.
+
+## İki yaygın hata
+
+**Kalıcı hesap.** "Gerektiğinde bağlanırlar" diye açılan hesap hiç kapanmaz. Tedarikçi tarafındaki personel değişir, hesabın kimde olduğu bilinmez hâle gelir.
+
+**Paylaşılan kimlik bilgisi.** Bir hesap, tedarikçinin üç çalışanında birden. Bir işlem yapıldığında kimin yaptığı belli değildir; denetim izi anlamsızdır.
+
+İkisi de kolaylık için yapılır ve ikisi de olay anında en pahalı kalemlerdir.
+
+## Kurulacak model
+
+**1. Kişiye özel hesap.** Tedarikçi personelinin her biri için ayrı hesap. Adlandırmada firma görünsün: `dis-acmebt-fyilmaz`. Böylece raporda anında ayrışırlar.
+
+**2. Zamanla sınırlı.** Hesabın bitiş tarihi olsun ve dizin bunu kendisi uygulasın:
+
+```powershell
+New-ADUser -Name 'dis-acmebt-fyilmaz' -AccountExpirationDate (Get-Date).AddDays(30) `
+  -Path 'OU=Tedarikci,DC=sirket,DC=local' -Enabled $true
+```
+
+Süre uzatımı bir talep ve onay gerektirsin. Bu tek kural, unutulmuş hesap sorununu kökten çözer.
+
+**3. Dar kapsam.** Tedarikçi yalnızca çalıştığı sisteme erişsin. "Ağa alalım, gerisini kendisi bulur" yaklaşımı, en geniş yetkiyi en az bilinen kişiye vermektir.
+
+**4. MFA zorunlu.** İstisnasız. Dış erişim, iç erişimden daha yüksek risk taşır; daha gevşek değil daha sıkı olmalıdır.
+
+**5. Oturum kaydı.** Kritik sistemlerde tedarikçi oturumları kaydedilsin. Bu hem caydırıcıdır hem de bir sorun çıktığında ne yapıldığını gösterir.
+
+## Erişim yöntemi seçimi
+
+VPN vermek en kolay ama en geniş çözümdür. Alternatifleri değerlendirin:
+
+**Uygulama düzeyinde yayınlama.** Tedarikçi bir web arayüzüne erişecekse, ters vekil ve kimlik sağlayıcı üzerinden yayınlayın; ağa hiç girmesin.
+
+**Atlama sunucusu (jump host).** Sunucu yönetimi gerekiyorsa, tedarikçi yalnızca bir atlama sunucusuna bağlansın ve oradan hedeflere gitsin. Tüm oturum tek noktadan geçer, kaydedilir ve kısıtlanır.
+
+**Eşlik edilen oturum.** Yüksek riskli işlerde tedarikçi ekranı paylaşsın, sizin personeliniz izlesin. Yavaş ama bazı işler için tek doğru yöntem budur.
+
+## Sözleşme tarafı
+
+Teknik önlemler kadar önemli ama genelde BT'nin gündeminde olmayan maddeler:
+
+- Tedarikçi personeli değiştiğinde bildirim yükümlülüğü
+- Güvenlik olayı bildirim süresi
+- Alt yüklenici kullanımı ve onay şartı
+- Erişimin sözleşme bitiminde otomatik sona ermesi
+- Denetim hakkı
+
+Bu maddeler yoksa teknik kontroller yarım kalır: hesabı kapatırsınız ama tedarikçinin sizin verinizle ne yaptığını bilemezsiniz.
+
+## Envanter tutun
+
+Her tedarikçi erişimi için beş alan yeterlidir: firma, kişi, erişilen sistemler, gerekçe/sözleşme referansı, bitiş tarihi.
+
+Bu tabloyu üç ayda bir gözden geçirin. Gözden geçirmeyi yapan kişi BT değil, **hizmeti alan iş birimi** olmalı — çünkü tedarikçinin hâlâ çalışıp çalışmadığını yalnızca onlar bilir.
+
+```powershell
+# süresi dolmak üzere olan dış hesaplar
+Get-ADUser -SearchBase 'OU=Tedarikci,DC=sirket,DC=local' -Filter * `
+  -Properties AccountExpirationDate, LastLogonDate |
+  Select-Object Name, AccountExpirationDate, LastLogonDate |
+  Sort-Object AccountExpirationDate
+```
+
+Bu sorguyu haftalık çalıştırıp ilgili yöneticilere göndermek, gözden geçirmenin kendiliğinden olmasını sağlar.
+
+## Ayrılış süreci
+
+Tedarikçi ilişkisi bittiğinde yapılacaklar listesi önceden hazır olsun: hesap devre dışı, VPN profili iptal, paylaşılan klasör erişimi kaldırıldı, API anahtarı döndürüldü, sertifika iptal edildi, oturum kayıtları arşivlendi.
+
+Son madde önemli: erişim biterken kayıtları silmeyin. Sonradan bir sorun ortaya çıkarsa o kayıtlar tek kanıtınızdır.
+
+## Risk sınıflandırması
+
+Her tedarikçi aynı denetimi hak etmez. Üçe ayırmak, emeği doğru yere yoğunlaştırır.
+
+**Yüksek risk:** Üretim sistemlerine yönetici erişimi olan, kişisel veri işleyen ya da kesintisi işi durduran tedarikçiler. Tam kontrol seti uygulanır: kişiye özel hesap, MFA, oturum kaydı, eşlik edilen erişim, yıllık gözden geçirme.
+
+**Orta risk:** Belirli bir uygulamaya sınırlı erişimi olanlar. Kişiye özel hesap ve MFA yeterli; oturum kaydı isteğe bağlı.
+
+**Düşük risk:** Salt okunur erişim, tek bir raporlama arayüzü. Standart kontroller yeter.
+
+Sınıflandırmayı sözleşme aşamasında yapın. Erişim talebi geldikten sonra yapılan sınıflandırma, aciliyet baskısı altında hep düşük çıkar.
+
+## Bulut ve API erişimi
+
+Tedarikçi erişimi denince akla VPN gelir ama bugün daha yaygın olan yol API anahtarları ve bulut kiracınıza verilen izinlerdir.
+
+Bunlar için de aynı ilkeler geçerlidir ve genelde hiç uygulanmaz: anahtarın bir sahibi olmalı, bitiş tarihi olmalı, yalnızca gereken kapsama sahip olmalı ve kullanımı izlenmelidir.
+
+Bulut tarafında tedarikçiye kalıcı rol atamak yerine, mümkünse kısa ömürlü kimlik federasyonu kullanın. Uzun ömürlü bir anahtar, tedarikçinin sisteminden sızdığında sizin sorununuz olur.
+
+## Doğrulama adımı
+
+İki testi yapın.
+
+**Süre testi:** Süresi dolmuş bir tedarikçi hesabıyla oturum açmayı deneyin — **başarısız olmalı**. Dizin süresini uygulamıyorsa (bazı sistemler kendi yerel hesabını tutar) o sistemi ayrıca kontrol edin.
+
+**Kapsam testi:** Tedarikçi hesabıyla, erişmesi gerekmeyen bir sisteme bağlanmayı deneyin. Erişebiliyorsa kapsam çizilmemiş, yalnızca varsayılmıştır.
+
+Bu iki testi yılda bir tekrarlayın; erişim kapsamları zamanla sessizce genişler.

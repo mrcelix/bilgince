@@ -99,29 +99,6 @@ const etkin = (p: string) => (yol === p || yol.startsWith(p + '/') ? 'page' : un
 
   <!-- ------------------------------------------------ Konular mega menüsü -->
   <div class="mega mega-konular" id="mega-konular" data-acik="hayir">
-    {
-      oneCikanKonular.length > 0 && (
-        <div class="mega-one-cikan">
-          <div class="kap">
-            {oneCikanKonular.map((k) => (
-              <a class="one-cikan-konu" href={`/konu/${k.slug}`}>
-                <span class="ikon" aria-hidden="true">
-                  <KonuIkon ad={k.ikon} boyut={20} />
-                </span>
-                <span class="govde">
-                  <span class="ad">
-                    {k.ad}
-                    <span class="rozet">Öne çıkan</span>
-                  </span>
-                  <span class="ac">{k.ozet}</span>
-                </span>
-                <span class="sayi">{say(k.slug)} yazı →</span>
-              </a>
-            ))}
-          </div>
-        </div>
-      )
-    }
     <div class="kap">
       {
         gorunenGruplar.map((grup) => (
@@ -164,6 +141,30 @@ const etkin = (p: string) => (yol === p || yol.startsWith(p + '/') ? 'page' : un
         <a class="mega-tum" href="/rehberler">Tüm arşiv · {rehberler.length} rehber →</a>
       </div>
     </div>
+
+    {
+      oneCikanKonular.length > 0 && (
+        <div class="mega-one-cikan">
+          <div class="kap">
+            {oneCikanKonular.map((k) => (
+              <a class="one-cikan-konu" href={`/konu/${k.slug}`}>
+                <span class="ikon" aria-hidden="true">
+                  <KonuIkon ad={k.ikon} boyut={20} />
+                </span>
+                <span class="govde">
+                  <span class="ad">
+                    {k.ad}
+                    <span class="rozet">Öne çıkan</span>
+                  </span>
+                  <span class="ac">{k.ozet}</span>
+                </span>
+                <span class="sayi">{say(k.slug)} yazı →</span>
+              </a>
+            ))}
+          </div>
+        </div>
+      )
+    }
   </div>
 
   <!-- ---------------------------------------------- Kaynaklar mega menüsü -->

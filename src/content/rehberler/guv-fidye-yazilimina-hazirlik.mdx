@@ -1,0 +1,109 @@
+---
+baslik: "Fidye yazılımına hazırlık: önlemekten çok toparlanmak"
+ozet: "Önleme katmanları gerekli ama yeterli değil. Asıl fark, şifreleme başladıktan sonra ne kadar hızlı ayağa kalktığınızda."
+konu: "guvenlik"
+etiketler: ["fidye-yazilimi", "sureklilik", "yedekleme"]
+yayin: 2026-06-12
+sure: 12
+---
+
+Fidye yazılımı savunması iki ayrı çalışmadır ve kurumlar genelde yalnızca birincisini yapar.
+
+Birincisi önlemedir: e-posta filtresi, uç nokta koruması, yama, MFA. Gereklidir ve hepsini yapmalısınız.
+
+İkincisi toparlanmadır ve asıl farkı o yaratır. Çünkü önleme katmanlarının hepsini kuran kurumlar da bu olayı yaşıyor. Fark, yaşadıktan sonra üç gün mü üç ay mı sürdüğünde ortaya çıkıyor.
+
+## Saldırganın sırası
+
+Toparlanma planı yapabilmek için saldırının nasıl ilerlediğini bilmek gerekir. Tipik sıra şudur:
+
+1. İlk erişim (kimlik avı, açık RDP, yamalanmamış uygulama)
+2. Kalıcılık ve keşif — genelde günler, bazen haftalar sürer
+3. Yetki yükseltme, hedef: etki alanı yöneticisi
+4. **Yedeklerin bulunması ve silinmesi**
+5. Veri sızdırma (çift şantaj)
+6. Şifreleme — genelde gece ya da tatil günü
+
+Dördüncü adım kritiktir: şifreleme başlamadan **önce** yedekleriniz hedef alınır. Bu yüzden "yedeğimiz var" cümlesi, yedeğin nerede ve nasıl korunduğu söylenmeden anlamlı değildir.
+
+## Yedeği saldırgandan korumak
+
+Üç özellik gerekir ve üçü birden olmalıdır.
+
+**Değiştirilemezlik.** Yedek, saklama süresi dolmadan silinemez ya da değiştirilemez olmalı. Nesne kilidi (object lock) ya da donanım tarafında WORM desteği.
+
+**Kimlik ayrımı.** Yedek sistemine üretim etki alanı kimlikleriyle erişilememeli. Etki alanı yöneticisi ele geçtiğinde yedeklere de ulaşabiliyorsa, yedek korumasızdır.
+
+**Çevrimdışı veya mantıksal ayrım.** En az bir kopya, üretim ağından erişilemeyen bir yerde.
+
+Bu üçünü karşılamayan bir yedek stratejisi, fidye senaryosunda planladığınızdan çok daha az işe yarar.
+
+## Geri dönüş sırasını önceden yazın
+
+Şifreleme sonrası en çok zaman kaybettiren şey, neyi önce ayağa kaldıracağına karar vermeye çalışmaktır.
+
+Sıra teknik değil iş temellidir ve önceden yazılmalıdır:
+
+1. **Etki alanı ve kimlik** — bunlar olmadan hiçbir şey açılmaz
+2. **Ağ ve DNS**
+3. **Kritik iş uygulamaları** (iş biriminin belirlediği ilk üç)
+4. **Dosya ve e-posta**
+5. **Geri kalanı**
+
+Her katmanın bağımlılıkları da yazılı olsun. Bir uygulamayı geri yükleyip veritabanının başka bir sunucuda olduğunu fark etmek, saatler kaybettirir.
+
+## Temiz ortam sorunu
+
+Sık atlanan bir nokta: şifrelenmiş ortama geri yükleme yapamazsınız. Saldırgan hâlâ içeride olabilir ve geri yüklenen sistemler yeniden şifrelenebilir.
+
+Bu yüzden plan, **temiz bir ortam kurmayı** içermeli: yeni sanal ağ, sıfırdan kurulmuş etki alanı denetleyicileri, sıkı erişim kontrolü. Geri yükleme oraya yapılır.
+
+Bunu olay anında tasarlamak imkânsıza yakındır. En azından adımların yazılı olması, saatler kazandırır.
+
+## Sızdırma ihtimalini varsayın
+
+Modern saldırıların çoğu şifrelemeden önce veri kopyalıyor. Yani yedekten dönseniz bile bir veri ihlali yaşamış olabilirsiniz.
+
+Bunun sonuçları teknik değil hukuki: bildirim yükümlülüğü, süre sınırları, müşteri iletişimi. Hukuk ve yönetimin süreçte baştan yer alması gerekir.
+
+Sızdırmayı tespit etmek için giden trafiği izleyin; olağandışı büyüklükte dış transferler, şifreleme başlamadan önceki en güçlü uyarı sinyalidir.
+
+## Tatbikat: kâğıt üzerinde kalmasın
+
+Yılda bir kez gerçek bir geri yükleme yapın. Tam felaket senaryosu gerekmez; bir kritik sistemi izole ortamda sıfırdan ayağa kaldırmak yeterlidir.
+
+Ölçün: **kurtarma süresi**, **eksik çıkan bağımlılıklar**, **belgelerin doğruluğu**. Üçüncüsü her tatbikatta sürpriz üretir — parolalar değişmiştir, adımlar eskimiştir, sorumlu kişi ayrılmıştır.
+
+Kurtarma belgelerinizin bir kopyası **çevrimdışı** olsun. Tüm sistemler şifreliyken wiki'deki kurtarma planına erişemezsiniz; bu, gerçek olaylarda tekrar tekrar yaşanan bir ironidir.
+
+## Erken uyarı sinyalleri
+
+Şifreleme, saldırının son adımıdır. Öncesinde günler süren bir hazırlık vardır ve o dönemde yakalanabilir. İzlenmeye değer sinyaller:
+
+**Gölge kopyaların silinmesi.** Neredeyse her fidye yazılımının ilk yaptığı iştir ve meşru kullanımı çok nadirdir:
+
+```powershell
+Get-WinEvent -FilterHashtable @{ LogName='System'; Id=524 } -MaxEvents 20
+```
+
+Ayrıca `vssadmin delete shadows` komutunun çalıştırılması, uç nokta koruma ürünlerinde yüksek öncelikli bir uyarı olmalıdır.
+
+**Yeni yerel yönetici hesabı.** Saldırgan kalıcılık için hesap açar. Olay 4720 (hesap oluşturuldu) ve 4732 (yönetici grubuna ekleme) izlenmelidir.
+
+**Olağandışı büyüklükte dış transfer.** Sızdırma aşamasının imzasıdır. Bir uç noktadan gigabaytlarca veri dışarı akıyorsa, bu neredeyse hiçbir zaman normal değildir.
+
+**Güvenlik günlüğünün temizlenmesi.** Olay 1102. Meşru sebebi yoktur; her zaman incelenmelidir.
+
+Bu dört sinyal için uyarı kurmak, ürün almadan yapabileceğiniz en yüksek getirili tespit yatırımıdır.
+
+## Doğrulama adımı
+
+Üç soruya bugün cevap verebiliyor musunuz?
+
+**"Yedeklerimizi üretim yöneticisi hesabıyla silebilir miyiz?"** Cevap evetse, fidye senaryosunda yedeğiniz yok sayılmalı.
+
+**"Son geri yükleme testimiz ne zaman yapıldı ve ne kadar sürdü?"** Tarih veremiyorsanız test yapılmamıştır.
+
+**"Tüm sistemler kapalıyken kurtarma planına nasıl erişiriz?"** Cevap "wiki'de duruyor" ise plan erişilemez demektir.
+
+Bu üç sorunun cevabı, fidye yazılımına gerçek hazırlık düzeyinizi, herhangi bir üründen daha doğru gösterir.

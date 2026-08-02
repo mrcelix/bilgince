@@ -1,0 +1,120 @@
+---
+baslik: "BitLocker'ı filo genelinde devreye almak"
+ozet: "Tek makinede açmak kolay; üç yüz makinede açıp kurtarma anahtarlarını güvence altına almak farklı bir iştir."
+konu: "windows"
+etiketler: ["bitlocker", "sifreleme", "dagitim"]
+yayin: 2026-03-06
+sure: 11
+---
+
+Disk şifreleme, kaybolan bir dizüstü bilgisayarı veri ihlalinden ayıran tek şeydir. Buna rağmen birçok kurumda yalnızca "yeni cihazlarda açık" durumdadır ve eski filo şifresizdir.
+
+Filo genelinde devreye almanın teknik kısmı kolaydır. Zor olan kısım kurtarma anahtarlarının yönetimidir.
+
+## Önce anahtar yedeklemesi
+
+Sıra kritiktir: **anahtar yedeklemesi çalışmadan şifrelemeyi başlatmayın.**
+
+Anahtarı olmayan şifreli bir disk, veri kaybıdır. Bir güncelleme sonrası kurtarma ekranı gelirse ve anahtar hiçbir yerde yoksa o makinedeki veri gitmiştir.
+
+Anahtar üç yerden birine yedeklenir: Entra ID (bulut yönetimli cihazlar), Active Directory (etki alanı üyeleri) ya da yönetim aracınızın kendi kasası.
+
+Politikayı, **yedekleme başarısız olursa şifrelemenin başlamayacağı** şekilde yapılandırın. Bu ayar varsayılan olarak açık değildir ve en önemli olanıdır.
+
+## Ön koşulları kontrol edin
+
+Şifreleme başlamadan önce filoda üç şeyi doğrulayın:
+
+**TPM durumu.** TPM yoksa kullanıcı her açılışta parola girmek zorunda kalır; bu, direnç üretir.
+
+```powershell
+Get-Tpm | Select-Object TpmPresent, TpmReady, TpmEnabled
+```
+
+**Bölüm yapısı.** BitLocker ayrı bir sistem bölümü ister. Eski kurulumlarda eksik olabilir; `bdehdcfg` ile oluşturulur.
+
+**Güvenli önyükleme.** Açık olması hem güvenlik hem uyumluluk açısından tercih edilir.
+
+Filo genelinde ön kontrol:
+
+```powershell
+Invoke-Command -ComputerName $makineler {
+    [pscustomobject]@{
+        Makine    = $env:COMPUTERNAME
+        Tpm       = (Get-Tpm).TpmReady
+        Sifreleme = (Get-BitLockerVolume -MountPoint C:).VolumeStatus
+        Koruma    = (Get-BitLockerVolume -MountPoint C:).ProtectionStatus
+    }
+} | Sort-Object Makine
+```
+
+Bu liste, dağıtım planınızın temelidir: hazır olanlar, TPM sorunu olanlar ve elle müdahale gerekenler.
+
+## Kademeli açın
+
+Tüm filoda aynı anda şifreleme başlatmak, diskleri günlerce meşgul eder ve performans şikâyetleri üretir.
+
+Halka halka ilerleyin ve her halkadan sonra doğrulayın. İlk şifreleme büyük disklerde saatler sürer; kullanıcıya bunu önceden bildirin, yoksa "bilgisayarım yavaşladı" çağrıları gelir.
+
+Yalnızca kullanılan alanı şifrelemek (`-UsedSpaceOnly`) yeni cihazlarda süreyi belirgin biçimde kısaltır. Daha önce veri barındırmış disklerde ise tam şifreleme tercih edilmelidir; silinmiş ama üzerine yazılmamış veriler aksi hâlde korumasız kalır.
+
+## Kurtarma anahtarına erişim süreci
+
+Anahtar yedeklendi, peki kullanıcı kurtarma ekranıyla karşılaştığında ne olacak?
+
+Bu süreci önceden kurun: yardım masası kimin anahtarını görebilir, kimlik doğrulaması nasıl yapılır, telefon üzerinden 48 haneli anahtar nasıl okunur.
+
+Son madde pratikte önemlidir — anahtar uzundur ve telefonda okumak hataya açıktır. Mümkünse kullanıcıyı kendi kendine hizmet portalına yönlendirin.
+
+Anahtarı görüntüleme yetkisi de kayıt altında olsun. Kim, ne zaman, hangi cihazın anahtarını gördü — bu, denetimde sorulan bir sorudur.
+
+## Kurtarma ekranı neden gelir
+
+Kullanıcı hiçbir şey yapmadığı hâlde kurtarma isteniyorsa sebep genelde şudur: önyükleme yapılandırması değişmiştir. BIOS güncellemesi, güvenli önyükleme ayarının değişmesi, donanım ekleme, önyükleme sırası değişikliği.
+
+Bu yüzden BIOS güncellemesi öncesinde korumayı geçici olarak duraklatın:
+
+```powershell
+Suspend-BitLocker -MountPoint C: -RebootCount 1
+```
+
+`-RebootCount 1` bir yeniden başlatmadan sonra korumanın kendiliğinden geri gelmesini sağlar. Duraklatıp geri açmayı unutmak, şifrelemeyi sessizce devre dışı bırakır.
+
+## Uyumluluğu izleyin
+
+Şifreleme açıldı diye iş bitmez; sapmayı izleyin. Yeni gelen cihazlar, geri yüklenen makineler ve elle müdahale edilenler listeden düşer.
+
+Haftalık bir rapor yeterlidir: kaç cihaz şifreli, kaçında koruma duraklatılmış, kaçının anahtarı yedeklenmemiş. Üçüncü sayı sıfır olmalıdır.
+
+## Çıkarılabilir ortam ve veri sürücüleri
+
+İşletim sistemi diskini şifrelemek, hikâyenin yarısıdır. Veri kaybı olaylarının önemli bir kısmı USB belleklerden ve harici disklerden gelir.
+
+BitLocker To Go ile çıkarılabilir ortamları da kapsama alabilirsiniz. İki politika seçeneği vardır ve ikisi de faydalıdır:
+
+**Yazma için şifreleme zorunluluğu.** Şifrelenmemiş bir USB belleğe yazma engellenir; kullanıcı ortamı şifrelemeye yönlendirilir.
+
+**Salt okunur erişim.** Başka kurumlarda şifrelenmiş ortamlar okunabilir ama yazılamaz.
+
+İkinci diskleri (D:, E:) de unutmayın. Masaüstü makinelerde veri genelde ikinci diskte durur ve yalnızca C: şifrelenmişse asıl veri korumasız kalır:
+
+```powershell
+Get-BitLockerVolume | Select-Object MountPoint, VolumeType, VolumeStatus, ProtectionStatus
+```
+
+Veri sürücülerinde otomatik kilit açma (auto-unlock) kullanın; aksi hâlde her açılışta kullanıcıdan parola istenir ve bu, korumanın kapatılmasıyla sonuçlanır.
+
+```powershell
+Enable-BitLocker -MountPoint D: -EncryptionMethod XtsAes256 -UsedSpaceOnly -RecoveryPasswordProtector
+Enable-BitLockerAutoUnlock -MountPoint D:
+```
+
+## Doğrulama adımı
+
+İki testi yapın.
+
+**Anahtar erişim testi:** Rastgele üç cihaz seçin ve kurtarma anahtarlarını dizinden okumayı deneyin. Üçü de bulunamıyorsa yedekleme çalışmıyordur.
+
+**Kurtarma testi:** Bir test cihazında kurtarma modunu bilerek tetikleyin (BIOS'ta önyükleme sırasını değiştirin), anahtarla açın ve süreci baştan sona yaşayın.
+
+İkinci test, yardım masası sürecinizin gerçekten işleyip işlemediğini gösteren tek yoldur — ve ilk gerçek vakada değil, kontrollü bir ortamda yaşamak istersiniz.

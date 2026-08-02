@@ -1,0 +1,98 @@
+---
+baslik: "Uzak çalışanı VPN'e bağlamadan yönetmek"
+ozet: "Ofise hiç uğramayan cihazlar, grup ilkesine ve dosya paylaşımına dayanan yönetim modelini bozar. Yerine ne konur?"
+konu: "windows"
+etiketler: ["uzaktan-yonetim", "intune", "dagitim"]
+yayin: 2026-03-27
+sure: 12
+---
+
+Klasik Windows yönetimi bir varsayıma dayanır: cihaz düzenli olarak kurumsal ağa bağlanır. Grup ilkesi böyle uygulanır, yazılım dağıtımı böyle yapılır, envanter böyle toplanır.
+
+Ofise ayda bir gelen — ya da hiç gelmeyen — bir çalışanda bu varsayım çöker. Cihaz altı ay boyunca politika almaz, yamaları eksik kalır ve envanterde "en son şu tarihte görüldü" olarak kalır.
+
+## Neyin kırıldığını görün
+
+Uzak cihazlarda sessizce çalışmayanlar:
+
+- Grup ilkesi (etki alanı denetleyicisine erişemez)
+- Oturum açma betikleri ve eşlenmiş sürücüler
+- Dosya paylaşımından yazılım dağıtımı
+- WSUS üzerinden yama
+- Etki alanı tabanlı envanter
+
+Bunların hepsinin ortak noktası, iç ağa bağımlı olmalarıdır.
+
+## VPN çözüm değil
+
+İlk refleks "sürekli açık VPN kuralım" olur. Bu, üç sorun üretir: merkez hattı yükü, kullanıcı deneyimi ve — en önemlisi — kullanıcı VPN'i kapatabildiği sürece yönetim garantisi yoktur.
+
+Yönetimi VPN'e bağlamak, "kullanıcı isterse yönetilir" demektir.
+
+## İnternet üzerinden yönetim
+
+Modern yaklaşım, yönetimi internete taşımaktır. Bulut tabanlı cihaz yönetimi (Intune benzeri) cihazla doğrudan konuşur; iç ağa gerek yoktur.
+
+Geçiş tek adımda olmak zorunda değil. Hibrit bir yol izlenebilir:
+
+**Adım 1 — Yama.** Windows Update for Business ile yamayı buluta taşıyın. WSUS'a bağımlılık biter, uzak cihazlar yamalanmaya başlar. En hızlı kazanç budur.
+
+**Adım 2 — Politika.** Kritik ayarları grup ilkesinden yönetim aracına taşıyın. Hepsini değil; güvenlik temel çizgisi ve şifreleme ile başlayın.
+
+**Adım 3 — Uygulama.** Yazılım dağıtımını buluta alın.
+
+**Adım 4 — Envanter ve uyumluluk.** Cihaz durumu artık gerçek zamanlıya yakın görünür.
+
+Her adımda eski yöntem yedekte kalabilir; çakışmayı önlemek için aynı ayarı iki yerden yönetmeyin.
+
+## Uzak masaüstü desteği
+
+Kullanıcının ekranını görmek gerektiğinde iç ağa dayanan araçlar çalışmaz. Buluttan çalışan bir uzak yardım aracı gerekir.
+
+Seçerken üç şeye bakın: kullanıcı onayı istiyor mu (istemeli), oturum kaydediliyor mu, ve yükseltilmiş haklarla çalışan pencereleri görebiliyor mu. Sonuncusu pratikte en çok takılınan noktadır — UAC istemi göründüğünde araç ekranı kaybediyorsa destek yarıda kalır.
+
+## İlk kurulum sorunu
+
+Uzak çalışana gönderilen yeni cihaz, hiç ofise uğramadan kullanıma hazır olmalı. Bu, sıfırdan yapılandırma modelinin (Autopilot benzeri) asıl kullanım senaryosudur.
+
+Cihaz üreticiden doğrudan kullanıcıya gider, kullanıcı açar, kurumsal hesabıyla oturum açar ve yapılandırma iner. BT hiç dokunmaz.
+
+Bu akışın çalışması için cihazın üretici tarafından kurumunuza kaydedilmiş olması gerekir; satın alma sürecinde bunu talep edin. Sonradan kaydetmek mümkündür ama elle iş gerektirir.
+
+## Parola sıfırlama tuzağı
+
+Uzak çalışanda klasik bir kilitlenme senaryosu vardır: kullanıcı Windows parolasını unutur, ama parolayı değiştirmek için iç ağa bağlanması gerekir, bağlanmak için de parolaya ihtiyacı vardır.
+
+Çözüm, oturum açma ekranından çalışan bir kendi kendine parola sıfırlama akışıdır. Bunu kurmadıysanız her unutulan parola, kargo ile cihaz gönderme veya uzun bir telefon süreci demektir.
+
+Windows Hello ve biyometrik oturum açma da bu sorunu büyük ölçüde azaltır — kullanıcı parolayı nadiren yazdığı için nadiren unutur.
+
+## Ölçün: son iletişim tarihi
+
+Uzak filoda en değerli tek metrik, cihazların **en son ne zaman yönetim sistemiyle konuştuğudur**.
+
+30 günden uzun süredir görünmeyen cihazlar için bir süreç tanımlayın: kullanıcıya ulaşın, cihaz hâlâ kullanımda mı öğrenin, değilse envanterden düşürün.
+
+Bu liste temizlenmezse envanteriniz zamanla hayali cihazlarla dolar ve uyumluluk oranınız gerçeği yansıtmaz.
+
+## Ev ağı kaynaklı sorunlar
+
+Uzak çalışan desteğinde çağrıların önemli bir kısmı kurumsal altyapıdan değil, kullanıcının ev ağından kaynaklanır. Bunları hızlı ayırt etmek zaman kazandırır.
+
+Sık görülenler ve ayırt edici belirtileri:
+
+**Çift NAT.** Modem ve yönlendirici arka arkaya NAT yapıyorsa bazı VPN protokolleri çalışmaz. Belirti: VPN bağlanıyor ama trafik akmıyor.
+
+**Ev yönlendiricisi DNS'i.** Bazı sağlayıcı modemleri, çözemedikleri isimler için kendi arama sayfalarına yönlendirir. Belirti: iç isimler garip bir sayfaya gidiyor.
+
+**Zayıf Wi-Fi.** Toplantı kalitesi şikâyetlerinin çoğunun kaynağı budur; kurumsal tarafta iz bırakmaz.
+
+**Aynı adres bloğu.** Ev ağı `192.168.1.0/24` ve kurumsal ağ da aynı blok kullanıyorsa yönlendirme çakışır. Bu, kurumsal IP planında `10.x` tercih etmenin pratik sebeplerinden biridir.
+
+Kullanıcıya sorabileceğiniz tek soru çoğu vakayı ayırır: **"Telefonunuzun mobil verisiyle paylaşım açıp aynı işlemi deneyebilir misiniz?"** Sorun kayboluyorsa kaynak ev ağıdır ve sizin çözebileceğiniz bir şey değildir.
+
+## Doğrulama adımı
+
+Bir test cihazını **hiç iç ağa bağlamadan** kurun ve şu dördünü doğrulayın: yamalar iniyor mu, güvenlik politikaları uygulanmış mı, kurumsal uygulamalar gelmiş mi, uzak yardım aracıyla bağlanabiliyor musunuz.
+
+Dördü de çalışıyorsa uzaktan yönetim modeliniz gerçektir. Biri için "ofise gelince olur" diyorsanız, o parça uzak çalışan için hiç çalışmıyor demektir.

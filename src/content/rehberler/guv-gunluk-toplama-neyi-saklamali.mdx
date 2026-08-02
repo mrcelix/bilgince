@@ -1,0 +1,122 @@
+---
+baslik: "Günlük toplama: her şeyi saklamak da bir hata"
+ozet: "Olaydan sonra 'kayıt yok' demek kadar kötü olan tek şey, kayıtta boğulmak. Hangi günlükler, ne kadar süre."
+konu: "guvenlik"
+etiketler: ["gunluk", "izleme", "olay-mudahale"]
+yayin: 2026-03-20
+sure: 12
+---
+
+Bir olay incelemesinde en çok duyulan iki cümle vardır. Birincisi: "O günlük tutulmuyormuş." İkincisi: "Günlük var ama 400 GB, içinden bir şey çıkaramıyoruz."
+
+İkisi de aynı planlama eksikliğinden doğar.
+
+## Önce soruyu belirleyin
+
+Günlük stratejisi, "neyi toplayalım" sorusuyla değil, **"hangi soruya cevap vermek istiyoruz"** sorusuyla başlar.
+
+Tipik sorular şunlardır:
+
+- Bu hesaba kim, nereden, ne zaman girdi?
+- Bu dosyayı kim sildi?
+- Bu değişikliği kim yaptı?
+- Bu makine hangi dış adreslere bağlandı?
+- Bu e-posta kutusuna kural kim ekledi?
+
+Her soru belirli bir kaynağı işaret eder. Sorular listelenmeden yapılan toplama, çoğu zaman yanlış şeyleri toplar.
+
+## Öncelikli kaynaklar
+
+Sınırlı bütçeyle başlıyorsanız sıra şu olmalı:
+
+**1. Kimlik.** Etki alanı denetleyicisi güvenlik günlükleri ve bulut kimlik oturum açma kayıtları. Neredeyse her olay incelemesi buradan başlar.
+
+**2. Uç nokta.** EDR telemetrisi ve PowerShell betik bloğu günlüğü. Saldırganın makinede ne yaptığını yalnızca burası söyler.
+
+**3. Ağ sınırı.** Güvenlik duvarı bağlantı günlükleri ve DNS sorguları. DNS özellikle değerlidir: komuta-kontrol trafiğinin çoğu isim çözümlemesiyle başlar ve az yer kaplar.
+
+**4. Kritik uygulamalar.** E-posta ağ geçidi, dosya sunucusu denetimi, VPN.
+
+Bu dörtlü, olayların büyük çoğunluğunu araştırmaya yeter.
+
+## Neyi toplamayın
+
+Her şeyi toplamak hem pahalıdır hem de sinyali gizler. Genelde toplanmaması gerekenler:
+
+- Bilgi düzeyindeki (Information) uygulama günlükleri
+- Sağlık kontrolü ve yük dengeleyici probu istekleri
+- Ayrıntılı hata ayıklama çıktıları
+- Başarılı okuma erişimleri (dosya sunucusunda silme ve izin değişikliği yeterlidir)
+
+Bir günlük kaynağı için "bunu hangi soruda kullanırım" sorusuna cevap veremiyorsanız toplamayın. Sonradan eklemek, baştan toplayıp asla bakmamaktan ucuzdur.
+
+## Saklama süresi: iki katmanlı
+
+Tek bir saklama süresi belirlemek pahalıdır. İki katman kurun:
+
+**Sıcak katman (30–90 gün):** Aranabilir, hızlı, pahalı. Günlük operasyon ve çoğu inceleme bu aralıkta yapılır.
+
+**Soğuk katman (1–2 yıl):** Ucuz depolamada arşiv. Nadiren erişilir ama uzun süre fark edilmemiş bir olayda hayat kurtarır.
+
+Sektörünüzde yasal bir saklama yükümlülüğü varsa o süre tabandır, tavan değil.
+
+## Saati doğru tutun
+
+Bu, en sık atlanan ve en pahalı ihmaldir. Farklı saatlere sahip sistemlerden gelen günlükler bir araya getirildiğinde olay sırasını kurmak imkânsız hâle gelir.
+
+Tüm sistemleri tek bir zaman kaynağına bağlayın ve **UTC olarak saklayın**, yerel saate yalnızca görüntülerken çevirin. Yaz saati geçişlerinde yerel saatle tutulan günlükler bir saat çakışır ya da bir saat kaybolur.
+
+```powershell
+w32tm /query /source
+w32tm /query /status | Select-String 'Phase Offset|Source'
+```
+
+Ofset milisaniyeler düzeyinde olmalıdır. Saniyeler düzeyindeyse korelasyon güvenilmez hâle gelir.
+
+## Günlükleri koruyun
+
+Saldırganın standart adımlarından biri izleri silmektir. Sunucuda duran bir günlük, o sunucu ele geçtiğinde yok edilebilir.
+
+Bu yüzden toplama **gerçek zamanlıya yakın** ve **tek yönlü** olmalı: makineler merkeze gönderir, merkezden geri yazılamaz. Arşiv katmanında değiştirilemez depolama kullanın.
+
+Ayrıca merkezî günlük sistemine erişimi de sınırlayın. Ayrıcalıklı hesapların bu sistemde silme yetkisi olmamalı — denetim izini silebilen bir yönetici, denetim izini değersizleştirir.
+
+## Uyarı ile arama farkı
+
+Topladığınız her şey için uyarı yazmayın. Uyarı, **insan müdahalesi gerektiren** durumlar içindir; geri kalanı arama için durur.
+
+Başlangıç için birkaç yüksek değerli uyarı yeter: ayrıcalıklı gruba üye ekleme, çok sayıda başarısız girişin ardından başarı, posta kutusunda iletme kuralı oluşturma, güvenlik günlüğünün temizlenmesi, yeni bir yerel yönetici hesabı açılması.
+
+Bu beş uyarı, gürültü üretmeden gerçek olayları yakalar.
+
+## Windows tarafında pratik ayarlar
+
+Varsayılan Windows güvenlik günlüğü boyutu çoğu ortamda yetersizdir; yoğun bir domain controller'da birkaç saatte dolup dönmeye başlar. Yani olayı fark ettiğinizde kayıt çoktan silinmiştir.
+
+```powershell
+# günlük boyutunu büyüt (DC'lerde 1 GB makul bir başlangıç)
+wevtutil sl Security /ms:1073741824
+
+# betik bloğu günlüğü — saldırgan davranışını gösteren en değerli kaynak
+$p = 'HKLM:\SOFTWARE\Policies\Microsoft\Windows\PowerShell\ScriptBlockLogging'
+New-Item $p -Force | Out-Null
+Set-ItemProperty $p -Name EnableScriptBlockLogging -Value 1
+```
+
+Denetim politikasında da varsayılanlar yetersizdir. En azından şunları açın: oturum açma/kapatma, hesap yönetimi, ayrıcalık kullanımı, süreç oluşturma.
+
+Süreç oluşturma denetimi (4688) komut satırı argümanlarıyla birlikte kaydedilecek şekilde yapılandırılırsa, incelemede paha biçilmez olur:
+
+```powershell
+$p2 = 'HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\Policies\System\Audit'
+New-Item $p2 -Force | Out-Null
+Set-ItemProperty $p2 -Name ProcessCreationIncludeCmdLine_Enabled -Value 1
+```
+
+Bu ayarı açarken bir uyarı: komut satırında parola geçen betikler varsa artık o parolalar günlüğe yazılır. Bu, günlük erişimini kısıtlamak için ek bir gerekçedir.
+
+## Doğrulama adımı
+
+Yılda iki kez **masa başı tatbikatı** yapın: "Üç hafta önce bir kullanıcının hesabının ele geçirildiğini öğrendik. Ne zaman, nereden girildiğini ve neye eriştiğini bulun."
+
+Cevabı bir saat içinde verebiliyorsanız günlük stratejiniz çalışıyordur. Veremiyorsanız eksik olanı not edin — bu tatbikat, eksik kaynağı gerçek bir olaydan çok daha ucuza bulmanın tek yoludur.

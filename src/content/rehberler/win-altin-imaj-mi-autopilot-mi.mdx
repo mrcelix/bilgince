@@ -1,0 +1,115 @@
+---
+baslik: "Altın imaj mı, sıfırdan kurulum mu?"
+ozet: "Yıllardır bakımı yapılan bir imaj mı, yoksa kutudan çıkan cihazın buluttan yapılandırılması mı? Karar, ekip büyüklüğüne ve cihazın nereye gittiğine bağlı."
+konu: "windows"
+etiketler: ["dagitim", "imaj", "autopilot"]
+yayin: 2026-01-23
+sure: 12
+---
+
+Bir kurumda kullanılan altın imaj dört yıllıktı. İçinde kimsenin ne olduğunu bilmediği üç yardımcı program, artık kullanılmayan bir VPN istemcisi ve 2022'de eklenmiş bir kayıt defteri düzeltmesi vardı. Yeni bir bilgisayar kurulduğunda hepsi geliyordu.
+
+İmaj tabanlı dağıtımın asıl maliyeti kurulum değil, imajın kendisinin bakımıdır.
+
+## İki yaklaşım
+
+**Altın imaj:** Referans bir makine hazırlanır, uygulamalar kurulur, ayarlar yapılır, sysprep ile genelleştirilir ve dağıtılır. Kurulum hızlıdır, sonuç tekrarlanabilirdir.
+
+**Sıfırdan yapılandırma (Autopilot benzeri):** Cihaz üreticiden gelen hâliyle açılır, kullanıcı oturum açar ve yapılandırma buluttan uygulanır. İmaj yoktur; her şey politikalarla ve uygulama paketleriyle gelir.
+
+İkisi zıt değildir; ölçeğe ve senaryoya göre seçilir.
+
+## Altın imaj ne zaman doğru
+
+- Cihazlar merkeze geliyorsa ve BT eline alıyorsa
+- İnternet bant genişliği dar bir şubede toplu kurulum yapılıyorsa
+- Çok sayıda büyük uygulama varsa (mühendislik yazılımları gibi)
+- Özel donanım sürücüleri gerekiyorsa
+
+Ana avantajı hızdır: kurulum dakikalar sürer, ağdan büyük indirme olmaz.
+
+## Sıfırdan yapılandırma ne zaman doğru
+
+- Cihaz doğrudan kullanıcıya gönderiliyorsa (uzaktan çalışan, şube)
+- Ekip küçükse ve imaj bakımına ayıracak zaman yoksa
+- Cihaz çeşitliliği yüksekse
+- Kurumsal uygulama sayısı sınırlıysa
+
+Ana avantajı, **imaj bakımının tamamen ortadan kalkmasıdır**. Windows sürümü güncellendiğinde imajı yeniden üretmezsiniz.
+
+## Altın imajın gizli maliyeti
+
+İmaj kullanacaksanız bunu bilinçli kabul edin: imaj yaşayan bir varlıktır.
+
+- Her altı ayda bir yeniden üretilmeli (yoksa kurulan her makine yüzlerce yamayla açılır)
+- İçindeki her uygulama ayrıca güncellenmeli
+- Sürücü paketleri yeni donanım geldikçe eklenmeli
+- İçeriği belgelenmeli — "bu neden burada" sorusu cevaplanabilmeli
+
+Bu bakım yapılmadığında imaj, teknik borcun dağıtılabilir hâline dönüşür.
+
+## Ara yol: ince imaj
+
+Pratikte en çok işe yarayan yaklaşım genelde ortadadır. İmaj yalnızca şunları içerir: işletim sistemi, güncel yamalar, yönetim ajanı ve donanım sürücüleri.
+
+Uygulamalar imaja girmez; yönetim aracıyla dağıtılır. Ayarlar imaja girmez; politikayla uygulanır.
+
+Bu model, imaj bakımını yılda iki güne indirir ve uygulama güncellemelerini imajdan bağımsızlaştırır.
+
+## Kullanıcı verisi ve durumu
+
+Hangi yöntemi seçerseniz seçin, cihaz yenilemede asıl acı veri taşımadır. Bunu baştan çözün:
+
+Masaüstü, Belgeler ve Resimler klasörlerini bulut depolamaya yönlendirin. Tarayıcı profili ve ayarları hesaba bağlansın. Uygulama ayarları mümkünse sunucu tarafında dursun.
+
+Bu üçü yapıldığında cihaz değişimi bir günlük iş olmaktan çıkıp yarım saatlik bir işe döner — ve kullanıcı "eski bilgisayarımdaki dosya" diye aramaz.
+
+## Sürücüler
+
+Altın imajda sürücü yönetimi en çok emek yiyen kısımdır. Modern yaklaşım, sürücüleri imaja gömmek yerine dağıtım sırasında ya da sonrasında uygulamaktır — üretici katalogları bunu destekler.
+
+Sıfırdan yapılandırmada sürücüler Windows Update üzerinden gelir. Bu genelde yeterlidir ama özel donanımda (dizüstü dock, özel ekran kartı) eksik kalabilir; o durumda hedeflenmiş sürücü paketleri tanımlayın.
+
+## Kurulum sonrası doğrulama
+
+Hangi yöntemi kullanırsanız kullanın, cihaz kullanıcıya gitmeden önce bir kontrol listesi çalıştırın:
+
+```powershell
+[pscustomobject]@{
+  Makine     = $env:COMPUTERNAME
+  Surum      = (Get-ComputerInfo).OsDisplayVersion
+  EtkiAlani  = (Get-CimInstance Win32_ComputerSystem).PartOfDomain
+  BitLocker  = (Get-BitLockerVolume -MountPoint C:).ProtectionStatus
+  Defender   = (Get-MpComputerStatus).RealTimeProtectionEnabled
+  YamaSayisi = (Get-HotFix).Count
+  Yonetim    = (Get-Service -Name 'IntuneManagementExtension' -EA SilentlyContinue).Status
+}
+```
+
+Bu çıktıyı kurulum kaydına ekleyin. Altı ay sonra "bu cihaz nasıl kuruldu" sorusuna cevap verir.
+
+## Uygulama paketleme disiplini
+
+İmajdan vazgeçtiğinizde uygulamalar yönetim aracıyla dağıtılır ve paketleme kalitesi doğrudan kullanıcı deneyimine yansır.
+
+Her paket için üç şey tanımlı olmalı:
+
+**Sessiz kurulum komutu.** Kullanıcı etkileşimi isteyen bir kurulum, arka planda sonsuza kadar bekler. MSI için genelde `/qn`, EXE için üreticiye özgü bir anahtar gerekir.
+
+**Tespit kuralı.** Yönetim aracı, uygulamanın kurulu olup olmadığını nasıl anlayacak? Dosya sürümü, kayıt defteri anahtarı ya da MSI ürün kodu. Yanlış tespit kuralı, uygulamanın her döngüde yeniden kurulmasına yol açar — kullanıcı bunu "bilgisayarım kendiliğinden bir şeyler yüklüyor" diye bildirir.
+
+**Bağımlılıklar ve sıra.** Çalışma zamanı bileşenleri önce gelmelidir.
+
+```powershell
+# MSI ürün kodunu bulmak (tespit kuralı için)
+Get-CimInstance Win32_Product | Where-Object Name -like '*Uygulama*' |
+  Select-Object Name, Version, IdentifyingNumber
+```
+
+Bir de kaldırma komutunu test edin. Kaldırılamayan bir paket, bir sonraki sürüme geçerken elle müdahale gerektirir ve bu, üç yüz makinede üç yüz kez elle iş demektir.
+
+## Doğrulama adımı
+
+Yılda iki kez **sıfırdan bir cihaz kurun ve süreyi ölçün**: kutudan çıkıştan kullanıcının çalışmaya başlayabildiği ana kadar.
+
+Süre uzuyorsa sebebini arayın — genelde imaj eskimiştir ve kurulum sonrası yüzlerce yama iner. İki ölçüm arasındaki fark, dağıtım sürecinizin sağlığını gösteren en dürüst sayıdır.

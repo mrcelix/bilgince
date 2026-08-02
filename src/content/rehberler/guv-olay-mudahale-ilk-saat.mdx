@@ -1,0 +1,94 @@
+---
+baslik: "Olay müdahalesinde ilk saat"
+ozet: "Panikle atılan ilk adım genelde kanıtı yok eder. Sıralamayı önceden bilmek, o anda düşünmek zorunda kalmamaktır."
+konu: "guvenlik"
+etiketler: ["olay-mudahale", "surec", "adli-bilisim"]
+yayin: 2026-04-10
+sure: 12
+---
+
+Bir güvenlik olayında ilk saat, sonucun büyük kısmını belirler. Ve o saatte verilen kararların çoğu, hazırlıksız yakalanan ekiplerde yanlış olur — kötü niyetten değil, refleksten.
+
+En yaygın iki refleks şunlardır: makineyi hemen kapatmak ve zararlıyı hemen silmek. İkisi de kanıtı yok eder.
+
+## Kapatmayın, izole edin
+
+Makineyi kapatmak bellekteki her şeyi siler: çalışan işlemler, açık ağ bağlantıları, şifrelenmemiş anahtarlar, saldırganın belleğe yüklediği araçlar. Adli incelemenin en değerli kaynağı budur.
+
+Doğru hareket **ağdan izole etmektir**. EDR ürününüz varsa tek tıkla yapar. Yoksa fiziksel olarak kabloyu çekin ya da anahtar portunu kapatın — ama makineyi açık bırakın.
+
+Kablosuz bağlantıyı da unutmayın; kabloyu çekip Wi-Fi'yi açık bırakmak izolasyon değildir.
+
+## İlk saatin sırası
+
+**Dakika 0–5: Doğrula.**
+Gerçekten olay mı? Yanlış pozitif mi? Bunu hızlı ama atlamadan yapın; her alarma tam müdahale başlatmak ekibi tüketir.
+
+**Dakika 5–15: Kapsamı çıkar.**
+Kaç sistem etkilendi? Hangi hesaplar kullanıldı? Bu, kesin bir cevap değil, ilk tahmindir ve zamanla güncellenecektir.
+
+**Dakika 15–30: İzole et.**
+Etkilenen sistemleri ağdan ayırın. Şüpheli hesapları devre dışı bırakın — silmeyin. Oturumları sonlandırın; yalnızca parola değiştirmek, açık oturumları kapatmaz.
+
+```powershell
+Disable-ADAccount -Identity 'm.demir'
+# açık oturumları da düşür
+Get-ADUser 'm.demir' | Set-ADUser -Replace @{ msDS-UserPasswordExpiryTimeComputed = 0 }
+```
+
+Bulut tarafında oturum çerezlerini geçersiz kılmayı unutmayın; parola değişikliği tek başına yetmez.
+
+**Dakika 30–45: Kanıtı koru.**
+Etkilenen sistemlerin günlüklerini merkeze aldığınızdan emin olun. Mümkünse bellek dökümü ve disk imajı alın. Sanal makineyse **checkpoint değil**, kapalı bir kopya alın.
+
+**Dakika 45–60: İletişimi başlat.**
+Kimin bilmesi gerekiyor? Yönetim, hukuk, gerekiyorsa müşteri ve düzenleyici. İletişimi teknik ekibin dışından biri yürütsün.
+
+## Rolleri önceden dağıtın
+
+Olay sırasında rol atamaya çalışmak, en verimsiz dakikaları harcar. Üç rol önceden belli olmalı:
+
+**Olay yöneticisi** — süreci yürütür, kararları kaydeder, iletişimi yönetir. Teknik çözüme girmez.
+
+**Teknik lider** — araştırma ve müdahaleyi yürütür. Yalnızca olay yöneticisiyle konuşur.
+
+**Kayıt tutucu** — ne yapıldığını zaman damgasıyla yazar. Küçük ekiplerde olay yöneticisi bunu da üstlenir ama kayıt mutlaka tutulmalıdır.
+
+Kayıt, sonradan "neden bu kararı verdik" sorusuna cevap veren tek şeydir ve hukuki süreçlerde gerekebilir.
+
+## Neyi kaydetmeli
+
+Basit bir zaman çizelgesi yeterlidir:
+
+```
+14:05  Kullanıcı şüpheli e-posta bildirdi
+14:12  Doğrulandı: kimlik avı, kimlik bilgisi girilmiş
+14:18  Hesap devre dışı bırakıldı, oturumlar sonlandırıldı
+14:25  Posta kutusunda iletme kuralı bulundu ve kaldırıldı (kural: dış adrese)
+14:31  Aynı IP'den başka hesaplara erişim aranıyor
+14:48  İkinci hesap tespit edildi, devre dışı bırakıldı
+```
+
+Her satır tek cümle, saat ile. Bu format hem olay sırasında hızlıdır hem sonrasında rapor hâline getirilir.
+
+## Ne zaman dışarıdan yardım
+
+Şu durumlarda kendi başınıza devam etmeyin: fidye yazılımı şifrelemesi başlamışsa, etki alanı denetleyicisi ele geçmişse, veri sızdırıldığına dair kanıt varsa ya da olay birkaç günden eskiyse.
+
+Bu durumlarda müdahale, adli inceleme ve hukuki gereklilikler iç içe geçer. Sözleşmeli bir müdahale ekibiniz yoksa, kimi arayacağınızı **olay olmadan önce** belirleyin. Kriz anında tedarikçi araştırmak, saatler kaybettirir.
+
+## Fidye yazılımı özel durumu
+
+Şifreleme başladıysa öncelik sırası değişir: önce yayılmayı durdurun (paylaşımları kapatın, yönetim erişimini kesin), sonra **yedeklerin durumunu kontrol edin**.
+
+Saldırganların standart adımlarından biri yedekleri önce silmektir. Yedek sisteminizin durumunu erken öğrenmek, sonraki tüm kararları belirler — özellikle "ödeme" konuşulacaksa.
+
+Fidye ödemesi teknik değil hukuki ve yönetsel bir karardır; teknik ekip bu kararı vermez ve vermemelidir.
+
+## Doğrulama adımı
+
+Yılda bir kez masa başı tatbikatı yapın. Senaryo basit olsun: "Muhasebeden bir kullanıcı, e-postasındaki bağlantıya tıklayıp kimlik bilgilerini girdiğini bildirdi."
+
+Ekipten ilk bir saatte ne yapacaklarını adım adım anlatmalarını isteyin ve iki şeyi ölçün: **hesabı devre dışı bırakmaya kadar geçen süre** ve **kimin hangi rolü üstlendiğinin belirlenme süresi**.
+
+İkincisi beş dakikadan uzunsa roller önceden atanmamış demektir. Bu, tatbikatta düzeltilmesi en kolay, gerçek olayda en pahalı eksiktir.

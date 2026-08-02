@@ -1,0 +1,114 @@
+---
+baslik: "Yönetici hesabıyla e-posta okumayı bırakın"
+ozet: "Ayrıcalıklı hesap yönetiminin en pahalı kısmı ürün değil, alışkanlık. Katmanlı hesap modelini küçük ekiplerde kurmanın yolu."
+konu: "guvenlik"
+etiketler: ["ayricalikli-erisim", "kimlik", "sertlestirme"]
+yayin: 2026-01-16
+sure: 12
+---
+
+Bir olay incelemesinde başlangıç noktasını bulmak genelde kolaydır: birinin e-postasındaki bir eke tıklanmıştır. Zor olan kısım, o tıklamanın neden bu kadar büyük bir sonuç doğurduğunu açıklamaktır.
+
+Cevap çoğu zaman aynıdır: tıklayan kişi, o anda etki alanı yöneticisi yetkisiyle oturum açmıştı.
+
+## Sorun ürün değil, alışkanlık
+
+Ayrıcalıklı erişim yönetimi denince akla pahalı ürünler gelir: kasa çözümleri, oturum kaydı, geçici yetkilendirme. Bunlar değerlidir ama sıralamada sonda gelirler.
+
+İlk sırada duran şey ücretsizdir ve yalnızca disiplin ister: **yönetici yetkisi olan hesapla günlük iş yapmamak.**
+
+Günlük iş derken şunları kastediyorum: e-posta okumak, internete girmek, doküman açmak, sohbet uygulaması kullanmak. Bunların hepsi dış içerikle temas eder ve dış içerik saldırı yüzeyidir.
+
+Bir sistem yöneticisinin gün içinde yaptığı işlerin belki yüzde beşi yönetici yetkisi gerektirir. Kalan yüzde doksan beşi standart bir hesapla yapılabilir. Yetkiyi sürekli açık tutmak, bu yüzde beşi rahatlatmak için yüzde doksan beşi riske atmaktır.
+
+## Katmanlı hesap modeli
+
+Büyük kurumlarda "tier" modeli diye geçen yaklaşım, küçük ekiplerde de sadeleştirilerek uygulanabilir. Üç hesap yeterlidir:
+
+**Günlük hesap** (`m.demir`) — e-posta, tarayıcı, ofis uygulamaları. Hiçbir sunucuda yönetici değil, hiçbir yerde ayrıcalıklı grup üyesi değil.
+
+**Sunucu yönetim hesabı** (`a-m.demir`) — sunuculara ve altyapı hizmetlerine erişim. İnternet erişimi yok, e-posta kutusu yok.
+
+**Etki alanı yönetim hesabı** (`da-m.demir`) — yalnızca domain controller ve dizin işlemleri. Günde birkaç dakika kullanılır.
+
+Üçüncüsü en kritik olanıdır ve en az kullanılmalıdır. Etki alanı yöneticisi yetkisiyle bir üye sunucuya bağlanmak, o sunucu ele geçmişse kimlik bilgilerinizi oraya bırakmak demektir.
+
+## Kimlik bilgisi nerede kalır
+
+Bu, modelin arkasındaki asıl teknik gerekçedir ve genelde anlatılmaz.
+
+Bir sunucuya interaktif olarak (RDP ile) bağlandığınızda, kimlik bilgileriniz o makinenin belleğinde bir iz bırakır. Makine ele geçmişse saldırgan o izi kullanarak sizin adınıza başka yerlere gidebilir — buna yanal hareket denir.
+
+Bu yüzden kural şudur: **yüksek yetkili hesapla düşük güvenli makineye bağlanmayın.** Yön her zaman yukarıdan aşağı değil, aşağıdan yukarı olmalı.
+
+Pratikte bu, yönetim işlerinin ayrı bir yönetim istasyonundan yapılması demektir.
+
+## Yönetim istasyonu
+
+Ayrı bir fiziksel makine gerekmez; ayrılmış bir sanal masaüstü de olur. Önemli olan özellikleri:
+
+- İnternet erişimi yok ya da çok dar bir listeye kısıtlı
+- E-posta ve ofis uygulamaları kurulu değil
+- Yalnızca yönetim hesaplarıyla oturum açılabilir
+- Sıkı yama takvimi ve tam günlükleme
+
+Bu makineyi kurmak bir günlük iştir ve ayrıcalıklı erişim güvenliğinin en yüksek getirili adımıdır. Ürün almadan önce bunu yapın.
+
+## Zamana bağlı yetki
+
+Bir sonraki adım, yetkiyi sürekli değil talebe bağlı vermektir. Bulut kimlik platformlarında bu yerleşik olarak gelir: kullanıcı yetkiyi talep eder, gerekçe yazar, belirli bir süre için alır ve süre dolunca yetki kendiliğinden düşer.
+
+Şirket içi ortamda aynı fikri daha basit kurabilirsiniz: yönetici grupları normalde boş dursun, ihtiyaç anında üyelik eklensin ve zamanlanmış bir görev her gece grupları temizlesin.
+
+```powershell
+# gece temizliği — kalıcı olması gereken hesaplar hariç
+$muaf = @('da-break-glass-1', 'da-break-glass-2')
+Get-ADGroupMember 'Domain Admins' |
+  Where-Object { $_.SamAccountName -notin $muaf } |
+  ForEach-Object {
+      Remove-ADGroupMember 'Domain Admins' -Members $_ -Confirm:$false
+      Write-Output "Kaldırıldı: $($_.SamAccountName)"
+  }
+```
+
+Bu betiği devreye almadan önce mutlaka bir muafiyet listesi tanımlayın ve break-glass hesaplarını oraya koyun. Aksi hâlde sabah kimse dizine giremez.
+
+## Ölçün ve görünür kılın
+
+Ayrıcalıklı grupların üyeliğini haftalık raporlayın. Rapor kısa olsun ve sapmayı göstersin:
+
+```powershell
+'Domain Admins','Enterprise Admins','Schema Admins','Administrators' | ForEach-Object {
+    $g = $_
+    Get-ADGroupMember $g -Recursive | ForEach-Object {
+        [pscustomobject]@{ Grup = $g; Uye = $_.SamAccountName; Sinif = $_.objectClass }
+    }
+} | Sort-Object Grup, Uye | Format-Table -AutoSize
+```
+
+`-Recursive` önemlidir: iç içe gruplar üzerinden gelen dolaylı üyelikler, doğrudan üyelikten daha sık gözden kaçar. Bir kullanıcı "Domain Admins" listesinde görünmez ama üyesi olduğu bir grup oradadır.
+
+Rapora bakarken tek soru sorun: **bu listedeki her isim bugün de gerekli mi?** Proje bitmiş, kişi rol değiştirmiş ya da tedarikçi işi tamamlamış olabilir.
+
+## Servis hesapları
+
+İnsan hesaplarını düzeltip servis hesaplarını unutmak, işin yarısını yapmaktır. Yönetici yetkisiyle çalışan bir yedekleme ajanı ya da izleme servisi, aynı riski taşır ve kimse ona bakmaz.
+
+Servis hesapları için üç kural: mümkünse grup yönetimli hizmet hesabı (gMSA) kullanın, interaktif oturum açmayı ilkeyle engelleyin, ve gerçekten ihtiyaç duyduğu en dar yetkiyi verin. "Çalışsın diye Domain Admin yaptık" cümlesi, üretimdeki en yaygın güvenlik borcudur.
+
+## Doğrulama adımı
+
+Modeli kurduktan sonra iki testi yapın.
+
+**Birinci test:** Günlük hesabınızla bir sunucuya RDP yapmayı deneyin — **başarısız olmalı**. Olmuyorsa katmanlar gerçekte ayrılmamıştır.
+
+**İkinci test:** Bir hafta boyunca yönetici hesabınızın oturum açma günlüklerini inceleyin. Hangi makinelerden oturum açılmış?
+
+```powershell
+Get-WinEvent -ComputerName DC01 -FilterHashtable @{ LogName='Security'; Id=4624 } -MaxEvents 500 |
+  Where-Object { $_.Properties[5].Value -like 'da-*' } |
+  Select-Object TimeCreated, @{n='Hesap';e={$_.Properties[5].Value}}, @{n='Kaynak';e={$_.Properties[18].Value}} |
+  Group-Object Kaynak | Sort-Object Count -Descending
+```
+
+Listede yönetim istasyonu dışında bir makine varsa model kâğıt üzerinde kalmış demektir. İkinci testi yapmadan modeli kurulmuş saymayın; alışkanlıklar politikadan yavaş değişir.

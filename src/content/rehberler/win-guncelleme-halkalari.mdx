@@ -1,0 +1,104 @@
+---
+baslik: "Windows güncelleme halkaları: hepsini aynı gün yamamak"
+ozet: "Tek grupta yama, tüm filoyu aynı riske sokar. Halka modeli riski dağıtır ve sorunu küçük bir grupta yakalar."
+konu: "windows"
+etiketler: ["guncelleme", "yama", "dagitim"]
+yayin: 2026-02-13
+sure: 11
+---
+
+Bir güncelleme, belirli bir yazıcı sürücüsüyle çakışıp yazdırmayı bozdu. Filonun tamamına aynı gün uygulanmıştı. Üç yüz kullanıcı aynı sabah yazdıramadı.
+
+Aynı güncelleme halka modeliyle dağıtılsaydı, sorunu on beş kişilik pilot grup yaşardı ve geri kalan iki yüz seksen beş kişi hiç etkilenmezdi.
+
+## Halka modeli
+
+Filoyu risk toleransına göre gruplara bölersiniz ve güncelleme sırayla ilerler.
+
+**Halka 0 — BT ekibi (5–10 cihaz).** Yayın günü. Sorunu ilk yaşayan, çözebilecek kişiler olur.
+
+**Halka 1 — Pilot (%5–10).** 3 gün sonra. Farklı departmanlardan, farklı donanımlardan gönüllüler. Buradaki çeşitlilik önemlidir: hepsi aynı model dizüstüyse test değeri düşer.
+
+**Halka 2 — Genel (%80).** 7–10 gün sonra.
+
+**Halka 3 — Kritik (%5).** 14 gün sonra. Üretim hattı terminalleri, kritik iş istasyonları, yönetici cihazları.
+
+Aradaki süre, sorunun ortaya çıkması için gereken zamandır. Çoğu uyumsuzluk ilk 48 saatte görünür.
+
+## Güvenlik yamalarında farklı davranın
+
+Halka modeli özellik güncellemeleri için idealdir. Aktif olarak sömürülen bir açığın yaması için aynı takvimi beklemek, farklı bir riski büyütmektir.
+
+Kural: **kalite ve özellik güncellemeleri halkalarla, aktif sömürülen açık yamaları hızlandırılmış takvimle.** İkincisinde halkalar korunur ama araları saatlere iner.
+
+## Yeniden başlatma davranışı
+
+Kullanıcı şikâyetlerinin çoğu yamadan değil, yeniden başlatmadan gelir. Üç ayarı bilinçli yapın:
+
+**Etkin saatler.** Kullanıcının çalıştığı aralıkta yeniden başlatma olmasın. Otomatik tespit çoğu ortamda iyi çalışır.
+
+**Son tarih.** Kullanıcı erteleyebilsin ama sonsuza kadar değil. 3–5 gün makul bir aralıktır.
+
+**Uyarı süresi.** Zorunlu yeniden başlatmadan önce en az birkaç saatlik bildirim.
+
+Bu üçü ayarlanmadığında ya sunum ortasında yeniden başlayan makineler olur ya da altı aydır yamalanmamış cihazlar.
+
+## Sürücü güncellemelerini ayırın
+
+Windows Update sürücü de dağıtır ve bu, en sık sorun çıkaran kalemdir — özellikle ekran kartı ve ses sürücülerinde.
+
+Kurumsal ortamda sürücü güncellemelerini işletim sistemi güncellemelerinden ayırıp üretici kataloglarından yönetmek genelde daha öngörülebilirdir. En azından kritik cihaz gruplarında sürücü güncellemelerini erteleyin.
+
+## Uyumluluğu ölçün
+
+Yama yönetiminin sağlığı, "kaç makine güncel" sorusunun cevabıdır. Bu sayıyı haftalık takip edin ve **halka bazında** bakın.
+
+```powershell
+# basit bir uyumluluk özeti
+$sunucular = Get-ADComputer -Filter { OperatingSystem -like '*Windows 1*' } -Properties OperatingSystemVersion
+$sunucular | Group-Object OperatingSystemVersion |
+  Select-Object Name, Count | Sort-Object Count -Descending
+```
+
+Bir halkada uyumluluk oranı diğerlerinden belirgin düşükse orada bir engel vardır: kapalı duran cihazlar, ağa gelmeyen uzak çalışanlar ya da diski dolu makineler.
+
+Son ihtimal sık görülür ve fark edilmesi zordur: C: sürücüsünde yeterli boş alan yoksa güncelleme sessizce başarısız olur.
+
+## Geri alma planı
+
+Bir güncelleme sorun çıkardığında ne yapacağınızı önceden bilin. Kalite güncellemeleri kaldırılabilir:
+
+```powershell
+wusa /uninstall /kb:5031234 /quiet /norestart
+```
+
+Ama asıl önlem, sorunlu güncellemeyi **dağıtımdan durdurmaktır** — kaldırmak yerine yayılmasını kesin. Yönetim aracınızda bunu nasıl yapacağınızı bir kez deneyin; olay anında öğrenmek istemezsiniz.
+
+Özellik güncellemelerinde geri dönüş penceresi sınırlıdır (varsayılan 10 gün). Bu süre dolduktan sonra geri dönüş, yeniden kurulum demektir.
+
+## Özellik güncellemeleri ayrı bir konudur
+
+Aylık kalite güncellemeleri ile yıllık özellik güncellemeleri aynı süreçle yönetilmemelidir. İkincisi işletim sistemi sürümünü değiştirir; uygulama uyumluluğu, sürücü desteği ve kullanıcı arayüzü etkilenir.
+
+Özellik güncellemelerinde ek adımlar gerekir:
+
+**Uyumluluk envanteri.** Kritik uygulamaların yeni sürümde desteklendiğini üreticiden teyit edin. Özellikle eski istemci-sunucu uygulamaları ve özel donanım sürücüleri risklidir.
+
+**Daha uzun pilot.** Kalite güncellemesinde 3 gün yeterken burada 2–4 hafta uygun olur; bazı sorunlar ancak aylık iş döngüsü tamamlanınca görünür.
+
+**Destek ömrü takvimi.** Her Windows sürümünün destek bitiş tarihi vardır. Bu tarihleri bir takvime koyun ve altı ay öncesinden planlamaya başlayın; son ayda yapılan geçişler hep sorunlu olur.
+
+```powershell
+# filodaki sürüm dağılımı
+Get-ADComputer -Filter { OperatingSystem -like '*Windows 1*' } -Properties OperatingSystemVersion |
+  Group-Object OperatingSystemVersion | Sort-Object Count -Descending |
+  Select-Object Name, Count
+```
+
+Bu dağılımda uzun kuyruk oluşuyorsa — yani birkaç makine hep eski sürümde kalıyorsa — o makineler genelde en kritik olanlardır ve kimse dokunmaya cesaret edememiştir.
+
+## Doğrulama adımı
+
+Her aylık döngüden sonra iki sayıyı kaydedin: **halka 2'ye geçmeden önce halka 1'de raporlanan sorun sayısı** ve **döngü sonunda uyumluluk oranı**.
+
+Halka 1'de hiç sorun raporlanmıyorsa pilot grubunuz temsili değildir — muhtemelen hepsi aynı tip cihaz kullanıyor ya da sorunları bildirmiyorlar. Pilotun değeri sorun bulmasındadır; hiç bulmuyorsa modeli çalıştırıyor gibi yapıyorsunuz demektir.

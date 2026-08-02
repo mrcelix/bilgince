@@ -1,0 +1,85 @@
+---
+baslik: "Kimlik avına karşı teknik katmanlar"
+ozet: "Kullanıcı eğitimi gerekli ama yeterli değil. Tıklamanın sonuç doğurmasını engelleyen teknik önlemler."
+konu: "guvenlik"
+etiketler: ["kimlik-avi", "e-posta", "mfa"]
+yayin: 2026-02-27
+sure: 12
+---
+
+Kimlik avı savunması denince akla önce eğitim gelir. Eğitim değerlidir ama tek başına dayandığınız katman olursa, savunmanız "hiç kimse yorgun bir cuma akşamı yanlış bağlantıya tıklamayacak" varsayımına dayanır.
+
+O varsayım tutmaz. Tutmadığında ne olacağını planlamak gerekir.
+
+## Katman 1: Mesaj gelmesin
+
+En ucuz savunma, mesajın kullanıcıya hiç ulaşmamasıdır.
+
+Kendi alan adınızı taklit eden mesajları engellemek için üç kayıt gerekir ve üçü de eksiksiz olmalıdır:
+
+**SPF** — hangi sunucuların sizin adınıza posta gönderebileceğini söyler. Kaydın `-all` ile bitmesi gerekir; `~all` (softfail) çoğu alıcıda engellemez.
+
+**DKIM** — giden postaları imzalar, yolda değiştirilmediğini kanıtlar.
+
+**DMARC** — ilk ikisi başarısız olduğunda ne yapılacağını söyler. Asıl koruma buradadır.
+
+```
+_dmarc.sirket.com  TXT  "v=DMARC1; p=reject; rua=mailto:dmarc@sirket.com; pct=100"
+```
+
+DMARC'ı doğrudan `p=reject` ile açmayın; `p=none` ile başlayıp raporları bir ay okuyun. Raporlar, sizin adınıza posta gönderen ama bilmediğiniz sistemleri gösterir — pazarlama araçları, fatura sistemleri, İK yazılımları. Bunlar SPF'e eklenmeden reject'e geçerseniz meşru postalarınız engellenir.
+
+Bir de şu ayarı yapın: **dışarıdan gelen ve iç alan adınızı taklit eden** mesajları posta ağ geçidinde doğrudan reddedin. Bu tek kural, "CEO'dan acil havale" tipi saldırıların büyük kısmını keser.
+
+## Katman 2: Tıklansa bile çalışmasın
+
+Mesaj geçtiyse ikinci katman devreye girmeli.
+
+**Bağlantı yeniden yazma.** Posta ağ geçidi, e-postadaki bağlantıları kendi üzerinden geçirir ve tıklandığı anda hedefi kontrol eder. Gönderim anında temiz olup sonradan zararlı hâle gelen sayfaları yakalar — bu, yaygın bir taktiktir.
+
+**Ek dosya kısıtlaması.** Kurumsal ortamda hiç kimsenin e-postayla `.iso`, `.img`, `.vhd`, `.lnk`, `.js` dosyası almasına gerek yoktur. Bu uzantıları ağ geçidinde engelleyin; makro içeren Office dosyalarını da karantinaya alın.
+
+**Dış gönderen etiketi.** Kurum dışından gelen mesajların konusuna ya da gövdesine görünür bir uyarı ekleyin. Basit ama etkilidir: iç yazışma sanılan mesajlar anında ayrışır.
+
+## Katman 3: Kimlik bilgisi çalınsa bile işe yaramasın
+
+Bu katman en önemlisidir çünkü kimlik avının asıl hedefi genelde parolanızdır.
+
+**Kimlik avına dayanıklı MFA.** SMS ve tek kullanımlık kod, gerçek zamanlı vekil saldırılarına karşı koruma sağlamaz — kullanıcı kodu sahte siteye girer, saldırgan aynı anda gerçek siteye iletir. FIDO2 güvenlik anahtarları ve platform kimlik doğrulayıcıları (Windows Hello, passkey) bu saldırıya karşı yapısal olarak dayanıklıdır çünkü kimlik doğrulama alan adına bağlıdır.
+
+En azından yöneticiler ve finans erişimi olan kullanıcılar için bu yönteme geçin.
+
+**Koşullu erişim.** Bilinmeyen bir ülkeden, uyumsuz bir cihazdan gelen oturum açma denemesini engelleyin ya da ek doğrulama isteyin.
+
+**Oturum çalınmasına karşı.** Saldırgan parolayı değil oturum çerezini çalabilir. Cihaz uyumluluğu koşulu, çalınan çerezin başka bir cihazda işe yaramasını engeller.
+
+## Katman 4: Olduğunda hızlı görün
+
+Hiçbir katman yüzde yüz değildir. Dördüncü katman tespit ve müdahaledir.
+
+İzlenecek sinyaller:
+
+- Alışılmadık konumdan başarılı oturum açma
+- Posta kutusunda yeni **iletme kuralı** oluşturulması (saldırganın ilk yaptığı işlerden biridir)
+- Kısa sürede çok sayıda başarısız denemenin ardından bir başarı
+- Yeni bir uygulama izninin (OAuth onayı) verilmesi
+
+Posta kutusu iletme kuralı özellikle değerli bir sinyaldir; meşru kullanımı nadirdir ve saldırgan için neredeyse zorunludur.
+
+## Kullanıcı eğitimi: nasıl işe yarar
+
+Eğitimi tamamen bırakmayın ama beklentiyi doğru kurun. Amaç, kullanıcının her saldırıyı tanıması değil, **şüphelendiğinde kolayca bildirmesidir**.
+
+Bunun için tek şey gerekir: Outlook'ta tek tıkla "şüpheli bildir" düğmesi ve bildiren kişiye teşekkür eden bir süreç. Bildirimi zorlaştıran ya da bildireni azarlayan bir kültürde kimse bildirmez — ve size ulaşmayan sinyal, olmayan sinyaldir.
+
+Simülasyon kampanyaları yapıyorsanız amacın ceza değil ölçüm olduğunu net söyleyin. Tıklayan kullanıcıyı utandıran kampanyalar, bir sonraki gerçek olayda kimsenin haber vermemesine yol açar.
+
+## Doğrulama adımı
+
+Üç testi yapın ve sonuçlarını kaydedin.
+
+**DMARC testi:** Dış bir adresten kendi alan adınızı taklit eden bir mesaj göndermeyi deneyin — reddedilmeli. `p=none` modunda kaldıysanız koruma yoktur, yalnızca rapor vardır.
+
+**Ek testi:** Kendinize parola korumalı bir arşiv içinde zararsız bir test dosyası (EICAR) gönderin — karantinaya düşmeli.
+
+**Bildirim testi:** Rastgele bir kullanıcıya sorun: "Şüpheli bir e-posta gelse ne yaparsın?" Cevap "silerim" ise bildirim süreciniz yoktur. Doğru cevap düğmenin adını içermelidir.

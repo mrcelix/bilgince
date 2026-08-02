@@ -1,0 +1,98 @@
+---
+baslik: "Yama önceliklendirme: CVSS puanı tek başına yeterli değil"
+ozet: "Kritik etiketli yüzlerce açık var ve hepsini aynı hafta kapatamazsınız. Sıralamayı gerçek riske göre yapmanın yolu."
+konu: "guvenlik"
+etiketler: ["yama", "risk", "operasyon"]
+yayin: 2026-02-06
+sure: 12
+---
+
+Zafiyet tarayıcısı raporu geldi: 1.400 bulgu, 230'u "kritik". Ekip iki kişi. Bu raporla ne yapacaksınız?
+
+Çoğu ekibin yaptığı şey, listenin başından başlayıp yorulana kadar ilerlemektir. Bu yaklaşım, en yüksek puanlı ama en düşük riskli açıkları kapatıp gerçek tehdidi listenin ortasında bırakır.
+
+## CVSS neyi ölçer, neyi ölçmez
+
+CVSS puanı, bir açığın **teknik ciddiyetini** ölçer: uzaktan sömürülebilir mi, kimlik doğrulama gerekiyor mu, etkisi ne kadar büyük.
+
+Ölçmediği şeyler ise sizin ortamınızla ilgilidir:
+
+- O sistem internete açık mı, yoksa iç ağın derinliğinde mi?
+- Açık için gerçekte kullanılan bir sömürü kodu var mı?
+- O sistemde ne kadar kritik veri var?
+- Telafi edici bir kontrol var mı (WAF, segmentasyon, uygulama beyaz listesi)?
+
+CVSS 9.8 puanlı ama internete kapalı, segmentli bir test sunucusundaki açık, CVSS 7.5 puanlı ama internete açık bir uygulama sunucusundaki açıktan daha az acildir.
+
+## Üç filtre, doğru sırayla
+
+Listeyi şu sırayla süzün. Her filtre listeyi belirgin biçimde küçültür.
+
+**1. Aktif olarak sömürülüyor mu?**
+Bilinen sömürü listeleri (KEV benzeri kataloglar) bu bilgiyi verir. Vahşi doğada kullanıldığı bilinen açıklar, teorik olanlardan kat kat önceliklidir. Bu filtre genelde 1.400 bulguyu birkaç düzineye indirir.
+
+**2. Sistem dışarıdan erişilebilir mi?**
+İnternete açık her sistem, iç sistemden önce gelir. Bunu tahmin etmeyin; dışarıdan tarayın. İç envanteriniz "kapalı" dese bile bir güvenlik duvarı kuralı onu açmış olabilir.
+
+**3. Sistem kritik veri veya kimlik barındırıyor mu?**
+Domain controller, kimlik sunucusu, veritabanı, yedekleme sunucusu. Bu sistemlerdeki bir açık, yanal hareketin başlangıç noktası olur.
+
+Üç filtreden geçen liste, bu hafta yapılacak iştir. Kalanı takvime yayılır.
+
+## Yama penceresi gerçekçi olsun
+
+Sık görülen bir hata, tek bir "kritik yamalar 24 saat içinde" kuralı yazmaktır. Bu kural yazıldığı gün ihlal edilmeye başlar ve kimse ciddiye almaz.
+
+Sistem sınıfına göre farklılaştırın:
+
+| Sistem sınıfı | Kritik açık | Yüksek | Orta |
+| --- | --- | --- | --- |
+| İnternete açık | 48 saat | 7 gün | 30 gün |
+| Kimlik ve altyapı | 7 gün | 14 gün | 60 gün |
+| İç sunucular | 14 gün | 30 gün | 90 gün |
+| Test/geliştirme | 30 gün | 60 gün | fırsat oldukça |
+
+Bu tablo tartışmayı bitiren tablodur: bir bulgu geldiğinde ne zaman kapatılacağı kendiliğinden bellidir ve her seferinde yeniden pazarlık yapılmaz.
+
+## Yamalanmayanı belgeleyin
+
+Bazı sistemler yamalanamaz: üretici desteği bitmiştir, uygulama belirli bir sürüme bağımlıdır, kesinti penceresi yoktur.
+
+Bu durumda yapılacak şey görmezden gelmek değil, **istisnayı kayda geçirmektir**. Her istisnada dört alan olsun: hangi sistem, hangi açık, neden yamalanamıyor, hangi telafi edici kontrol uygulandı.
+
+Telafi edici kontrol somut olmalı: "ağ segmentine alındı", "yalnızca iki IP'den erişilebilir", "uygulama önünde WAF kuralı yazıldı". "Dikkatli olacağız" bir kontrol değildir.
+
+İstisna listesinin bir de gözden geçirme tarihi olmalı. Üretici bir güncelleme yayınladığında ya da uygulama yükseltildiğinde istisna kalkabilir — ama kimse takip etmiyorsa yıllarca durur.
+
+## Yamanın kendisi risk taşır
+
+Yama uygulamak da bir değişikliktir ve kırabilir. Bu yüzden sıralamanın yanında bir de yayım disiplini gerekir:
+
+1. Test grubu — birkaç makine, bir hafta
+2. Pilot grup — bir departman, bir hafta
+3. Genel yayım
+4. Yamalanamayanlar için istisna kaydı
+
+Kritik ve aktif sömürülen açıklarda bu takvimi sıkıştırırsınız ama atlamazsınız. Tek bir test adımı bile, tüm filoyu kıran bir yamayı yakalamaya yeter.
+
+## Ölçün: kapanma süresi
+
+Yama yönetiminin sağlığını gösteren tek sayı, bulgunun açılışından kapanışına geçen süredir — ortalama değil, **medyan ve en kötü değer**.
+
+```powershell
+# örnek: tarayıcı dışa aktarımından basit bir özet
+Import-Csv .\bulgular.csv |
+  Where-Object Durum -eq 'Kapandi' |
+  ForEach-Object { [int]((Get-Date $_.KapanisTarihi) - (Get-Date $_.AcilisTarihi)).TotalDays } |
+  Measure-Object -Average -Maximum -Minimum
+```
+
+Ortalama iyi görünürken en kötü değer aylarsa, birkaç sistem sürekli atlanıyordur — ve o sistemler genelde en zor yamalanan, yani en riskli olanlardır.
+
+## Doğrulama adımı
+
+Ayda bir, kapatıldığı raporlanan üç bulguyu **rastgele seçip yeniden tarayın**.
+
+Hâlâ açık görünüyorsa iki ihtimal var: yama uygulanmış ama yeniden başlatma yapılmamış, ya da kayıt kapatılmış ama iş yapılmamış. İkisi de sık görülür ve ikisi de yalnızca doğrulamayla ortaya çıkar.
+
+Bu üç örnekleme, tüm yama sürecine duyduğunuz güvenin tek dayanağıdır. Raporun kendisi, raporu üreten sürecin doğru çalıştığını kanıtlamaz.

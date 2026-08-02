@@ -379,19 +379,23 @@ code {
   display: grid;
   gap: 0;
   padding: 0 28px;
+  /* sütunlar aynı yükseklikte kalsın ki ayırıcı çizgiler bölünmesin;
+     başlık hizası aşağıdaki eşit üst dolgularla sağlanıyor */
+  align-items: stretch;
 }
-/* Küme sayısı arttıkça sabit sütun düzeni sığmıyordu; akan düzen
-   yeni kategori eklendiğinde kendiliğinden yeni satıra geçiyor. */
+/* Küme sayısı arttıkça sabit sütun düzeni sığmıyordu. minmax alt sınırı,
+   kümeler + tanıtım sütununun tek satırda kalmasına yetecek kadar düşük;
+   daha fazlasında kendiliğinden alt satıra sarar. */
 .mega-konular .kap {
-  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
 }
 .mega-kaynaklar .kap {
   grid-template-columns: 1.1fr 1fr 0.85fr;
 }
-/* öne çıkan konu şeridi — mega menünün üstünde tam genişlik */
+/* öne çıkan konu şeridi — mega menünün altında tam genişlik */
 .mega-one-cikan {
   background: linear-gradient(100deg, var(--tint), var(--paper) 70%);
-  border-bottom: 1px solid var(--line);
+  border-top: 1px solid var(--line);
 }
 .mega-one-cikan .kap {
   display: flex;
@@ -522,12 +526,14 @@ code {
   }
 }
 
+/* Tüm sütunlarda üst dolgu aynı: başlıklar tek hizada başlar. */
 .mega-sutun {
   padding: 24px 22px 24px 0;
   display: flex;
   flex-direction: column;
   gap: 13px;
   border-right: 1px solid var(--line);
+  align-content: start;
 }
 .mega-sutun + .mega-sutun {
   padding-left: 22px;
@@ -622,10 +628,11 @@ code {
 }
 .mega-tanitim {
   background: linear-gradient(150deg, var(--tint), var(--bg));
-  padding: 26px 30px;
+  /* üst dolgu .mega-sutun ile aynı: başlıklar hizalı kalsın */
+  padding: 24px 30px 24px 22px;
   display: flex;
   flex-direction: column;
-  gap: 14px;
+  gap: 13px;
   margin-right: -28px;
 }
 .mega-kart {
