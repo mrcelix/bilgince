@@ -1,0 +1,116 @@
+---
+baslik: "Yeni sunucu kurmadan önce cevaplanması gereken sekiz soru"
+ozet: "Kurulum yarım saat sürer, sonuçları beş yıl yaşar. Devreye alma öncesi kontrol listesi."
+konu: "windows-server"
+etiketler: ["devreye-alma", "operasyon", "standart"]
+yayin: 2026-06-19
+sure: 9
+---
+
+Sunucu kurmak kolaylaştıkça, düşünmeden kurulan sunucu sayısı arttı. Sanal makine oluşturmak birkaç tıklama sürüyor; o makinenin beş yıl boyunca üreteceği yönetim yükü ise hiç hesaplanmıyor.
+
+Devreye alma öncesi sekiz soru, bu yükün büyük kısmını baştan siliyor.
+
+## 1. Bu sunucu gerçekten gerekli mi?
+
+Mevcut bir sunucuya kurulamaz mı? Bir hizmete abone olunamaz mı? Her yeni sunucu; yama, yedekleme, izleme, lisans ve kapasite yükü demektir.
+
+En ucuz sunucu, kurulmayan sunucudur.
+
+## 2. Adı ne olacak?
+
+Adlandırma standardı yoksa altı ay sonra `srv-yeni2`, `test-son`, `deneme-3` gibi isimler ortaya çıkar.
+
+İşleyen bir kalıp: `rol-ortam-sira` (`web-uat-01`, `sql-prd-02`). Lokasyon ve işletim sistemi bilgisini isme sıkıştırmaya çalışmayın; onlar envanterde durmalı, isimde değil.
+
+## 3. Sahibi kim?
+
+Teknik sorumlu ve iş sahibi. İkisi de bir kişi adı olmalı, "BT" değil.
+
+Sahipsiz sunucular, portföy temizliğinde kimsenin kapatmaya cesaret edemediği kalemlerdir.
+
+## 4. Hangi ortam ve hangi hizmet seviyesi?
+
+Üretim mi test mi? RTO ve RPO ne? Bu cevap, yedekleme planını, izleme eşiklerini ve bakım penceresini belirler.
+
+Test sunucusunu üretim gibi yedeklemek para israfıdır; üretimi test gibi yedeklemek kariyer riskidir.
+
+## 5. Nasıl yamalanacak?
+
+Hangi bakım penceresinde, hangi grupta, yeniden başlatma serbest mi? Bu soru kurulum anında sorulmazsa, sunucu hiçbir yama grubuna girmez ve iki yıl sonra kritik açıklarla çalışır durumda bulunur.
+
+Etiketle çözün: makineye `Yama=Pazar` etiketi verin, yama aracı dinamik kapsamla onu kendiliğinden alsın.
+
+## 6. Yedeği alınacak mı, nasıl doğrulanacak?
+
+"Alınacak" cevabı yetmez. Hangi işe dahil edilecek, saklama süresi ne, geri dönüş testi ne zaman yapılacak?
+
+Yedekleme işine eklenmemiş sunucu, ilk arızada tam kayıptır — ve bunu ancak arıza anında öğrenirsiniz.
+
+## 7. İzlemeye nasıl girecek?
+
+Disk, bellek, CPU eşikleri; hizmet durumları; uyarılar kime gidecek? İzlemeye alınmamış sunucu, sessizce dolan diskiyle bir gece çöker.
+
+## 8. Ne zaman kapatılacak?
+
+En çok atlanan ve en değerli soru. Geçici bir ihtiyaç için kuruluyorsa bitiş tarihi yazın ve takvime koyun.
+
+"Geçici" sunucuların çoğu kalıcı olur, çünkü kimse kapatma sorumluluğunu almaz. Tarihi baştan yazmak, o sorumluluğu baştan atar.
+
+## Bunu bir şablona çevirin
+
+Sekiz soruyu her seferinde sormak yerine bir devreye alma formu yapın — bir sayfa yeter. Formu doldurmadan sunucu kurulmaması kuralını koyun.
+
+Otomasyonla birleştirirseniz daha da iyi olur: form verisi doğrudan etiketlere, izleme kaydına ve yedekleme kapsamına dönüşür. O noktada kontrol listesi bir bürokrasi değil, kurulumun kendisi olur.
+
+## Kurulum sonrası ilk on dakika
+
+Form doldurulduktan ve makine kurulduktan sonra, kapatmadan önce şunları doğrulayın:
+
+```powershell
+# isim ve etki alanı
+Get-ComputerInfo | Select-Object CsName, CsDomain, OsName, OsVersion
+
+# zaman kaynağı — yanlış saat, kimlik doğrulamayı kırar
+w32tm /query /source
+
+# disk yerleşimi
+Get-Volume | Select-Object DriveLetter, FileSystemLabel, SizeRemaining, Size
+
+# güvenlik duvarı açık mı
+Get-NetFirewallProfile | Select-Object Name, Enabled
+
+# yama durumu
+Get-HotFix | Sort-Object InstalledOn -Descending | Select-Object -First 5
+```
+
+Zaman kaynağı özellikle önemlidir: sanal makinelerde ana makineyle senkron kalıp etki alanı zamanından sapan sunucular, açıklanamayan Kerberos hatalarının klasik sebebidir.
+
+## Disk yerleşimini baştan doğru kurun
+
+Sonradan değiştirmesi en zahmetli karar budur. Üç kural çoğu sorunu önler.
+
+**İşletim sistemi ve veri ayrı birimlerde olsun.** C: dolduğunda sunucu durur; veri ayrı birimdeyse yalnızca uygulama etkilenir ve müdahale alanınız kalır.
+
+**Günlük dosyaları veriyle aynı birimde olmasın.** Kontrolsüz büyüyen bir günlük, veritabanını da durdurur.
+
+**C: için bel bel bir alan bırakın.** Yamalar, bellek dökümü ve geçici dosyalar için en az 20–30 GB boş alan gerekir. Sıkışık bir C:, aylar sonra yama uygulanamayan bir sunucu demektir.
+
+## Etiketleme envanterin kendisidir
+
+Devreye alma formundaki cevapları sunucunun kendisine etiket olarak yazın — sanallaştırma platformunda, bulut kaynağında ya da AD nesnesinin açıklama alanında.
+
+Ayrı bir envanter tablosu tutmak yerine bunu tercih edin: ayrı tablolar eskir, kaynağın üzerindeki etiket kaynakla birlikte yaşar. Yama kapsamı, yedekleme seçimi ve maliyet raporu da doğrudan bu etiketlerden beslenebilir.
+
+```powershell
+Set-ADComputer -Identity 'SQL-PRD-02' `
+  -Description 'Sahip: F.Yıldız | Ortam: Uretim | Yama: Pazar | RTO: 4s'
+```
+
+Basit görünür ama "bu sunucu ne işe yarıyor" sorusuna altı ay sonra cevap veren tek şey genelde bu satır olur.
+
+## Doğrulama adımı
+
+Sunucu üretime alındıktan bir hafta sonra dört soruyu tekrar sorun: **yedeği alındı mı, izlemede görünüyor mu, yama grubunda mı, envanterde sahibiyle kayıtlı mı?**
+
+Dördü de evet değilse sunucu üretimde değil, sadece açık. Bu farkı bir hafta içinde kapatmak kolaydır; bir yıl sonra kapatmak, kimsenin hatırlamadığı bir sistemin arkeolojisini yapmak demektir.

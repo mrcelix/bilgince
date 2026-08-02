@@ -1,0 +1,136 @@
+---
+baslik: "Elimde çalışan betik zamanlanmış görevde neden çalışmıyor?"
+ozet: "Aynı kod, aynı makine, farklı sonuç. Sebep neredeyse her zaman aynı beş şeyden biri."
+konu: "powershell"
+etiketler: ["zamanlanmis-gorev", "otomasyon", "tanilama"]
+yayin: 2026-03-20
+sure: 9
+---
+
+Bu, sistem yöneticiliğinin en tekrar eden hayal kırıklığıdır. Betiği açar, çalıştırır, çıktıyı görürsünüz. Aynı betiği Görev Zamanlayıcı'ya koyarsınız ve hiçbir şey olmaz. Hata da yoktur — çünkü hatayı kimse görmez.
+
+Sebep neredeyse her zaman şu beşten biridir.
+
+## 1. Farklı hesap, farklı yetki
+
+Siz betiği kendi hesabınızla çalıştırdınız. Görev, `SYSTEM` ya da bir hizmet hesabıyla çalışıyor. O hesabın ağ paylaşımına, kayıt defteri anahtarına veya AD nesnesine erişimi olmayabilir.
+
+`SYSTEM` hesabı özellikle yanıltıcıdır: yerel makinede neredeyse her şeye yetkilidir ama **ağda makine hesabı** olarak görünür. Uzak bir paylaşıma erişmesi gerekiyorsa, o paylaşımda makine hesabına izin verilmiş olmalıdır.
+
+Test etmenin yolu, betiği o hesapla elle çalıştırmaktır:
+
+```powershell
+# SYSTEM olarak bir konsol açmak için (PsExec ile)
+psexec -i -s powershell.exe
+```
+
+## 2. Çalışma dizini farklı
+
+Betiğinizde `.\rapor.csv` gibi göreli bir yol varsa, elle çalıştırdığınızda betiğin bulunduğu klasöre yazar. Zamanlanmış görevde çalışma dizini genelde `C:\Windows\System32` olur ve dosya oraya düşer — ya da yetki olmadığı için hiç düşmez.
+
+İki çözüm var. Görev tanımında "Başlangıç yeri" alanını doldurun ya da betiği kendi kendine yetsin:
+
+```powershell
+$kok = Split-Path -Parent $PSCommandPath
+$cikti = Join-Path $kok 'rapor.csv'
+```
+
+İkincisini tercih edin; görev tanımına bağımlı olmaz.
+
+## 3. Profil yüklenmiyor
+
+Etkileşimli oturumda PowerShell profiliniz çalışır: modül yolları eklenir, takma adlar tanımlanır, kimlik bilgileri yüklenir. Zamanlanmış görevde profil çalışmaz.
+
+Bu yüzden betiğin ihtiyaç duyduğu her modülü açıkça içe aktarın:
+
+```powershell
+Import-Module ActiveDirectory -ErrorAction Stop
+```
+
+Ve görev eyleminde `-NoProfile` kullanın; böylece yerelde de aynı koşulda test edersiniz:
+
+```
+Program: pwsh.exe
+Argüman: -NoProfile -ExecutionPolicy Bypass -File "D:\Betikler\rapor.ps1"
+```
+
+## 4. Yürütme ilkesi
+
+Betik imzasızsa ve makinenin yürütme ilkesi `Restricted` veya `AllSigned` ise görev sessizce başarısız olur. Görev argümanına `-ExecutionPolicy Bypass` eklemek pratik çözümdür.
+
+Not: bu, ilkeyi makine genelinde değiştirmez; yalnızca o çalıştırma için geçerlidir. Makine genelinde `Unrestricted` yapmak yerine bunu tercih edin.
+
+## 5. Etkileşim bekleyen komutlar
+
+Betikte `Read-Host`, `Get-Credential` veya onay soran bir cmdlet varsa görev sonsuza kadar bekler. Görev durumu "çalışıyor" görünür ama hiçbir şey olmaz.
+
+Onay isteyen komutlara `-Confirm:$false` ekleyin. Kimlik bilgisi gerekiyorsa şifreli bir dosyadan okuyun ya da yönetilen bir kimlik kullanın; betiğe gömmeyin.
+
+## Görüntüleyemediğiniz hatayı yakalayın
+
+Asıl sorun, zamanlanmış görevde hata mesajını görememenizdir. Çözüm, betiğin kendi günlüğünü tutmasıdır:
+
+```powershell
+$gunluk = Join-Path (Split-Path -Parent $PSCommandPath) "gunluk-$(Get-Date -f yyyyMMdd).log"
+Start-Transcript -Path $gunluk -Append
+
+try {
+    # asıl iş
+} catch {
+    "HATA: $($_.Exception.Message) [satır $($_.InvocationInfo.ScriptLineNumber)]" |
+        Out-File $gunluk -Append
+    exit 1
+} finally {
+    Stop-Transcript
+}
+```
+
+`exit 1` önemlidir: görev sonucu böylece "başarısız" olarak kaydedilir ve izleme sisteminiz bunu görebilir. Kod hata verse bile `exit 0` dönen görevler, panoda hep yeşil görünür.
+
+## Görev sonucunu okumak
+
+```powershell
+Get-ScheduledTaskInfo -TaskName 'Gunluk-Rapor' |
+  Select-Object LastRunTime, LastTaskResult, NextRunTime
+```
+
+`LastTaskResult` değeri `0` başarıdır. Sık görülen diğerleri: `0x1` genel hata, `0x41301` hâlâ çalışıyor, `0x2` dosya bulunamadı (genelde yol hatası).
+
+## Kimlik bilgisini betiğe gömmeyin
+
+Zamanlanmış görevlerde en sık karşılaşılan kötü çözüm, parolayı betiğin içine yazmaktır. Betik dosyası yedeklenir, kopyalanır, kod deposuna düşer — parola da onunla birlikte gider.
+
+Tercih sırası şudur:
+
+**1. Hesap gerektirmeyen çözüm.** Görevi, hedefe zaten yetkili bir hizmet hesabıyla çalıştırın. En temizi budur.
+
+**2. Grup yönetimli hizmet hesabı (gMSA).** Parolayı AD yönetir ve otomatik döndürür; siz hiç görmezsiniz.
+
+```powershell
+New-ADServiceAccount -Name 'gmsa-rapor' -DNSHostName 'gmsa-rapor.sirket.local' `
+  -PrincipalsAllowedToRetrieveManagedPassword 'GG-RaporSunuculari'
+Install-ADServiceAccount -Identity 'gmsa-rapor'
+```
+
+**3. Şifreli kimlik bilgisi dosyası.** gMSA mümkün değilse, `Export-Clixml` ile kaydedilen kimlik bilgisi yalnızca **aynı kullanıcı ve aynı makinede** çözülebilir:
+
+```powershell
+Get-Credential | Export-Clixml D:\gizli\rapor.cred   # görevi çalıştıran hesapla yapın
+$kb = Import-Clixml D:\gizli\rapor.cred
+```
+
+Bu dosyayı başka bir makineye kopyalarsanız çözülmez — bu bir kısıtlama değil, korumadır.
+
+## Görev geçmişini açın
+
+Görev Zamanlayıcı'da geçmiş varsayılan olarak kapalı olabilir. Açık değilse görevin ne zaman çalıştığını, ne kadar sürdüğünü göremezsiniz:
+
+```powershell
+wevtutil set-log Microsoft-Windows-TaskScheduler/Operational /enabled:true
+```
+
+## Doğrulama adımı
+
+Görevi kurduktan sonra **elle bir kez tetikleyin** ve üç şeyi kontrol edin: günlük dosyası oluştu mu, beklenen çıktı doğru yerde mi, `LastTaskResult` sıfır mı.
+
+Üçü de doğruysa görevi zamana bırakın. Ama ilk planlı çalışmasından sonra aynı üç kontrolü tekrarlayın — elle tetikleme sizin oturumunuzun bağlamını taşıyabilir, planlı çalışma taşımaz. Aradaki farkı ancak ikinci kontrol gösterir.

@@ -1,0 +1,142 @@
+---
+baslik: "WinRM tuzakları: uzak komut neden bağlanamıyor"
+ozet: "Bağlantı hatalarının çoğu güvenlik duvarı değil; ağ profili, kimlik doğrulama ve çift atlama sorunudur."
+konu: "powershell"
+etiketler: ["winrm", "uzaktan-yonetim", "tanilama"]
+yayin: 2026-05-22
+sure: 9
+---
+
+`Invoke-Command` çalışmadığında ilk suçlanan güvenlik duvarıdır. Portu açarsınız, yine çalışmaz. Sonra saatler kaybedersiniz.
+
+Sorunun kaynağı genelde dört yerden biridir ve teşhis sırası önemlidir.
+
+## Önce doğru soruyu sorun
+
+Tek komutla nerede durduğunu görebilirsiniz:
+
+```powershell
+Test-WSMan -ComputerName sunucu01
+```
+
+Cevap gelirse WinRM ayakta ve erişilebilir demektir; sorun kimlik doğrulamadadır. Cevap gelmezse ya servis kapalıdır ya da ağ engellidir.
+
+Ağ tarafını ayırmak için:
+
+```powershell
+Test-NetConnection sunucu01 -Port 5985
+```
+
+`TcpTestSucceeded` `True` ama `Test-WSMan` başarısızsa, port açık ama servis dinlemiyordur.
+
+## 1. Ağ profili "Genel"
+
+En sık ve en şaşırtıcı sebep budur. WinRM'in varsayılan güvenlik duvarı kuralı, **Genel** ağ profilinde etkin değildir. Sunucu bir şekilde ağını "Genel" olarak tanımışsa — genelde etki alanı denetleyicisine ulaşamadan önyükleme yaptığı için — uzak yönetim sessizce kapanır.
+
+```powershell
+Get-NetConnectionProfile
+Set-NetConnectionProfile -InterfaceAlias 'Ethernet' -NetworkCategory Private
+```
+
+Etki alanına katılmış makinelerde profil `DomainAuthenticated` olmalıdır. Değilse asıl sorun DNS veya denetleyici erişimidir; profili elle değiştirmek belirtiyi gizler.
+
+## 2. Etki alanı dışı makineler
+
+Hedef makine etki alanında değilse Kerberos kullanılamaz ve NTLM'e düşülür. Bu durumda kaynak makinede hedefin güvenilir olduğunu belirtmeniz gerekir:
+
+```powershell
+Set-Item WSMan:\localhost\Client\TrustedHosts -Value 'sunucu01' -Concatenate -Force
+```
+
+`-Concatenate` önemlidir; yoksa listeyi ezersiniz. Ve `*` yazmayın — tüm makinelere güvenmiş olursunuz.
+
+Daha temiz çözüm HTTPS dinleyicisi kurmaktır (5986). Sertifika yönetimi gerektirir ama TrustedHosts listesi tutmaktan iyidir.
+
+## 3. Çift atlama sorunu
+
+Bu, en kafa karıştırıcı olanıdır. Uzak makineye bağlanırsınız, orada bir ağ paylaşımına erişmeye çalışırsınız ve "erişim reddedildi" alırsınız — oysa aynı komutu makinede elle çalıştırdığınızda çalışır.
+
+Sebep: kimlik bilgileriniz ilk atlamada kullanılır ama **ikinci atlamaya taşınmaz**. Uzak makine, sizin adınıza üçüncü bir sisteme kimlik sunamaz.
+
+Çözümler, tercih sırasıyla:
+
+**Kimlik bilgisini içeride yeniden verin.** En basit ve en güvenli yol:
+
+```powershell
+Invoke-Command -ComputerName sunucu01 -ScriptBlock {
+    param($kb)
+    Get-ChildItem \\dosya01\pay -Credential $kb
+} -ArgumentList $kimlikBilgisi
+```
+
+**CredSSP kullanın.** Çalışır ama kimlik bilgilerinizi hedef makineye teslim eder; hedef ele geçmişse siz de ele geçtiniz demektir. Yalnızca güvendiğiniz sunucularda ve geçici olarak açın.
+
+**Kısıtlı devretme (constrained delegation).** Doğru kurumsal çözümdür, AD tarafında yapılandırma gerektirir.
+
+## 4. Bellek ve zaman aşımı sınırları
+
+Büyük veri döndüren uzak komutlar sessizce kesilebilir. Varsayılan kabuk bellek sınırı bazı sürümlerde düşüktür:
+
+```powershell
+Get-Item WSMan:\localhost\Shell\MaxMemoryPerShellMB
+Set-Item WSMan:\localhost\Shell\MaxMemoryPerShellMB -Value 1024
+```
+
+Uzun süren işlerde zaman aşımını da uzatmanız gerekebilir. Ama önce şunu sorun: gerçekten bu kadar veriyi ağdan taşımanız gerekiyor mu? Süzmeyi uzak tarafta yapmak neredeyse her zaman daha iyidir:
+
+```powershell
+# kötü: her şeyi getir, burada süz
+Invoke-Command -ComputerName sunucu01 { Get-EventLog System } | Where-Object EntryType -eq 'Error'
+
+# iyi: uzakta süz, azını taşı
+Invoke-Command -ComputerName sunucu01 { Get-WinEvent -FilterHashtable @{LogName='System'; Level=2} -MaxEvents 50 }
+```
+
+## Oturumları yeniden kullanın
+
+Art arda birkaç komut çalıştıracaksanız her seferinde yeni bağlantı kurmayın:
+
+```powershell
+$o = New-PSSession -ComputerName sunucu01, sunucu02
+Invoke-Command -Session $o { Get-Service Spooler }
+Invoke-Command -Session $o { Restart-Service Spooler }
+Remove-PSSession $o
+```
+
+Oturumu kapatmayı unutmak, sunucuda oturum birikmesine ve bir noktada "bağlantı sınırı aşıldı" hatasına yol açar.
+
+## JEA: yetkiyi daraltmak
+
+Uzak yönetim açtığınızda genelde tam yönetici yetkisi de açılmış olur. Oysa çoğu operasyon işi için birkaç komut yeterlidir.
+
+Just Enough Administration (JEA), kullanıcıya yalnızca belirli cmdlet'leri ve belirli parametreleri çalıştırma yetkisi veren kısıtlı bir uç nokta tanımlamanızı sağlar:
+
+```powershell
+# rol yetenek dosyasında
+@{
+    VisibleCmdlets = @(
+        @{ Name = 'Restart-Service'; Parameters = @{ Name = 'Name'; ValidateSet = 'Spooler','W3SVC' } },
+        'Get-Service', 'Get-EventLog'
+    )
+}
+```
+
+Bu tanımla destek ekibi yazıcı biriktiricisini yeniden başlatabilir ama başka hiçbir şey yapamaz — ve yaptığı her şey oturum transkriptine kaydedilir. Yardım masasına sunucu erişimi vermenin doğru yolu budur.
+
+## HTTPS dinleyicisi
+
+Varsayılan HTTP (5985) dinleyicisinde kimlik doğrulama şifrelidir ama trafiğin kendisi Kerberos/NTLM şifrelemesine bağlıdır. Etki alanı dışındaki senaryolarda HTTPS tercih edilmelidir:
+
+```powershell
+$sert = New-SelfSignedCertificate -DnsName 'sunucu01.sirket.local' -CertStoreLocation Cert:\LocalMachine\My
+New-Item -Path WSMan:\localhost\Listener -Transport HTTPS -Address * -CertificateThumbPrint $sert.Thumbprint -Force
+New-NetFirewallRule -DisplayName 'WinRM HTTPS' -Direction Inbound -LocalPort 5986 -Protocol TCP -Action Allow
+```
+
+Üretimde kendinden imzalı sertifika yerine iç CA'nızdan sertifika kullanın; aksi hâlde her istemcide güven istisnası tanımlamak zorunda kalırsınız.
+
+## Doğrulama adımı
+
+Uzak yönetimi kurduktan sonra üç testi sırayla yapın: `Test-NetConnection` ile port, `Test-WSMan` ile servis, `Invoke-Command { $env:COMPUTERNAME }` ile uçtan uca.
+
+Üçüncüsü hedefin adını döndürüyorsa yapılandırma tamamdır. Bu üç adımı sırayla yapmak, hangi katmanda takıldığınızı tahmin etmeye çalışmaktan çok daha hızlıdır — ve genelde suçlunun güvenlik duvarı olmadığını gösterir.

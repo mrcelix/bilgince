@@ -1,0 +1,154 @@
+---
+baslik: "Etki alanı denetleyicisi yükseltme sırası"
+ozet: "Yeni sürüm DC eklemek kolay, eskisini emekliye ayırmak risklidir. FSMO, DNS ve işlevsel düzeyin doğru sırası."
+konu: "windows-server"
+etiketler: ["active-directory", "goc", "dns"]
+yayin: 2026-01-23
+sure: 11
+---
+
+Etki alanı denetleyicisi yükseltmesi, "yeni sunucu kur, eskisini kapat" işlemi değildir. Kapatılan bir DC'nin geride bıraktığı meta veriler, aylar sonra açıklanamayan çoğaltma hatalarına dönüşür.
+
+Sıra önemlidir ve her adımın bir doğrulaması vardır.
+
+## 0. Önce sağlığı ölçün
+
+Bozuk bir ortama yeni DC eklemek, sorunu çoğaltmaktan başka işe yaramaz.
+
+```powershell
+dcdiag /e /c /v > dcdiag.txt
+repadmin /replsummary
+repadmin /showrepl * /csv > repl.csv
+```
+
+`repadmin /replsummary` çıktısında hata sütunu sıfır olmalı. Değilse önce onu çözün. En sık sebep DNS'tir; ikinci sırada kapatılmış ama meta verisi temizlenmemiş eski bir DC vardır.
+
+## 1. Şema hazırlığı
+
+Yeni sürüm DC eklemeden önce şemanın hazırlanması gerekir. `adprep` artık `dcpromo` sırasında otomatik çalışır ama şema yöneticisi yetkisiyle çalıştırdığınızdan emin olun (Schema Admins + Enterprise Admins).
+
+Şema değişikliği **geri alınamaz**. Öncesinde şema sahibi DC'nin sistem durumu yedeğini alın ve o yedeğin geri yüklenebilir olduğunu doğrulayın.
+
+## 2. Yeni DC'yi ekleyin
+
+```powershell
+Install-WindowsFeature AD-Domain-Services -IncludeManagementTools
+
+Install-ADDSDomainController `
+  -DomainName 'sirket.local' `
+  -InstallDns:$true `
+  -SiteName 'Merkez' `
+  -Credential (Get-Credential) `
+  -NoGlobalCatalog:$false
+```
+
+Kurulumdan sonra çoğaltmanın başladığını doğrulayın:
+
+```powershell
+repadmin /showrepl
+Get-ADDomainController -Filter * | Select-Object Name, Site, IsGlobalCatalog, OperationMasterRoles
+```
+
+## 3. DNS'i düzeltin — en çok atlanan adım
+
+Yeni DC kurulduğunda DNS sunucusu olur ama **istemciler bunu bilmez**. DHCP kapsamlarındaki ve statik yapılandırmalardaki DNS sunucu listesi güncellenmezse, eski DC kapatıldığı anda isim çözümlemesi durur.
+
+Ayrıca DC'lerin kendi DNS ayarları da kritiktir. Yaygın ve doğru kalıp: **birincil olarak başka bir DC, ikincil olarak kendisi (127.0.0.1)**. Kendisini birincil gösteren DC, önyüklemede çoğaltma sorunları yaşayabilir.
+
+```powershell
+Get-DnsClientServerAddress -AddressFamily IPv4 |
+  Select-Object InterfaceAlias, ServerAddresses
+```
+
+## 4. FSMO rollerini taşıyın
+
+Beş rol vardır ve hepsinin taşınması gerekir:
+
+```powershell
+Move-ADDirectoryServerOperationMasterRole -Identity 'DC03' `
+  -OperationMasterRole SchemaMaster, DomainNamingMaster, PDCEmulator, RIDMaster, InfrastructureMaster
+```
+
+Taşıma **sıcak** yapılır; kaynak DC ayakta olmalıdır. Kaynak DC ölmüşse rolleri "ele geçirmek" (seize) gerekir ve o durumda eski DC bir daha ağa **asla** bağlanmamalıdır.
+
+Doğrulama:
+
+```powershell
+netdom query fsmo
+```
+
+PDC emulator özellikle önemlidir: zaman kaynağı, hesap kilitlenme olayları ve grup ilkesi düzenlemeleri ona bağlıdır. Taşıdıktan sonra yeni PDC'nin dış zaman kaynağıyla eşitlendiğini doğrulayın:
+
+```powershell
+w32tm /query /status
+w32tm /query /source
+```
+
+## 5. Eski DC'yi düzgün emekliye ayırın
+
+Kapatmayın — **düşürün**:
+
+```powershell
+Uninstall-ADDSDomainController -DemoteOperationMasterRole -Credential (Get-Credential)
+```
+
+Bu işlem AD'deki tüm referansları temizler. Sunucu ölmüşse ve düşürülemiyorsa meta veriyi elle temizlemeniz gerekir (`ntdsutil metadata cleanup` ya da AD Sites and Services + AD Users and Computers üzerinden nesne silme).
+
+Meta veri temizliği yapılmamış her eski DC, `dcdiag` çıktısında yıllarca hata olarak görünür ve gerçek sorunları gizler.
+
+## 6. İşlevsel düzeyi yükseltin
+
+En son adımdır ve **geri alınamaz** (sınırlı istisnalar dışında). Tüm eski DC'ler kaldırılmadan yapmayın:
+
+```powershell
+Get-ADDomain | Select-Object DomainMode
+Get-ADForest | Select-Object ForestMode
+
+Set-ADDomainMode -Identity 'sirket.local' -DomainMode Windows2016Domain
+Set-ADForestMode -Identity 'sirket.local' -ForestMode Windows2016Forest
+```
+
+Yükseltmeden önce ormanda o sürümden eski hiçbir DC kalmadığını doğrulayın:
+
+```powershell
+Get-ADDomainController -Filter * | Select-Object Name, OperatingSystem
+```
+
+## Sık yapılan üç hata
+
+**Tek DC ile çalışmak.** Yedeklilik olmadan yükseltme yapılmaz; kurulum sırasında bir sorun çıkarsa etki alanı erişilemez olur.
+
+**Sanal DC anlık görüntüsünden geri dönmek.** USN geri sarılması (rollback) çoğaltmayı kalıcı olarak bozabilir. Modern sürümlerde VM-Generation ID koruması vardır ama sanallaştırma platformunun bunu desteklediğini doğrulamadan güvenmeyin.
+
+**Genel katalog rolünü unutmak.** Son genel katalog sunucusunu kaldırırsanız oturum açma işlemleri başarısız olur.
+
+## Yedekleme ve geri dönüş planı
+
+Etki alanı yükseltmesinde geri dönüş, sıradan bir sunucu geri yüklemesi değildir. Bir DC'yi yedekten geri yüklemek, çoğaltma açısından zamanda geriye gitmek demektir ve dikkatsiz yapılırsa USN geri sarılmasına yol açar.
+
+Bu yüzden plan şöyle olmalı: **en az iki DC'nin sistem durumu yedeği**, yükseltmeden hemen önce alınmış olsun. Ve geri dönüş senaryosu "yedekten geri yükle" değil, "sorunlu DC'yi düşür, temizle, yeniden ekle" olsun. Sağlam bir DC ayakta olduğu sürece bu yol her zaman daha güvenlidir.
+
+Tombstone (mezar taşı) süresini de bilin: varsayılan 180 gündür. Bu süreden eski bir yedeği geri yüklemek, silinmiş nesnelerin geri gelmesine yol açar ve dizini bozar.
+
+```powershell
+Get-ADObject -Identity "CN=Directory Service,CN=Windows NT,CN=Services,$((Get-ADRootDSE).configurationNamingContext)" `
+  -Properties tombstoneLifetime | Select-Object tombstoneLifetime
+```
+
+## Yükseltme sonrası ilk hafta
+
+Yükseltme bittikten sonra bir hafta boyunca üç şeyi izleyin: çoğaltma hataları, oturum açma sürelerindeki değişim ve DNS sorgu hataları.
+
+Sorunların çoğu ilk gün değil, ilk hafta içinde görünür — çünkü bazı istemciler DC'yi ancak kira yenilemesinde veya yeniden başlatmada değiştirir. Yükseltmeyi "tamamlandı" saymadan önce bu haftayı geçirin.
+
+## Doğrulama adımı
+
+Her adımdan sonra değil, **işin sonunda** şu üçünü çalıştırın ve çıktıyı saklayın:
+
+```powershell
+dcdiag /e /c
+repadmin /replsummary
+Get-ADDomainController -Filter * | Select-Object Name, OperatingSystem, IsGlobalCatalog, OperationMasterRoles
+```
+
+Üçü de temizse yükseltme tamamlanmıştır. Bu çıktıyı bir dosyaya alıp saklayın: bir sonraki yükseltmede "önceden nasıldı" sorusunun tek güvenilir cevabı odur.

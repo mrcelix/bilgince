@@ -1,0 +1,139 @@
+---
+baslik: "Otomasyon betiklerinde günlük tutma disiplini"
+ozet: "Gece çalışan bir betiğin ne yaptığını sabah anlayabilmek. Neyi, nereye ve hangi ayrıntıda yazmalı."
+konu: "powershell"
+etiketler: ["gunluk", "otomasyon", "operasyon"]
+yayin: 2026-06-12
+sure: 8
+---
+
+Zamanlanmış bir betik iki ay sorunsuz çalıştı. Üçüncü ay bir sabah, olması gereken rapor gelmedi. Betik "başarılı" görünüyordu. Ne olduğunu anlamak için betiği elle çalıştırdım — sorun tekrarlamadı.
+
+Günlük tutmayan otomasyon, çalıştığını kanıtlayamayan otomasyondur.
+
+## Üç soruya cevap verin
+
+İyi bir günlük, sabah bakan kişinin üç sorusuna cevap verir:
+
+1. **Çalıştı mı?** Başlangıç ve bitiş satırı.
+2. **Ne yaptı?** Kaç nesne işlendi, kaçı atlandı, kaçı hata verdi.
+3. **Sorun varsa nerede?** Hata mesajı, satır numarası, ilgili nesne.
+
+Bu üçünü karşılamayan günlük, dosya boyutundan başka bir şey üretmez.
+
+## Basit ve yeterli bir kalıp
+
+Karmaşık günlükleme çatıları kurmadan önce şu kadarı çoğu betiğe yeter:
+
+```powershell
+$gunlukYolu = Join-Path (Split-Path -Parent $PSCommandPath) "gunluk"
+New-Item -ItemType Directory -Path $gunlukYolu -Force | Out-Null
+$dosya = Join-Path $gunlukYolu "rapor-$(Get-Date -f yyyyMMdd).log"
+
+function Yaz {
+    param([string]$Mesaj, [ValidateSet('BILGI','UYARI','HATA')][string]$Duzey = 'BILGI')
+    $satir = "{0} [{1}] {2}" -f (Get-Date -f 'yyyy-MM-dd HH:mm:ss'), $Duzey, $Mesaj
+    Add-Content -Path $dosya -Value $satir -Encoding utf8
+    if ($Duzey -eq 'HATA') { Write-Error $Mesaj } else { Write-Verbose $satir }
+}
+
+Yaz "Betik başladı. Sürüm 1.4, çalıştıran: $env:USERNAME"
+```
+
+Zaman damgası **her satırda** olmalı. "Hangi adım uzun sürdü" sorusuna ancak böyle cevap verirsiniz.
+
+## Sayıları yazın, cümleleri değil
+
+"İşlem tamamlandı" satırı hiçbir şey söylemez. Sayı yazın:
+
+```powershell
+Yaz "Bulunan hesap: $($hepsi.Count), işlenen: $islenen, atlanan: $atlanan, hatalı: $hatali"
+```
+
+Bu satır iki hafta sonra çok değerli olur: sayılar aniden değiştiğinde bir şeyin bozulduğunu **kimse şikâyet etmeden önce** anlarsınız. Her gün 40 hesap işleyen betik bugün 3 işlediyse, kaynak veride bir sorun var demektir.
+
+## Atlananları da kaydedin
+
+En sık atlanan günlük satırı budur ve en çok işe yarayanlardan biridir. Betik bir nesneyi işlemediyse **nedenini** yazın:
+
+```powershell
+if ($k.Enabled -eq $false) {
+    Yaz "Atlandı: $($k.SamAccountName) — hesap zaten devre dışı" -Duzey BILGI
+    $atlanan++
+    continue
+}
+```
+
+"Neden bu kullanıcı raporda yok?" sorusuna cevap verebilmek, otomasyona duyulan güvenin temelidir.
+
+## Hassas veri yazmayın
+
+Günlükler genelde daha az korunur ve daha çok kopyalanır. Şunlar asla girmemeli: parolalar, bağlantı dizgeleri, API anahtarları, kişisel veriler (TC kimlik, tam adres).
+
+Kullanıcı adı ve hesap adı genelde kabul edilebilir; ama kişisel veri işliyorsanız kurumunuzun kuralına bakın. Tereddütteyseniz kimliği maskeleyin.
+
+## Dosyaları döndürün
+
+Tek bir günlük dosyasına sonsuza kadar eklemek, bir gün diski doldurur ve dosyayı açılamaz hâle getirir. Tarihli dosya adı (yukarıdaki kalıpta olduğu gibi) bunu kendiliğinden çözer; geriye eskileri silmek kalır:
+
+```powershell
+Get-ChildItem $gunlukYolu -Filter '*.log' |
+  Where-Object LastWriteTime -lt (Get-Date).AddDays(-60) |
+  Remove-Item
+```
+
+Bu satırı betiğin sonuna koyun; ayrı bir temizlik görevi kurmaktan daha güvenilirdir.
+
+## Transcript ne zaman
+
+`Start-Transcript` her şeyi kaydeder: komutlar, çıktılar, hatalar. Teşhis için mükemmeldir ama gürültülüdür ve hassas veri sızdırabilir.
+
+Pratik yaklaşım: **düzenli çalışmada yapılandırılmış kendi günlüğünüz, sorun araştırırken transcript.** Betiğe bir `-Ayrintili` anahtarı ekleyip transcript'i yalnızca o zaman açabilirsiniz.
+
+## Merkezî toplama
+
+Betik sayısı arttığında dosyalara tek tek bakmak sürdürülemez. İki basit yol:
+
+Windows olay günlüğüne yazmak — izleme sisteminiz zaten oradan topluyorsa en kolayı budur:
+
+```powershell
+New-EventLog -LogName Application -Source 'BilgiApp' -ErrorAction SilentlyContinue
+Write-EventLog -LogName Application -Source 'BilgiApp' -EventId 1001 -EntryType Error -Message $mesaj
+```
+
+Ya da hata durumunda doğrudan bildirim göndermek. Kural şu: **sessiz başarısızlık olmasın.** Betik çöktüğünde kimse haber almıyorsa, günlük tutmanın yarısı boşa gitmiştir.
+
+## Yapılandırılmış günlük
+
+Düz metin günlük insan okumak için iyidir, makine okumak için kötüdür. Günlükleri bir araca aktaracaksanız satır başına bir JSON nesnesi yazmak çok daha kullanışlıdır:
+
+```powershell
+function YazJson {
+    param([string]$Mesaj, [string]$Duzey = 'BILGI', [hashtable]$Ek = @{})
+    $kayit = [ordered]@{
+        zaman   = (Get-Date).ToString('o')
+        duzey   = $Duzey
+        betik   = Split-Path -Leaf $PSCommandPath
+        makine  = $env:COMPUTERNAME
+        mesaj   = $Mesaj
+    }
+    $Ek.GetEnumerator() | ForEach-Object { $kayit[$_.Key] = $_.Value }
+    ($kayit | ConvertTo-Json -Compress) | Add-Content $dosya -Encoding utf8
+}
+
+YazJson "Hesap işlendi" -Ek @{ hesap = 'm.demir'; sure_ms = 240 }
+```
+
+Bu biçimde her satır bağımsız olarak ayrıştırılabilir. Sonradan `Get-Content | ConvertFrom-Json` ile süzmek, düz metinde düzenli ifade yazmaktan çok daha güvenilirdir.
+
+## Ne kadar ayrıntı fazla
+
+Her satırı günlüğe yazan betikler, sorun anında işe yaramaz — çünkü ilgili satırı bulmak imkânsız hâle gelir. Pratik denge şudur: **durum değişikliklerini** yazın, adımları değil.
+
+"Kullanıcı listesi alındı (412 kayıt)" değerlidir. "Döngüye girildi", "değişken atandı" değildir. Ayrıntıyı `Write-Verbose` ile yazın; ihtiyaç olduğunda `-Verbose` ile açarsınız.
+
+## Doğrulama adımı
+
+Betiği bir hafta çalıştırdıktan sonra günlüğü açın ve tek bir soruyu cevaplamayı deneyin: **"Salı gecesi tam olarak ne oldu?"**
+
+Cevap verebiliyorsanız günlük yeterlidir. "Çalıştı galiba" diyorsanız, sayı satırlarınız eksiktir. Hiçbir şey bulamıyorsanız, günlük zaten yok demektir — dosyanın var olması yetmiyor.

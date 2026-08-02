@@ -1,0 +1,122 @@
+---
+baslik: "Anlık görüntü yedek değildir"
+ozet: "Checkpoint ve yedek karıştırıldığında veri kaybı kaçınılmaz olur. İkisinin ne işe yaradığı ve nerede ayrıldığı."
+konu: "sanallastirma"
+etiketler: ["yedekleme", "hyper-v", "checkpoint"]
+yayin: 2026-02-20
+sure: 8
+---
+
+"Yedeğimiz var, checkpoint aldım" cümlesi, sanallaştırma dünyasının en pahalı yanlış anlamasıdır. Depolama arızasında checkpoint'in de kaybolduğu an, bu cümlenin bedeli ödenir.
+
+## Neyin ne olduğu
+
+**Anlık görüntü (checkpoint/snapshot):** Sanal makinenin belli bir andaki durumuna dönmenizi sağlayan bir fark diski. **Aynı depolama üzerinde durur** ve orijinal diske bağımlıdır. Temel disk bozulursa görüntü de işe yaramaz.
+
+**Yedek:** Verinin farklı bir ortama, bağımsız olarak kopyalanmış hâli. Kaynak tamamen kaybolsa bile geri getirilebilir.
+
+Aradaki fark bir tercih meselesi değil, tanım meselesidir. Checkpoint asla yedek yerine geçmez.
+
+## Checkpoint ne zaman doğru araç
+
+Kısa süreli ve geri dönüş amaçlıdır:
+
+- Güncelleme veya sürüm yükseltmesi öncesi
+- Yapılandırma değişikliği denemesi öncesi
+- Test ortamında tekrarlanabilir başlangıç noktası
+
+Ortak nokta: **saatlerle ölçülen bir süre.** Alındıktan sonra iş biter bitmez silinmelidir.
+
+## Uzun süre duran checkpoint'in bedeli
+
+Silinmeyen bir checkpoint üç sorun üretir.
+
+**Disk büyümesi.** Fark diski, o andan sonraki tüm yazmaları tutar. Yoğun bir sunucuda günde onlarca gigabayt büyüyebilir ve depolamayı doldurur. Depolama dolduğunda sanal makine durur — hem de checkpoint'i olan makine değil, aynı birimdeki tüm makineler.
+
+**Performans düşüşü.** Her okuma, fark diski zincirini dolaşmak zorundadır. Zincir uzadıkça gecikme artar.
+
+**Birleştirme riski.** Uzun süre biriken bir zinciri birleştirmek saatler sürer ve bu süre boyunca I/O yükü yüksektir. Yarıda kesilirse durum daha da karmaşıklaşır.
+
+Envanteri düzenli çıkarın:
+
+```powershell
+Get-VM | Get-VMSnapshot |
+  Select-Object VMName, Name, CreationTime,
+    @{ n='GunGecti'; e={ (New-TimeSpan -Start $_.CreationTime).Days } } |
+  Sort-Object GunGecti -Descending
+```
+
+Yedi günden eski her checkpoint sorgulanmalıdır.
+
+## Yedekleme ürünleri de checkpoint kullanır
+
+Kafa karışıklığının bir kaynağı da budur: yedekleme yazılımları, tutarlı bir kopya almak için geçici olarak checkpoint oluşturur ve iş bitince siler.
+
+Sorun, yedekleme işi yarıda kaldığında bu geçici görüntülerin **silinmeden kalmasıdır**. Adları genelde ürüne özgüdür ve fark edilmezler. Yukarıdaki envanter sorgusu bunları da yakalar.
+
+Yedekleme sonrası kalan görüntüleri düzenli kontrol etmezseniz, bir gün depolama dolduğunda sebebini ararsınız.
+
+## Uygulama tutarlılığı
+
+Bir sanal makinenin diskini kopyalamak, üzerindeki veritabanının tutarlı olduğu anlamına gelmez. Yazma işlemi yarım kalmış olabilir.
+
+Bu yüzden yedekleme, konuk işletim sistemindeki VSS gibi bir mekanizmayla konuşmalı ve uygulamaya "yazmaları duraklat" demelidir. Buna **uygulama tutarlı** yedek denir.
+
+Entegrasyon hizmetleri kurulu değilse ya da VSS yazıcısı hatalıysa, yedeğiniz yalnızca **çökme tutarlıdır** — geri yüklendiğinde veritabanı kurtarma moduna girer ve bazen açılmaz.
+
+```powershell
+Get-VM | Select-Object Name, @{n='Entegrasyon';e={ (Get-VMIntegrationService -VMName $_.Name | Where-Object Name -eq 'VSS').Enabled }}
+```
+
+## Üretimde checkpoint yasağı
+
+Pratikte işleyen bir kural: **üretim makinelerinde 24 saatten uzun checkpoint yasak.** Kuralı bir denetim betiğiyle destekleyin; süreyi aşan görüntüler için uyarı üretsin.
+
+Yasak koymadan yalnızca "dikkat edelim" demek işe yaramıyor; bu, gördüğüm her ortamda tekrarlanan bir örüntü.
+
+## Üretim checkpoint'i mi, standart mı?
+
+Hyper-V iki checkpoint türü sunar ve varsayılanı bilmek önemlidir.
+
+**Üretim checkpoint'i (production):** Konuk içindeki VSS ile alınır, uygulama tutarlıdır ve **bellek durumunu içermez**. Geri dönüldüğünde makine kapalı durumdan açılır — tıpkı düzgün kapatılıp açılmış gibi.
+
+**Standart checkpoint:** Belleği de içerir, yani makinenin o andaki tam durumuna dönersiniz. Test için idealdir ama üretimde veritabanı tutarlılığı garantisi vermez.
+
+Üretim sunucularında üretim checkpoint'i kullanın:
+
+```powershell
+Set-VM -Name 'sql01' -CheckpointType Production
+```
+
+`ProductionOnly` seçeneği ise VSS başarısız olursa checkpoint almayı reddeder — sessizce standart'a düşmesini engellediği için daha güvenlidir.
+
+## Zincir uzunluğunu izleyin
+
+Bir sanal diskin kaç katmanlı olduğunu görmek, sorun büyümeden fark etmenizi sağlar:
+
+```powershell
+Get-VM | ForEach-Object {
+    $d = Get-VMHardDiskDrive -VM $_
+    foreach ($disk in $d) {
+        $bilgi = Get-VHD -Path $disk.Path
+        [pscustomobject]@{
+            Makine   = $_.Name
+            Tur      = $bilgi.VhdType
+            Ebeveyn  = if ($bilgi.ParentPath) { Split-Path -Leaf $bilgi.ParentPath } else { '-' }
+            BoyutGB  = [math]::Round($bilgi.FileSize / 1GB, 1)
+        }
+    }
+}
+```
+
+`Ebeveyn` sütunu dolu olan her satır bir fark diskidir. Üretim makinelerinde bu sütunun boş olması beklenir.
+
+## Doğrulama adımı
+
+İki ayrı testi yapın ve ikisini karıştırmayın.
+
+**Checkpoint testi:** Bir test makinesinde görüntü alın, bir değişiklik yapın, geri dönün. Değişikliğin gittiğini görün.
+
+**Yedek testi:** Sanal makineyi **tamamen silin**, yedekten geri yükleyin, açılmasını ve uygulamanın çalışmasını doğrulayın.
+
+İkinci testi yapmadan yedeğinizin olduğunu söyleyemezsiniz. Ve bu testi izole bir ağda yapın; üretimle aynı adı ve IP'yi taşıyan bir makineyi ağa almak, testi olaya çevirir.

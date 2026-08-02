@@ -1,0 +1,114 @@
+---
+baslik: "Hyper-V dinamik bellek ne zaman zarar verir?"
+ozet: "Bellek tasarrufu sağlayan özellik, bazı iş yüklerinde performansı sessizce çökertir. Hangi makinede açıp hangisinde kapatmalı."
+konu: "sanallastirma"
+etiketler: ["hyper-v", "bellek", "performans"]
+yayin: 2026-01-30
+sure: 9
+---
+
+Bir SQL sunucusu ayda birkaç kez "yavaşlıyor" diye bildirildi. CPU boştaydı, disk kuyruğu normaldi. Sorun bellekteydi: sanal makinede dinamik bellek açıktı ve SQL Server, altından çekilen belleği sürekli geri kazanmaya çalışıyordu.
+
+Dinamik bellek iyi bir özelliktir. Yanlış yerde açıldığında sessizce zarar verir.
+
+## Nasıl çalışır
+
+Dinamik bellek, sanal makineye sabit bir miktar ayırmak yerine üç değer tanımlamanızı sağlar: başlangıç, minimum ve maksimum. Hyper-V, makinenin bellek baskısını izler ve gerektikçe ekler, gerekmedikçe **balon sürücüsü** aracılığıyla geri alır.
+
+Geri alma mekanizması kritik ayrıntıdır: konuk işletim sistemi belleğin gittiğini bilir ve buna göre davranır. Sorun, bazı uygulamaların bu davranışı beklememesidir.
+
+## Kapatmanız gereken iş yükleri
+
+**SQL Server ve benzeri veritabanları.** Bellek yöneticileri, başlangıçta gördükleri belleğe göre önbellek planlar. Bellek geri alındığında plan bozulur, disk okuması artar. Veritabanı sunucularında sabit bellek verin ve SQL'in kendi maksimum bellek ayarını yapın.
+
+**Exchange.** Aynı sebep, aynı sonuç. Üretici de sabit bellek önerir.
+
+**Java uygulama sunucuları.** JVM yığın boyutu başlangıçta belirlenir; altından bellek çekilirse takas (swap) başlar.
+
+**Yoğun önbellek kullanan her şey.** Redis benzeri bellek içi sistemler.
+
+**Etki alanı denetleyicileri.** AD veritabanını bellekte tutmayı sever; dinamik bellek altında çoğaltma ve LDAP yanıt süreleri dalgalanır.
+
+## Açmanın doğru olduğu yerler
+
+**Sanal masaüstleri.** Onlarca makine, çoğu boşta. Dinamik bellek burada gerçek yoğunlaştırma sağlar.
+
+**Test ve geliştirme ortamları.** Kullanılmayan makineler belleği geri verir.
+
+**Web ön uçları.** Genelde bellek yoğun değildirler ve dalgalanmaya toleranslıdırlar.
+
+**Dosya ve yazıcı sunucuları.** Talep öngörülebilir ve düşüktür.
+
+## Ayarları doğru vermek
+
+Açacaksanız üç değeri de bilinçli seçin:
+
+```powershell
+Set-VMMemory -VMName 'web01' `
+  -DynamicMemoryEnabled $true `
+  -MinimumBytes 1GB -StartupBytes 2GB -MaximumBytes 8GB `
+  -Buffer 20 -Priority 50
+```
+
+**Minimum** çok düşük olursa makine boştayken belleği aşırı geri verilir ve yük geldiğinde toparlanması gecikir. İşletim sisteminin rahat çalışacağı seviyenin altına inmeyin.
+
+**Buffer**, konuğa "yedek" olarak verilen ek yüzdedir. Ani yük artışlarında tampon görevi görür; düşük ayarlanırsa her sıçramada bellek talebi oluşur.
+
+**Priority**, ana makinede bellek sıkışırsa hangi makinenin öncelikli olacağını belirler. Kritik makinelerde yükseltin.
+
+## Aşırı taahhüt (overcommit) tuzağı
+
+Dinamik bellek, ana makinede olduğundan fazla bellek taahhüt etmenize izin verir. Bu genelde işe yarar — ta ki tüm makineler aynı anda yük altına girene kadar.
+
+Ay sonu kapanışında, yedekleme penceresinde ya da bir olay sırasında makineler eşzamanlı olarak bellek ister ve ana makine veremez. Sonuç: hepsinde birden yavaşlama.
+
+Bu yüzden taahhüt oranını izleyin ve kritik makineleri aşırı taahhüt edilen ana makinelere koymayın.
+
+## NUMA'yı unutmayın
+
+Büyük sanal makinelerde bellek, fiziksel işlemci soketlerine dağılır. Bir makinenin belleği tek bir NUMA düğümüne sığmıyorsa uzak bellek erişimi başlar ve performans düşer.
+
+Dinamik bellek, NUMA yerleşimini karmaşıklaştırır. Büyük veritabanı makinelerinde sabit bellek + NUMA hizalaması, dinamik bellekten kıyaslanamayacak kadar iyi sonuç verir.
+
+## Ana makineye de yer bırakın
+
+Hyper-V ana makinesinin kendisi de bellek ister. Tüm belleği sanal makinelere taahhüt ederseniz ana makine takasa başlar ve **üzerindeki her makine** etkilenir.
+
+Ana makineye en az 2–4 GB rezerv bırakın; depolama ve ağ rolleri de varsa daha fazlası gerekir.
+
+## Akıllı sayfalama tuzağı
+
+Hyper-V, yeniden başlatma sırasında minimum bellekten başlangıç belleğine geçemezse "akıllı sayfalama" (smart paging) devreye girer ve **diski bellek olarak kullanır**. Geçicidir ama o sırada makine son derece yavaştır.
+
+Bu duruma düşmemek için minimum belleği makul tutun ve akıllı sayfalama dosyasının hızlı bir diskte olduğundan emin olun:
+
+```powershell
+Get-VM | Select-Object Name, SmartPagingFilePath
+Set-VM -Name 'web01' -SmartPagingFilePath 'D:\SmartPaging'
+```
+
+Varsayılan olarak sanal makinenin yapılandırma dizinine yazılır; o dizin yavaş bir birimdeyse yeniden başlatmalar acı verir.
+
+## Konuk tarafını da ölçün
+
+Ana makinedeki sayaçlar sanal makinenin bellek **talebini** gösterir, gerçekten ihtiyacını değil. Bir uygulama belleği tuttuğu hâlde kullanmıyorsa talep yüksek görünür.
+
+Gerçek resmi görmek için konuk içinden bakın:
+
+```powershell
+Get-Counter '\Memory\Available MBytes', '\Memory\Pages/sec' -SampleInterval 5 -MaxSamples 12
+```
+
+`Pages/sec` sürekli yüksekse makine takas yapıyordur — bu, bellek yetersizliğinin en net göstergesidir ve ana makinedeki "talep" sayacından çok daha güvenilirdir.
+
+## Doğrulama adımı
+
+Ayarları değiştirdikten sonra bir hafta boyunca iki sayacı izleyin:
+
+```powershell
+Get-VM | Select-Object Name, MemoryAssigned, MemoryDemand, MemoryStatus
+```
+
+`MemoryStatus` sürekli `Warning` ya da `Low` görünen makineler bellek açlığı çekiyordur — minimum değeri yükseltin. `MemoryAssigned` ile `MemoryDemand` arasındaki fark sürekli çok büyükse, gereğinden fazla tampon veriyorsunuz demektir.
+
+Ve asıl test: kullanıcı şikâyetinin gelip gelmediği. Sayaçlar iyi görünürken şikâyet sürüyorsa, sorun bellekte değil — bakmaya oradan devam edin.

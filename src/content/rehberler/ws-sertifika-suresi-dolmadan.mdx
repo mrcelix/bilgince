@@ -1,0 +1,114 @@
+---
+baslik: "Süresi dolan sertifikayı kesintiden önce yakalamak"
+ozet: "Sertifika kesintileri her zaman aynı sebeple olur: kimse tarihi takip etmiyordur. Envanter ve uyarı kurmanın pratik yolu."
+konu: "windows-server"
+etiketler: ["sertifika", "izleme", "pki"]
+yayin: 2026-03-27
+sure: 9
+---
+
+Sertifika kaynaklı kesintilerin ortak özelliği şudur: tamamen öngörülebilirdirler. Bitiş tarihi ilk günden bellidir. Yine de her yıl birileri pazartesi sabahı "site açılmıyor" çağrısıyla uyanır.
+
+Sorun teknik değil, envanter sorunudur.
+
+## Önce nerede sertifika olduğunu bilin
+
+Çoğu kurum yalnızca web sunucusundaki sertifikaları takip eder. Oysa liste çok daha uzundur:
+
+Web sunucuları ve yük dengeleyiciler. LDAPS için domain controller'lar. RDP ağ geçitleri. VPN uç noktaları. İç uygulamaların istemci sertifikaları. Kod imzalama. WinRM HTTPS dinleyicileri. Ve en çok unutulanı: **kendi kök/ara sertifika otoritenizin sertifikası.**
+
+Sonuncusu on yıllık ömre sahip olduğu için unutulur ve süresi dolduğunda tüm iç PKI çöker.
+
+## Makinedeki sertifikaları listeleyin
+
+```powershell
+Get-ChildItem Cert:\LocalMachine\My |
+  Select-Object Subject, NotAfter,
+    @{ n='KalanGun'; e={ (New-TimeSpan -End $_.NotAfter).Days } },
+    Thumbprint |
+  Sort-Object KalanGun
+```
+
+Birden çok sunucuda:
+
+```powershell
+$sunucular = 'web01','web02','dc01','dc02','vpn01'
+Invoke-Command -ComputerName $sunucular {
+    Get-ChildItem Cert:\LocalMachine\My |
+      Where-Object { $_.NotAfter -lt (Get-Date).AddDays(60) } |
+      Select-Object Subject, NotAfter, Thumbprint
+} | Sort-Object NotAfter
+```
+
+Bu sorguyu haftalık bir zamanlanmış görevle çalıştırıp sonucu e-postayla göndermek, sertifika kesintilerinin büyük kısmını ortadan kaldırır.
+
+## Dışarıdan da bakın
+
+Sunucudaki depoda sertifikanın olması, hizmetin onu **kullandığı** anlamına gelmez. Bağlama (binding) yanlışsa eski sertifika sunuluyor olabilir.
+
+Dışarıdan gerçekte ne sunulduğunu kontrol edin:
+
+```powershell
+$b = [Net.Sockets.TcpClient]::new('www.sirket.com', 443)
+$s = [Net.Security.SslStream]::new($b.GetStream())
+$s.AuthenticateAsClient('www.sirket.com')
+$sert = [Security.Cryptography.X509Certificates.X509Certificate2]$s.RemoteCertificate
+[pscustomobject]@{
+    Konu    = $sert.Subject
+    Bitis   = $sert.NotAfter
+    Kalan   = (New-TimeSpan -End $sert.NotAfter).Days
+}
+$s.Dispose(); $b.Close()
+```
+
+Bu kontrol, "yeniledim ama site hâlâ eski sertifikayı gösteriyor" durumunu yakalar — ki yenilemenin en sık atlanan adımı budur.
+
+## Zincirin tamamını kontrol edin
+
+Bitiş tarihi yalnızca yaprak sertifikada değildir. Ara sertifikanın süresi dolarsa ya da sunucu ara sertifikayı sunmuyorsa, bazı istemciler siteyi güvenilmez görür — ve bu, tarayıcıya göre değişen "bazı kullanıcılarda çalışıyor" tipi bir arızadır.
+
+Sunucunun zinciri tam gönderdiğinden emin olun; eksik ara sertifika, en sık görülen yapılandırma hatasıdır.
+
+## Otomatik yenileme kurun
+
+İç PKI kullanıyorsanız otomatik kayıt (autoenrollment) sertifika yönetiminin çoğunu ortadan kaldırır: şablonda yenileme eşiğini tanımlarsınız, makineler kendiliğinden yeniler.
+
+Dış sertifikalarda ACME tabanlı otomatik yenileme mümkünse tercih edin. Manuel yenilenen her sertifika, bir gün unutulacak sertifikadır.
+
+Otomatik yenilemede de bir tuzak var: sertifika yenilenir ama **hizmet yeni sertifikayı almaz**. Yenileme sonrası ilgili hizmetin yeniden başlatılması ya da bağlamanın güncellenmesi gerekebilir. Bunu yenileme betiğinin parçası yapın.
+
+## Özel anahtarı yedekleyin
+
+Sertifikayı yedeklemek yetmez; özel anahtar olmadan işe yaramaz. Dışa aktarırken anahtarı da alın ve güvenli saklayın:
+
+```powershell
+$parola = Read-Host -AsSecureString
+Export-PfxCertificate -Cert Cert:\LocalMachine\My\<parmakizi> `
+  -FilePath D:\yedek\web01.pfx -Password $parola
+```
+
+Kök CA'nızın özel anahtarı çevrimdışı ve fiziksel olarak korunmalıdır. Kök CA'sı sürekli açık bir sanal makinede duran PKI, PKI değildir.
+
+## İptal kontrolü de çalışmalı
+
+Sertifikanın geçerli olması yetmez; istemcinin iptal durumunu kontrol edebilmesi de gerekir. İç PKI'da CRL dağıtım noktası (CDP) ya da OCSP yanıtlayıcısı erişilemezse istemciler ya bekler ya da bağlantıyı reddeder.
+
+Bu, klasik bir "her şey doğru görünüyor ama çalışmıyor" senaryosudur — özellikle CDP adresi iç ağdan erişilebilirken dışarıdan erişilemediğinde.
+
+```powershell
+certutil -verify -urlfetch C:\gecici\sertifika.cer
+```
+
+Bu komut zinciri doğrular ve CDP/OCSP adreslerine gerçekten ulaşılıp ulaşılmadığını gösterir. Yeni bir PKI kurduğunuzda ilk çalıştıracağınız komut budur.
+
+## Kısalan geçerlilik süreleri
+
+Genel sertifika otoritelerinin verdiği sertifikaların ömrü yıllar içinde belirgin şekilde kısaldı ve kısalmaya devam ediyor. Bu, elle yenilemeyi giderek daha sürdürülemez hâle getiriyor.
+
+Pratik sonuç şudur: otomasyon artık bir kolaylık değil, zorunluluk. Yılda bir kez yapılan manuel yenileme süreçlerini, ömür kısaldıkça yılda dört kez yapmak zorunda kalırsınız — ve dördüncüsü mutlaka unutulur.
+
+## Doğrulama adımı
+
+Envanteri kurduktan sonra tek soruyla test edin: **"Önümüzdeki 60 gün içinde hangi sertifikaların süresi doluyor?"**
+
+Cevabı bir dakikada, tek bir listeden verebiliyorsanız süreç çalışıyordur. Sunucu sunucu dolaşmanız gerekiyorsa envanter yok demektir — ve bir sonraki kesinti zaten takvimde, siz sadece tarihini bilmiyorsunuz.

@@ -1,0 +1,120 @@
+---
+baslik: "DHCP yük devretme: tek sunucuya bağımlılığı bitirmek"
+ozet: "DHCP sunucusu kapandığında kimse hemen fark etmez — kiralar dolana kadar. Yük devretme kurmanın ve doğru modu seçmenin yolu."
+konu: "windows-server"
+etiketler: ["dhcp", "yedeklilik", "ag"]
+yayin: 2026-05-08
+sure: 9
+---
+
+DHCP arızasının sinsi tarafı, gecikmeli görünmesidir. Sunucu öğlen kapanır, kimse fark etmez; çünkü mevcut kiralar geçerlidir. Ertesi sabah, kiraları dolan cihazlar adres alamaz ve destek masası dolar.
+
+Windows Server'ın yerleşik yük devretme özelliği bu riski iki komutla ortadan kaldırır ve kurulumu şaşırtıcı derecede basittir.
+
+## İki mod, iki senaryo
+
+**Yük dengeleme (load balance):** İki sunucu aynı anda hizmet verir, istekler belirlediğiniz oranda paylaşılır (varsayılan 50/50). Aynı sitedeki iki sunucu için doğrudur.
+
+**Sıcak bekleme (hot standby):** Bir sunucu birincil, diğeri yedektir ve yalnızca birincil kapandığında devreye girer. Merkez–şube senaryosunda doğrudur: şubedeki sunucu, merkezdekinin yedeği olur.
+
+Yanlış mod seçimi işlevsel bir soruna yol açmaz ama trafiği beklemediğiniz yerden akıtır. Şube hattı üzerinden merkeze giden DHCP trafiği, WAN'ı gereksiz yere kullanır.
+
+## Kurulum
+
+```powershell
+Add-DhcpServerv4Failover `
+  -ComputerName 'dhcp01' -PartnerServer 'dhcp02' `
+  -Name 'Merkez-YukDevretme' `
+  -ScopeId 10.10.0.0, 10.20.0.0 `
+  -LoadBalancePercent 50 `
+  -SharedSecret 'uzun-ve-rastgele-bir-parola' `
+  -MaxClientLeadTime 01:00:00 `
+  -AutoStateTransition $true `
+  -StateSwitchInterval 00:60:00
+```
+
+Birkaç parametre açıklama hak ediyor.
+
+**MaxClientLeadTime (MCLT)** en kritik olanıdır. Bir sunucu, ortağının kapalı olduğunu anladıktan sonra bu süre boyunca yalnızca kısa kiralar verir; ancak süre dolduktan sonra tam yetkiyle çalışır. Bu, iki sunucunun aynı adresi farklı cihazlara vermesini engelleyen mekanizmadır. Çok kısa ayarlamak çakışma riski, çok uzun ayarlamak yeni cihazların uzun süre kısa kira alması demektir. Bir saat çoğu ortam için makuldür.
+
+**AutoStateTransition**, ortak uzun süre erişilemezse hayatta kalan sunucunun kendiliğinden tam yetkiye geçmesini sağlar. Kapalıysa bu geçişi elle yapmanız gerekir — ve gece 3'te bunu yapacak kimse olmayabilir.
+
+## Kapsam seçenekleri de eşitlenmeli
+
+Yük devretme kiraları eşitler ama **kapsam seçeneklerini** (DNS sunucuları, ağ geçidi, alan adı) otomatik eşitlemez. İki sunucudaki seçenekler farklıysa, hangi sunucudan adres aldığınıza göre farklı davranan istemciler ortaya çıkar — teşhis etmesi çok zor bir arızadır.
+
+Kurulumdan sonra karşılaştırın:
+
+```powershell
+'dhcp01','dhcp02' | ForEach-Object {
+    Get-DhcpServerv4OptionValue -ComputerName $_ -ScopeId 10.10.0.0 |
+      Select-Object @{n='Sunucu';e={$_}}, OptionId, Name, Value
+}
+```
+
+Sunucu düzeyindeki seçenekleri de aynı şekilde kontrol edin.
+
+## Rezervasyonlar ve dışlamalar
+
+Rezervasyonlar yük devretme ile çoğaltılır. Dışlama aralıkları da kapsam yapılandırmasının parçası olduğu için taşınır. Ama **kapsam eklerken** her iki sunucuda da yapmanız gerekir; yeni kapsam otomatik olarak ilişkiye katılmaz:
+
+```powershell
+Add-DhcpServerv4FailoverScope -ComputerName 'dhcp01' -Name 'Merkez-YukDevretme' -ScopeId 10.30.0.0
+```
+
+Bu adımı unutmak, yeni VLAN'ın tek sunucuya bağımlı kalmasına yol açar — ve bunu ancak o sunucu kapandığında öğrenirsiniz.
+
+## Yetkilendirme ve sahte sunucular
+
+Windows DHCP sunucusu, AD'de yetkilendirilmeden hizmet vermez. Bu, kazara kurulan sunucuları engeller ama ağa takılan bir yönlendiricinin DHCP'sini engellemez.
+
+Kullanıcı tarafındaki anahtarlarda **DHCP snooping** açık değilse, birinin getirdiği ev tipi yönlendirici tüm kata yanlış adres dağıtabilir. Yük devretme bu senaryoya karşı koruma sağlamaz; anahtar tarafındaki önlem gerekir.
+
+## Kira süresi
+
+Uzun kira (8 gün gibi) sunucu arızasına dayanıklılık verir ama adres havuzunun geri dönüşünü yavaşlatır. Misafir ve kablosuz ağlarda kısa kira (birkaç saat) daha uygundur.
+
+Yük devretme kurduktan sonra kira süresini kısaltmak güvenlidir; artık tek sunucuya bağımlı değilsiniz.
+
+## Yedekleme ve geri yükleme
+
+DHCP yapılandırması, sunucu yeniden kurulduğunda elle yeniden yazılacak bir şey olmamalı. Dışa aktarma tek komuttur:
+
+```powershell
+Export-DhcpServer -ComputerName 'dhcp01' -File 'D:\yedek\dhcp01.xml' -Leases -Force
+```
+
+`-Leases` parametresi kiraları da alır; genelde gerekmez ama geri yüklemeden sonra istemcilerin adres değiştirmemesini istiyorsanız işe yarar.
+
+Bu dışa aktarmayı haftalık bir görevle çalıştırın. Yük devretme ortağı zaten bir kopya taşır ama iki sunucu da aynı anda kaybedilirse (ortak depolama arızası, fidye yazılımı) elinizde yalnızca bu dosya kalır.
+
+## Kapasite izleme
+
+Adres havuzunun dolması, DHCP'nin sessizce başarısız olduğu ikinci senaryodur. Yeni cihazlar adres alamaz, mevcutlar çalışmaya devam eder — yani sorun yalnızca yeni bağlananlarda görünür.
+
+```powershell
+Get-DhcpServerv4ScopeStatistics -ComputerName 'dhcp01' |
+  Select-Object ScopeId, Free, InUse, PercentageInUse |
+  Where-Object PercentageInUse -gt 80
+```
+
+Bu sorguyu izlemeye bağlayın. %80 eşiği, havuzu genişletmek veya kira süresini kısaltmak için yeterli zaman bırakır. Misafir ve kablosuz kapsamlarda doluluk çok daha hızlı değişir; onlarda eşiği daha düşük tutun.
+
+## Doğrulama adımı
+
+Kurulumdan sonra **gerçek bir test** yapın: birincil sunucunun DHCP hizmetini durdurun ve bir istemcide kira yenileyin.
+
+```powershell
+Stop-Service DHCPServer -ComputerName dhcp01
+# istemcide:
+ipconfig /release; ipconfig /renew
+ipconfig /all | Select-String 'DHCP Server'
+```
+
+İstemci adres almalı ve **DHCP Server satırında ikinci sunucunun adresi** görünmeli. Sonra hizmeti geri başlatın ve ilişki durumunun `Normal`'a döndüğünü doğrulayın:
+
+```powershell
+Get-DhcpServerv4Failover -ComputerName dhcp01 | Select-Object Name, State, Mode, PartnerServer
+```
+
+Bu testi yapmadan yük devretmenin çalıştığını varsaymayın; yapılandırmanın doğru görünmesi, devrin gerçekleştiği anlamına gelmiyor.

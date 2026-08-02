@@ -1,0 +1,142 @@
+---
+baslik: "PowerShell'de try/catch neden çalışmıyor?"
+ozet: "Hata yakalandığını sandığınız betikler sessizce yanlış iş yapar. Sonlandıran ve sonlandırmayan hata ayrımı, PowerShell'in en pahalı sürprizidir."
+konu: "powershell"
+etiketler: ["hata-yonetimi", "betik", "temel"]
+yayin: 2026-01-16
+sure: 9
+---
+
+Bir gece, kullanıcı hesaplarını taşıyan bir betik yazdım. Her adımı `try/catch` ile sardım, günlüğe yazdırdım, test ettim. Ertesi sabah 40 hesabın yarısının taşınmadığını ama betiğin "başarıyla tamamlandı" dediğini gördüm.
+
+Sorun `catch` bloğunun yanlış yazılması değildi. Sorun, hatanın hiç fırlatılmamış olmasıydı.
+
+## İki tür hata
+
+PowerShell hataları ikiye ayırır ve bu ayrım her şeyi belirler.
+
+**Sonlandıran hata (terminating):** İşlemi durdurur, `catch` bloğuna düşer. Sözdizimi hataları ve `throw` ile üretilenler böyledir.
+
+**Sonlandırmayan hata (non-terminating):** Ekrana kırmızı yazı basar, `$Error` listesine eklenir ve **betik çalışmaya devam eder**. `catch` bloğuna hiç uğramaz.
+
+Cmdlet'lerin ürettiği hataların büyük çoğunluğu ikinci türdendir. `Get-ADUser` olmayan bir kullanıcıyı sorguladığında, `Copy-Item` erişemediği bir dosyaya rastladığında hata yazar ama akış devam eder.
+
+Yani `try { Get-ADUser hatali } catch { "yakalandı" }` yazdığınızda `catch` çalışmaz. Kırmızı yazıyı görürsünüz, betik devam eder ve siz hatayı yakaladığınızı sanırsınız.
+
+## Çözüm: ErrorAction Stop
+
+Sonlandırmayan bir hatayı yakalanabilir hâle getirmek için onu sonlandırana çevirmeniz gerekir:
+
+```powershell
+try {
+    Get-ADUser -Identity 'olmayan.kullanici' -ErrorAction Stop
+} catch {
+    Write-Warning "Kullanıcı bulunamadı: $($_.Exception.Message)"
+}
+```
+
+`-ErrorAction Stop` bu komut için davranışı değiştirir. Betik genelinde istiyorsanız başa şunu koyabilirsiniz:
+
+```powershell
+$ErrorActionPreference = 'Stop'
+```
+
+Ama dikkat: bu ayar her şeyi sonlandırır ve bazı cmdlet'lerin zararsız uyarıları da betiği durdurur. Otomasyon betiklerinde genelde doğru seçimdir; etkileşimli araçlarda değil.
+
+## SilentlyContinue en tehlikeli parametredir
+
+Hata mesajından kurtulmak için `-ErrorAction SilentlyContinue` yazmak çok yaygındır ve genelde yanlıştır. Bu parametre hatayı çözmez, **görünmez yapar**.
+
+Betiğiniz artık sessizce yanlış çalışır. Kullanıcı bulunamadı, dosya kopyalanmadı, servis başlatılamadı — ama hiçbir iz kalmadı.
+
+Hatayı gerçekten yok saymak istiyorsanız bunu açıkça yazın:
+
+```powershell
+$eski = Get-Item $yol -ErrorAction SilentlyContinue
+if (-not $eski) { Write-Verbose "Dosya zaten yok, atlanıyor." }
+```
+
+Fark şu: burada hatayı susturmakla kalmıyor, **beklendiğini belgeliyorsunuz**.
+
+## Yerel hataları da kontrol edin
+
+Bazı komutlar hiç hata fırlatmaz; yalnızca çıkış kodu döner. `robocopy`, `net`, `msiexec` gibi yerel çalıştırılabilirler böyledir.
+
+```powershell
+robocopy $kaynak $hedef /E
+if ($LASTEXITCODE -ge 8) {
+    throw "robocopy başarısız: çıkış kodu $LASTEXITCODE"
+}
+```
+
+`robocopy` için 8 ve üstü gerçek hatadır; 0–7 arası normaldir. Bunu bilmeden `$LASTEXITCODE -ne 0` kontrolü yazarsanız başarılı kopyalamaları hata sayarsınız.
+
+## finally: temizlik garantisi
+
+Açtığınız bir kaynağı kapatmanız gerekiyorsa `finally` kullanın; hata olsa da olmasa da çalışır.
+
+```powershell
+$oturum = New-PSSession -ComputerName sunucu01
+try {
+    Invoke-Command -Session $oturum -ScriptBlock { Get-Service }
+} finally {
+    Remove-PSSession $oturum
+}
+```
+
+Uzak oturumların kapatılmaması, uzun süre çalışan otomasyonlarda sunucuda oturum birikmesine yol açar ve bir noktada yeni bağlantı kurulamaz hâle gelir.
+
+## Hata nesnesini okuyun
+
+`catch` bloğunda `$_` size yalnızca mesajı değil, hatanın tamamını verir:
+
+```powershell
+catch {
+    Write-Warning "Mesaj    : $($_.Exception.Message)"
+    Write-Warning "Kategori : $($_.CategoryInfo.Category)"
+    Write-Warning "Satır    : $($_.InvocationInfo.ScriptLineNumber)"
+}
+```
+
+Satır numarasını günlüğe yazmak, üç ay sonra gece çalışan bir betiğin neden durduğunu bulmanın en hızlı yoludur.
+
+## Belirli hataları ayrı yakalayın
+
+Tek bir `catch` bloğu her hatayı aynı şekilde ele alır ve bu genelde yanlıştır. "Kullanıcı bulunamadı" ile "dizine erişilemiyor" farklı tepkileri hak eder: birincisi atlanabilir, ikincisi betiği durdurmalıdır.
+
+PowerShell, istisna tipine göre ayrı bloklar yazmanıza izin verir:
+
+```powershell
+try {
+    Get-ADUser -Identity $hesap -ErrorAction Stop
+} catch [Microsoft.ActiveDirectory.Management.ADIdentityNotFoundException] {
+    Yaz "Atlandı: $hesap dizinde yok" -Duzey BILGI
+} catch [System.UnauthorizedAccessException] {
+    Yaz "Yetki yok, betik durduruluyor" -Duzey HATA
+    throw
+} catch {
+    Yaz "Beklenmeyen hata: $($_.Exception.GetType().FullName)" -Duzey HATA
+    throw
+}
+```
+
+Son bloktaki `GetType().FullName` çağrısı, bilmediğiniz bir hatanın tipini öğrenmenin en hızlı yoludur; bir sonraki sürümde onun için özel blok yazarsınız.
+
+Dikkat edilecek nokta: yakaladığınız ama çözemediğiniz hatayı `throw` ile yeniden fırlatın. Sessizce yutulan hata, betiği "başarılı" gösterir ve asıl tehlike budur.
+
+## $Error listesini kullanın
+
+Etkileşimli çalışırken bir şey ters gittiğinde son hataları görmek için:
+
+```powershell
+$Error[0] | Format-List * -Force
+$Error.Count
+```
+
+`$Error[0]` en son hatadır. `Format-List * -Force` ise mesajın altındaki tüm ayrıntıyı — iç istisnayı, hedef nesneyi, çağrı yığınını — gösterir. Kısa mesajın yeterli olmadığı durumlarda cevap genelde burada.
+
+## Doğrulama adımı
+
+Yazdığınız betiği **kasıtlı olarak bozun**: olmayan bir sunucu adı verin, erişimi olmayan bir yola yazdırın, yanlış kimlik bilgisi kullanın.
+
+Betik hata mesajı verip devam ediyorsa `try/catch` çalışmıyordur. Beklediğiniz `catch` bloğuna düşüp anlamlı bir günlük satırı yazıyorsa hata yönetiminiz gerçektir. Bu testi yapmadan hiçbir otomasyonu zamanlanmış göreve koymayın — çünkü orada kırmızı yazıyı kimse görmez.

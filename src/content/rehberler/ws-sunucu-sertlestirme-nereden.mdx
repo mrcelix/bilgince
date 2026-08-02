@@ -1,0 +1,100 @@
+---
+baslik: "Sunucu sertleştirme: 300 maddelik listeye bakmadan önce"
+ozet: "Kıyaslama belgeleri kapsamlıdır ama uygulanamaz. Gerçek riski düşüren ilk on maddeyi seçmenin yolu."
+konu: "windows-server"
+etiketler: ["sertlestirme", "guvenlik", "uyum"]
+yayin: 2026-05-29
+sure: 10
+---
+
+Sertleştirme kıyaslama belgeleri üç yüz maddeden oluşur ve her maddesi haklıdır. Ama üç yüz maddeyi tek seferde uygulamaya çalışan her ekip, üretimde bir şey kırar ve projeyi durdurur.
+
+Daha işlevli yol, riski en çok düşüren azınlığı seçip uygulamak, sonra genişletmektir.
+
+## İlk on madde
+
+Sıralama, gördüğüm gerçek olayların sıklığına göre.
+
+**1. Eski protokolleri kapatın.** SMBv1 hâlâ açık olan ortamlar var. TLS 1.0/1.1 de öyle.
+
+```powershell
+Get-WindowsOptionalFeature -Online -FeatureName SMB1Protocol
+Disable-WindowsOptionalFeature -Online -FeatureName SMB1Protocol -NoRestart
+```
+
+**2. Yerel yönetici parolalarını benzersizleştirin.** Aynı parola tüm filoda kullanılıyorsa tek bir makinenin ele geçmesi tüm filo demektir. Windows LAPS ile çözülür.
+
+**3. Ayrıcalıklı hesapları ayırın.** Günlük kullanılan hesap yönetici olmamalı. Bu tek değişiklik, kimlik avı kaynaklı olayların etkisini dramatik biçimde küçültür.
+
+**4. RDP'yi internete açmayın.** Doğrudan açık 3389 portu, otomatik taramaların ilk hedefidir. Ağ geçidi ya da VPN arkasına alın, MFA ekleyin.
+
+**5. Yerel güvenlik duvarını açık tutun.** Sunucularda kapatmak bir gelenek hâline gelmiş durumda. Açık tutup gerekli portları tanımlayın; yanal hareketi zorlaştıran en ucuz önlem budur.
+
+**6. PowerShell günlüklerini açın.** Betik bloğu günlüğü ve modül günlüğü, olay araştırmasında elinizdeki en değerli kayıttır.
+
+**7. Kullanılmayan rolleri ve özellikleri kaldırın.** Kurulmayan bileşenin açığı olmaz.
+
+**8. Yönetim arayüzlerini ayırın.** Sunucu yönetimi kullanıcı ağından erişilebilir olmamalı.
+
+**9. Yamaları düzenli uygulayın.** Sertleştirme listesinin en tepesinde durması gereken madde aslında budur.
+
+**10. Günlükleri merkezî toplayın.** Sunucuda kalan günlük, sunucu ele geçtiğinde silinir.
+
+## Kıyaslama belgelerini nasıl kullanmalı
+
+Belgeleri çöpe atmayın; **kademeli** kullanın. Çoğu kıyaslama, maddeleri "Düzey 1" ve "Düzey 2" olarak ayırır. Düzey 1 genelde uyumluluk riski düşüktür ve doğrudan uygulanabilir. Düzey 2 işlevsellik kısıtlar ve test gerektirir.
+
+Sunucu rolüne göre de ayırın: dosya sunucusuna uygulanacak ayar ile domain controller'a uygulanacak ayar aynı değildir. Tek bir "sunucu sertleştirme GPO'su" yapmaya çalışmak, en kısıtlayıcı ortak kümede kalmanıza yol açar.
+
+## Uygulama sırası
+
+Sertleştirmeyi doğrudan üretime uygulamak, kırılan şeyi bulma maliyetini üretimde ödemek demektir.
+
+1. **Tek bir test sunucusunda** uygulayın, uygulamaları çalıştırın.
+2. **Bir üretim sunucusunda** uygulayın, bir hafta izleyin.
+3. **Rol grubuna** yayın.
+4. Her adımda geri alma yolu hazır olsun — GPO ile uyguladıysanız bağlantıyı kaldırmak yeterlidir; kayıt defterine elle yazdıysanız geri dönüş çok daha zordur.
+
+Bu yüzden mümkün olan her ayarı **grup ilkesiyle** uygulayın. Elle yapılan sertleştirme, belgelenmediği ve geri alınamadığı için zamanla korkulan bir şeye dönüşür.
+
+## Kırılanı önceden tahmin edin
+
+Sertleştirmenin en sık kırdığı üç şey:
+
+**Eski uygulamalar.** SMBv1'e ya da eski TLS'e bağımlı yazılımlar. Önce envanter çıkarın: hangi uygulama hangi protokolü kullanıyor?
+
+**Yedekleme ve izleme ajanları.** Kısıtlı yönetici haklarıyla çalışamayabilirler. Sertleştirmeden sonra yedeklerin hâlâ alındığını doğrulayın — bu, en sık gözden kaçan yan etkidir.
+
+**Yazıcılar ve tarayıcılar.** Eski gömülü yazılımlar modern kimlik doğrulamayı desteklemez.
+
+## Ölçün, iddia etmeyin
+
+Sertleştirmenin uygulandığını varsaymayın; tarayın. Düzenli bir uyum taraması (ister ticari araç ister betik) sapmaları gösterir.
+
+Sapma her zaman olur: biri sorun çözmek için güvenlik duvarını kapatır, biri test için bir ayarı geri alır. Tarama olmadan bunu aylarca fark etmezsiniz.
+
+## Taban çizgisini bir kez yazın, her yerde kullanın
+
+Sertleştirmeyi sunucu sunucu uygulamak sürdürülemez. Bir **taban çizgisi** (baseline) tanımlayın ve yeni kurulan her sunucu doğduğu anda ona uysun.
+
+Pratikte üç katman işe yarar:
+
+**Katman 1 — tüm sunucular.** Protokol kapatmaları, güvenlik duvarı, günlük ayarları, LAPS. Bunlar hiçbir rolü kırmaz.
+
+**Katman 2 — rol bazlı.** Dosya sunucusu, web sunucusu, domain controller için ayrı GPO'lar. Her biri katman 1'in üzerine biner.
+
+**Katman 3 — istisnalar.** Belgelenmiş, gerekçeli, sahibi olan ve **gözden geçirme tarihi bulunan** muafiyetler.
+
+Üçüncü katmanı görünür tutmak kritiktir. İstisna listesi büyüyorsa taban çizginiz gerçekçi değildir; küçülüyorsa doğru yoldasınız.
+
+## Sanal makine şablonuna gömün
+
+Sertleştirmeyi kurulum sonrası uygulamak yerine şablona koymak, sapma ihtimalini baştan azaltır. Yeni makine zaten sertleştirilmiş doğar; GPO yalnızca sürdürür.
+
+Şablonu yılda en az iki kez güncelleyin. Güncellenmeyen altın imaj, kurulan her makineye eski yamaları ve eski ayarları dağıtır — sertleştirme çalışmasının sessizce geri alınmasının en yaygın yolu budur.
+
+## Doğrulama adımı
+
+Sertleştirmeden sonra iki listeyi yan yana koyun: **kapatılan özellikler** ve **hâlâ çalıştığı doğrulanan iş süreçleri**.
+
+İkinci liste, ilkinden kısa olmamalı. Bir sunucuyu sertleştirip üzerindeki uygulamanın uçtan uca çalıştığını test etmediyseniz, güvenliği artırmış değil, yalnızca riski başka bir yere taşımış olabilirsiniz — ve o risk artık "kesinti" adını taşıyor.

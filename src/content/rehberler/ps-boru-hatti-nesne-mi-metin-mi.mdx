@@ -1,0 +1,148 @@
+---
+baslik: "PowerShell boru hattı: nesne mi akıyor, metin mi?"
+ozet: "Bash alışkanlığıyla yazılan PowerShell betikleri yavaş ve kırılgan olur. Nesne boru hattını anlamak, çoğu sorunu baştan çözer."
+konu: "powershell"
+etiketler: ["boru-hatti", "temel", "performans"]
+yayin: 2026-02-27
+sure: 8
+---
+
+Linux tarafından gelen bir meslektaşım PowerShell'de şöyle bir satır yazdı:
+
+```powershell
+Get-Process | Select-String "chrome" | ForEach-Object { $_.ToString().Split()[0] }
+```
+
+Çalıştı. Ama yanlış nedenle çalıştı ve bir hafta sonra sürüm farkı yüzünden bozuldu.
+
+## Temel fark
+
+Klasık kabuklarda borudan **metin** akar. Sonraki komut o metni ayrıştırmak zorundadır: sütunları böler, boşlukları sayar, `awk` ile alan çeker. Çıktı biçimi değişirse betik kırılır.
+
+PowerShell'de borudan **nesne** akar. `Get-Process` size metin değil, `Process` nesneleri verir; her birinin `Name`, `Id`, `CPU` gibi özellikleri vardır. Ayrıştırmaya gerek yoktur.
+
+Doğrusu şu:
+
+```powershell
+Get-Process | Where-Object Name -like '*chrome*' | Select-Object -ExpandProperty Id
+```
+
+Bu satır, çıktının nasıl göründüğünden bağımsızdır. Sürüm değişse de çalışır.
+
+## Ne olduğunu görmek
+
+Bir komutun ne döndürdüğünü bilmiyorsanız sormanın yolu var:
+
+```powershell
+Get-Process | Get-Member
+```
+
+Bu komut, nesnenin tüm özelliklerini ve metotlarını listeler. PowerShell öğrenirken en çok işe yarayan tek komut budur; `Get-Help`'ten bile önce gelir.
+
+Özellik adlarını gördükten sonra `Select-Object` ile istediğinizi çekersiniz:
+
+```powershell
+Get-Service | Select-Object Name, Status, StartType, @{ n='Makine'; e={ $env:COMPUTERNAME } }
+```
+
+Son ifade hesaplanmış özelliktir: olmayan bir alanı siz üretirsiniz.
+
+## Format-* komutları boru hattını bitirir
+
+Bu, en sık yapılan hatalardan biridir:
+
+```powershell
+Get-Service | Format-Table Name, Status | Export-Csv .\servis.csv   # bozuk
+```
+
+`Format-Table` nesneleri biçimlendirme talimatlarına çevirir. Ondan sonra gelen hiçbir komut orijinal nesneyi göremez; CSV'de anlamsız satırlar oluşur.
+
+Kural basit: **`Format-*` komutları her zaman son gelir.** Veriyi işleyecekseniz `Select-Object` kullanın, göstereceksiniz `Format-Table`.
+
+## Süzmeyi sola alın
+
+Performans farkı burada doğar. İki satır aynı sonucu verir ama biri çok daha hızlıdır:
+
+```powershell
+# yavaş: her şeyi getirir, sonra süzer
+Get-ADUser -Filter * -Properties Department | Where-Object Department -eq 'Muhasebe'
+
+# hızlı: süzmeyi sunucu yapar
+Get-ADUser -Filter "Department -eq 'Muhasebe'" -Properties Department
+```
+
+Kural: **süzmeyi mümkün olan en erken noktada yapın.** Cmdlet'in kendi `-Filter` parametresi varsa onu kullanın; `Where-Object`, veri size geldikten sonra çalışır.
+
+Birkaç yüz kayıtta fark önemsizdir. On binlerce kayıtlı bir dizinde fark dakikalarla ölçülür.
+
+## ForEach-Object mi, foreach mi
+
+İkisi farklı şeylerdir ve karıştırılır.
+
+`ForEach-Object` bir cmdlet'tir, boru hattında çalışır ve öğeleri **geldikçe** işler. Bellek dostudur; çok büyük koleksiyonlarda tercih edilir.
+
+`foreach` bir dil yapısıdır, koleksiyonun tamamını belleğe alır ve daha hızlı çalışır. Elinizde zaten bir dizi varsa bu daha uygundur.
+
+```powershell
+# akış hâlinde, bellek dostu
+Get-Content buyuk.log | ForEach-Object { if ($_ -match 'HATA') { $_ } }
+
+# dizi elinizdeyse daha hızlı
+foreach ($k in $kullanicilar) { $k.Name }
+```
+
+Bir milyon satırlık günlüğü `Get-Content` ile tamamen belleğe alıp `foreach` ile dolaşmak, makineyi kilitlemenin bilinen bir yoludur.
+
+## Diziye eklemeyin, boru hattına bırakın
+
+Yaygın ve yavaş bir kalıp:
+
+```powershell
+$sonuc = @()
+foreach ($k in $liste) { $sonuc += $k }   # her += yeni dizi kopyalar
+```
+
+`+=` her seferinde diziyi baştan oluşturur; bin öğede bin kopyalama yapar. Bunun yerine çıktıyı doğrudan bırakın:
+
+```powershell
+$sonuc = foreach ($k in $liste) { $k }
+```
+
+Ya da gerçekten biriktirmeniz gerekiyorsa `[System.Collections.Generic.List[object]]` kullanın.
+
+## Boru hattından parametre almak
+
+Kendi fonksiyonunuzu boru hattında kullanılabilir yapmak, onu birleştirilebilir kılar. İki şey gerekir: parametreye `ValueFromPipeline` eklemek ve `process` bloğu kullanmak.
+
+```powershell
+function Get-DiskDurumu {
+    param(
+        [Parameter(ValueFromPipeline, ValueFromPipelineByPropertyName)]
+        [Alias('ComputerName')]
+        [string[]]$Makine
+    )
+    process {
+        foreach ($m in $Makine) {
+            Get-CimInstance Win32_LogicalDisk -ComputerName $m -Filter 'DriveType=3' |
+              Select-Object @{n='Makine';e={$m}}, DeviceID,
+                @{n='BosYuzde'; e={ [math]::Round($_.FreeSpace / $_.Size * 100, 1) }}
+        }
+    }
+}
+
+'pc01','pc02' | Get-DiskDurumu | Where-Object BosYuzde -lt 15
+```
+
+`process` bloğu olmadan fonksiyon yalnızca son öğeyi işler — sessiz ve kafa karıştırıcı bir hata. `ValueFromPipelineByPropertyName` ise nesnelerin `ComputerName` özelliğinden otomatik eşleşme sağlar; takma ad sayesinde başka cmdlet'lerin çıktısı doğrudan borulanabilir.
+
+## Sıralama ve gruplama akışı durdurur
+
+`Sort-Object` ve `Group-Object`, doğaları gereği tüm veriyi toplamadan sonuç üretemez. Boru hattının o noktasında akış durur ve bellek kullanımı zirve yapar.
+
+Büyük veri kümelerinde süzmeyi sıralamadan **önce** yapın. Bir milyon satırı sıralayıp ilk onunu almak yerine, önce süzüp yüz satıra indirin, sonra sıralayın.
+
+## Doğrulama adımı
+
+Yazdığınız her boru hattı satırını `| Get-Member` ile bitirip bir kez çalıştırın. Dönen tipin ne olduğunu görün.
+
+`System.String` görüyorsanız ve beklediğiniz zengin bir nesneyse, bir yerde metne düşmüşsünüzdür — genelde `Write-Host`, `Out-String` veya erken bir `Format-Table` yüzünden. Nesne kaybını erken fark etmek, sonradan ayrıştırma kodu yazmaktan çok daha ucuzdur.

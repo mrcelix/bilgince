@@ -1,0 +1,123 @@
+---
+baslik: "PowerShell 7'ye geçiş: neyin bozulacağını önceden bilmek"
+ozet: "Yan yana kurulabiliyor olması geçişi risksiz yapmıyor. Windows PowerShell 5.1 ile arasındaki, betikleri kıran farklar."
+konu: "powershell"
+etiketler: ["pwsh", "goc", "uyumluluk"]
+yayin: 2026-04-10
+sure: 10
+---
+
+PowerShell 7, Windows PowerShell 5.1'in yerini almaz; yanına kurulur. `powershell.exe` ve `pwsh.exe` aynı makinede birlikte yaşar. Bu, geçişi kolaylaştırır ama aynı zamanda erteletir: iki sürüm birden yaşayan bir ortamda hangi betiğin hangisiyle çalıştığı zamanla belirsizleşir.
+
+Geçişi planlı yapmak için önce farkları bilmek gerekir.
+
+## Kazanç nerede
+
+Somut olanlardan başlayayım. `ForEach-Object -Parallel` ile paralel işleme, betik sürelerini ciddi biçimde kısaltır:
+
+```powershell
+$sunucular | ForEach-Object -Parallel {
+    [pscustomobject]@{
+        Makine = $_
+        Servis = (Get-Service -ComputerName $_ -Name Spooler).Status
+    }
+} -ThrottleLimit 10
+```
+
+Elli sunucuyu sırayla sorgulamak dakikalar sürerken, on paralel iş parçacığıyla saniyelere iner.
+
+Diğer kazançlar: `?:` üçlü operatörü, `??` boş birleştirme, `&&` ve `||` zincirleme, belirgin şekilde daha hızlı başlangıç ve çok daha iyi JSON işleme.
+
+## Kırılan şey: Windows'a özgü modüller
+
+En büyük risk burada. PowerShell 7 .NET Core üzerinde çalışır; bazı eski modüller yalnızca .NET Framework ile çalışır.
+
+Çözüm uyumluluk katmanıdır:
+
+```powershell
+Import-Module -Name EskiModul -UseWindowsPowerShell
+```
+
+Bu komut arka planda bir Windows PowerShell oturumu açar ve komutları oraya vekil eder. Çalışır ama bedeli vardır: nesneler serileştirilerek gelir, yani metotlarını kaybederler. `$nesne.Kapat()` gibi bir çağrı artık çalışmaz; yalnızca özellikleri okuyabilirsiniz.
+
+Geçiş öncesi envanter çıkarın: betikleriniz hangi modülleri kullanıyor ve bunların 7 uyumlu sürümü var mı?
+
+## Kırılan şey: Invoke-WebRequest davranışı
+
+5.1'de `Invoke-WebRequest` Internet Explorer motorunu kullanırdı ve `ParsedHtml` özelliği DOM verirdi. 7'de bu özellik yoktur.
+
+HTML ayrıştıran betikleriniz varsa yeniden yazılmaları gerekir. Ayrıca 5.1'de varsayılan olarak açık olan `UseBasicParsing` parametresi artık anlamsızdır (her zaman öyle davranır) — zararsızdır ama gereksizdir.
+
+## Kırılan şey: kodlama varsayılanı
+
+Bu, sessizce veri bozan bir farktır ve Türkçe içerikte doğrudan hissedilir.
+
+Windows PowerShell 5.1'de `Out-File`, `Set-Content` gibi komutların varsayılan kodlaması sistem ANSI kod sayfasıdır. PowerShell 7'de varsayılan **BOM'suz UTF-8**'dir.
+
+Yani 5.1 ile yazılıp 7 ile okunan (veya tersi) dosyalarda Türkçe karakterler bozulur. Geçiş döneminde kodlamayı her zaman açıkça belirtin:
+
+```powershell
+$veri | Export-Csv rapor.csv -Encoding utf8BOM -NoTypeInformation
+```
+
+Excel'de açılacak CSV'ler için `utf8BOM` kullanın; BOM olmadan Excel dosyayı ANSI sanır ve şapkalı harfleri bozar.
+
+## Kırılan şey: küçük ama sinsi farklar
+
+`Get-Content -Raw` olmadan okunan dosyalarda satır sonu davranışı değişebilir. `Sort-Object` artık kararlıdır (eşit öğeler girdi sırasını korur) — bu bir iyileştirmedir ama sıralamaya bağlı çıktı üreten testleriniz varsa sonuç değişir.
+
+`cd`, `ls`, `curl` gibi takma adlar Linux/macOS'ta yoktur. Betiği çapraz platform çalıştıracaksanız tam cmdlet adlarını kullanın.
+
+## Geçiş sırası
+
+1. **Envanter.** Hangi betikler var, hangi modülleri kullanıyorlar, kim çalıştırıyor.
+2. **Yan yana kurun.** PowerShell 7'yi dağıtın ama hiçbir görevi taşımayın.
+3. **Betikleri elle deneyin.** `pwsh -File betik.ps1` ile çalıştırıp farkları görün.
+4. **Zamanlanmış görevleri tek tek taşıyın.** Görev eylemindeki `powershell.exe` yerine `pwsh.exe` yazmak yeterlidir — ama her taşımadan sonra bir çalışma çevrimi izleyin.
+5. **Uyumsuz kalanları listeleyin** ve 5.1'de bırakın. Bu listeyi görünür tutun; küçülmesi geçişin gerçek ölçüsüdür.
+
+## Hangisiyle çalıştığınızı bilin
+
+Betiğin başına sürüm kontrolü koymak, karışıklığın çoğunu önler:
+
+```powershell
+#requires -Version 7.0
+```
+
+Bu satır, betik 5.1 ile çalıştırılırsa anlamlı bir hata verir. Belirsiz bir davranış hatasından çok daha iyidir.
+
+## İkisini aynı makinede ayırt etmek
+
+Yan yana kurulum, hangi sürümün ne çalıştırdığını belirsizleştirir. Birkaç alışkanlık bunu önler.
+
+Sürümü betik içinde okuyun ve günlüğe yazın:
+
+```powershell
+"PowerShell $($PSVersionTable.PSVersion) / $($PSVersionTable.PSEdition)"
+```
+
+`PSEdition` değeri `Core` ise PowerShell 7, `Desktop` ise Windows PowerShell 5.1'dir.
+
+Modül yolları da farklıdır. 7, kendi modül dizinine ek olarak 5.1'in `WindowsPowerShell\Modules` dizinini de tarar — ama tersi geçerli değildir. PowerShell 7 için yazdığınız modülü 5.1'den çağıramazsınız.
+
+Profil dosyaları da ayrıdır: `Documents\PowerShell\` (7) ve `Documents\WindowsPowerShell\` (5.1). Ortak ayarlarınız varsa birinden diğerini nokta kaynaklı (`. $profil`) çağırın; iki dosyayı elle senkron tutmaya çalışmayın.
+
+## Betikleri çapraz uyumlu yazmak
+
+Geçiş dönemi uzun sürecekse, betiklerin her iki sürümde de çalışması işinizi kolaylaştırır. İki basit kural yeter:
+
+Takma ad kullanmayın; tam cmdlet adı yazın (`Get-ChildItem`, `ls` değil). Ve yalnızca 7'de olan sözdizimlerinden (`??`, `?:`, `&&`) kaçının ya da `#requires -Version 7.0` ile betiği açıkça 7'ye bağlayın.
+
+İkisinin arasında kalmak — yani 7 sözdizimi kullanıp `#requires` yazmamak — en kötü seçenektir: betik 5.1'de anlaşılmaz bir ayrıştırma hatası verir.
+
+## Doğrulama adımı
+
+Taşıdığınız her betiği iki sürümde de çalıştırıp **çıktıları karşılaştırın** — göz kararı değil, dosya olarak:
+
+```powershell
+powershell.exe -File .\rapor.ps1 | Out-File eski.txt
+pwsh.exe       -File .\rapor.ps1 | Out-File yeni.txt
+Compare-Object (Get-Content eski.txt) (Get-Content yeni.txt)
+```
+
+Fark çıkmıyorsa taşıma güvenlidir. Fark çıkıyorsa, sebebini anlamadan görevi taşımayın: farkların bir kısmı zararsız biçimlendirme, bir kısmı ise gerçek davranış değişikliğidir ve ikisini ancak bakarak ayırabilirsiniz.

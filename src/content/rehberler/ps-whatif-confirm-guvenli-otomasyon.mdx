@@ -1,0 +1,138 @@
+---
+baslik: "-WhatIf: geri alınamaz komutları güvenli hale getirmek"
+ozet: "Toplu silme betiğini üretimde ilk kez çalıştırmanın tek güvenli yolu, hiçbir şey silmemesini sağlamaktır."
+konu: "powershell"
+etiketler: ["guvenlik", "betik", "otomasyon"]
+yayin: 2026-05-01
+sure: 8
+---
+
+Bir meslektaşım eski dosyaları temizleyen bir betik yazdı. Filtreyi test etmişti, doğru dosyaları buluyordu. Betiği çalıştırdı ve 12.000 dosya sildi — filtre doğruydu ama yol değişkeni boş kalmıştı ve betik kök dizinden başlamıştı.
+
+Bu hikâyenin `-WhatIf` ile biten bir versiyonu yoktur, çünkü `-WhatIf` ile hiç yaşanmaz.
+
+## Ne yapar
+
+`-WhatIf` parametresi, komutun ne yapacağını söyler ama yapmaz:
+
+```powershell
+Get-ChildItem D:\Arsiv -Recurse -File |
+  Where-Object LastWriteTime -lt (Get-Date).AddYears(-3) |
+  Remove-Item -WhatIf
+```
+
+Çıktı şuna benzer:
+
+```
+What if: Performing the operation "Remove File" on target "D:\Arsiv\2021\rapor.pdf".
+```
+
+Her satır bir işlemdir. Listeyi okur, doğru dosyalar olduğunu görür, sonra `-WhatIf` parametresini kaldırırsınız.
+
+Kritik nokta şu: bu listeyi **saymak** da mümkündür.
+
+```powershell
+$silinecek = Get-ChildItem D:\Arsiv -Recurse -File |
+  Where-Object LastWriteTime -lt (Get-Date).AddYears(-3)
+
+"Silinecek dosya: $($silinecek.Count), toplam $([math]::Round(($silinecek | Measure-Object Length -Sum).Sum/1GB,2)) GB"
+```
+
+Sayı beklediğinizden büyükse durun. Bu tek kontrol, yukarıdaki hikâyeyi engeller.
+
+## Kendi betiğinize ekleyin
+
+`-WhatIf` yalnızca destekleyen cmdlet'lerde çalışır. Kendi betiğinize eklemek iki satırdır:
+
+```powershell
+[CmdletBinding(SupportsShouldProcess, ConfirmImpact = 'High')]
+param(
+    [Parameter(Mandatory)][string]$Hesap
+)
+
+if ($PSCmdlet.ShouldProcess($Hesap, 'AD hesabını devre dışı bırak')) {
+    Disable-ADAccount -Identity $Hesap -Confirm:$false
+}
+```
+
+Artık betiğiniz `-WhatIf` desteklemektedir. `ConfirmImpact = 'High'` ise şunu sağlar: parametre verilmese bile kullanıcıdan onay ister — çünkü varsayılan onay eşiği `High`'dır.
+
+Yani riskli betikler varsayılan olarak soru sorar; otomasyonda `-Confirm:$false` ile susturursunuz. Bu, doğru varsayılandır: kaza olmasın diye çaba göstermeniz gerekmez, kaza yapmamak için çaba göstermeniz gerekir.
+
+## İç içe çağrılarda dikkat
+
+`ShouldProcess` kullanan bir betikten, kendisi de onay isteyen bir cmdlet çağırıyorsanız iki kez sorulur. Bunu önlemek için içteki çağrıya `-Confirm:$false` verin — dış onayı zaten aldınız.
+
+Ama dikkat: `-Confirm:$false` yazarken `-WhatIf` desteğini kırmayın. `Remove-Item -Confirm:$false` yazdığınızda `-WhatIf` hâlâ çalışır; `-Force` ise bazı korumaları atlar.
+
+## Prova modu her yerde
+
+Aynı fikir PowerShell dışında da geçerlidir ve en pahalı hataların çoğunu önler:
+
+- `robocopy /MIR /L` — `/L` yalnızca listeler
+- `git clean -n` — `-n` prova
+- `rsync --dry-run`
+- Grup ilkesi: önce **modelleme** çalıştırın
+- Koşullu erişim: önce **rapor modu**
+- Güvenlik duvarı: önce günlük, sonra engelle
+
+Ortak kalıp şudur: **her yıkıcı işlemin bir prova modu vardır; onu bulmak sizin işiniz.**
+
+## Günlüğe yazın
+
+Prova çıktısını ekranda okuyup geçmek yerine dosyaya alın. Bir sorun çıktığında "ne silinmesi bekleniyordu" sorusuna cevap verir:
+
+```powershell
+$silinecek | Select-Object FullName, Length, LastWriteTime |
+  Export-Csv "silinecekler-$(Get-Date -f yyyyMMdd-HHmm).csv" -NoTypeInformation -Encoding utf8BOM
+```
+
+Bu dosya, işlemi yapmadan önce başkasının gözden geçirmesini de mümkün kılar. Toplu silme işlemlerinde ikinci bir çift göz, en ucuz sigortadır.
+
+## Kademeli uygulama
+
+Prova doğru göründükten sonra bile hepsini birden yapmayın:
+
+```powershell
+$silinecek | Select-Object -First 10 | Remove-Item
+```
+
+On tanesini silin, sonucu kontrol edin, sonra devam edin. Yanlış bir şey yaptıysanız bedeli on dosyadır, on iki bin değil.
+
+## Geri alma yolunu önceden hazırlayın
+
+Prova modu, yanlış şeyi yapmanızı engeller. Ama doğru şeyi yapıp sonra pişman olma ihtimali her zaman kalır. Bu yüzden yıkıcı işlemlerden önce **geri dönüş verisini** üretin.
+
+Silme yerine taşıma, en ucuz geri alma mekanizmasıdır:
+
+```powershell
+$karantina = 'D:\Karantina\{0:yyyyMMdd}' -f (Get-Date)
+New-Item -ItemType Directory -Path $karantina -Force | Out-Null
+
+$silinecek | ForEach-Object {
+    $hedef = Join-Path $karantina $_.Name
+    Move-Item -Path $_.FullName -Destination $hedef
+}
+```
+
+Otuz gün sonra karantina klasörünü silen ayrı bir görev kurun. Böylece "sildim ama geri lazım oldu" durumu bir felaket değil, iki dakikalık bir iş olur.
+
+AD hesaplarında aynı fikir: silmek yerine devre dışı bırakıp karantina OU'suna taşıyın. Grup üyeliklerini de bir dosyaya kaydedin — geri alırken asıl zor olan üyelikleri hatırlamaktır:
+
+```powershell
+Get-ADPrincipalGroupMembership $hesap |
+  Select-Object -ExpandProperty distinguishedName |
+  Set-Content "$karantina\$hesap-gruplar.txt"
+```
+
+## Onay eşiğini bilinçli seçin
+
+`ConfirmImpact` değerleri `Low`, `Medium`, `High` olabilir. Betiğiniz `$ConfirmPreference` değişkeninin eşiğini aşarsa onay ister. Varsayılan eşik `High` olduğu için yalnızca `High` işaretli işlemler sorar.
+
+Toplu işlem yapan otomasyonlarda her nesne için ayrı onay istemek kullanılamaz hâle getirir; bu yüzden döngünün **dışında** bir kez onay alıp içeride `-Confirm:$false` kullanmak daha doğrudur.
+
+## Doğrulama adımı
+
+Riskli bir betiği üretimde ilk kez çalıştırmadan önce üç çıktıyı yan yana koyun: **etkilenecek nesne sayısı**, **toplam boyut veya kapsam**, ve **listeden rastgele seçilmiş beş örnek**.
+
+Üçü de beklentinizle uyuşuyorsa devam edin. Biri bile şaşırtıcıysa durun — çünkü şaşırtıcı olan şey, betiğin yaptığı şey değil, sizin ne yaptığını sandığınızdır.

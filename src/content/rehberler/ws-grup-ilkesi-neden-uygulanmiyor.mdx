@@ -1,0 +1,130 @@
+---
+baslik: "Grup ilkesi neden uygulanmıyor?"
+ozet: "GPO doğru yazıldı, doğru OU'ya bağlandı ama makineye inmiyor. Teşhis sırası ve en sık altı sebep."
+konu: "windows-server"
+etiketler: ["gpo", "active-directory", "tanilama"]
+yayin: 2026-04-17
+sure: 10
+---
+
+Grup ilkesi sorunlarının ortak özelliği, hata mesajı üretmemeleridir. Ayar uygulanmaz, hepsi bu. Nerede durduğunu anlamak için sıralı bir teşhis gerekir.
+
+## Önce gerçeği ölçün
+
+Tahmin etmeden önce makinenin ne aldığını görün:
+
+```powershell
+gpresult /h rapor.html /f
+```
+
+Bu HTML rapor, uygulanan ve **uygulanmayan** GPO'ları gerekçesiyle listeler. "Reddedildi (Erişim engellendi)" ya da "Filtrelendi" gibi satırlar doğrudan cevabı verir.
+
+Sadece bilgisayar ayarları için:
+
+```powershell
+gpresult /scope computer /r
+```
+
+## Sebep 1: Yanlış kapsam
+
+Bilgisayar yapılandırması yalnızca **bilgisayar nesnesinin** bulunduğu OU'ya bağlı GPO'lardan uygulanır. Kullanıcı yapılandırması yalnızca kullanıcı nesnesinin OU'sundan.
+
+En sık hata: kullanıcı ayarını, bilgisayarların bulunduğu OU'ya bağlamak. Hiçbir şey olmaz ve hata da verilmez.
+
+İhtiyaç gerçekten "şu bilgisayarlarda oturum açan herkese" ise geri döngü işleme (loopback processing) kullanılır — ama bunu kullanmadan önce iki kez düşünün; hata ayıklaması zordur.
+
+## Sebep 2: Güvenlik filtreleme
+
+GPO'nun uygulanabilmesi için hedefin hem **Okuma** hem **Grup İlkesi Uygula** iznine sahip olması gerekir.
+
+Yaygın hata: "Authenticated Users" grubunu kaldırıp yerine özel bir grup koymak ama yalnızca "Grup İlkesi Uygula" iznini vermek — okuma izni olmadan GPO okunamaz ve uygulanmaz.
+
+Ayrıca bilgisayar yapılandırması için makinenin okuma izni olmalıdır; kullanıcı grubuna izin vermek yetmez.
+
+```powershell
+Get-GPPermission -Name 'Masaustu-Kilit' -All |
+  Select-Object @{n='Kim';e={$_.Trustee.Name}}, Permission
+```
+
+## Sebep 3: WMI filtresi
+
+WMI filtreleri sessizce eler. Filtre yanlış yazılmışsa ya da makinede o WMI sınıfı yoksa GPO hiç uygulanmaz.
+
+Filtreyi makinede elle deneyin:
+
+```powershell
+Get-CimInstance -Query "SELECT * FROM Win32_OperatingSystem WHERE ProductType = 1"
+```
+
+Boş dönüyorsa filtre o makineyi eliyor demektir. WMI filtreleri ayrıca her ilke uygulamasında değerlendirildiği için oturum açmayı yavaşlatır; alternatif varsa kullanmayın.
+
+## Sebep 4: Kalıtım engellendi veya zorlandı
+
+Bir OU'da "Kalıtımı engelle" açıksa üstten gelen GPO'lar inmez. Tersine, üstteki bir GPO'da "Zorlandı" işaretliyse engellemeyi aşar ve alttaki çakışan ayarları ezer.
+
+İkisinin birlikte kullanıldığı ortamlarda hangi ayarın kazandığını okumak zorlaşır. Mümkün olduğunca ikisini de kullanmayın; ihtiyaç duyuyorsanız gerekçesini GPO açıklamasına yazın.
+
+## Sebep 5: Çoğaltma gecikmesi veya SYSVOL sorunu
+
+GPO iki parçadan oluşur: AD'deki nesne ve SYSVOL'daki dosyalar. İkisi ayrı mekanizmalarla çoğaltılır ve **birbirinden ayrı düşebilir**.
+
+Sürüm numaralarını karşılaştırın:
+
+```powershell
+Get-GPO -All | Select-Object DisplayName, @{n='AD';e={$_.Computer.DSVersion}}, @{n='SYSVOL';e={$_.Computer.SysvolVersion}} |
+  Where-Object { $_.AD -ne $_.SYSVOL }
+```
+
+Sonuç boş değilse çoğaltma sorunu vardır. DFSR sağlığını kontrol edin; SYSVOL çoğaltması durmuş bir ortamda yeni GPO'lar bazı DC'lere hiç ulaşmaz — ve kullanıcı hangi DC'ye bağlandıysa farklı davranır. "Bazı kullanıcılarda çalışıyor" tarifinin arkasında genelde bu vardır.
+
+## Sebep 6: Zamanlama
+
+Grup ilkesi arka planda 90 dakikada bir (rastgele ofsetle) yenilenir. Bazı ayarlar ise yalnızca **oturum açarken** veya **önyüklemede** uygulanır: yazılım yükleme, klasör yönlendirme, sürücü eşleme.
+
+Test ederken zorlayın:
+
+```powershell
+gpupdate /force /boot /logoff
+```
+
+Yine de bazı ayarlar için yeniden başlatma şarttır. "Uygulanmıyor" demeden önce bir kez yeniden başlatın.
+
+## Modelleme kullanın
+
+Değişiklik yapmadan sonucu görmek mümkündür:
+
+```powershell
+Get-GPResultantSetOfPolicy -User 'SIRKET\m.demir' -Computer 'PC-042' -ReportType Html -Path model.html
+```
+
+Bu, yeni bir GPO bağlamadan önce kimin etkileneceğini gösterir. Üretimde GPO değiştirmeden önce alışkanlık hâline getirin.
+
+## Olay günlüğü asıl cevabı verir
+
+`gpresult` özet verir; ayrıntı olay günlüğündedir. Grup ilkesi işlemcisi kendi kanalına yazar:
+
+```powershell
+Get-WinEvent -LogName 'Microsoft-Windows-GroupPolicy/Operational' -MaxEvents 40 |
+  Where-Object LevelDisplayName -in 'Error','Warning' |
+  Select-Object TimeCreated, Id, Message
+```
+
+Sık görülen kimlikler: **1058** SYSVOL'daki dosyaya erişilemedi (genelde DFS/izin sorunu), **1030** ilke işleme başarısız, **7017** ilke uygulaması zaman aşımına uğradı.
+
+Zaman aşımı özellikle yavaş WAN bağlantılı şubelerde görülür. Uzun süren bir betik ya da yazılım yükleme, ilkenin tamamının uygulanmasını engelleyebilir.
+
+## Betikleri ve tercihleri ayırt edin
+
+Grup ilkesinde iki farklı mekanizma vardır ve davranışları farklıdır.
+
+**İlke ayarları** kayıt defterinin ilke anahtarlarına yazılır ve GPO kapsamdan çıkınca **geri alınır**. Kullanıcı arayüzde değiştiremez.
+
+**Tercihler (preferences)** ise normal kayıt anahtarlarına yazılır ve GPO kaldırıldığında varsayılan olarak **kalır**. Kullanıcı değiştirebilir; bir sonraki yenilemede geri gelir (eğer "bir kez uygula" seçilmemişse).
+
+"GPO'yu kaldırdım ama ayar duruyor" durumunun sebebi neredeyse her zaman budur. Tercih kullanıyorsanız "artık uygulanmadığında öğeyi kaldır" seçeneğini bilinçli işaretleyin.
+
+## Doğrulama adımı
+
+Bir GPO'yu yayına aldıktan sonra üç kontrol yapın: hedef bir makinede `gpresult /r` çıktısında GPO **uygulananlar** listesinde mi, ayarın kendisi kayıt defterinde ya da arayüzde gerçekten değişmiş mi, ve **hedef olmayan** bir makinede uygulanmamış mı.
+
+Üçüncüsü en çok atlanan ve en pahalı olanıdır: yanlış kapsama uygulanan bir kısıtlama, çalışmayan bir GPO'dan çok daha fazla çağrı üretir.

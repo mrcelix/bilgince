@@ -1,0 +1,112 @@
+---
+baslik: "Dosya sunucusu izinleri: paylaşım mı NTFS mi?"
+ozet: "İki ayrı izin katmanı var ve kesişimleri geçerli oluyor. Karışıklığı bitiren basit kural ve sürdürülebilir bir grup modeli."
+konu: "windows-server"
+etiketler: ["dosya-sunucusu", "izin", "ntfs"]
+yayin: 2026-03-06
+sure: 10
+---
+
+"Kullanıcıya izin verdim ama hâlâ erişemiyor" çağrısı, sistem yöneticiliğinin en eski klasiğidir. Sebep neredeyse her zaman aynı: iki ayrı izin katmanının varlığı ve **en kısıtlayıcı olanın** kazanması.
+
+## İki katman
+
+**Paylaşım izinleri** yalnızca ağ üzerinden erişimde geçerlidir. Sunucuda oturum açmış bir kullanıcı için hiçbir etkisi yoktur.
+
+**NTFS izinleri** her zaman geçerlidir — ağdan da, yerelden de.
+
+Etkin izin, ikisinin **kesişimidir**. Paylaşımda "Değiştir", NTFS'te "Okuma" verdiyseniz kullanıcı okuyabilir, yazamaz.
+
+## Karışıklığı bitiren kural
+
+Pratikte işleyen en sade model şudur: **paylaşım izninde "Authenticated Users → Değiştir" verin, gerçek yetkilendirmeyi NTFS'te yapın.**
+
+Böylece tek bir yerde düşünürsünüz. İki katmanı da ince ayar yapmaya çalışmak, altı ay sonra kimsenin çözemediği bir durum üretir.
+
+```powershell
+New-SmbShare -Name 'Muhasebe' -Path 'D:\Paylasim\Muhasebe' `
+  -ChangeAccess 'Authenticated Users'
+```
+
+"Everyone → Tam Denetim" vermeyin. Fark pratikte küçüktür ama denetimde bulgu üretir ve anonim erişim senaryolarını açık bırakır.
+
+## AGDLP: neden hâlâ doğru
+
+Kullanıcıya doğrudan izin vermek, kısa vadede hızlıdır ve uzun vadede yönetilemez. Klasik model hâlâ en iyisidir:
+
+**Kullanıcı → Genel grup → Etki alanı yerel grubu → İzin**
+
+Pratikte:
+
+1. `GG-Muhasebe` — kullanıcıları buraya koyun (rol grubu)
+2. `DL-Muhasebe-Degistir` ve `DL-Muhasebe-Oku` — kaynak grupları
+3. NTFS izni **yalnızca DL gruplarına** verilir
+4. `GG-Muhasebe`, `DL-Muhasebe-Degistir` içine üye yapılır
+
+Faydası şudur: bir kullanıcının erişimini değiştirmek için klasöre hiç dokunmazsınız, grubu değiştirirsiniz. Ve "bu klasöre kimler erişiyor" sorusunun cevabı iki grup üyeliğine bakmakla verilir.
+
+Bu model kurulmadan yapılan her izin çalışması, ilerleyen yıllarda "şu klasörde 40 farklı ACL girdisi var" durumuna varır.
+
+## Kalıtımı bozmayın
+
+Bir alt klasörde kalıtımı devre dışı bırakıp özel izin vermek, o klasörü ana yapıdan koparır. Üstteki bir değişiklik oraya inmez ve kimse fark etmez.
+
+Zorunlu değilse kalıtımı kırmayın. Gerçekten farklı erişim gereken bir alt ağaç varsa, onu ayrı bir paylaşım yapmak genelde daha temizdir.
+
+Mevcut durumu görmek için:
+
+```powershell
+Get-ChildItem 'D:\Paylasim' -Recurse -Directory |
+  Where-Object { (Get-Acl $_.FullName).AreAccessRulesProtected } |
+  Select-Object FullName
+```
+
+Bu komut kalıtımı kırılmış klasörleri listeler. Liste uzunsa yapı zaten kontrolden çıkmıştır.
+
+## Erişim tabanlı numaralandırma
+
+Kullanıcının erişemediği klasörleri görmesi, hem kafa karıştırır hem de bilgi sızdırır (klasör adları çoğu zaman anlamlıdır: "İşten Çıkarmalar 2026" gibi).
+
+```powershell
+Set-SmbShare -Name 'Muhasebe' -FolderEnumerationMode AccessBased -Force
+```
+
+Bu ayar, kullanıcıya yalnızca erişebildiği klasörleri gösterir. Sunucuda küçük bir yük yaratır, karşılığında çok sayıda destek çağrısı önler.
+
+## Etkin izni ölçmek
+
+Tahmin etmeyin; sorun. Klasör özelliklerindeki **Güvenlik → Gelişmiş → Etkin Erişim** sekmesi, belirli bir kullanıcı için sonucu hesaplar. Betikle bakmak isterseniz:
+
+```powershell
+(Get-Acl 'D:\Paylasim\Muhasebe').Access |
+  Select-Object IdentityReference, FileSystemRights, AccessControlType, IsInherited |
+  Sort-Object IdentityReference
+```
+
+`AccessControlType` sütununda `Deny` görürseniz dikkat: reddetme her zaman izni ezer ve iç içe gruplarda beklenmedik sonuçlar üretir. Reddetmeyi mümkün olduğunca kullanmayın; izin vermeyerek engelleyin.
+
+## Denetimi açın
+
+"Bu dosyayı kim sildi?" sorusunun cevabı, denetim önceden açılmadıysa yoktur. İki katman gerekir: grup ilkesinde nesne erişim denetimi ve klasörün kendisinde SACL tanımı.
+
+```powershell
+$acl = Get-Acl 'D:\Paylasim\Muhasebe' -Audit
+$kural = New-Object System.Security.AccessControl.FileSystemAuditRule(
+    'Everyone', 'Delete, DeleteSubdirectoriesAndFiles', 'ContainerInherit, ObjectInherit', 'None', 'Success')
+$acl.AddAuditRule($kural)
+Set-Acl 'D:\Paylasim\Muhasebe' $acl
+```
+
+Her şeyi denetlemeyin — yalnızca silme ve izin değişikliği yeterlidir. Okuma denetimi açarsanız günlük dakikalar içinde dolar ve asıl olayı gizler.
+
+## Kotalar ve dosya türü engelleme
+
+Dosya Sunucusu Kaynak Yöneticisi (FSRM), paylaşımın kontrolden çıkmasını önler. Kota, klasör başına sınır koyar; dosya türü engelleme ise belirli uzantıların yazılmasını durdurur.
+
+İkincisi fidye yazılımına karşı da basit bir erken uyarı sağlar: bilinen fidye uzantılarını engelleyen bir dosya grubu tanımlayıp ihlalde e-posta gönderirseniz, şifrelemenin başladığını dosyalar bitmeden öğrenirsiniz. Tam koruma değildir ama ucuz bir sinyaldir.
+
+## Doğrulama adımı
+
+Yeni bir izin yapısı kurduktan sonra üç kullanıcıyla test edin: **erişmesi gereken biri**, **yalnızca okuması gereken biri** ve **hiç erişmemesi gereken biri**.
+
+Üçüncüsü en çok atlanan testtir ve en önemlisidir. "Erişmesi gerekenler erişebiliyor" yeterli bir sonuç değildir; asıl soru, erişmemesi gerekenin gerçekten erişemediğidir. Test hesabıyla oturum açıp paylaşımı açmayı deneyin — ACL'e bakarak varsaymayın.

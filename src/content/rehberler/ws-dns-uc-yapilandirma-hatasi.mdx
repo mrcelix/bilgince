@@ -1,0 +1,110 @@
+---
+baslik: "DNS'te en sık yapılan üç yapılandırma hatası"
+ozet: "Açıklanamayan yavaşlıkların ve rastgele oturum açma sorunlarının büyük kısmı üç yaygın DNS hatasından doğuyor."
+konu: "windows-server"
+etiketler: ["dns", "active-directory", "tanilama"]
+yayin: 2026-02-13
+sure: 10
+---
+
+Bir kurumda kullanıcılar "sabahları sistem çok yavaş" diyordu. Ağ ölçümleri temizdi, sunucular boştaydı. Sorun DNS'teydi: istemciler, artık var olmayan bir sunucuyu birincil DNS olarak deniyor, zaman aşımını bekliyor, sonra ikinciye geçiyordu. Her isim çözümlemesi saniyeler alıyordu.
+
+DNS sorunları nadiren "çalışmıyor" biçiminde görünür. Genelde "yavaş" ya da "bazen" biçiminde görünür.
+
+## Hata 1: İstemcide dış DNS sunucusu
+
+En yaygın ve en zararlı hata. Bir DC'nin ya da etki alanına katılmış istemcinin DNS listesinde 8.8.8.8 gibi bir genel çözümleyici bulunması.
+
+Neden zararlı: etki alanı hizmetleri SRV kayıtlarıyla bulunur (`_ldap._tcp.dc._msdcs.sirket.local`). Genel çözümleyici bu kayıtları bilmez. İstemci ona sorduğunda başarısız yanıt alır, sonra sıradakine geçer — ya da hiç geçmez ve oturum açma yavaşlar, grup ilkesi uygulanmaz.
+
+Kural: **etki alanı üyeleri yalnızca iç DNS sunucularını göstermelidir.** İnternet çözümlemesi, iç DNS'te tanımlı iletici (forwarder) üzerinden yapılır.
+
+```powershell
+Get-DnsServerForwarder
+Set-DnsServerForwarder -IPAddress 1.1.1.1, 8.8.8.8 -UseRootHint $false
+```
+
+Kontrol için:
+
+```powershell
+Get-DnsClientServerAddress -AddressFamily IPv4 |
+  Where-Object { $_.ServerAddresses -match '^(8\.8|1\.1|208\.67)' }
+```
+
+Bu sorgu size dış DNS kullanan arayüzleri verir. Sonuç boş olmalıdır.
+
+## Hata 2: Eski (bayat) kayıtlar temizlenmiyor
+
+Dinamik güncelleme açık ama **yaşlandırma/temizleme (aging/scavenging)** kapalıysa, DNS bölgesi yıllar içinde ölü kayıtlarla dolar.
+
+Sonuç: bir IP adresi yeni bir cihaza atandığında, eski kaydı yüzünden trafik yanlış makineye gider. Teşhis etmesi çok zor, etkisi rastgele görünen sorunlardır.
+
+```powershell
+# sunucu genelinde
+Set-DnsServerScavenging -ScavengingState $true -ScavengingInterval 7.00:00:00 -ApplyOnAllZones
+
+# bölge bazında
+Set-DnsServerZoneAging -Name 'sirket.local' -Aging $true `
+  -RefreshInterval 7.00:00:00 -NoRefreshInterval 7.00:00:00
+```
+
+Açmadan önce dikkat: temizleme, statik olarak eklenmiş ama zaman damgası olan kayıtları da silebilir. Önce mevcut kayıtları dışa aktarın ve yalnızca bir DC'de açın — temizlemeyi birden çok DC'de aynı anda çalıştırmak gereksizdir.
+
+## Hata 3: Yanlış iletici zinciri ve kök ipuçları
+
+İletici tanımlanmamışsa DNS sunucusu kök ipuçlarını kullanır ve internete doğrudan sorgu yapar. Bu çoğu kurumsal ağda ya engellidir ya da yavaştır.
+
+Tersi de olur: iletici olarak ISS'nin DNS'i yazılır, o da yanıt vermeyi bıraktığında tüm iç çözümleme durur — çünkü sunucu tek iletici için beklemeye devam eder.
+
+Sağlıklı yapılandırma: **iki farklı sağlayıcıdan iletici**, kök ipuçları yedek olarak açık, koşullu ileticiler ise yalnızca gerçekten gerektiğinde.
+
+Koşullu iletici, başka bir iç alan adını farklı bir sunucuya yönlendirmek için kullanılır (ör. birleşme sonrası ikinci bir orman). Gereksiz koşullu iletici, o sunucu kapandığında tüm sorguları geciktirir.
+
+## Bonus: tek etiketli isimler
+
+`sunucu01` gibi tek etiketli bir isim sorgulandığında istemci, DNS son ek listesindeki her alan adını sırayla dener. Liste uzunsa her başarısız deneme zaman kaybıdır.
+
+Grup ilkesiyle DNS son ek arama listesini kısa ve düzenli tutun. Beş alan adı denenen bir ortamda, olmayan bir ismin çözülmesi saniyeler sürer.
+
+## Teşhis sırası
+
+Bir DNS sorununda şu sırayı izleyin:
+
+```powershell
+# 1. istemci hangi sunucuya soruyor?
+Get-DnsClientServerAddress -AddressFamily IPv4
+
+# 2. önbellekte eski kayıt mı var?
+Get-DnsClientCache | Where-Object Entry -like '*sunucu01*'
+Clear-DnsClientCache
+
+# 3. sunucu doğru cevap veriyor mu?
+Resolve-DnsName sunucu01.sirket.local -Server 10.0.0.10
+
+# 4. SRV kayıtları yerinde mi?
+Resolve-DnsName -Name '_ldap._tcp.dc._msdcs.sirket.local' -Type SRV
+```
+
+Dördüncü sorgu boş dönüyorsa etki alanı hizmetleri bulunamıyor demektir ve oturum açma sorunlarının kaynağı budur.
+
+## Bölge çoğaltma kapsamı
+
+AD entegre bölgelerde çoğaltma kapsamı üç seçenekten biridir: ormandaki tüm DNS sunucuları, etki alanındaki tüm DNS sunucuları veya belirli bir uygulama dizini bölümü.
+
+Varsayılan genelde doğrudur ama çok etki alanlı ormanlarda yanlış kapsam, bazı DC'lerin bölgeyi hiç almamasına yol açar. O DC'ye yönlendirilen istemciler için isim çözümlemesi çalışmaz — ve bu, "bazı kullanıcılarda sorun var" tarifinin bir başka kaynağıdır.
+
+```powershell
+Get-DnsServerZone | Select-Object ZoneName, ZoneType, IsDsIntegrated, ReplicationScope
+```
+
+## Ters arama bölgeleri
+
+Ters arama (PTR) bölgeleri sık atlanır çünkü çoğu şey onlarsız da çalışır. Ama üç yerde işe yararlar: e-posta sunucularının itibar kontrolünde, güvenlik günlüklerinin okunabilirliğinde ve sorun gidermede.
+
+Kullandığınız her iç ağ bloğu için bir ters bölge tanımlayın ve istemcilerin PTR kaydı oluşturmasına izin verin. Bir güvenlik olayında IP yerine makine adı görmek, araştırmayı belirgin biçimde hızlandırır.
+
+## Doğrulama adımı
+
+Değişikliklerden sonra bir istemcide iki testi yapın: `nltest /dsgetdc:sirket.local` komutu bir DC bulmalı ve **bulma süresi bir saniyenin altında** olmalı.
+
+İkincisi kritiktir. Doğru sonucu yavaş vermek de bir arızadır; kullanıcı bunu "sistem yavaş" diye bildirir ve siz DNS'e bakmazsınız. Süreyi ölçmeden DNS'i sağlıklı saymayın.

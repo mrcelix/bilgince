@@ -1,0 +1,150 @@
+---
+baslik: "Betiğinizi başkasının da çalıştırabilmesi için"
+ozet: "Sabit kodlanmış yollar ve açıklamasız parametreler, betiği yazan kişiye bağımlı kılar. Devredilebilir betik yazmanın kuralları."
+konu: "powershell"
+etiketler: ["betik", "parametre", "dokumantasyon"]
+yayin: 2026-02-06
+sure: 9
+---
+
+Ekipten ayrılan bir arkadaşın bıraktığı betikleri devraldım. On yedi dosya. Hiçbirinde açıklama yoktu, çoğunda sunucu adları ve yollar kodun içine gömülüydü. Hangisinin ne yaptığını anlamak, hepsini baştan yazmaktan uzun sürdü.
+
+Devredilebilir betik yazmak, ekstra bir özen değil; işin parçasıdır.
+
+## Sabit kodlanmış değerleri yukarı çıkarın
+
+En düşük maliyetli iyileştirme budur. Betiğin içine serpiştirilmiş sunucu adları, yollar ve eşikler tek bir parametre bloğunda toplanmalı:
+
+```powershell
+param(
+    [Parameter(Mandatory)]
+    [string]$SunucuAdi,
+
+    [ValidateScript({ Test-Path $_ })]
+    [string]$CiktiYolu = "$env:USERPROFILE\Desktop",
+
+    [ValidateRange(1, 365)]
+    [int]$GunSayisi = 90
+)
+```
+
+Üç şey kazandınız: değer değiştirmek için kodu okumak gerekmiyor, zorunlu alan boş geçilemiyor ve geçersiz değer betik başlamadan yakalanıyor.
+
+`ValidateScript` ve `ValidateRange`, hatayı en ucuz olduğu anda — daha hiçbir şey değişmeden — yakalar.
+
+## Yardım metni yazın
+
+PowerShell'in yerleşik yardım sistemi vardır ve kullanmak yalnızca birkaç satır yorum gerektirir:
+
+```powershell
+<#
+.SYNOPSIS
+    Belirtilen gün sayısından uzun süredir giriş yapmayan AD hesaplarını raporlar.
+
+.DESCRIPTION
+    Hesapları CSV'ye döker. Devre dışı bırakmaz, yalnızca raporlar.
+    Hizmet hesaplarını ayıklamaz — çıktıyı gözden geçirmeden uygulamayın.
+
+.PARAMETER GunSayisi
+    Kaç gündür giriş yapmamış hesaplar listelensin. Varsayılan 90.
+
+.EXAMPLE
+    .\Pasif-Hesaplar.ps1 -GunSayisi 120 -CiktiYolu 'D:\Rapor'
+
+.NOTES
+    LastLogonDate 9-14 gün gecikmeyle eşitlenir; 30 günün altına inmeyin.
+#>
+```
+
+Bu bloğu yazdıktan sonra `Get-Help .\Pasif-Hesaplar.ps1 -Full` çalışır. Ama asıl değeri şurada: `.NOTES` bölümü, betiği yazarken öğrendiğiniz tuzağı saklar. Altı ay sonra o bilgiyi yeniden keşfetmek zorunda kalmazsınız.
+
+## Çıktı nesne olsun, metin değil
+
+Ekrana güzel görünen metin basan betikler, başka bir betikten çağrıldığında işe yaramaz. Nesne döndürün; biçimlendirmeyi çağırana bırakın.
+
+```powershell
+# kötü
+Write-Host "$($k.Name) - son giriş: $($k.LastLogonDate)"
+
+# iyi
+[pscustomobject]@{
+    Ad          = $k.Name
+    Hesap       = $k.SamAccountName
+    SonGiris    = $k.LastLogonDate
+    GunGecti    = (New-TimeSpan -Start $k.LastLogonDate).Days
+}
+```
+
+Nesne döndüren betiğin çıktısını süzebilir, sıralayabilir, CSV'ye dökebilir veya başka bir komuta borulayabilirsiniz. `Write-Host` ile basılan metin hiçbirine yaramaz — hatta değişkene bile atanamaz.
+
+## Write-Host yerine doğru akışı seçin
+
+PowerShell'de birden çok çıktı akışı vardır ve her birinin yeri farklıdır:
+
+- `Write-Output` — gerçek sonuç, boru hattına gider
+- `Write-Verbose` — ayrıntılı ilerleme, yalnızca `-Verbose` ile görünür
+- `Write-Warning` — dikkat çeken ama durdurmayan durumlar
+- `Write-Error` — hata
+- `Write-Host` — yalnızca gerçekten ekrana yazmak istediğiniz, yakalanmasını istemediğiniz şeyler
+
+Otomasyon betiklerinde ilerleme mesajlarını `Write-Verbose` ile yazın. Elle çalıştırırken `-Verbose` ekleyip görürsünüz; zamanlanmış görevde gürültü yapmaz.
+
+## Tehlikeli işlemleri işaretleyin
+
+Silme, devre dışı bırakma, taşıma gibi geri alınamaz işlemler yapan betiklere `-WhatIf` desteği ekleyin:
+
+```powershell
+[CmdletBinding(SupportsShouldProcess, ConfirmImpact = 'High')]
+param([string]$Hesap)
+
+if ($PSCmdlet.ShouldProcess($Hesap, 'Devre dışı bırak')) {
+    Disable-ADAccount -Identity $Hesap
+}
+```
+
+Artık `-WhatIf` ile çalıştırıldığında betik neyi yapacağını söyler, hiçbir şey değiştirmez. Bu tek satır, üretimde yapılan en pahalı hataların çoğunu önler.
+
+## Bir dosya, bir iş
+
+On yedi betikten bazıları üç ayrı iş yapıyordu ve hangisinin ne zaman çalıştığı belli değildi. Betik başına tek bir sorumluluk tutmak, bakımı belirgin biçimde kolaylaştırır.
+
+Ortak kod tekrarlanıyorsa modül yazın. Modül yazmak sandığınızdan basittir: birkaç fonksiyonu bir `.psm1` dosyasına koyup `Export-ModuleMember` ile dışa açmak yeterlidir.
+
+## Parametre kümeleri
+
+Bir betiğin iki farklı çalışma biçimi varsa — örneğin tek hesap ya da CSV dosyası işlemek — bunları ayrı parametre kümelerinde tanımlayın. PowerShell böylece geçersiz kombinasyonları kendisi engeller:
+
+```powershell
+[CmdletBinding(DefaultParameterSetName = 'Tek')]
+param(
+    [Parameter(Mandatory, ParameterSetName = 'Tek')]
+    [string]$Hesap,
+
+    [Parameter(Mandatory, ParameterSetName = 'Toplu')]
+    [ValidateScript({ Test-Path $_ })]
+    [string]$ListeDosyasi
+)
+
+$hedefler = if ($PSCmdlet.ParameterSetName -eq 'Toplu') {
+    (Import-Csv $ListeDosyasi).Hesap
+} else { @($Hesap) }
+```
+
+Kullanıcı ikisini birden verirse betik daha başlamadan anlamlı bir hata alır. Bu kontrolü kendiniz yazmaya çalışmak, hem daha uzun hem daha hatalıdır.
+
+## Sürüm numarası koyun
+
+Betiğin başına bir sürüm satırı ekleyip günlüğe yazdırın:
+
+```powershell
+$Surum = '1.4.0'
+Yaz "Betik başladı — sürüm $Surum"
+```
+
+Basit görünür ama şu soruyu cevaplar: "Bu hata hangi sürümde çıktı?" Betikler kopyalanarak çoğaldığı için, üretimde çalışanın hangi sürüm olduğu şaşırtıcı derecede sık bilinmez.
+
+## Doğrulama adımı
+
+Betiği bitirdikten sonra tek test: **bilgisayarınızda değil, başka birinin oturumunda çalıştırın.**
+
+Çalışmıyorsa sebebi neredeyse her zaman aynıdır — sizin profilinizde tanımlı bir yol, kurulu bir modül veya kayıtlı bir kimlik bilgisi. Bu bağımlılıklar betiğin başında kontrol edilip anlamlı bir hata mesajıyla bildirilmelidir. "Betik bende çalışıyor" cümlesi, devredilemez betiğin tanımıdır.
