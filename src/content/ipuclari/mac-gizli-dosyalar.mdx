@@ -1,0 +1,22 @@
+---
+baslik: "Finder'da gizli dosyaları tek tuşla göster"
+ozet: "Terminal komutu ezberlemeye gerek yok; Cmd + Shift + nokta anında açıp kapatıyor."
+konu: "macos"
+etiketler: ["finder", "kisayol"]
+yayin: 2026-08-02
+sure: 2
+populerlik: 61
+---
+
+Finder penceresindeyken **Cmd + Shift + . (nokta)** gizli dosyaları gösterir; aynı tuş tekrar gizler.
+
+Kalıcı olarak açmak isterseniz:
+
+```bash
+defaults write com.apple.finder AppleShowAllFiles -bool true
+killall Finder
+```
+
+Bir dosyanın tam yolunu almak için Finder'da seçip **Cmd + Option + C** yapın — yol panoya kopyalanır. Yalnızca adı için `Cmd + C` yeterlidir.
+
+Finder'ın alt kısmındaki yol çubuğunu açmak da işe yarar: **Görünüm → Yol Çubuğunu Göster**. Oradaki klasörlere çift tıklayarak hızlıca yukarı çıkabilirsiniz.

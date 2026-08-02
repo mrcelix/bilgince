@@ -1,0 +1,34 @@
+---
+baslik: "Yeni Mac'i Brewfile ile dakikalar içinde kurmak"
+ozet: "Kurulu paketleri tek dosyaya dökün, yeni makinede tek komutla geri yükleyin."
+konu: "macos"
+etiketler: ["homebrew", "kurulum", "otomasyon"]
+yayin: 2026-08-02
+sure: 2
+populerlik: 64
+---
+
+Mevcut makinede kurulu her şeyi dışa aktarın:
+
+```bash
+brew bundle dump --file=~/Brewfile --describe --force
+```
+
+`--describe` her satıra ne olduğunu yazar; altı ay sonra listeye baktığınızda işinize yarar.
+
+Yeni makinede:
+
+```bash
+brew bundle install --file=~/Brewfile
+```
+
+Brewfile yalnızca komut satırı araçlarını değil, `cask` ile masaüstü uygulamalarını ve `mas` ile App Store uygulamalarını da kapsar.
+
+Bakım için düzenli çalıştırın:
+
+```bash
+brew update && brew upgrade && brew cleanup
+brew bundle cleanup --file=~/Brewfile   # listede olmayanları gösterir
+```
+
+Son komut, zamanla biriken ve kimsenin hatırlamadığı paketleri ortaya çıkarır.

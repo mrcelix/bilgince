@@ -1,0 +1,27 @@
+---
+baslik: "Hata mesajını yapıştırırken çevresini de verin"
+ozet: "Tek satırlık hata mesajı çoğu zaman yetmez. Üç ek bilgi cevabın isabetini belirgin biçimde artırıyor."
+konu: "claude"
+etiketler: ["tanilama", "verimlilik"]
+yayin: 2026-08-02
+sure: 2
+populerlik: 76
+---
+
+Yalnızca hata metnini yapıştırmak, aynı hatanın onlarca olası sebebi olduğu için genel cevaplar üretir. Üç şeyi eklemek sonucu değiştirir:
+
+**1. Ne yapmaya çalışıyordunuz.** "Kullanıcı hesabı taşıyordum" — hata metninde bu yok.
+
+**2. Ne değişti.** "Dün çalışıyordu, bugün çalışmıyor. Aradaki tek fark yama uygulanması." Bu cümle çoğu teşhisi tek adıma indirir.
+
+**3. Ortam.** Sürüm, işletim sistemi, çalıştıran hesap.
+
+Ayrıca hatanın **tamamını** verin. PowerShell'de tek satır yerine:
+
+```powershell
+$Error[0] | Format-List * -Force
+```
+
+Bu çıktı iç istisnayı ve satır numarasını da içerir — asıl sebep genelde iç istisnadadır, üstteki mesaj yalnızca sarmalayıcıdır.
+
+Son olarak: neyi denediğinizi ve sonucunu yazın. Aynı öneriyi ikinci kez almak, iki tarafın da zamanını harcar.

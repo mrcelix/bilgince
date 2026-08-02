@@ -1,0 +1,29 @@
+---
+baslik: "macOS'ta disk nereye gitti?"
+ozet: "\"Diğer\" ve \"Sistem Verileri\" kategorileri genelde anlık görüntülerden ve önbelleklerden oluşur."
+konu: "macos"
+etiketler: ["disk", "bakim"]
+yayin: 2026-08-02
+sure: 2
+populerlik: 69
+---
+
+Gerçek kullanımı görmek:
+
+```bash
+df -h /System/Volumes/Data
+sudo du -sh /* 2>/dev/null | sort -h | tail -15
+```
+
+macOS'ta "Sistem Verileri"nin büyük kısmı genelde **Time Machine yerel anlık görüntüleridir**:
+
+```bash
+tmutil listlocalsnapshots /
+sudo tmutil deletelocalsnapshots 2026-08-01-120000
+```
+
+Bu görüntüler disk dolunca kendiliğinden temizlenir ama siz beklemek istemeyebilirsiniz.
+
+Diğer büyük tüketiciler: `~/Library/Caches`, `~/Library/Developer` (Xcode kullanıyorsanız onlarca GB olabilir) ve indirilenler klasörü.
+
+Görsel bir döküm için `Sistem Ayarları → Genel → Depolama` bölümündeki öneriler listesi işinizi görür; ama "Diğer" kategorisinin ne olduğunu yalnızca terminal söyler.

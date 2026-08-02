@@ -1,0 +1,25 @@
+---
+baslik: "macOS'ta ekran görüntüsünün üç ayrı kısayolu"
+ozet: "Tam ekran, seçili alan ve pencere için ayrı tuşlar var; Ctrl eklemek dosyaya değil panoya alır."
+konu: "macos"
+etiketler: ["kisayol", "ekran-goruntusu"]
+yayin: 2026-08-02
+sure: 2
+populerlik: 60
+---
+
+- **Cmd + Shift + 3** — tüm ekran
+- **Cmd + Shift + 4** — seçtiğiniz alan
+- **Cmd + Shift + 4, sonra Boşluk** — imleçle seçtiğiniz pencere (gölgeli, temiz kenarlı)
+- **Cmd + Shift + 5** — kayıt paneli: ekran videosu, zamanlayıcı ve kaydetme yeri seçenekleri
+
+Herhangi birine **Ctrl** eklerseniz dosya oluşmaz, doğrudan panoya kopyalanır: `Cmd + Ctrl + Shift + 4`.
+
+Varsayılan kayıt yerini değiştirmek için:
+
+```bash
+defaults write com.apple.screencapture location ~/Resimler/Ekran
+killall SystemUIServer
+```
+
+Pencere gölgesini kaldırmak isterseniz `defaults write com.apple.screencapture disable-shadow -bool true`.

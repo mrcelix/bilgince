@@ -1,0 +1,35 @@
+---
+baslik: "Mac neden uyumuyor?"
+ozet: "Kapak kapalı ama fan çalışıyorsa bir uygulama uyku engeli koymuştur; pmset onu isimle söyler."
+konu: "macos"
+etiketler: ["enerji", "tanilama"]
+yayin: 2026-08-02
+sure: 2
+populerlik: 67
+---
+
+Uykuyu engelleyen etkin talepleri görmek:
+
+```bash
+pmset -g assertions
+```
+
+Çıktının alt kısmında `PreventUserIdleSystemSleep` ya da `PreventDisplaySleep` satırlarının yanında engelleyen uygulamanın adı yazar. Genelde bir medya oynatıcı, açık bir toplantı uygulaması ya da dosya eşitleme aracıdır.
+
+Enerji ayarlarının tamamını görmek:
+
+```bash
+pmset -g
+```
+
+Son uyku/uyanma geçmişi:
+
+```bash
+pmset -g log | grep -E 'Sleep|Wake' | tail -20
+```
+
+Bir işi bilerek engellemek isterseniz (uzun bir kopyalama sırasında uyumasın diye):
+
+```bash
+caffeinate -i -w $(pgrep -n rsync)
+```

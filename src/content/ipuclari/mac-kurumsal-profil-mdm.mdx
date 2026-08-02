@@ -1,0 +1,26 @@
+---
+baslik: "Kurumsal Mac'te hangi profiller yüklü?"
+ozet: "\"Bu ayarı neden değiştiremiyorum?\" sorusunun cevabı genelde bir MDM yapılandırma profilidir."
+konu: "macos"
+etiketler: ["mdm", "kurumsal", "profil"]
+yayin: 2026-08-02
+sure: 2
+populerlik: 65
+---
+
+Yüklü yapılandırma profillerini listelemek:
+
+```bash
+profiles list -all
+sudo profiles show -type enrollment
+```
+
+İkinci komut cihazın bir MDM'e kayıtlı olup olmadığını ve hangi sunucuya bağlı olduğunu gösterir.
+
+Ayrıntılı olarak hangi ayarın hangi profilden geldiğini görmek için **Sistem Ayarları → Genel → Cihaz Yönetimi** bölümüne bakın; her profilin içindeki yükleri (payload) tek tek açabilirsiniz.
+
+Sorun giderirken faydalı bir ayrım: kullanıcı bir ayarı değiştiremiyorsa ya profil kilitlemiştir ya da yönetici hakkı yoktur. İlkini `profiles list`, ikincisini şu komut söyler:
+
+```bash
+dsmemberutil checkmembership -U "$(whoami)" -G admin
+```

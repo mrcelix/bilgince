@@ -1,0 +1,35 @@
+---
+baslik: "macOS'ta ağ sorunlarını komut satırından çözmek"
+ozet: "ipconfig ve nslookup burada farklı çalışır. DNS önbelleği, arayüz sırası ve Wi-Fi durumu için doğru komutlar."
+konu: "macos"
+etiketler: ["ag", "dns", "tanilama"]
+yayin: 2026-08-02
+sure: 2
+populerlik: 63
+---
+
+DNS önbelleğini temizlemek:
+
+```bash
+sudo dscacheutil -flushcache; sudo killall -HUP mDNSResponder
+```
+
+Sistemin gerçekten hangi DNS sunucusunu kullandığını görmek — `scutil`, ağ ayarları penceresinden daha doğru bilgi verir:
+
+```bash
+scutil --dns | grep 'nameserver\[[0-9]*\]'
+```
+
+Arayüz sırası (hangisi öncelikli) çok ekranlı/VPN'li kurulumlarda kritiktir:
+
+```bash
+networksetup -listnetworkserviceorder
+```
+
+Wi-Fi bağlantı ayrıntıları için:
+
+```bash
+system_profiler SPAirPortDataType | grep -A 8 'Current Network'
+```
+
+VPN bağlıyken iç isim çözülmüyorsa önce `scutil --dns` çıktısına bakın; VPN'in DNS'i listenin üstünde değilse sorun oradadır.

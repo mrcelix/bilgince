@@ -1,0 +1,32 @@
+---
+baslik: "FileVault gerçekten açık mı?"
+ozet: "Arayüzde \"Açık\" yazması yetmez; şifreleme tamamlanmamış olabilir ve kurtarma anahtarı kayıtlı olmayabilir."
+konu: "macos"
+etiketler: ["sifreleme", "guvenlik", "filevault"]
+yayin: 2026-08-02
+sure: 2
+populerlik: 66
+---
+
+Durumu ve şifreleme ilerlemesini görmek:
+
+```bash
+fdesetup status
+```
+
+`FileVault is On.` yeterli değil — büyük disklerde ilk şifreleme saatler sürer ve o süre boyunca disk tam korumalı değildir. İlerleme yüzdesi de bu çıktıda görünür.
+
+Kurtarma anahtarını kimin tuttuğunu kontrol edin:
+
+```bash
+sudo fdesetup list
+sudo fdesetup hasinstitutionalrecoverykey
+```
+
+Kurumsal ortamda anahtarın MDM'e yedeklenmiş olması gerekir. Yalnızca kullanıcıda duran bir kurtarma anahtarı, kullanıcı ayrıldığında diski kalıcı olarak erişilemez yapar.
+
+Yeni bir kurtarma anahtarı üretmek (eskisini geçersiz kılar):
+
+```bash
+sudo fdesetup changerecovery -personal
+```

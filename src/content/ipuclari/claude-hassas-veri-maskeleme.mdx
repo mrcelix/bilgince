@@ -1,0 +1,30 @@
+---
+baslik: "Yapıştırmadan önce maskeleyin"
+ozet: "Günlük çıktısı, yapılandırma dosyası ve hata mesajları sandığınızdan fazla bilgi taşır."
+konu: "claude"
+etiketler: ["guvenlik", "gizlilik", "veri"]
+yayin: 2026-08-02
+sure: 2
+populerlik: 73
+---
+
+Bir hata mesajını yapıştırmadan önce içinde ne olduğuna bakın. Sık sızan şeyler: iç sunucu adları, IP blokları, kullanıcı adları, bağlantı dizgeleri, API anahtarları ve dosya yollarındaki kişi isimleri.
+
+Çoğu zaman bunların hiçbiri soruyu cevaplamak için gerekmez. Maskelenmiş bir örnek aynı işi görür:
+
+```
+Sunucu: SRV-01 → SUNUCU-A
+IP: 10.42.17.8 → 10.0.0.10
+Kullanıcı: m.demir@sirket.com → kullanici@ornek.local
+Anahtar: AKIA... → <API-ANAHTARI>
+```
+
+Hızlı maskeleme için:
+
+```powershell
+(Get-Content hata.log -Raw) -replace '\b\d{1,3}(\.\d{1,3}){3}\b','10.0.0.x' `
+  -replace '(?i)[\w.+-]+@[\w.-]+','kullanici@ornek.local' |
+  Set-Content hata-maskeli.log
+```
+
+Kurumunuzun veri politikası varsa ona uyun. Politika yoksa basit bir kural işinizi görür: **müşteri verisi, kimlik bilgisi ve güvenlik yapılandırması hiçbir dış araca gitmez.**

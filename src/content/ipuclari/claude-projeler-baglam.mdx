@@ -1,0 +1,26 @@
+---
+baslik: "Tekrar eden bağlamı her seferinde yazmayın"
+ozet: "Ortamınızı, adlandırma kurallarınızı ve kısıtlarınızı bir kez tanımlayıp saklarsanız her konuşma oradan başlar."
+konu: "claude"
+etiketler: ["verimlilik", "baglam"]
+yayin: 2026-08-02
+sure: 2
+populerlik: 70
+---
+
+BT işlerinde sorular hep aynı zemine oturur: hangi sürüm, hangi etki alanı, hangi adlandırma standardı, neyi yapmak yasak.
+
+Bunları her konuşmada yeniden yazmak yerine bir kez tanımlayın. Faydalı bir bağlam notu şöyle görünür:
+
+```
+Ortam: Windows Server 2022, tek orman (sirket.local), 3 DC
+İstemciler: Windows 11 24H2, Intune yönetimli
+Bulut: Azure, tek abonelik, hibrit kimlik (AD Connect)
+Adlandırma: rol-ortam-sira (web-prd-01)
+Kısıt: Üretimde -WhatIf olmadan yıkıcı komut önerme
+Dil: Türkçe, komutlar PowerShell 7
+```
+
+Son iki satır en çok işe yarayanlar. "Kısıt" satırı, verilen önerilerin sizin kurallarınıza uymasını sağlar; dil satırı ise her seferinde "Türkçe yaz" demenizi önler.
+
+Aynı notu ekiple paylaşırsanız herkes aynı zeminden başlar.

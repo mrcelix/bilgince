@@ -380,8 +380,10 @@ code {
   gap: 0;
   padding: 0 28px;
 }
+/* Küme sayısı arttıkça sabit sütun düzeni sığmıyordu; akan düzen
+   yeni kategori eklendiğinde kendiliğinden yeni satıra geçiyor. */
 .mega-konular .kap {
-  grid-template-columns: 0.95fr 1fr 0.95fr 0.95fr 0.95fr;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
 }
 .mega-kaynaklar .kap {
   grid-template-columns: 1.1fr 1fr 0.85fr;

@@ -1,0 +1,23 @@
+---
+baslik: "Windows'ta Copilot'u yönetmek"
+ozet: "Kullanıcı istemiyorsa kapatılabilir; kurumsal ortamda politikayla yönetilir."
+konu: "copilot"
+etiketler: ["windows", "politika", "yonetim"]
+yayin: 2026-08-02
+sure: 2
+populerlik: 86
+---
+
+Klavyede Copilot tuşu varsa ya da görev çubuğunda simge duruyorsa, bunlar kullanıcı bazında kapatılabilir: **Ayarlar → Kişiselleştirme → Görev çubuğu** altındaki anahtar simgeyi kaldırır.
+
+Kurumsal ortamda tek tek kapatmak yerine grup ilkesi ya da Intune kullanın. Kayıt defteri tarafında ilgili ilke anahtarı:
+
+```powershell
+Get-ItemProperty 'HKCU:\Software\Policies\Microsoft\Windows\WindowsCopilot' -ErrorAction SilentlyContinue
+```
+
+Değerin varlığı ve içeriği Windows sürümüne göre değişebilir; dağıtımdan önce bir test makinesinde doğrulayın ve **ilkenin gerçekten uygulandığını** `gpresult /h` ile kontrol edin.
+
+Kapatma kararını bilinçli verin. Copilot'u tamamen engellemek, kullanıcıların tarayıcı üzerinden kişisel hesapla tüketici araçlara yönelmesine yol açabilir — ki bu, veri açısından daha kötü bir sonuçtur.
+
+Genelde daha iyi yaklaşım: kurumsal aracı açık tutup net bir kullanım politikası yayınlamak.

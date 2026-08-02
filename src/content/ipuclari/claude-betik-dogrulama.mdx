@@ -1,0 +1,24 @@
+---
+baslik: "Üretilen betiği çalıştırmadan önce sorulacak üç soru"
+ozet: "Dil modelinden gelen kod çalışır görünür ama sizin ortamınızı bilmez. Doğrulama sorumluluğu sizde kalır."
+konu: "claude"
+etiketler: ["betik", "guvenlik", "dogrulama"]
+yayin: 2026-08-02
+sure: 2
+populerlik: 71
+---
+
+Üretilen bir PowerShell betiğini üretimde çalıştırmadan önce şunları isteyin:
+
+**1. "Bu betik neyi geri alınamaz şekilde değiştiriyor?"**
+Cevap listesi boş değilse `-WhatIf` desteği ekletin.
+
+**2. "Hangi varsayımları yaptın?"**
+Genelde burada ortaya çıkar: modül kurulu sayılmış, yetki varsayılmış, tek etki alanı varsayılmış.
+
+**3. "Bu betik hangi durumda sessizce yanlış çalışır?"**
+En değerli soru budur. Hata vermeden yanlış iş yapan kod, hata veren koddan tehlikelidir.
+
+Ardından üç şeyi kendiniz yapın: küçük bir kümede deneyin, çıktıyı gözle doğrulayın, geri dönüş yolunu hazırlayın.
+
+Model ortamınızı görmüyor — sürüm farkları, özel yapılandırmalar ve yerel kısıtlar yalnızca sizde. Kodu okumadan çalıştırmak, tanımadığınız birinin verdiği betiği çalıştırmakla aynı şeydir.

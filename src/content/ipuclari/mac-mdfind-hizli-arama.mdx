@@ -1,0 +1,32 @@
+---
+baslik: "Spotlight'ı terminalden kullanmak: mdfind"
+ozet: "find yavaş kalır; mdfind aynı dizini kullandığı için sonuç anında gelir."
+konu: "macos"
+etiketler: ["terminal", "arama", "verimlilik"]
+yayin: 2026-08-02
+sure: 2
+populerlik: 68
+---
+
+`find` diski tarar, `mdfind` Spotlight dizinini sorgular — büyük disklerde fark saniyelerle dakikalar arasındadır.
+
+```bash
+mdfind "fatura"                       # her yerde ara
+mdfind -onlyin ~/Belgeler "sözleşme"  # tek klasörde
+mdfind -name "rapor.xlsx"             # dosya adına göre
+```
+
+Meta veriyle arama, asıl gücüdür:
+
+```bash
+# son 3 günde değişmiş PDF'ler
+mdfind 'kMDItemContentModificationDate >= $time.today(-3) && kMDItemKind == "PDF belgesi"'
+```
+
+Bir dosyanın hangi meta verilere sahip olduğunu görmek için:
+
+```bash
+mdls dosya.pdf
+```
+
+Sonuç gelmiyorsa o konum Spotlight gizlilik listesinde olabilir: **Sistem Ayarları → Spotlight → Arama Gizliliği**.

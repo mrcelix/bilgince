@@ -1,0 +1,27 @@
+---
+baslik: "macOS'ta donan uygulamayı kapatmak"
+ozet: "Cmd + Option + Esc çoğu durumda yeter; direnen uygulamalar için terminalden tek satır."
+konu: "macos"
+etiketler: ["onarim", "islem"]
+yayin: 2026-08-02
+sure: 2
+populerlik: 62
+---
+
+**Cmd + Option + Esc** Zorla Çık penceresini açar. Dock'taki simgeye **Option** basılı tutarak sağ tıklamak da aynı seçeneği verir.
+
+Pencere hiç yanıt vermiyorsa terminalden:
+
+```bash
+killall "Uygulama Adı"
+# inatçıysa:
+pkill -9 -f "Uygulama Adı"
+```
+
+Hangi işlemin sistemi zorladığını görmek için:
+
+```bash
+top -o cpu -n 10
+```
+
+`Activity Monitor` aynı bilgiyi arayüzle verir; **Görünüm → Tüm İşlemler** seçmeyi unutmayın, varsayılan görünüm yalnızca kendi kullanıcınızın işlemlerini gösterir.
