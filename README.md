@@ -39,19 +39,60 @@ sayfası bunu belirten bir not gösterir.
 | `/rss.xml` | `src/pages/rss.xml.ts` | RSS akışı |
 | `/og/<slug>.png` | `src/pages/og/[...slug].png.ts` | 1200×630 paylaşım kartı (derleme sırasında üretilir) |
 
+## Admin paneli
+
+Keystatic ile `/keystatic` adresinde. Yazıları, kategorileri, menüyü ve site
+ayarlarını buradan yönetirsiniz; her kayıt depodaki bir dosyaya yazılır.
+
+**Yerelde** (kimlik doğrulama yok, doğrudan diske yazar):
+
+```bash
+npm run dev
+```
+
+Sonra `http://localhost:4321/keystatic`. Değişiklikler çalışma kopyanızda
+oluşur; commit ve push'u siz yaparsınız.
+
+**Canlıda** GitHub moduna geçer ve değişiklikleri doğrudan depoya commit'ler.
+Çalışması için bir kerelik GitHub App kurulumu gerekir:
+
+1. `https://bilgince.com/keystatic` adresine gidin, "Set up Keystatic" akışını izleyin.
+   Keystatic sizin adınıza bir GitHub App oluşturur.
+2. Akışın sonunda verilen dört değeri Vercel'de **Settings → Environment
+   Variables** altına ekleyin:
+   `KEYSTATIC_GITHUB_CLIENT_ID`, `KEYSTATIC_GITHUB_CLIENT_SECRET`,
+   `KEYSTATIC_SECRET`, `PUBLIC_KEYSTATIC_GITHUB_APP_SLUG`.
+3. Yeniden dağıtın.
+
+Depo adı `keystatic.config.ts` içinde sabit (`mrcelix/bilgince`); depoyu
+taşırsanız orayı güncelleyin.
+
+Panel yüzünden site tamamen statik olmaktan çıktı: içerik sayfaları hâlâ
+derleme sırasında üretiliyor, yalnızca `/keystatic` ve `/api/keystatic`
+sunucu tarafında çalışıyor. Vercel adaptörü bunun için eklendi.
+
 ## İçerik ekleme
 
 Markdown dosyaları `src/content/` altında. Şema `src/content.config.ts` içinde tanımlı;
 zorunlu bir alanı unutursanız derleme hata verir — bu kasıtlı.
 
 Koleksiyonlar: `rehberler` (uzun rehberler), `ipuclari` (tek ekranlık notlar),
-`komutlar` (komut kütüphanesi), `projeler` (portfolyo).
+`komutlar` (komut kütüphanesi), `projeler` (portfolyo). İçerik dosyaları `.mdx`
+biçiminde (Keystatic zengin metin alanı bunu gerektiriyor; render açısından
+markdown ile aynı davranır).
 
-Konu taksonomisi `src/site.js` içindeki `KONULAR` dizisinde; dört küme (`GRUPLAR`)
-altında 12 konu var ve mega menü bu diziden üretilir. Yeni konu eklemek için diziye
-bir satır eklemek yeterlidir — menü, konu sayfası ve OG kartı kendiliğinden oluşur.
+Yapılandırma verisi `src/data/` altında ve panelden yönetilir:
 
-Yeni rehber: `src/content/rehberler/<slug>.md`
+| Dosya | Ne tutar |
+| --- | --- |
+| `src/data/ayarlar.json` | Site adı, alan adı, yazar, bülten, popüler aramalar |
+| `src/data/konu/<slug>.json` | Her kategori ayrı dosya; slug = dosya adı |
+| `src/data/menu.json` | Ana menü, kaynaklar menüsü, altlık sütunları, kümeler |
+
+Yeni kategori eklemek `src/data/konu/` altına bir dosya eklemektir (ya da panelden
+"Konular → +"). Menü, konu sayfası, OG kartı ve arşiv sayaçları kendiliğinden oluşur.
+
+Yeni rehber: `src/content/rehberler/<slug>.mdx`
 
 ```yaml
 ---

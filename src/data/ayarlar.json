@@ -1,0 +1,39 @@
+{
+  "ad": "bilgince",
+  "adres": "https://bilgince.com",
+  "baslik": "bilgince — BT rehberleri ve saha ipuçları",
+  "aciklama": "Windows Server, Active Directory, PowerShell, bulut ve ağ üzerine üretim ortamında denenmiş rehberler. Her yazının sonunda doğrulama adımı var.",
+  "yazar": {
+    "ad": "Mustafa Çelik",
+    "basHarfler": "MÇ",
+    "unvan": "Kıdemli Sistem Yöneticisi",
+    "kurum": "Anadolu Lojistik A.Ş.",
+    "sehir": "Ankara",
+    "eposta": "merhaba@bilgince.com",
+    "linkedin": "https://www.linkedin.com/in/mustafacelik",
+    "github": "https://github.com/mrcelix",
+    "uzmanlik": [
+      "Windows Server",
+      "Active Directory",
+      "PowerShell",
+      "Hyper-V",
+      "Microsoft Entra ID",
+      "Ağ güvenliği"
+    ]
+  },
+  "bulten": {
+    "aboneSayisi": 4812,
+    "sikligi": "Yeni yazı çıkınca e-posta",
+    "vaat": "Yeni yazı yayınlandığında tek e-posta. Takvim yok, doldurma içerik yok.",
+    "endpoint": "",
+    "alanAdi": "email"
+  },
+  "populerAramalar": [
+    "hesap kilitleniyor",
+    "robocopy /MIR",
+    "4740 olayı",
+    "SMB over QUIC",
+    "GPO yedekleme"
+  ],
+  "sayfaBasi": 12
+}

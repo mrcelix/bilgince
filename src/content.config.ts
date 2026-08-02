@@ -2,7 +2,7 @@ import { defineCollection, z } from 'astro:content';
 import { glob } from 'astro/loaders';
 
 const rehberler = defineCollection({
-  loader: glob({ pattern: '**/*.md', base: './src/content/rehberler' }),
+  loader: glob({ pattern: '**/*.{md,mdx}', base: './src/content/rehberler' }),
   schema: z.object({
     baslik: z.string(),
     ozet: z.string(),
@@ -21,7 +21,7 @@ const rehberler = defineCollection({
 });
 
 const ipuclari = defineCollection({
-  loader: glob({ pattern: '**/*.md', base: './src/content/ipuclari' }),
+  loader: glob({ pattern: '**/*.{md,mdx}', base: './src/content/ipuclari' }),
   schema: z.object({
     baslik: z.string(),
     ozet: z.string(),
@@ -40,7 +40,7 @@ const ipuclari = defineCollection({
 });
 
 const projeler = defineCollection({
-  loader: glob({ pattern: '**/*.md', base: './src/content/projeler' }),
+  loader: glob({ pattern: '**/*.{md,mdx}', base: './src/content/projeler' }),
   schema: z.object({
     baslik: z.string(),
     ozet: z.string(),
@@ -62,7 +62,7 @@ const projeler = defineCollection({
 });
 
 const komutlar = defineCollection({
-  loader: glob({ pattern: '**/*.md', base: './src/content/komutlar' }),
+  loader: glob({ pattern: '**/*.{md,mdx}', base: './src/content/komutlar' }),
   schema: z.object({
     baslik: z.string(),
     ozet: z.string(),

@@ -1,20 +1,37 @@
 import { defineConfig } from 'astro/config';
 import sitemap from '@astrojs/sitemap';
-import { SITE } from './src/site.js';
+import mdx from '@astrojs/mdx';
+import react from '@astrojs/react';
+import keystatic from '@keystatic/astro';
+import vercel from '@astrojs/vercel';
+import { readFileSync } from 'node:fs';
+
+// site.js JSON içe aktarımı kullanıyor; yapılandırma dosyası Node tarafında
+// çalıştığı için veriyi doğrudan okuyoruz.
+const ayarlar = JSON.parse(readFileSync(new URL('./src/data/ayarlar.json', import.meta.url), 'utf8'));
 
 export default defineConfig({
-  site: SITE.url,
+  site: ayarlar.adres,
   // canonical adresler eğik çizgisiz; site haritası da öyle olsun ki
   // tarayıcı botu her adreste 308 yönlendirmesine takılmasın
   trailingSlash: 'never',
+
+  // İçerik sayfaları statik üretilir; yalnızca /keystatic ve /api/keystatic
+  // sunucu tarafında çalışır. Adaptör bunun için gerekli.
+  output: 'static',
+  adapter: vercel(),
+
   integrations: [
+    mdx(),
+    react(),
+    keystatic(),
     sitemap({
-      // noindex sayfaları site haritasına girmemeli
-      filter: (sayfa) => !/\/(ara|404|ozgecmis\/yazdir)\/?$/.test(sayfa),
+      // noindex ve yönetim sayfaları site haritasına girmemeli
+      filter: (sayfa) => !/\/(ara|404|ozgecmis\/yazdir|keystatic|api)(\/|$)/.test(sayfa),
     }),
   ],
+
   build: {
-    // /rehberler/slug/index.html — sondaki eğik çizgi olmadan da çalışır
     format: 'directory',
   },
 });

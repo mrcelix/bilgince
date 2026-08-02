@@ -1,0 +1,118 @@
+{
+  "anaMenu": [
+    {
+      "etiket": "Konular",
+      "tur": "mega-konular",
+      "adres": "/rehberler"
+    },
+    {
+      "etiket": "Kaynaklar",
+      "tur": "mega-kaynaklar",
+      "adres": "/komutlar"
+    },
+    {
+      "etiket": "Portfolyo",
+      "tur": "bag",
+      "adres": "/portfolyo"
+    },
+    {
+      "etiket": "Özgeçmiş",
+      "tur": "bag",
+      "adres": "/ozgecmis"
+    },
+    {
+      "etiket": "Hakkımda",
+      "tur": "bag",
+      "adres": "/hakkimda"
+    }
+  ],
+  "araclar": [
+    {
+      "etiket": "Komut kütüphanesi",
+      "adres": "/komutlar",
+      "aciklama": "Denenmiş tek satırlar, uyarısıyla birlikte",
+      "ikon": "terminal",
+      "sayac": "komutlar"
+    },
+    {
+      "etiket": "Hızlı ipuçları",
+      "adres": "/ipuclari",
+      "aciklama": "Tek ekranda biten notlar",
+      "ikon": "pencere",
+      "sayac": "ipuclari"
+    },
+    {
+      "etiket": "RSS akışı",
+      "adres": "/rss.xml",
+      "aciklama": "Bültene alternatif",
+      "ikon": "geri",
+      "sayac": "yok"
+    }
+  ],
+  "altlik": [
+    {
+      "baslik": "İçerik",
+      "baglantilar": [
+        {
+          "etiket": "Tüm rehberler",
+          "adres": "/rehberler"
+        },
+        {
+          "etiket": "Komut kütüphanesi",
+          "adres": "/komutlar"
+        },
+        {
+          "etiket": "Hızlı ipuçları",
+          "adres": "/ipuclari"
+        },
+        {
+          "etiket": "Portfolyo",
+          "adres": "/portfolyo"
+        },
+        {
+          "etiket": "RSS",
+          "adres": "/rss.xml"
+        }
+      ]
+    },
+    {
+      "baslik": "Site",
+      "baglantilar": [
+        {
+          "etiket": "Hakkımda",
+          "adres": "/hakkimda"
+        },
+        {
+          "etiket": "Özgeçmiş",
+          "adres": "/ozgecmis"
+        },
+        {
+          "etiket": "İletişim",
+          "adres": "/hakkimda#iletisim"
+        },
+        {
+          "etiket": "Site haritası",
+          "adres": "/sitemap-index.xml"
+        }
+      ]
+    }
+  ],
+  "kumeler": [
+    {
+      "ad": "Bulut",
+      "ozet": "Üç sağlayıcı, operasyon gözüyle"
+    },
+    {
+      "ad": "Altyapı",
+      "ozet": "Sunucu, istemci, otomasyon"
+    },
+    {
+      "ad": "Ağ & Güvenlik",
+      "ozet": "Bağlantı ve kimlik"
+    },
+    {
+      "ad": "Süreç & Süreklilik",
+      "ozet": "İşin devam etmesini sağlayan taraf"
+    }
+  ]
+}
