@@ -1,0 +1,119 @@
+---
+baslik: "Mimari karar kayıtları: iki yıl sonra 'bunu neden böyle yaptık?'"
+ozet: "Kararın kendisi kadar değerli olan şey gerekçesidir. Bir sayfalık ADR alışkanlığı kurumsal hafızayı nasıl kurtarır."
+konu: "kurumsal-mimari"
+etiketler: ["adr", "dokumantasyon", "karar"]
+yayin: 2026-04-03
+sure: 12
+---
+
+Bir sistemin neden o şekilde kurulduğunu soran her mühendis, aynı cevapla karşılaşır: "Bilmiyorum, ben geldiğimde böyleydi."
+
+Bu cümle, kurumsal hafızanın kaybolduğu andır. Ve sonrasında iki şeyden biri olur: ya kimse dokunmaya cesaret edemez, ya da biri gerekçeyi bilmeden değiştirir ve altı ay önce çözülmüş bir sorun geri döner.
+
+## Belge değil, karar kaydı
+
+Mimari dokümantasyon denince akla 80 sayfalık bir Word dosyası gelir. O dosya yazıldığı gün eskimeye başlar ve altıncı ayda kimse açmaz.
+
+Mimari karar kaydı (ADR) farklı bir şeydir: **tek bir karar**, tek sayfa, değişmez. Karar değişirse eski kayıt silinmez; yeni bir kayıt yazılır ve eskisini "yerini aldı" diye işaretler. Böylece elinizde bir belge değil, bir **karar geçmişi** olur.
+
+Fark önemli. Belge "sistem şu an nasıl" sorusuna cevap verir ve sürekli güncellenmesi gerekir. Karar kaydı "neden böyle" sorusuna cevap verir ve hiç güncellenmez.
+
+## Bir sayfa, beş başlık
+
+Şablonu karmaşıklaştırmak, kimsenin yazmamasının en hızlı yoludur. Beş başlık yeterlidir:
+
+**Başlık ve tarih.** "PostgreSQL yerine SQL Server kullanılması — 12 Mart 2026".
+
+**Bağlam.** Karar hangi koşullarda alındı? Bütçe, ekip yetkinliği, mevcut lisanslar, süre baskısı. Bu bölüm en değerli olanıdır çünkü iki yıl sonra koşullar değişmiş olur ve kararın hâlâ geçerli olup olmadığını ancak buradan anlarsınız.
+
+**Karar.** Ne yapmaya karar verildi? Tek cümle.
+
+**Değerlendirilen alternatifler.** Hangi seçenekler vardı ve neden elenmediler değil, **neden elendiler**. Bu bölüm olmadan gelecekteki ekip aynı alternatifleri baştan değerlendirir.
+
+**Sonuçlar.** Bu kararın kabul ettiğimiz bedelleri neler? Neyi zorlaştırıyor?
+
+Son başlık en çok atlanandır ve dürüstlük testi burasıdır. Hiçbir bedeli olmayan karar, yeterince düşünülmemiş karardır.
+
+## Hangi kararlar kaydedilir
+
+Hepsi değil. Ölçüt şudur: **geri alması pahalı olan kararlar.**
+
+Kaydedilir: veri tabanı seçimi, kimlik mimarisi, entegrasyon deseni, bulut sağlayıcı, ana çatı (framework) tercihi, servis sınırları, çok kiracılı mı tek kiracılı mı.
+
+Kaydedilmez: kütüphane sürümü, kod biçimlendirme kuralı, klasör yapısı. Bunlar geri alınabilir ve kaydetmek yalnızca gürültü üretir.
+
+Pratik bir test: karardan dönmek bir haftadan uzun sürecekse yazın.
+
+## Kod deposunda tutun
+
+ADR'leri wiki'de değil, kod deposunda tutun — `docs/karar/0007-sql-server-secimi.md` gibi. Üç sebeple:
+
+Değişiklikler kod incelemesinden geçer; yani karar tartışılabilir ve tartışma kaydı da kalır. Kararın tarihi commit geçmişinde durur. Ve en önemlisi: kodla aynı yerde olduğu için okunma ihtimali vardır.
+
+Wiki'ye konan mimari belgeleri kimse okumaz. Bu bir disiplin sorunu değil, mesafe sorunudur.
+
+## Reddedilen kararları da yazın
+
+En çok değeri olan kayıtlardan biri "yapmamaya karar verdiklerimizdir". Kubernetes'e geçmemeyi, mikroservise bölmemeyi, o ürünü almamayı neden seçtiniz?
+
+Bu kayıtlar olmadan aynı öneri her yıl yeniden gündeme gelir ve her seferinde baştan tartışılır. Kayıt varsa tartışma çok daha hızlı ilerler: "Bunu 2025'te değerlendirmiştik, gerekçemiz şuydu; o gerekçe hâlâ geçerli mi?"
+
+Bu soru, sıfırdan tartışmaktan kıyaslanamayacak kadar verimlidir.
+
+## Kararın sahibi ve süresi
+
+İki alan daha eklemenizi öneririm, çünkü zamanla en çok işe yarayanlar bunlar oldu.
+
+**Sahip:** Kararı kim verdi. Suçlamak için değil; iki yıl sonra soru sorulacak kişiyi bilmek için.
+
+**Gözden geçirme tarihi:** Bazı kararlar koşula bağlıdır. "Şimdilik tek sunucu, kullanıcı sayısı 500'ü geçerse yeniden değerlendirilecek" gibi. Bu tetikleyiciyi yazmazsanız hatırlanmaz ve karar, koşulları değiştiği hâlde yürürlükte kalır.
+
+Gördüğüm en pahalı mimari sorunlar yanlış kararlardan değil, **koşulları değiştiği hâlde gözden geçirilmemiş doğru kararlardan** doğdu.
+
+## Örnek: bir sayfanın nasıl göründüğü
+
+Soyut kalmasın diye gerçek bir kaydın iskeletini vereyim.
+
+> **0012 — Raporlama için ayrı okuma veritabanı** · 4 Şubat 2026 · Sahip: M. Çelik
+>
+> **Bağlam.** Aylık kapanış döneminde raporlama sorguları üretim veritabanını
+> kilitliyor ve sipariş girişi yavaşlıyor. Ay sonunda üç kez kesinti kaydı açıldı.
+> Veritabanı lisansımız okuma kopyasını kapsıyor, ek maliyet yok.
+>
+> **Karar.** Raporlama sorguları asenkron çoğaltılan bir okuma kopyasına yönlendirilecek.
+>
+> **Alternatifler.** (1) Sorguları optimize etmek — denendi, kazanç yetersiz, temel
+> sorun eşzamanlılık. (2) Veri ambarı kurmak — doğru uzun vadeli çözüm ama üç aylık
+> iş, kapanış sorunu bu ay çözülmeli. (3) Raporlamayı gece penceresine almak —
+> iş birimi gün içi rapor istiyor, reddedildi.
+>
+> **Sonuçlar.** Raporlar birkaç saniye gecikmeli veri gösterecek; iş birimi kabul etti.
+> Okuma kopyasının izlenmesi ve gecikme uyarısı kurulması gerekiyor. Veri ambarı
+> kararı ertelendi, iptal edilmedi.
+>
+> **Gözden geçirme.** Veri hacmi iki katına çıkarsa veya ambar projesi başlarsa.
+
+Dikkat edilecek nokta: kayıt teknolojiyi değil, **koşulları** anlatıyor. İki yıl sonra
+biri "neden veri ambarı kurmadık" diye sorduğunda cevap burada duruyor — ve o cevap
+"kurmayı düşünmedik" değil, "o ay için fazla uzundu" oluyor. Bu ikisi çok farklı şeyler.
+
+## Toplantıyı kayıt yürütür
+
+Beklenmedik bir yan fayda: şablonu toplantıya sokmak tartışmayı düzenler.
+
+Ekip bir karar tartışırken doğrudan çözüm önerilerine atlar. Şablonu ekrana açıp
+"önce bağlamı yazalım" dediğinizde, tartışma bir adım geri gider ve çoğu zaman
+sorunun herkeste farklı tanımlandığı ortaya çıkar. Alternatifler bölümüne
+geldiğinizde ise "bunu neden elemiştik" sorusu doğal olarak sorulur.
+
+Kaydı toplantıdan sonra yazmayı planlarsanız genelde hiç yazılmaz. Toplantı sırasında
+doldurun; eksik kalan yerleri sonra tamamlarsınız.
+
+## Nasıl anlarsınız
+
+Alışkanlığın tuttuğunu iki şeyle anlarsınız.
+
+**Yeni gelen birinin soru sayısı.** Ekibe katılan bir mühendis, ilk ayında "bu neden böyle" sorusunu kaç kez sordu ve kaçında cevabı kendisi buldu? İkinci sayı artıyorsa kayıtlar işini yapıyordur.
+
+**Tartışmaların uzunluğu.** Daha önce kapatılmış bir konu yeniden açıldığında tartışma dakikalar mı sürüyor, saatler mi? Kayıt varsa dakikalar sürer — çünkü tartışma "ne düşünüyoruz" değil, "gerekçe hâlâ geçerli mi" sorusundan başlar.

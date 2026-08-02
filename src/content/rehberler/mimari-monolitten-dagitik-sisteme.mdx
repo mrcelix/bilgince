@@ -1,0 +1,69 @@
+---
+baslik: "Monolitten dağıtık mimariye geçmek: kararı ne zaman vermelisiniz"
+ozet: "Mikroservis, ölçek sorununun değil organizasyon sorununun cevabıdır. Geçiş kararını teknolojiyle değil ekip yapısıyla vermenin gerekçesi."
+konu: "kurumsal-mimari"
+etiketler: ["mikroservis", "monolit", "karar"]
+yayin: 2026-01-09
+sure: 14
+oneCikan: false
+---
+
+Bir toplantıda "artık mikroservise geçmeliyiz" cümlesini duyduğunuzda sorulacak tek bir soru vardır: **neyi çözmeye çalışıyoruz?** Bu soruya "daha modern olmak" dışında bir cevap gelmiyorsa, toplantı orada bitmeli.
+
+Ben bu cümleyi üç ayrı kurumda duydum. Üçünde de gerekçe "performans" olarak sunuldu. Üçünde de gerçek sebep başkaydı.
+
+## Monolit neden yavaşladı sanılıyor
+
+Bir uygulamanın yavaşlaması neredeyse hiçbir zaman "tek parça olmasından" kaynaklanmaz. Yavaşlığın kaynağı üç yerden birindedir: indekssiz bir veritabanı sorgusu, N+1 problemi ya da senkron çağrılan bir dış servis. Üçü de monolit içinde çözülür ve çözülmesi haftalar değil günler sürer.
+
+Uygulamayı otuz parçaya bölerseniz bu üç sorun kaybolmaz. Sadece artık ağ üzerinden gerçekleşirler ve teşhis etmesi çok daha zor olur. Daha önce tek bir yığın izinde (stack trace) gördüğünüz akış, artık altı servisin günlüğüne dağılmıştır ve o günlükleri birleştirmek için dağıtık izleme kurmanız gerekir. Yani ilk yaptığınız şey, elinizdeki teşhis kabiliyetini kaybetmek olur.
+
+Bu yüzden performans, geçiş için tek başına bir gerekçe değildir. Ölçün, düzeltin, sonra konuşun.
+
+## Gerçek gerekçe: dağıtım sıklığı ve ekip sayısı
+
+Dağıtık mimariye geçmenin gerçek gerekçesi teknik değil, **organizasyoneldir**. Şu belirtileri arayın:
+
+Bir özelliği yayına almak için beş ekibin aynı anda hazır olmasını bekliyorsanız, sorun mimaridedir. Bir ekibin yaptığı değişiklik yüzünden diğer dört ekibin yayını erteleniyorsa, sorun mimaridedir. Sürüm notları iki sayfaysa ve kimse hepsini test edemiyorsa, sorun mimaridedir.
+
+Buradaki ortak nokta şudur: **bağımsız yayınlayamama.** Mikroservisin verdiği asıl şey ölçek değil, bağımsız yayın kabiliyetidir. Ölçek yan üründür.
+
+Tersi de doğrudur: tek bir ekip varsa ve haftada bir yayın yapıyorsanız, dağıtık mimari size hiçbir şey kazandırmaz. Sadece dağıtım hattı, gözlemlenebilirlik, servis keşfi ve sürüm uyumluluğu adında dört yeni tam zamanlı sorun kazandırır.
+
+## Conway yasası bir uyarıdır, temenni değil
+
+Sistemin mimarisi, onu üreten organizasyonun iletişim yapısını yansıtır. Bu bir gözlem olarak biliniyor ama pratikte tersten okunması gerekir: **mimariyi organizasyondan bağımsız seçemezsiniz.**
+
+Üç ekibiniz varsa üç servisiniz olur. Yirmi servis tanımlarsanız, üç ekip yirmi servisin sahibi olmaya çalışır ve hiçbiri gerçekten sahiplenilmez. Sahipsiz servis, altı ay sonra kimsenin dokunmaya cesaret edemediği servistir.
+
+Bu yüzden servis sınırlarını çizerken ilk sorulacak soru "bu iş mantığı ayrı mı" değil, **"bunun sahibi hangi ekip"** olmalıdır. Sahibi olmayan servis açmayın.
+
+## Aradaki yol: modüler monolit
+
+İki uç arasında çok işlevsel bir orta nokta var ve genelde atlanıyor: modüler monolit. Tek uygulama, tek dağıtım, ama içeride net modül sınırları ve modüller arası çağrıların yalnızca tanımlı arayüzlerden geçmesi.
+
+Bu yaklaşımın değeri şudur: servis sınırlarını **ayırmadan önce** keşfedersiniz. Sınırları yanlış çizdiyseniz, modüler monolitte düzeltmek bir yeniden adlandırma işlemidir. Dağıtık sistemde ise iki servisi birleştirmek, iki takımın altı aylık işidir.
+
+Gördüğüm en pahalı mimari hatalar, sınırların erken ve yanlış çizilmesinden doğdu. Bir kurumda "Müşteri" ve "Sipariş" servisleri ayrılmıştı ama her sipariş işlemi müşteri servisine üç senkron çağrı yapıyordu. Ortada iki servis vardı, pratikte tek bir sistem — ama artık ağ gecikmesi, kısmi arıza ve dağıtım koordinasyonu da vardı.
+
+## Veri en zor kısımdır
+
+Kodu bölmek kolaydır. Veritabanını bölmek zordur ve asıl proje odur.
+
+Servisler aynı veritabanını paylaşıyorsa dağıtık mimariniz yoktur; ortak bir veritabanına bağlı birden çok uygulamanız vardır ve bu, monolitten daha kötüdür. Şema değişikliği artık tüm servisleri aynı anda kırar ama bunu derleme zamanında değil, üretimde öğrenirsiniz.
+
+Veriyi bölmeye başladığınızda karşınıza çıkacak soru şudur: iki servis arasındaki tutarlılığı nasıl sağlayacaksınız? Cevap "dağıtık işlem" değildir — pratikte işlemez. Cevap, **nihai tutarlılığı kabul etmek** ve iş biriminin bunu kabul edip etmediğini açıkça sormaktır. "Sipariş verildikten 2 saniye sonra stokta görünmesi kabul edilebilir mi?" sorusuna cevap alınmadan başlanan hiçbir bölme işlemi iyi bitmez.
+
+## Karar için üç soru
+
+Toplantıya bu üç soruyla girin:
+
+1. **Kaç ekip aynı kod tabanında bağımsız yayın yapmak istiyor?** İki veya daha azsa, geçiş için erken.
+2. **Hangi modülün ayrı ölçeklenmesi gerekiyor ve bunu ölçtünüz mü?** Ölçüm yoksa gerekçe yok.
+3. **Veri sınırını çizebiliyor musunuz?** Çizemiyorsanız servis sınırını da çizemezsiniz.
+
+## Nasıl anlarsınız
+
+Geçişten altı ay sonra tek bir sayıya bakın: **bir özelliğin fikirden üretime geçme süresi.** Bu süre kısalmadıysa mimari değişimi işe yaramamıştır — ne kadar modern göründüğünün önemi yok.
+
+İkinci sayı: **bir yayının kaç ekibin onayını gerektirdiği.** Hâlâ üç ekip onaylıyorsa, servisleri ayırmışsınız ama bağımlılıkları ayıramamışsınız demektir. O durumda elinizde dağıtık bir monolit vardır ve bu, başlangıç noktasından her bakımdan daha pahalıdır.

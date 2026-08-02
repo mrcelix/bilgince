@@ -21,6 +21,13 @@ const seriler = [...new Set(rehberler.map((r) => r.data.seri).filter(Boolean))].
   return { ad: ad as string, yayinda: bolumler.length, planlanan };
 });
 
+// Öne çıkan konular küme sütunlarından çıkarılıp menünün üstünde tam genişlik
+// bir şeride alınıyor; böylece sütun sayısı da kontrolde kalıyor.
+const oneCikanKonular = KONULAR.filter((k) => k.oneCikan);
+const gorunenGruplar = GRUPLAR.filter((g) =>
+  KONULAR.some((k) => k.grup === g.ad && !k.oneCikan)
+);
+
 const yol = Astro.url.pathname.replace(/\/$/, '') || '/';
 const etkin = (p: string) => (yol === p || yol.startsWith(p + '/') ? 'page' : undefined);
 ---
@@ -91,13 +98,36 @@ const etkin = (p: string) => (yol === p || yol.startsWith(p + '/') ? 'page' : un
 
   <!-- ------------------------------------------------ Konular mega menüsü -->
   <div class="mega mega-konular" id="mega-konular" data-acik="hayir">
+    {
+      oneCikanKonular.length > 0 && (
+        <div class="mega-one-cikan">
+          <div class="kap">
+            {oneCikanKonular.map((k) => (
+              <a class="one-cikan-konu" href={`/konu/${k.slug}`}>
+                <span class="ikon" aria-hidden="true">
+                  <KonuIkon ad={k.ikon} boyut={20} />
+                </span>
+                <span class="govde">
+                  <span class="ad">
+                    {k.ad}
+                    <span class="rozet">Öne çıkan</span>
+                  </span>
+                  <span class="ac">{k.ozet}</span>
+                </span>
+                <span class="sayi">{say(k.slug)} yazı →</span>
+              </a>
+            ))}
+          </div>
+        </div>
+      )
+    }
     <div class="kap">
       {
-        GRUPLAR.map((grup) => (
+        gorunenGruplar.map((grup) => (
           <div class="mega-sutun">
             <span class="mega-etiket">{grup.ad}</span>
             <span class="mega-grup-ozet">{grup.ozet}</span>
-            {KONULAR.filter((k) => k.grup === grup.ad).map((k) => (
+            {KONULAR.filter((k) => k.grup === grup.ad && !k.oneCikan).map((k) => (
               <a class="mega-bag" href={`/konu/${k.slug}`}>
                 <span class="ikon" aria-hidden="true">
                   <KonuIkon ad={k.ikon} />

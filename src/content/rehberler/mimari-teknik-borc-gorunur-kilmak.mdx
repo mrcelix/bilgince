@@ -1,0 +1,107 @@
+---
+baslik: "Teknik borcu görünür kılmak: yönetimin anlayacağı dile çevirmek"
+ozet: "\"Refactor bütçesi\" isteyen hiçbir talep onaylanmaz. Teknik borcu risk ve maliyet olarak ifade etmenin yolu."
+konu: "kurumsal-mimari"
+etiketler: ["teknik-borc", "yonetisim", "risk"]
+yayin: 2026-07-17
+sure: 12
+---
+
+"Bu yıl teknik borç için bütçe ayırmamız lazım" cümlesi hiçbir yönetim kurulunda kabul görmez. Çünkü bu cümle, karşı tarafa hiçbir bilgi taşımaz: ne kadar borç, hangi riski üretiyor, ödenmezse ne olur?
+
+Sorun teknik borcun var olması değil, **ölçülemiyor olmasıdır**.
+
+## Borç metaforu neden işe yarar
+
+Metafor doğrudur ve sonuna kadar kullanılmalıdır. Borç almak kötü değildir; hızlı ilerlemek için bilinçli alınır. Kötü olan, faizini ödemeden borcu unutmaktır.
+
+Bu ayrım pratikte önemlidir çünkü iki tür teknik borç vardır:
+
+**Bilinçli borç:** "Süre yetişsin diye şimdilik böyle yapıyoruz, sonra düzelteceğiz." Kaydedilebilir, planlanabilir, yönetilebilir.
+
+**Farkında olunmayan borç:** Kimsenin karar vermediği, zamanla biriken çürüme. Desteklenmeyen sürümler, kimsenin bilmediği entegrasyonlar, belgesiz özel kodlar.
+
+İkincisi daha tehlikelidir çünkü bir karar anı yoktur; fark edildiğinde faizi çoktan birikmiştir.
+
+## Üç kategoriye ayırın
+
+Teknik borcu tek bir yığın olarak sunmak, yönetimin gözünde onu "BT'nin iç işi" yapar. Ayırın ve her birini farklı dille anlatın:
+
+**Güvenlik borcu.** Desteklenmeyen işletim sistemi, yamalanmayan bileşen, kapatılamayan eski protokol. Dili: **risk ve uyumluluk**. Denetim bulgusu varsa kullanın.
+
+**Süreklilik borcu.** Tek noktada çalışan, yedeği test edilmemiş, sahibi tek kişi olan sistemler. Dili: **kesinti süresi ve iş etkisi**.
+
+**Hız borcu.** Değişiklik yapmayı yavaşlatan her şey: test edilemeyen kod, elle yapılan dağıtım, belgesiz süreç. Dili: **teslim süresi ve maliyet**.
+
+Üçünü ayırdığınızda konuşma değişir. "Refactor lazım" yerine "bu sistemin desteği bitti, bir açık çıkarsa yamalayamayız" dersiniz — ve bu cümle bütçe üretir.
+
+## Faizi hesaplayın
+
+Her borç kaleminin bir faizi vardır: onu ödemediğiniz için her ay kaybettiğiniz zaman veya para. Kabaca da olsa hesaplayın.
+
+Elle yapılan bir dağıtım her seferinde 3 saat alıyor ve ayda 4 kez yapılıyorsa, yıllık faiz 144 saattir. Otomatikleştirmek 80 saat sürüyorsa, yatırım altı ayda geri döner. Bu cümle, "dağıtımı otomatikleştirmeliyiz" cümlesinden kıyaslanamayacak kadar ikna edicidir.
+
+Eski bir sistemi bilen tek kişi varsa, faizi o kişinin izin planıdır. Bunu da yazın: "X sistemi yalnızca bir kişi tarafından biliniyor; o kişi izindeyken ilgili bir arıza çıkarsa çözüm süresi belirsiz."
+
+Belirsizlik, yöneticiler için somut bir risktir. "Kod kalitesi düşük" değildir.
+
+## Kayıt tutun, liste değil
+
+Teknik borcu bir Excel listesinde tutmak işe yaramaz çünkü liste kimsenin gündeminde değildir. Bunun yerine borcu, zaten kullandığınız iş takip sisteminde **normal iş kalemleri** olarak tutun ve etiketleyin.
+
+Böylece iki şey olur: borç kalemleri sprint planlamasında görünür hâle gelir ve ne kadarının kapatıldığı ölçülebilir olur.
+
+Her kalemde şunlar olsun: hangi sistem, hangi kategori (güvenlik/süreklilik/hız), tahmini faiz, kapatma maliyeti, kapatılmazsa senaryo.
+
+## Bütçeyi oran olarak isteyin
+
+Teknik borç için ayrı bir proje bütçesi istemek genelde başarısız olur; proje bütçeleri yeni işlevler için ayrılır.
+
+Daha işlevli yaklaşım, kapasitenin sabit bir oranını talep etmektir: "her sprint'in %20'si borç kalemlerine ayrılacak". Bu, tek seferlik bir onay yerine sürekli bir kural üretir ve tartışmayı her seferinde yeniden yapmazsınız.
+
+Oran düşük görünebilir ama süreklidir. Yılda bir kez alınan büyük bir modernizasyon bütçesinden çok daha fazla borç kapatır — ve o büyük bütçe genelde hiç gelmez.
+
+## Yeni borcu görünür kılın
+
+En değerli alışkanlık şudur: **bilinçli borç alırken kaydını aynı gün açın.** "Süre yetişsin diye şunu atlıyoruz" kararı verildiğinde, o kararın bir kaydı ve bir sahibi olsun.
+
+Bu, sonradan "kim böyle yaptı" tartışmasını bitirir ve daha önemlisi, borcun görünmez birikmesini engeller. Kaydedilmeyen borç, iki yıl sonra "eski sistem" adıyla anılan ve kimsenin gerekçesini bilmediği şeye dönüşür.
+
+## Borcun tekrar birikmesini önlemek
+
+Bir kez temizlemek yetmez; aynı borç aynı yollardan geri gelir. Üç kural birikimi
+belirgin biçimde yavaşlatıyor.
+
+**Sürüm sonu takvimi görünür olsun.** Kullandığınız her ürünün destek bitiş tarihini
+tek bir tabloda tutun ve altı ay kala uyarı üretsin. Desteklenmeyen bileşenlerin
+çoğu, tarihi kimse takip etmediği için desteklenmez hâle gelir — bir karar sonucu değil.
+
+**Yeni sistem kabul kriteri olsun.** Üretime alınacak her yeni sistem için kısa bir
+kontrol listesi: izleme bağlı mı, yedeği alınıyor mu, sahibi kim, nasıl yamalanacak,
+nasıl geri alınır. Bu beş soru cevaplanmadan üretime giren sistem, doğduğu gün
+borçludur.
+
+**Emeklilik, projenin parçası olsun.** Yeni sistem devreye alınırken eskisinin
+kapatılma tarihi de aynı proje planında yer alsın. Ayrı bir iş olarak bırakılan
+kapatma işlemi yapılmaz; iki sistem yıllarca birlikte yaşar ve maliyeti ikiye katlar.
+
+## Yönetimle konuşurken tek slayt
+
+Teknik borcu anlatan sunumların çoğu fazla ayrıntılıdır. Tek slayt genelde daha
+etkilidir ve şu üç satırdan oluşur:
+
+1. **Bugün taşıdığımız risk:** desteklenmeyen X bileşen, tek kişiye bağımlı Y sistem.
+2. **Bunun bize maliyeti:** yılda Z saat elle iş, N gün gecikmiş teslim.
+3. **Talebimiz:** kapasitenin %20'si, çeyrek sonunda ölçülebilir hedefle.
+
+Üçüncü satır kritiktir. Ölçülebilir hedef vermeyen her talep, "BT yine kendi işini
+yapmak istiyor" olarak okunur. Hedef verdiğinizde ise bir sonraki çeyrekte sonucu
+gösterebilirsiniz — ve ikinci talebi almak çok daha kolay olur.
+
+## Nasıl anlarsınız
+
+**Kapatılan borç kalemi sayısı, çeyrek bazında.** Sıfırsa oran kuralı uygulanmıyordur.
+
+**Açılan/kapatılan oranı.** Yeni borç, kapatılandan hızlı birikiyorsa açığınız büyüyordur — ve bu, tek bir sayıyla yönetime anlatılabilecek en net göstergedir.
+
+**Desteklenmeyen bileşen sayısı.** Güvenlik borcunun en somut ölçüsü. Bu sayı yıldan yıla artıyorsa, ne kadar modernizasyon yaptığınızın önemi yok; borç kazanıyor demektir.

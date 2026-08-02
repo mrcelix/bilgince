@@ -386,6 +386,140 @@ code {
 .mega-kaynaklar .kap {
   grid-template-columns: 1.1fr 1fr 0.85fr;
 }
+/* öne çıkan konu şeridi — mega menünün üstünde tam genişlik */
+.mega-one-cikan {
+  background: linear-gradient(100deg, var(--tint), var(--paper) 70%);
+  border-bottom: 1px solid var(--line);
+}
+.mega-one-cikan .kap {
+  display: flex;
+  gap: 16px;
+  padding-top: 16px;
+  padding-bottom: 16px;
+  flex-wrap: wrap;
+}
+.one-cikan-konu {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  flex: 1 1 320px;
+  background: var(--paper);
+  border: 1px solid var(--line);
+  border-left: 3px solid var(--indigo);
+  border-radius: var(--r-s);
+  padding: 14px 18px;
+  transition: box-shadow 0.16s ease;
+}
+.one-cikan-konu:hover {
+  box-shadow: 0 12px 26px -18px rgba(22, 32, 58, 0.5);
+}
+.one-cikan-konu .ikon {
+  width: 38px;
+  height: 38px;
+  border-radius: 10px;
+  background: var(--tint);
+  color: var(--indigo);
+  display: grid;
+  place-items: center;
+  flex: none;
+}
+.one-cikan-konu .govde {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  min-width: 0;
+  flex: 1;
+}
+.one-cikan-konu .ad {
+  font-size: 15px;
+  font-weight: 900;
+  letter-spacing: -0.025em;
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  flex-wrap: wrap;
+}
+.one-cikan-konu .rozet {
+  font-size: 9.5px;
+  font-weight: 900;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  padding: 2px 7px;
+  border-radius: 5px;
+  background: var(--indigo);
+  color: #fff;
+}
+.one-cikan-konu .ac {
+  font-size: 12.5px;
+  color: var(--muted);
+  line-height: 1.4;
+}
+.one-cikan-konu .sayi {
+  font-size: 12.5px;
+  font-weight: 800;
+  color: var(--indigo);
+  white-space: nowrap;
+}
+.one-cikan-konu:hover .ad {
+  color: var(--indigo);
+}
+
+/* ana sayfadaki öne çıkan konu bandı */
+.konu-one-cikan {
+  display: grid;
+  grid-template-columns: 52px minmax(0, 1fr) auto;
+  gap: 18px;
+  align-items: center;
+  background: radial-gradient(70% 130% at 100% 0%, rgba(58, 69, 224, 0.16), transparent 62%),
+    linear-gradient(150deg, var(--tint), var(--paper));
+  border: 1px solid var(--line);
+  border-left: 4px solid var(--indigo);
+  border-radius: var(--r-m);
+  padding: 22px 26px;
+  margin-bottom: 16px;
+}
+.konu-one-cikan .ikon {
+  width: 52px;
+  height: 52px;
+  border-radius: 14px;
+  background: var(--indigo);
+  color: #fff;
+  display: grid;
+  place-items: center;
+}
+.konu-one-cikan h3 {
+  font-size: 20px;
+  font-weight: 900;
+  letter-spacing: -0.03em;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+.konu-one-cikan p {
+  font-size: 14px;
+  color: var(--muted);
+  line-height: 1.5;
+  margin-top: 4px;
+  max-width: 62ch;
+}
+.konu-one-cikan .rozet {
+  font-size: 10px;
+  font-weight: 900;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  padding: 3px 8px;
+  border-radius: 5px;
+  background: var(--indigo);
+  color: #fff;
+}
+@media (max-width: 620px) {
+  .konu-one-cikan {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 12px;
+  }
+}
+
 .mega-sutun {
   padding: 24px 22px 24px 0;
   display: flex;

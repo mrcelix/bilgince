@@ -1,0 +1,113 @@
+---
+baslik: "Olay güdümlü mimari: ne zaman kurtarır, ne zaman batırır"
+ozet: "Mesaj kuyruğu eklemek sistemi gevşek bağlı yapmaz. Olay tabanlı tasarımın gerçek kazancı ve karşılığında ödenen teşhis bedeli."
+konu: "kurumsal-mimari"
+etiketler: ["olay", "mesajlasma", "tasarim"]
+yayin: 2026-06-05
+sure: 13
+---
+
+Bir sistemde her servis birbirini doğrudan çağırıyordu ve tek bir servisin yavaşlaması tüm zinciri kilitliyordu. Çözüm olarak araya bir mesaj kuyruğu konuldu. Altı ay sonra sistem hâlâ kilitleniyordu — sadece artık nerede kilitlendiğini kimse bulamıyordu.
+
+Kuyruk eklemek, gevşek bağlılık üretmez. Gevşek bağlılık bir **tasarım kararıdır**, bir bileşen değil.
+
+## Komut ile olay farkı
+
+Bu ayrım her şeyin temelidir ve genelde atlanır.
+
+**Komut** bir isteği ifade eder: "bu siparişi oluştur". Bir alıcısı vardır, bir sonucu vardır ve gönderen sonucu bekler. Komutu kuyruğa koymak asenkronluk kazandırır ama bağımlılığı kaldırmaz — gönderen hâlâ işin yapılmasına bağımlıdır.
+
+**Olay** olmuş bir şeyi ifade eder: "sipariş oluşturuldu". Kaç alıcısı olduğunu yayıncı bilmez ve umursamaz. Yayıncı için iş, olayı yayımladığı anda bitmiştir.
+
+Gerçek gevşek bağlılık ikincisinden gelir. Sisteminizde "sipariş servisi, stok servisine stok düş komutunu gönderir" varsa, kuyruk kullanıyor olmanız bir şey değiştirmez: sipariş hâlâ stoğa bağımlıdır. Bunun yerine sipariş "sipariş oluşturuldu" olayını yayınlar ve stok servisi kendi kararıyla tepki verirse, bağımlılık gerçekten kopar.
+
+## Kazanç: yeni tüketici eklemek
+
+Olay güdümlü tasarımın en somut faydası şudur: yeni bir ihtiyaç doğduğunda **mevcut hiçbir kodu değiştirmeden** yeni bir dinleyici eklersiniz.
+
+"Sipariş verildiğinde müşteriye SMS gidelim" isteği geldiğinde, sipariş servisine dokunmazsınız. Olayı dinleyen yeni bir servis yazarsınız. Sipariş ekibinin takvimine girmeniz gerekmez.
+
+Bu, organizasyonel bir kazançtır ve dağıtık mimarinin asıl vaadiyle aynı yere çıkar: bağımsız ilerleyebilmek.
+
+## Bedel: akışı zihinde canlandıramamak
+
+Karşılığında ödenen bedel ağırdır ve genelde küçümsenir.
+
+Senkron bir sistemde "sipariş verildiğinde ne oluyor" sorusunun cevabı koddadır; çağrı zincirini takip edersiniz. Olay güdümlü bir sistemde bu soru **kodda cevaplanamaz**. Olayı kimin dinlediğini ancak çalışma zamanında ya da bir kayıt defterinden bilirsiniz.
+
+Bu yüzden olay tabanlı sistemlerde iki şey zorunludur, tercih değil:
+
+**Olay kataloğu.** Hangi olaylar var, şeması ne, kim yayınlıyor, kim dinliyor. Bu belge yoksa sistem altı ayda anlaşılmaz hâle gelir.
+
+**Dağıtık izleme.** Bir işlemin tüm sistemdeki yolculuğunu tek bir kimlikle takip edebilmek. Yoksa "sipariş neden işlenmedi" sorusunun cevabı yoktur.
+
+Bu ikisini kurmadan olay güdümlü mimariye geçmek, teşhis kabiliyetinizi satıp yerine hiçbir şey almamaktır.
+
+## Sıra ve tekrar: iki sessiz tuzak
+
+**Sıra garantisi.** Çoğu mesajlaşma altyapısı, genel bir sıra garantisi vermez; yalnızca aynı bölüm (partition) içinde sıra korunur. "Müşteri güncellendi" olayları sırasız işlenirse eski değer yenisinin üstüne yazar. Çözüm, sıranın önemli olduğu yerde bölümleme anahtarını doğru seçmektir — genelde varlık kimliği.
+
+**Tekrarlı teslim.** Neredeyse tüm sistemler "en az bir kez" teslim eder. Yani aynı olay iki kez gelebilir. Tüketiciniz aynı olayı iki kez işlediğinde iki fatura kesiyorsa, mimari hatalıdır.
+
+Çözüm, tüketiciyi **idempotent** yazmaktır: işlenmiş olay kimliklerini saklamak ve tekrarı sessizce yutmak. Bu, sonradan eklenmesi çok zor bir özelliktir; baştan tasarlanmalıdır.
+
+## Ne zaman kullanmayın
+
+Olay güdümlü tasarım her yere uygun değildir.
+
+Kullanıcı bir düğmeye basıp sonucu hemen görmek zorundaysa, arada olay olmamalıdır. "Kaydet" dedikten sonra listede görünmeyen kayıt, kullanıcı için hatadır — nihai tutarlılık açıklaması onu ikna etmez.
+
+İki adım arasında güçlü tutarlılık gerekiyorsa (para transferi, stok rezervasyonu) olay kullanmak, telafi mantığı yazmayı zorunlu kılar ve bu mantık genelde asıl işten karmaşıktır.
+
+Ve sistem küçükse: üç servis arasında olay altyapısı kurmak, çözdüğünden fazla sorun getirir.
+
+## Şema evrimi
+
+Olaylar yayımlandıktan sonra kimin dinlediğini bilmediğiniz için, şemayı değiştirmek tehlikelidir. Kural basittir: **yalnızca ekleyin, hiç çıkarmayın.**
+
+Alan eklemek güvenlidir; eski tüketiciler görmezden gelir. Alan çıkarmak ya da anlamını değiştirmek, bilmediğiniz bir tüketiciyi kırar. Zorunluysa yeni bir olay sürümü yayımlayın ve eskisini bir süre birlikte yayınlayın.
+
+## Kuyruk mu, akış mı
+
+Altyapı seçerken iki farklı model karşınıza çıkar ve aralarındaki fark tasarımı
+doğrudan etkiler.
+
+**Kuyruk (queue):** Mesaj bir tüketici tarafından alınır ve kuyruktan silinir. İş
+dağıtımı için idealdir: on tane işçi aynı kuyruktan çeker, her mesajı biri işler.
+Ama mesaj bir kez okunduktan sonra gitmiştir; yeni bir tüketici eklerseniz geçmişi
+göremez.
+
+**Akış / kayıt defteri (log):** Mesajlar saklanır, her tüketici kendi konumunu
+takip eder. Yeni bir tüketici eklediğinizde geçmişi baştan okuyabilir. Olay güdümlü
+mimarinin asıl vaadi olan "yeni dinleyici ekle, kodu değiştirme" ancak bu modelde
+tam anlamıyla çalışır.
+
+Pratik ayrım şudur: **iş dağıtıyorsanız kuyruk, gerçekleri yayınlıyorsanız akış.**
+Sipariş işleme görevlerini paylaştırmak kuyruk işidir. "Sipariş oluşturuldu"
+gerçeğini yayınlamak akış işidir. İkisini aynı altyapıda yapmaya çalışmak, ikisinden
+birini kötü yapmak demektir.
+
+Akış modelinin bedeli saklama maliyeti ve tüketici konumlarını yönetme yüküdür.
+Kuyruğun bedeli ise geriye dönememektir — bir hata yüzünden kaybedilen mesajları
+yeniden işleyemezsiniz.
+
+## Olayın içine ne koymalı
+
+Sık tartışılan bir tasarım sorusu: olay yalnızca kimlik mi taşımalı, yoksa verinin
+tamamını mı?
+
+**Yalnızca kimlik** ("sipariş 4821 oluşturuldu") olayı küçük tutar ama tüketiciyi
+ayrıntı için kaynağa sorgu atmaya zorlar — yani çalışma zamanı bağımlılığı geri gelir.
+
+**Tam veri** taşımak bağımlılığı gerçekten koparır ama olay şemasını büyütür ve şema
+evrimi sorununu ağırlaştırır.
+
+Orta yol genelde doğrudur: tüketicilerin çoğunun ihtiyaç duyduğu alanları taşıyın,
+nadir ihtiyaçlar için sorguya bırakın. Hangi alanların gerektiğini tahmin etmeyin;
+ilk tüketicilerle konuşup öğrenin.
+
+## Nasıl anlarsınız
+
+**Yeni tüketici ekleme süresi.** Mimarinin asıl vaadi buydu. Yeni bir dinleyici eklemek hâlâ mevcut servislerde değişiklik gerektiriyorsa, olay tasarımı yanlıştır — muhtemelen olay değil komut yayımlıyorsunuzdur.
+
+**Ölü mektup kuyruğundaki mesaj sayısı.** Sıfır değilse ve kimse bakmıyorsa, sessizce veri kaybediyorsunuz demektir. Bu kuyruğun bir sahibi ve bir uyarısı olmalı; olay güdümlü sistemlerde en sık ihmal edilen operasyonel detay budur.

@@ -1,0 +1,72 @@
+---
+baslik: "Tek doğru kaynak yoksa hiçbir rapor doğru değildir"
+ozet: "Aynı müşteri üç sistemde üç farklı adresle duruyorsa sorun veri kalitesi değil, sahiplik tanımıdır. Veri sahipliğini kurmanın sırası."
+konu: "kurumsal-mimari"
+etiketler: ["veri", "mdm", "yonetisim"]
+yayin: 2026-02-20
+sure: 13
+---
+
+Yönetim raporunda müşteri sayısı 8.400 görünüyordu. Satış ekibinin CRM'inde 9.100, muhasebede 7.850. Üç sayı da doğruydu — çünkü üçü de farklı şeyi sayıyordu ve hiçbiri diğerinin ne saydığını bilmiyordu.
+
+Bu, veri kalitesi sorunu değildir. **Sahiplik sorunudur.**
+
+## Sahip kim, kaynak ne
+
+İki kavramı ayırmakla başlayın.
+
+**Kaynak sistem (system of record):** Bir veri varlığının doğru değerinin tutulduğu tek sistem. Müşteri adresi için bu CRM olabilir, çalışan verisi için İK sistemi.
+
+**Veri sahibi:** O verinin doğruluğundan sorumlu **kişi ya da birim**. Bir sistem sahip olamaz; sistemler veri tutar, insanlar sorumluluk taşır.
+
+Kurumların çoğunda ikincisi tanımsızdır. "Müşteri adresi yanlış" dendiğinde kimin düzelteceği belli değildir, bu yüzden herkes kendi sisteminde düzeltir ve fark büyür.
+
+## Önce varlıkları listeleyin, sistemleri değil
+
+Veri yönetişimi projeleri genelde sistem envanteriyle başlar ve orada boğulur. Daha verimli başlangıç, **iş varlıklarını** listelemektir: müşteri, ürün, tedarikçi, çalışan, sözleşme, lokasyon.
+
+Çoğu kurumda bu liste on kalemi geçmez. Her kalem için üç soru sorun:
+
+1. Bu varlığın kaynak sistemi hangisi?
+2. Sahibi kim (isim, unvan)?
+3. Hangi sistemler bunun kopyasını tutuyor?
+
+Üçüncü sorunun cevabı genelde beklenenden uzundur ve asıl iş orada başlar.
+
+## Kopyalar sorun değil, senkronsuz kopyalar sorundur
+
+Verinin birden çok yerde bulunması kaçınılmazdır ve kötü değildir. Sorun, kopyaların **nasıl güncellendiğinin tanımsız olmasıdır**.
+
+Her kopya için tek bir kural yazın: bu veri buraya nereden, hangi sıklıkta gelir ve buradan **değiştirilebilir mi**? Son soru kritiktir. Bir kopyanın üzerine yazılabiliyorsa, o artık kopya değil ikinci bir kaynaktır ve çatışma kaçınılmazdır.
+
+Pratik kural şudur: **kopyalar salt okunur olmalıdır.** Kullanıcı adresi düzeltmek istiyorsa kaynak sisteme yönlendirilmeli ya da düzeltme talebi kaynağa iletilmelidir. Kopyanın üzerine yazma yetkisini kapatmak, çoğu tutarsızlığı tek hamlede bitirir — ve en çok direnç gören karardır, çünkü kullanıcının işini kısa vadede zorlaştırır.
+
+## Kimlik eşleştirme: en çok hafife alınan kısım
+
+İki sistemdeki kaydın aynı müşteriye ait olduğunu nasıl bilirsiniz? Vergi numarası varsa şanslısınız. Yoksa isim ve adres benzerliğiyle eşleştirme yaparsınız ve bu, sandığınızdan daha çok yanlış sonuç üretir.
+
+"Ahmet Yılmaz" ile "AHMET YILMAZ" aynı kişi olabilir. "Yılmaz Ticaret Ltd. Şti." ile "Yılmaz Tic. Ltd." büyük ihtimalle aynıdır. Ama "Yılmaz Gıda" ile "Yılmaz İnşaat" farklı olabilir — ya da aynı grubun iki şirketi olabilir, ki bu da ayrı bir sorudur.
+
+Bu yüzden eşleştirmeyi tamamen otomatikleştirmeyin. Yüksek güvenli eşleşmeleri otomatik birleştirin, **şüpheli olanları insana kuyruğa alın**. Kuyruğu boşaltacak bir sahip yoksa proje burada durur — ve genelde durur.
+
+## Altın kayıt mı, referans mı
+
+Ana veri yönetimi araçları iki yaklaşım sunar. Birincisi tüm kopyaları birleştirip merkezî bir "altın kayıt" üretmek. İkincisi merkezde yalnızca eşleştirme tablosu tutup her sistemin kendi kaydını korumasına izin vermek.
+
+Birincisi daha temizdir ama daha pahalıdır ve tüm sistemlerin merkezle konuşmasını gerektirir. İkincisi çok daha hızlı hayata geçer: raporlama artık "hangi kayıt hangi kayıtla aynı kişidir" bilgisine sahiptir ve sayılar tutmaya başlar.
+
+Küçük ve orta ölçekli kurumların büyük çoğunluğunda ikinci yaklaşım yeterlidir. Altın kayda ihtiyaç, ancak operasyonel sistemlerin de birleşik veriye ihtiyaç duyduğu noktada doğar.
+
+## Sahiplik atamak teknik bir iş değildir
+
+Bu çalışmanın en zor kısmı teknik değildir. "Müşteri verisinin sahibi kim" sorusu bir yetki sorusudur ve cevabı BT veremez.
+
+Gördüğüm en işlevsel model şudur: her ana varlık için bir **iş sahibi** (o veriyle iş yapan birimden bir yönetici) ve bir **veri sorumlusu** (günlük düzeltmeleri yapan kişi) atanır. BT, aracı ve altyapıyı sağlar; doğruluktan sorumlu olmaz. BT'nin veri sahibi olduğu her kurumda veri kalitesi düşüktür, çünkü BT verinin doğrusunu bilemez.
+
+## Nasıl anlarsınız
+
+Altı ay sonra çalışmanın işe yarayıp yaramadığını tek bir testle anlarsınız: **aynı soruyu iki farklı sisteme sorun ve cevapları karşılaştırın.**
+
+"Geçen ay kaç aktif müşterimiz vardı?" sorusunun CRM ve muhasebe sistemindeki cevabı arasındaki fark %2'nin altına inmişse iyi yoldasınız. Fark aynı kaldıysa, muhtemelen tanımları hiç konuşmadınız — çünkü çoğu zaman asıl sorun kayıtların farklılığı değil, "aktif müşteri" tanımının iki birimde farklı olmasıdır.
+
+İkinci ölçüm: **veri düzeltme talebinin kapanma süresi.** Sahip atanmadan önce bu süre ölçülemez bile; ölçülebilir hâle gelmesi tek başına ilerlemedir.

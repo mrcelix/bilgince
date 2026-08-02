@@ -1,0 +1,88 @@
+---
+baslik: "Bulut göçünde referans mimari: landing zone kurduktan sonra"
+ozet: "Abonelik hiyerarşisi göçün başlangıcıdır, sonu değil. Uygulamaları taşırken verilecek altı kararın sırası."
+konu: "kurumsal-mimari"
+etiketler: ["bulut", "goc", "referans-mimari"]
+yayin: 2026-06-26
+sure: 14
+---
+
+Landing zone kurulduktan sonra bir boşluk oluşur. Abonelik hiyerarşisi hazır, ağ bağlı, politikalar yazılmış — ama ilk uygulamayı taşımaya gelince herkes durur. Çünkü asıl kararlar henüz verilmemiştir.
+
+Bu yazı o kararların sırası hakkında.
+
+## 1. Hangi uygulama önce gider
+
+Yanlış cevap: "en kritik olan, çünkü en çok fayda oradan gelir."
+Doğru cevap: **öğrenmenin en ucuz olduğu uygulama.**
+
+İlk göç, bir teknoloji projesi değil bir öğrenme projesidir. Ağ kurallarını, kimlik entegrasyonunu, izleme boru hattını, maliyet takibini ve dağıtım sürecini ilk kez uçtan uca çalıştırırsınız. Bunu kritik bir sistemle yapmak, öğrenme maliyetini kesinti maliyetine çevirir.
+
+İyi bir ilk aday: iç kullanıcıları olan, veri hacmi düşük, bağımlılığı az, sahibi işbirliğine açık bir uygulama.
+
+## 2. Yeniden barındırma mı, yeniden mimarlandırma mı
+
+Her uygulama için beş yoldan biri seçilir ve seçim iş değerine göre yapılır:
+
+**Yeniden barındırma (lift & shift):** Sanal makineyi olduğu gibi taşımak. Hızlıdır, kazanç düşüktür, maliyet genelde düşmez — hatta artar. Veri merkezi çıkışı için tarih baskısı varsa doğrudur.
+
+**Yeniden platformlandırma:** Veritabanını yönetilen hizmete almak gibi. Orta emek, kayda değer operasyonel kazanç. Çoğu uygulama için en iyi maliyet/fayda noktası budur.
+
+**Yeniden mimarlandırma:** Uygulamayı bulut yeteneklerine göre yeniden yazmak. Yüksek maliyet; yalnızca uygulamanın iş değeri yüksek ve değişim hızı kritikse anlamlıdır.
+
+**Satın alma:** Hazır bir SaaS'a geçmek. Süreç standartsa en verimli yol.
+
+**Emekliye ayırma:** Portföy çalışması yapıldıysa listede birkaç aday mutlaka çıkar. Taşınmayan uygulama, göçün en ucuz kalemidir.
+
+Kararı uygulama bazında verin, kurum genelinde değil. "Hepsini lift & shift yapalım" kararı, göçü tamamlar ama vaat edilen kazancı getirmez ve hayal kırıklığı üretir.
+
+## 3. Ağ: hangi trafik nereden akacak
+
+En çok sürprizin çıktığı karar budur. Şirket içi ve bulut arasında ne kadar trafik olacak? Uygulama bulutta, veritabanı şirket içinde kalırsa her sorgu VPN üzerinden gider ve gecikme uygulamayı kullanılamaz hâle getirebilir.
+
+Kural: **uygulama ile veritabanı asla farklı tarafta kalmamalı.** İkisini birlikte taşıyın ya da ikisini birlikte bırakın. Aradaki geçici dönem mümkün olduğunca kısa olmalı.
+
+İkinci sürpriz veri çıkış (egress) maliyetidir. Buluttan dışarı akan veri ücretlidir ve raporlama sistemi şirket içindeyse fatura hızla büyür.
+
+## 4. Kimlik: hibrit dönem ne kadar sürecek
+
+Göç sırasında kimliğiniz iki yerde olur. Bu dönemi planlanmış ve **sonlu** tutun.
+
+Uzun süren hibrit kimlik, en pahalı geçici durumdur: iki dizin, iki parola politikası, iki yetkilendirme modeli ve sürekli eşitleme sorunları. Bitiş tarihi olmayan hibrit, kalıcı hibrit olur.
+
+Kimlik göçünü uygulama göçünden **önce** bitirmeye çalışın. Sırayı ters kurarsanız her uygulama göçünde kimlik sorunlarını yeniden çözersiniz.
+
+## 5. Maliyet görünürlüğü ilk günden
+
+Göçten sonra gelen ilk büyük faturayı kimse beklemez. Oysa önlemi basittir ve ilk günden alınmalıdır: etiket zorunluluğu, abonelik/proje bazında bütçe uyarısı ve aylık maliyet raporunun uygulama sahiplerine gitmesi.
+
+Son madde en etkilisidir. Maliyeti gören sahip, kullanılmayan test ortamını kendisi kapatır. Görmeyen sahip, kapatmaz — çünkü bedeli hissetmez.
+
+Şirket içinde sunucu maliyeti sabit ve görünmezdi; bulutta değişken ve görünür. Bu görünürlüğü kullanmazsanız buluttan tasarruf beklemeyin.
+
+## 6. Operasyon modeli: kim yönetecek
+
+Göçün en çok ihmal edilen kısmı budur. Uygulama bulutta çalışmaya başladıktan sonra:
+
+Yamaları kim yapacak? İzleme uyarıları kime gidecek? Yedekleme kimin sorumluluğunda? Bir kaynak açmak için kimden onay alınacak?
+
+Bu sorular cevaplanmadan yapılan göçler, bulutta sahipsiz kaynaklar üretir. Altı ay sonra kimsenin ne olduğunu bilmediği elli kaynak ve şişmiş bir fatura ortaya çıkar.
+
+Operasyon modelini göçten önce yazın. Karmaşık olmasına gerek yok: her abonelik/projenin bir sahibi, her uygulamanın bir teknik sorumlusu, her uyarının bir alıcısı.
+
+## Sırayı özetlersek
+
+1. Portföyü değerlendirin, taşınmayacakları ayıklayın
+2. Kimlik hibritini kurun ve bitiş tarihi koyun
+3. Ağ ve veri yerleşimini kararlaştırın
+4. Maliyet görünürlüğünü ve etiket zorunluluğunu açın
+5. Operasyon modelini yazın
+6. Ucuz öğrenilecek bir uygulamayla başlayın
+
+Bu sıra bozulduğunda göç durmaz ama pahalılaşır — ve pahalılık genelde ilk yıl faturasında değil, ikinci yılın operasyon yükünde görünür.
+
+## Nasıl anlarsınız
+
+**Bulutta sahipsiz kaynak oranı.** Etiketi olmayan ya da sahibi bulunamayan kaynakların toplam maliyet içindeki payı. %10'un üzerindeyse operasyon modeli işlemiyordur.
+
+**Göç sonrası olay sayısı.** Taşınan uygulamanın göçten sonraki 30 günde ürettiği olay sayısını, göçten önceki 30 günle karşılaştırın. Artış varsa sebebi genelde ağ gecikmesi ya da eksik kalan bir bağımlılıktır — ve bir sonraki göçte aynı hatayı tekrarlamamak için bu karşılaştırmayı her uygulama için yapın.

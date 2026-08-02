@@ -1,0 +1,72 @@
+---
+baslik: "Kimlik mimarisi: her uygulamanın kendi kullanıcı tablosu olduğunda"
+ozet: "On dört uygulama, on dört parola politikası, on dört ayrılış prosedürü. Kimliği tek çatı altına almanın sırası ve nereden başlanacağı."
+konu: "kurumsal-mimari"
+etiketler: ["kimlik", "sso", "federasyon"]
+yayin: 2026-03-13
+sure: 14
+---
+
+Bir çalışanın işten ayrıldığı gün İK bize haber verdi. Active Directory hesabını kapattık, e-postasını devrettik, dizüstünü topladık. Dört ay sonra o kişinin hâlâ CRM'e giriş yapabildiğini fark ettik.
+
+CRM, kendi kullanıcı tablosunu tutuyordu. Kimse ona haber vermemişti.
+
+## Sorun parola değil, yaşam döngüsü
+
+Tek oturum açma (SSO) genelde bir kolaylık projesi olarak sunulur: "kullanıcılar tek parola kullansın". Bu doğru ama önemsiz bir faydadır. Asıl mesele **kimlik yaşam döngüsüdür**: hesabın açılması, yetkilerinin değişmesi ve kapanması.
+
+Her uygulama kendi kullanıcı tablosunu tutuyorsa, bir çalışan işe girdiğinde on dört yerde hesap açılır ve ayrıldığında on dört yerde kapatılması gerekir. İkinci işlem hiçbir zaman eksiksiz yapılmaz — çünkü açılışı kullanıcı ister ve takip eder, kapanışı kimse istemez.
+
+Denetimlerde en sık çıkan bulgu budur ve teknik bir açıktan çok bir süreç açığıdır.
+
+## Katmanları ayırın
+
+Kimlik konuşulurken üç ayrı şey birbirine karışır. Ayırın:
+
+**Kimlik doğrulama (authentication):** Bu kişi kim? SSO'nun çözdüğü katman budur.
+
+**Yetkilendirme (authorization):** Bu kişi ne yapabilir? SSO bunu **çözmez**. Uygulama içindeki roller yine uygulamada tanımlıdır; SSO yalnızca hangi grupların geldiğini söyler.
+
+**Sağlama (provisioning):** Hesap ne zaman açılır ve kapanır? Asıl yaşam döngüsü sorunu buradadır ve SCIM gibi bir protokol ya da bir kimlik yönetimi aracı gerektirir.
+
+Çoğu kurum SSO kurar, sağlamayı atlar ve sorunun çözüldüğünü sanır. Oysa SSO kurulduktan sonra bile uygulamada eski bir yerel hesap varsa, o hesap SSO'yu atlayarak çalışmaya devam eder. **Yerel hesapları kapatmadan SSO bir güvenlik kazancı değildir**; yalnızca bir kolaylıktır.
+
+## Nereden başlanır
+
+Uygulamaları üç kovaya ayırın.
+
+**Modern kimlik destekleyenler** (SAML veya OIDC). Bunlar en kolay kazançtır; bir gün içinde bağlanırlar. Listenin başına koyun.
+
+**Yalnızca LDAP destekleyenler.** Şirket içi dizine bağlanabilirler. Bulut kimliğine geçiyorsanız bunlar için bir köprü (ör. bulut dizin hizmeti) gerekir.
+
+**Hiçbirini desteklemeyenler.** Genelde eski, yerel ve kritik uygulamalardır. Bunlar için üç seçenek vardır: satıcıdan destek istemek, önüne bir vekil koymak ya da kabul edip **manuel bir kapatma prosedürü** yazmak. Üçüncüsü hoş değildir ama belgelenmiş manuel süreç, belgelenmemiş otomatik varsayımdan iyidir.
+
+Bu üçüncü listeyi görünür tutun. Kimlik projesinin başarısı, birinci kovayı bağlamakla değil, üçüncü kovanın küçülmesiyle ölçülür.
+
+## Gruplar rollerden önce gelir
+
+SSO bağlandıktan sonraki ilk hayal kırıklığı şudur: kullanıcı giriş yapabiliyor ama hiçbir yetkisi yok. Çünkü uygulama, hangi rolde olduğunu bilmiyor.
+
+Bunu çözmenin yolu, dizindeki grup yapısını uygulamalardaki rollere eşlemektir. Ve burada dizinin ne kadar dağınık olduğu ortaya çıkar: "Muhasebe", "MUHASEBE_YENI", "Finans-Muhasebe" adında üç grup vardır ve hangisinin güncel olduğunu kimse bilmez.
+
+Bu yüzden kimlik projeleri neredeyse her zaman bir **grup temizliği projesine** dönüşür. Bunu baştan kabul edip planlayın; sonradan sürpriz olarak yaşamayın. Temizlik sırasında tek kural yeter: her grubun bir sahibi ve bir amacı yazılı olsun. İkisi de yoksa grup silinir.
+
+## Rol tabanlı mı, öznitelik tabanlı mı
+
+Yetkilendirmede iki model tartışılır. Rol tabanlı (RBAC) basittir: kullanıcı bir rol alır, rol izinleri taşır. Öznitelik tabanlı (ABAC) daha esnektir: karar, kullanıcının departmanı, lokasyonu, cihazın durumu gibi özniteliklerden hesaplanır.
+
+Pratikte çoğu kurum için doğru cevap **RBAC ile başlamak** ve yalnızca gerçekten gereken yerlerde öznitelik koşulu eklemektir. ABAC'ı baştan kurmak, kimsenin akıl yürütemediği bir politika ağacı üretir. "Bu kişi neden erişemiyor?" sorusuna cevap veremiyorsanız model çok karmaşıktır.
+
+## Break-glass ve tek nokta riski
+
+Kimliği tek çatı altına almak, tek arıza noktası da yaratır. Kimlik sağlayıcı erişilemez olduğunda hiçbir uygulamaya girilemez.
+
+Bu riski kabul edip planlayın: acil durum hesapları (kimlik sağlayıcıdan bağımsız, fiziksel kasada, girişleri uyarı üreten) ve kritik uygulamalar için belgelenmiş bir yerel erişim prosedürü. Bu iki şey olmadan yapılan kimlik merkezîleştirmesi, kesinti anında kurumu tamamen felç eder.
+
+## Nasıl anlarsınız
+
+Projeden sonra iki testi yapın.
+
+**Ayrılış testi:** Bir test hesabı oluşturun, tüm uygulamalara erişim verin, sonra İK sürecini işletip hesabı kapatın. 24 saat sonra hangi uygulamalara hâlâ girilebiliyor? Liste boş değilse sağlama eksiktir — ve bu listeyi bilmek, bilmemekten çok daha iyidir.
+
+**Erişim gözden geçirme süresi:** "Bu uygulamaya kimlerin erişimi var?" sorusuna kaç dakikada cevap verebiliyorsunuz? Merkezîleştirme öncesinde bu soru günler alır. Dakikalara inmediyse, uygulamaları bağladınız ama raporlamayı kurmadınız demektir.

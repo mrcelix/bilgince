@@ -198,13 +198,31 @@ const enSonGuncelleme = hepsi
       <div class="bolum-bas">
         <div>
           <h2>Konular</h2>
-          <p>Bulut, altyapı, ağ ve süreç. Her konu ayrı bir arşiv sayfası.</p>
+          <p>Mimari, bulut, altyapı, ağ ve süreç. Her konu ayrı bir arşiv sayfası.</p>
         </div>
         <a href="/rehberler">Tüm arşiv →</a>
       </div>
+      {
+        KONULAR.filter((k) => k.oneCikan).map((k) => (
+          <a class="konu-one-cikan" href={`/konu/${k.slug}`}>
+            <span class="ikon" aria-hidden="true">
+              <KonuIkon ad={k.ikon} boyut={24} />
+            </span>
+            <div>
+              <h3>
+                {k.ad}
+                <span class="rozet">Öne çıkan</span>
+              </h3>
+              <p>{k.ozet}</p>
+            </div>
+            <span class="dg">{sayKonu(k.slug)} yazı →</span>
+          </a>
+        ))
+      }
+
       <div class="konu-izgara">
         {
-          KONULAR.map((k) => (
+          KONULAR.filter((k) => !k.oneCikan).map((k) => (
             <a class="konu-kart" href={`/konu/${k.slug}`}>
               <span class="ikon" aria-hidden="true">
                 <KonuIkon ad={k.ikon} boyut={17} />

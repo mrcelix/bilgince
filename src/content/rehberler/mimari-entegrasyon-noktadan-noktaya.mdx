@@ -1,0 +1,68 @@
+---
+baslik: "Noktadan noktaya entegrasyonların gizli bedeli"
+ozet: "On iki uygulama arasında altmış altı olası bağlantı var. Entegrasyon mimarisi kurmadan önce mevcut bağlantıları saymanın neden ilk iş olduğu."
+konu: "kurumsal-mimari"
+etiketler: ["entegrasyon", "api", "esb"]
+yayin: 2026-01-30
+sure: 13
+---
+
+Bir kurumda entegrasyon envanteri çıkarmam istendi. İki hafta sonra elimde 47 bağlantıdan oluşan bir liste vardı. Listeyi gören BT müdürünün ilk tepkisi şu oldu: "Bunların yarısını ben bilmiyordum."
+
+Bilmemesi normaldi. Bağlantıların çoğu bir proje sırasında, "geçici" olarak, iki uygulama arasında doğrudan kurulmuştu. Hiçbiri belgelenmemişti. Bazılarının sahibi şirketten ayrılmıştı.
+
+## Neden bu kadar hızlı çoğalıyor
+
+İki uygulamayı doğrudan bağlamak her zaman en hızlı çözümdür. Bir API anahtarı, bir zamanlanmış görev, bir dosya paylaşımı — bir günde biter. Üçüncü uygulama geldiğinde yine en hızlı çözüm doğrudan bağlamaktır.
+
+Sorun şu ki bağlantı sayısı uygulama sayısıyla doğrusal değil, **karesel** büyür. On iki uygulama arasında teorik olarak 66 farklı bağlantı kurulabilir. Gerçekte hepsi kurulmaz ama 40'a ulaşmak hiç zor değildir ve o noktadan sonra hiç kimse sistemin tamamını zihninde tutamaz.
+
+Asıl bedel bakımda ortaya çıkar. Bir uygulamanın sürümünü yükseltmek istersiniz ve o uygulamaya kimin bağlı olduğunu bilmezsiniz. Bilmediğiniz için de yükseltmeyi ertelersiniz. Ertelediğiniz için teknik borç birikir. Entegrasyon dağınıklığının en pahalı sonucu, kesintiler değil, **değişememektir**.
+
+## Önce sayın, sonra mimari kurun
+
+Entegrasyon platformu almadan önce yapılacak iş envanterdir. Her bağlantı için beş alan yeterlidir:
+
+- Kaynak ve hedef uygulama
+- Aktarılan veri (hangi varlık, hangi alanlar)
+- Yön ve sıklık (gerçek zamanlı mı, gecelik toplu mu)
+- Teknik yöntem (REST, dosya, doğrudan veritabanı, mesaj)
+- Sahibi ve iş gerekçesi
+
+Bu tabloyu doldurduğunuzda iki şey görürsünüz. Birincisi: bağlantıların önemli bir kısmı aynı veriyi taşımaktadır — genelde müşteri ve ürün. İkincisi: bir kısmının iş gerekçesi artık yoktur; bağlı oldukları süreç yıllar önce değişmiştir.
+
+Ben o 47 bağlantının 9'unu hiçbir şey yapmadan kapattım. Kimse fark etmedi. Envanterin ilk getirisi budur.
+
+## Doğrudan veritabanı erişimi: en kötü bağlantı türü
+
+Envanterde en sık göreceğiniz ve en tehlikeli kalıp, bir uygulamanın başka bir uygulamanın veritabanına doğrudan bağlanmasıdır. Hızlıdır, çalışır ve **hedef uygulamanın şemasını kalıcı olarak dondurur**.
+
+Çünkü artık o şema bir iç detay değil, yayınlanmış bir arayüzdür. Kolon adını değiştiremezsiniz. Tabloyu bölemezsiniz. Ürünü yükseltemezsiniz — çünkü yükseltme şemayı değiştirir ve neyin kırılacağını bilmiyorsunuz.
+
+Bu bağlantıları kapatmak, entegrasyon çalışmasının en yüksek getirili kısmıdır. Yerine bir okuma API'si ya da bir görünüm (view) koymak bile büyük kazançtır: en azından değişimi soğurabileceğiniz bir katman oluşur.
+
+## Merkezî platform mu, sözleşme disiplini mi
+
+Envanter çıktıktan sonra klasik cevap "bir entegrasyon platformu alalım" olur. Bazen doğrudur, çoğu zaman erkendir.
+
+Merkezî bir platform (ESB, iPaaS, API ağ geçidi) size görünürlük, tekrar kullanım ve merkezî izleme verir. Karşılığında yeni bir bağımlılık, yeni bir uzmanlık ihtiyacı ve yeni bir tek arıza noktası alırsınız. Platform ekibi yoksa platform, üzerinden geçen her projenin beklediği bir darboğaza dönüşür.
+
+Küçük ve orta ölçekte çoğu zaman daha az maliyetli olan yol şudur: platform yerine **sözleşme disiplini**. Her entegrasyon için yayınlanmış bir arayüz, sürümlenmiş bir sözleşme ve tanımlı bir sahip. Teknoloji basit kalabilir; disiplin karmaşayı önler.
+
+Platforma geçiş kararını ise şu eşikle verin: aynı veriyi üçten fazla bağlantı taşıyor ve her yeni tüketici için yeni bir bağlantı yazılıyorsa, merkezîleştirme kendini amorti eder.
+
+## Olay yayını, sorgu değil
+
+Entegrasyon tasarımında sık yapılan bir hata, her ihtiyacı sorgu olarak modellemektir: "sipariş servisi, müşteri servisinden müşteriyi çeksin". Bu kalıp, çalışma zamanı bağımlılığı üretir — müşteri servisi çökerse sipariş de çöker.
+
+Alternatif, değişikliği **olay olarak yayınlamaktır**: müşteri güncellendiğinde bir olay yayımlanır, ilgilenen sistemler kendi kopyalarını günceller. Böylece çalışma zamanında bağımlılık kalmaz.
+
+Bedeli nihai tutarlılıktır ve bu bedel her zaman kabul edilebilir değildir. Fatura kesiminde anlık doğru bakiye gerekiyorsa olay yayını yanlış araçtır. Karar, veriye değil **kararın kritikliğine** göre verilmeli: yanlış bir değerle iş yapılırsa ne olur?
+
+## Nasıl anlarsınız
+
+Altı ay sonra iki şeyi ölçün.
+
+**Bilinmeyen bağlantı sayısı:** Envanterde olmayan ama üretimde çalışan bağlantı bulunuyor mu? Bulunuyorsa süreç değil, yalnızca bir belge üretmişsiniz demektir. Yeni bağlantı açmanın envantere kayıt gerektirdiği bir kural yoksa liste ilk günden itibaren eskimeye başlar.
+
+**Bir uygulamayı yükseltme süresi:** Envanter çalışmasının gerçek testi budur. "Bu sürümü yükseltirsek ne kırılır?" sorusuna bir saat içinde cevap verebiliyorsanız, entegrasyon mimarisi işini yapıyordur. Hâlâ herkese e-posta atıp bekliyorsanız, elinizde bir tablo var ama mimari yok.

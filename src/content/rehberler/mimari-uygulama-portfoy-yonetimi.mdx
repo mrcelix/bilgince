@@ -1,0 +1,78 @@
+---
+baslik: "Uygulama portföyü: neyi emekliye ayıracağınıza nasıl karar verilir"
+ozet: "Kurumda kaç uygulama olduğunu kimse bilmiyorsa mimari kararların temeli yok demektir. Portföyü değerlendirmenin iki eksenli yöntemi."
+konu: "kurumsal-mimari"
+etiketler: ["portfoy", "teknik-borc", "envanter"]
+yayin: 2026-04-24
+sure: 13
+---
+
+"Kaç uygulamamız var?" sorusunu sorduğumda üç farklı cevap aldım: BT'den 60, satın almadan 90, güvenlikten 140. Fark, herkesin farklı bir şeyi "uygulama" saymasından geliyordu.
+
+Portföy yönetimi bu tanımı netleştirmekle başlar, teknolojiyle değil.
+
+## Ne sayılır, ne sayılmaz
+
+Çalışan bir tanım şudur: **bir iş sürecini destekleyen, kendi verisi olan ve kullanıcısı bulunan yazılım.** Bu tanımla bir Excel makrosu da uygulamadır — ve öyle sayılmalıdır, çünkü kritik süreçlerin şaşırtıcı bir kısmı orada yürür.
+
+Sayılmayanlar: altyapı bileşenleri (veritabanı sunucusu, güvenlik duvarı), kütüphaneler, tek kullanıcılık yardımcı araçlar.
+
+Sınırda kalanları tartışmayın; listeye alın ve "düşük önem" olarak işaretleyin. Envanterin amacı mükemmel taksonomi değil, karar verebilmektir.
+
+## İki eksen yeter
+
+Her uygulamayı iki eksende puanlayın. Karmaşık modeller kurmayın; iki eksen kararların yüzde sekseninini verir.
+
+**İş değeri:** Bu uygulama olmasa ne olur? Süreç durur mu, yavaşlar mı, yoksa kimse fark etmez mi? Puanı iş birimi verir, BT değil.
+
+**Teknik sağlık:** Destekleniyor mu, güncel mi, bilen kaç kişi var, entegrasyonları ne kadar kırılgan? Puanı BT verir.
+
+Dört kadran çıkar ve her biri farklı bir eylem gerektirir:
+
+**Yüksek değer, iyi sağlık →** Koruyun ve yatırım yapın. Buraya bütçe akmalı.
+
+**Yüksek değer, kötü sağlık →** En acil kadran. Yenileme ya da değiştirme planı gerekir. Kurumun asıl riski buradadır: kritik iş, çürüyen teknoloji.
+
+**Düşük değer, iyi sağlık →** Dokunmayın. Çalışıyor, ucuz, sorun değil. Buraya modernizasyon yapmak, en sık görülen kaynak israfıdır.
+
+**Düşük değer, kötü sağlık →** Emekliye ayırın. En kolay kazanç burada.
+
+## Emekliye ayırmak neden zordur
+
+Teknik olarak kolay, politik olarak zordur. Her uygulamanın bir savunucusu vardır ve genelde o kişi "ama X departmanı hâlâ kullanıyor" der.
+
+Bu itirazı veriyle karşılayın. Kullanım günlüklerine bakın: son 90 günde kaç farklı kullanıcı giriş yaptı? Cevap "üç" ise tartışma biter. Cevap "kırk" ise savunucu haklıdır ve puanı düzeltirsiniz.
+
+Ölçüm yoksa tartışma fikirler üzerinden yürür ve emekliye ayırma hiç gerçekleşmez. Bu yüzden portföy çalışmasının ilk teknik adımı, **kullanım verisi toplamaktır**.
+
+## Gizli maliyetleri de sayın
+
+Bir uygulamanın maliyeti lisans bedeli değildir. Şunlar da vardır ve genelde hiç hesaplanmaz:
+
+Üzerinde çalıştığı sunucunun ve yedeklemesinin maliyeti. Entegrasyonlarının bakımı. Eski işletim sistemi gerektiriyorsa, o sistemi ayakta tutmanın güvenlik bedeli. Ve en pahalısı: **onu bilen tek kişinin zamanı.**
+
+Son kalem çoğu zaman lisanstan büyüktür. "Bu uygulama bize yılda 12 bin lira" derken, aslında bir kişinin yılın iki haftasını yediğini hesaba katmıyorsunuzdur.
+
+## Yenileme mi, değiştirme mi, sarmalama mı
+
+Kötü sağlıktaki yüksek değerli uygulamalar için üç yol vardır.
+
+**Yenileme (rewrite):** En pahalı ve en riskli. Yalnızca iş mantığı gerçekten anlaşılmışsa ve belgelenmişse düşünülür. "Nasıl çalıştığını kimse bilmiyor" durumunda yenileme, bilinmeyen kuralları yeniden keşfetme projesine döner ve süresi ikiye üçe katlanır.
+
+**Değiştirme (hazır ürün):** Süreç standart ise en verimli yol. Ama hazır ürün, sürecinizi ürüne uydurmanızı gerektirir. Bu uyumu kabul etmiyorsanız özelleştirme başlar ve altı ay sonra elinizde bakımı yenilemeden zor bir ürün olur.
+
+**Sarmalama (strangler):** Eski uygulamayı yerinde bırakıp önüne bir arayüz koyup parça parça devralmak. En düşük riskli yoldur ve en uzun sürer. Kritik ve karmaşık sistemlerde genelde doğru cevaptır — ama ancak **bitirme takvimi varsa**. Takvim yoksa sarmalama, kalıcı olarak iki sistemi birden yaşatmaya dönüşür ve maliyet artar.
+
+## Yılda bir, aynı tabloyla
+
+Portföy çalışması bir kerelik proje değildir. Yılda bir kez, aynı iki eksenle tekrarlayın ve **önceki yılın puanlarıyla yan yana koyun**.
+
+Hareketi görmek tek tek puanlardan daha değerlidir. Sağlığı düşen bir uygulama, henüz kriz değilken görünür hâle gelir. Değeri düşen bir uygulama, emeklilik listesine kendiliğinden yürür.
+
+## Nasıl anlarsınız
+
+İki sayıyı takip edin.
+
+**Portföydeki uygulama sayısı.** Sürekli artıyorsa emekliye ayırma süreci işlemiyordur. Sağlıklı bir portföyde her yıl birkaç uygulama listeden çıkar; yalnızca eklenen bir liste, envanter değil birikimdir.
+
+**"Kötü sağlık, yüksek değer" kadranındaki uygulama sayısı.** Bu, kurumun taşıdığı gerçek riskin en dürüst göstergesidir. Bu sayı azalmıyorsa modernizasyon bütçesi yanlış kadrana harcanıyordur — genelde de "düşük değer, iyi sağlık" kadranına, çünkü orası teknik olarak en eğlenceli olanıdır.

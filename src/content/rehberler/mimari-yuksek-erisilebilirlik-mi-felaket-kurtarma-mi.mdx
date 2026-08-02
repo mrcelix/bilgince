@@ -1,0 +1,84 @@
+---
+baslik: "Yüksek erişilebilirlik mi, felaket kurtarma mı? İkisi aynı şey değil"
+ozet: "Sunucuyu ikiye çıkarmak felaket kurtarma değildir. İki kavramı ayırmadan yapılan her süreklilik yatırımı yanlış riski satın alır."
+konu: "kurumsal-mimari"
+etiketler: ["sureklilik", "ha", "dr"]
+yayin: 2026-05-15
+sure: 13
+---
+
+Bir toplantıda "felaket kurtarma çözümümüz var, sunucular kümede" cümlesini duydum. Küme, aynı kabinetteki iki sunucudan oluşuyordu. Aynı elektrik hattı, aynı yangın bölmesi, aynı bina.
+
+Bu bir yüksek erişilebilirlik çözümüdür ve iyi bir çözümdür. Felaket kurtarma ile hiçbir ilgisi yoktur.
+
+## İki kavram, iki farklı arıza
+
+**Yüksek erişilebilirlik (HA)** bileşen arızasına karşı korur: bir sunucu, bir disk, bir güç kaynağı. Ölçeği küçük, sıklığı yüksektir. Otomatiktir, saniyeler içinde devreye girer ve kullanıcı çoğu zaman fark etmez.
+
+**Felaket kurtarma (DR)** ise bölge kaybına karşı korur: yangın, sel, uzun elektrik kesintisi, fidye yazılımı. Ölçeği büyük, sıklığı düşüktür. Genelde bir karar gerektirir (kim "geçiyoruz" der?) ve saatler sürer.
+
+İkisi birbirinin yerine geçmez. HA olmadan sık ve küçük kesintiler yaşarsınız. DR olmadan nadir ama kurumu bitirebilecek bir kesinti yaşarsınız.
+
+## Fidye yazılımı ayrımı bozdu
+
+Klasik DR planları doğal afetlere göre yazılmıştı. Bugün en olası "felaket" senaryosu fidye yazılımıdır ve bu senaryo, DR mimarisini farklı bir yerden zorlar.
+
+Çünkü fidye yazılımı **çoğaltılan** bir olaydır. Şifrelenen veri, senkron çoğaltma sayesinde ikinci merkeze de anında gider. Aktif–aktif kurulumunuz varsa iki merkeziniz de aynı anda kullanılamaz hâle gelir.
+
+Bu yüzden modern süreklilik mimarisinde üçüncü bir kavram gerekir: **değiştirilemez yedek.** Zaman içinde geriye dönebileceğiniz, silinemeyen ve şifrelenemeyen bir kopya. Coğrafi olarak ayrı olması yetmez; **mantıksal olarak da ayrı** olması gerekir — yani üretim kimlik altyapısıyla erişilememesi.
+
+Yedek sisteminize üretimdeki bir yönetici hesabıyla giriliyorsa, o yedek fidye senaryosunda korumasızdır.
+
+## Önce iki sayı, sonra mimari
+
+Mimari çizmeden önce iş birimiyle iki sayıyı yazılı olarak netleştirin.
+
+**RPO (kabul edilebilir veri kaybı):** Kesinti anında kaç dakikalık veriyi kaybetmeyi göze alıyoruz?
+
+**RTO (kabul edilebilir kesinti süresi):** Hizmet kaç saat içinde dönmeli?
+
+Bu iki sayı verilmeden yapılan her mimari tartışma teknoloji tartışmasına dönüşür ve genelde en pahalı seçenekte biter.
+
+Sayıları alırken bir uyarı: ilk cevap her zaman "sıfır" olur. O zaman maliyeti gösterin. "Sıfır veri kaybı için senkron çoğaltma gerekir, bu da ikinci merkez ve karanlık fiber demektir; yıllık maliyeti şu kadar" cümlesinden sonra sayılar gerçekçileşir.
+
+Bir hizmet için RTO 4 saatse, o hizmete aktif–aktif kurmak para israfıdır. Başka bir hizmet için RTO 15 dakikaysa, gecelik yedekle o hedefe ulaşılamaz. Sayılar mimariyi belirler; tersi değil.
+
+## Her hizmet aynı seviyeyi hak etmez
+
+En sık yapılan hata, tüm sistemlere aynı süreklilik seviyesini uygulamaktır. Bu hem pahalıdır hem de gereksiz karmaşıklık üretir.
+
+Hizmetleri üç kademeye ayırın:
+
+**Kademe 1 —** Durursa iş durur. Üretim hattı, satış, ödeme. Düşük RTO, yüksek yatırım.
+
+**Kademe 2 —** Durursa iş yavaşlar. Raporlama, iç portal. Orta RTO, orta yatırım.
+
+**Kademe 3 —** Durursa kimse hemen fark etmez. Arşiv, test ortamı. Yedekten geri yükleme yeterlidir.
+
+Bu kademelendirmeyi iş birimiyle birlikte yapın ve **yazılı hâle getirin**. Kesinti anında "bu neden önce dönmüyor" tartışması, kademeler yazılıysa yaşanmaz.
+
+## Bağımlılıklar planı bozar
+
+Kademe 1'deki bir uygulamayı ikinci merkezde ayağa kaldırdınız — ama bağlı olduğu kimlik sunucusu, DNS'i, lisans sunucusu ve dosya paylaşımı orada yoksa uygulama çalışmaz.
+
+Süreklilik planlarının pratikte en çok takıldığı yer budur. Uygulama listesi çıkarılır, altyapı bağımlılıkları unutulur.
+
+Çözüm basit ama emek ister: her kademe 1 hizmeti için **bağımlılık ağacını** çizin ve ağaçtaki her düğümün de en az aynı kademede olduğunu doğrulayın. Kademe 1 uygulama, kademe 3 bir bağımlılığa dayanıyorsa gerçek kademesi 3'tür.
+
+## Tatbikat yapılmayan plan, plan değildir
+
+Bir DR planının değeri, yazıldığı gün değil, denendiği gün ortaya çıkar. Ve ilk tatbikat neredeyse her zaman başarısız olur — bu normaldir ve tatbikatın amacı budur.
+
+Yılda bir kez, planlı ve duyurulmuş bir tatbikat yapın. Ölçtüğünüz şey "başardık mı" değil, **gerçekleşen RTO ve eksik çıkan bağımlılıklar** olmalı.
+
+Tatbikat yapılmadığı sürece taahhüt ettiğiniz RTO bir tahmindir. Kesinti anında tahminle çalışmak istemezsiniz.
+
+## Nasıl anlarsınız
+
+Üç sayı yeter.
+
+**Ölçülen RTO ile taahhüt edilen RTO farkı.** Kronometreyle ölçülmemişse taahhüt yoktur.
+
+**Tatbikatta eksik çıkan bağımlılık sayısı.** Yıldan yıla azalmalı. Azalmıyorsa bulguları kapatan bir süreç yok demektir.
+
+**Yedeğin mantıksal ayrımı.** Üretim yöneticisi hesabıyla yedekleri silebiliyor musunuz? Cevap evet ise, fidye senaryosunda yedeğiniz yoktur — ne kadar coğrafi olarak uzakta olduğunun önemi yok.
