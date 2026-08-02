@@ -21,13 +21,18 @@ export default defineConfig({
   output: 'static',
   adapter: vercel(),
 
+  // panel /keystatic altında; /admin alışkanlığı için kısayol
+  redirects: {
+    '/admin': '/keystatic',
+  },
+
   integrations: [
     mdx(),
     react(),
     keystatic(),
     sitemap({
       // noindex ve yönetim sayfaları site haritasına girmemeli
-      filter: (sayfa) => !/\/(ara|404|ozgecmis\/yazdir|keystatic|api)(\/|$)/.test(sayfa),
+      filter: (sayfa) => !/\/(ara|404|ozgecmis\/yazdir|keystatic|admin|api)(\/|$)/.test(sayfa),
     }),
   ],
 
