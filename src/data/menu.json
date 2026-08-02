@@ -42,6 +42,13 @@
       "sayac": "ipuclari"
     },
     {
+      "etiket": "Paylaşım kartı üreteci",
+      "adres": "/araclar/paylasim-karti",
+      "aciklama": "Adresi girin, temasına uygun post çıksın",
+      "ikon": "kutu",
+      "sayac": "yok"
+    },
+    {
       "etiket": "RSS akışı",
       "adres": "/rss.xml",
       "aciklama": "Bültene alternatif",
