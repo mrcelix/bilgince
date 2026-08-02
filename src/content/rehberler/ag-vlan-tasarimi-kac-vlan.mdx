@@ -1,0 +1,81 @@
+---
+baslik: "VLAN tasarımı: kaç VLAN yeterli?"
+ozet: "Ne düz ağ ne de otuz VLAN. Segmentasyonu iş gerekçesine bağlayıp yönetilebilir bir sayıda tutmanın yolu."
+konu: "ag"
+etiketler: ["vlan", "segmentasyon", "tasarim"]
+yayin: 2026-01-09
+sure: 11
+---
+
+İki uç görürüm. Birincisi: tek düz ağ, üç yüz cihaz, yazıcılar ve sunucular kullanıcılarla aynı yayın alanında. İkincisi: departman başına VLAN, otuz altı segment, kimsenin tam olarak anlamadığı bir yönlendirme tablosu.
+
+İkisi de aynı sebepten doğar — segmentasyonun **neden** yapıldığı hiç tartışılmamıştır.
+
+## Önce sebebi seçin
+
+VLAN üç ayrı sorunu çözer ve hangisini çözdüğünüzü bilmek tasarımı belirler.
+
+**Yayın alanını küçültmek.** Eskiden asıl gerekçe buydu. Bugün anahtarlar çok daha yetenekli ve birkaç yüz cihazlık bir yayın alanı pratikte sorun çıkarmıyor. Bu gerekçe artık tek başına yeterli değil.
+
+**Güvenlik sınırı çizmek.** Asıl gerekçe budur. Kameralar sunuculara erişemesin, misafirler iç ağı görmesin, üretim hattı ofis ağından ayrılsın.
+
+**Politika uygulamak.** Farklı QoS, farklı DHCP seçenekleri, farklı erişim kuralları gereken cihaz grupları.
+
+Bir VLAN önerisi geldiğinde sorulacak soru şudur: **bu segment ile diğerleri arasına hangi kuralı koyacaksınız?** Cevap "hiçbiri" ise o VLAN'a gerek yoktur; yalnızca yönlendirme yükü ekler.
+
+## Cihaz türüne göre bölün, departmana göre değil
+
+En sık yapılan tasarım hatası, VLAN'ları organizasyon şemasına göre kurmaktır: Muhasebe VLAN'ı, Satış VLAN'ı, İK VLAN'ı.
+
+Bu yaklaşımın iki sorunu var. Birincisi, departmanlar arasında genelde bir güvenlik sınırı yoktur — muhasebe ile satışın birbirini görmemesi için bir gerekçe bulamazsınız, dolayısıyla kural yazmazsınız ve VLAN'lar boş yere çoğalır. İkincisi, insanlar yer değiştirir; departman bazlı VLAN, her taşınmada bir port yapılandırması işi doğurur.
+
+Cihaz türüne göre bölmek çok daha dayanıklıdır:
+
+| VLAN | İçerik | Neden ayrı |
+| --- | --- | --- |
+| Kullanıcı | Dizüstü, masaüstü | Temel ağ |
+| Ses | IP telefonlar | QoS ve ayrı DHCP seçenekleri |
+| Sunucu | İç sunucular | Erişim kontrolü |
+| Yönetim | Anahtar, ILO/iDRAC, hipervizör | Kullanıcıdan tamamen ayrık |
+| Kamera / IoT | Güvenlik kameraları, sensörler | Yamalanamayan cihazlar |
+| Yazıcı | Yazıcılar, çok fonksiyonlular | Zayıf gömülü yazılım |
+| Misafir | Ziyaretçi kablosuz | Yalnızca internet |
+
+Yedi VLAN, orta ölçekli çoğu kurum için hem yeterli hem yönetilebilirdir. Her birinin arasına yazılacak kural, tabloyu doldururken zaten belli olur.
+
+## Yönetim VLAN'ı pazarlık konusu değil
+
+Listedeki en kritik satır budur ve en sık atlanır. Anahtar yönetim arayüzleri, sunucu uzaktan yönetim kartları ve hipervizör konsolları kullanıcı ağından erişilebilir olmamalıdır.
+
+Bir kullanıcı bilgisayarının ele geçirilmesi durumunda saldırganın gördüğü ilk şey bu arayüzlerse, olayın ölçeği tamamen değişir. ILO/iDRAC kartları genelde eski gömülü yazılımlarla çalışır ve yamalanmaları unutulur.
+
+## IoT ve kamera: yamalanamayanı izole edin
+
+Kameralar, klimalar, kartlı geçiş sistemleri, üretim sensörleri. Ortak özellikleri: güncellenmezler, varsayılan parolalarla gelirler ve üreticileri destek vermeyi bırakır.
+
+Bunları izole etmek, "belki bir gün" değil bugün yapılacak iştir. Kural basit olsun: bu VLAN internete çıkabilir (gerekiyorsa), yönetim sunucusuna belirli portlardan erişebilir, **başka hiçbir yere erişemez**.
+
+## Kural setini VLAN sayısıyla birlikte düşünün
+
+N tane VLAN, N×(N−1) yönlü ilişki demektir. Yedi VLAN'da 42 olası yön vardır — hepsini tanımlamak zorunda değilsiniz ama varsayılan davranışın ne olduğunu bilmelisiniz.
+
+Sürdürülebilir yaklaşım: **varsayılan reddet, açık izinler**. Her izin satırının yanına neden var olduğunu yazın. Altı ay sonra "bu kural kimin için" sorusuna cevap veremediğiniz her satır, silinmeye aday demektir.
+
+## Geçişi kademeli yapın
+
+Düz ağdan segmentli ağa geçiş tek gecede yapılmaz. Sıra risk temellidir:
+
+1. **Misafir ağı** — ayrı zaten, en kolay.
+2. **Kameralar ve IoT** — kullanıcıyı etkilemez.
+3. **Yazıcılar** — sürücü ve keşim ayarları gerekebilir, dikkatli test edin.
+4. **Ses** — QoS ile birlikte.
+5. **Sunucular** — en riskli, en son.
+6. **Yönetim** — sunucularla birlikte veya hemen ardından.
+
+Her adımdan sonra bir hafta bekleyin. Segmentasyonun kırdığı şeyler genelde hemen değil, haftalık veya aylık bir işlem çalıştığında görünür: yedekleme, raporlama, envanter taraması.
+
+## Doğrulama adımı
+
+Segmentasyon bittikten sonra **her VLAN'dan bir cihazla** üç testi yapın: kendi segmentindeki bir kaynağa erişim (çalışmalı), izin verilen bir dış kaynağa erişim (çalışmalı), izin verilmeyen bir segmente erişim (**başarısız olmalı**).
+
+Üçüncü test en önemlisidir ve en sık atlanır. İzinlerin çalıştığını görmek kolaydır; asıl soru yasakların gerçekten uygulanıp uygulanmadığıdır. Kural setine bakarak varsaymayın — bir cihazdan gerçekten deneyin ve sonucu belgeleyin.

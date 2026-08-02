@@ -1,0 +1,96 @@
+---
+baslik: "IP adres planı: sonradan düzeltmesi en pahalı karar"
+ozet: "Rastgele büyüyen adres alanı, her yeni şubede ve her VPN kurulumunda karşınıza çıkar. Baştan doğru kurmanın kuralları."
+konu: "ag"
+etiketler: ["ip-plani", "dhcp", "tasarim"]
+yayin: 2026-01-30
+sure: 11
+---
+
+Bir birleşme projesinde iki şirketin ağını bağlamamız gerekti. İkisi de `192.168.1.0/24` kullanıyordu. Merkez ofisler, şubeler, hatta bazı sunucular çakışıyordu.
+
+Çözüm, bir tarafın tüm adres planını değiştirmesi oldu — altı ay süren, hiçbir iş değeri üretmeyen bir proje.
+
+## Özel adres alanını cömertçe kullanın
+
+RFC 1918 size üç blok verir ve `10.0.0.0/8` bunların en büyüğüdür: on altı milyondan fazla adres. Yine de çoğu kurum `192.168.x.x` içinde sıkışır.
+
+Cömert olmanın maliyeti yoktur. Her şubeye `/24` yerine `/22` ayırmak, hiçbir şeye mal olmaz ama beş yıl sonra "şubede adres kalmadı" sorununu tamamen ortadan kaldırır.
+
+## Yapıyı adrese kodlayın
+
+İyi bir plan, adrese bakınca nerede olduğunuzu söyler. Örnek bir şema:
+
+```
+10.  <lokasyon>  .  <vlan>  .  <host>
+10.      10      .     20   .   x     → Merkez, Sunucu VLAN
+10.      10      .     30   .   x     → Merkez, Yönetim VLAN
+10.      21      .     10   .   x     → Ankara şube, Kullanıcı VLAN
+10.      22      .     10   .   x     → İzmir şube, Kullanıcı VLAN
+```
+
+VLAN numarası ile üçüncü sekizliyi eşleştirmek, sorun giderirken çok işe yarar: `10.21.10.45` adresini gören biri, bunun Ankara şubesindeki bir kullanıcı olduğunu ezberden bilir.
+
+Lokasyon numaralarını 10'ar aralıklarla verin (10, 20, 30) — araya yeni lokasyon eklemek gerektiğinde yer kalır.
+
+## Her segmenti üçe bölün
+
+Bir `/24` içinde adresleri rastgele dağıtmayın. Sabit bir bölüm disiplini, sorun gidermeyi kolaylaştırır:
+
+```
+.1 – .9      → ağ altyapısı (ağ geçidi, anahtar yönetimi)
+.10 – .99    → statik sunucular ve yazıcılar
+.100 – .199  → DHCP havuzu
+.200 – .249  → DHCP rezervasyonları
+.250 – .254  → geçici / test
+```
+
+Bu düzende bir adrese bakınca ne olduğunu anlarsınız. Ayrıca DHCP havuzunu genişletmek gerektiğinde nereye kadar büyütebileceğiniz bellidir.
+
+## Statik mi rezervasyon mu
+
+Cihaza elle IP girmek yerine DHCP rezervasyonu kullanmak neredeyse her zaman daha iyidir: adres merkezî olarak görünür, değiştirmek için cihaza gitmek gerekmez ve çakışma riski yoktur.
+
+İstisna: DHCP sunucusunun kendisi, ağ geçitleri, anahtarlar ve domain controller'lar. Bunlar DHCP çalışmadığında da ayakta olmalıdır.
+
+Yazıcılar tartışmalıdır. Rezervasyon önerilir ama bazı eski yazıcılar kira yenilemede sorun çıkarır; o durumda statik verip **adresi mutlaka belgeleyin**.
+
+## VPN ve bulut için yer ayırın
+
+Planı yaparken bugünkü ihtiyacınıza göre değil, üç yıl sonrasına göre yer ayırın:
+
+- Site-to-site VPN uçları için ayrı bir blok
+- İstemci VPN havuzu için ayrı bir blok
+- Bulut sanal ağları için ayrı bir blok — bu, sonradan en çok çakışan yerdir
+
+Bulut bloğunu baştan ayırmamak, hibrit bağlantı kurulurken adres çakışması yaşamanın en yaygın sebebidir. Azure ya da AWS'de sanal ağ oluştururken varsayılan adres alanını kabul etmeyin; planınızdan seçin.
+
+## Belgeleyin — ama nerede
+
+IP planı bir Excel dosyasında yaşarsa altı ay içinde eskir. En sürdürülebilir yer, adres yönetiminin kendisidir: DHCP kapsam açıklamaları, DNS kayıtları ve varsa bir IPAM aracı.
+
+Minimum düzeyde şunu yapın: her DHCP kapsamının açıklama alanına VLAN adı, lokasyon ve sorumlusunu yazın.
+
+```powershell
+Get-DhcpServerv4Scope | Select-Object ScopeId, Name, Description, StartRange, EndRange, State
+```
+
+Bu çıktı, ayrı bir belge tutmadan planın büyük kısmını verir.
+
+## Kullanımı izleyin
+
+Adres tükenmesi sessiz bir arızadır: mevcut cihazlar çalışır, yalnızca yeni bağlananlar adres alamaz. Doluluk oranını izlemeye bağlayın:
+
+```powershell
+Get-DhcpServerv4ScopeStatistics |
+  Select-Object ScopeId, Free, InUse, PercentageInUse |
+  Sort-Object PercentageInUse -Descending
+```
+
+%80'i geçen kapsamlar için ya havuzu genişletin ya da kira süresini kısaltın. Kablosuz ve misafir ağlarda kira süresini kısa tutmak (2–4 saat) havuzun hızlı geri dönmesini sağlar.
+
+## Doğrulama adımı
+
+Planı uyguladıktan sonra tek bir testle sağlamasını yapın: **rastgele üç IP adresi seçin ve hangi lokasyon, hangi VLAN, hangi cihaz olduklarını yalnızca adrese ve DHCP kayıtlarına bakarak söyleyin.**
+
+Üçünü de söyleyebiliyorsanız plan işliyor demektir. Bir cihaza fiziksel olarak bakmanız ya da birine sormanız gerekiyorsa, planınız kafanızda var ama sistemde yok — ve o bilgi siz izne çıktığınızda kaybolur.

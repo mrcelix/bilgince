@@ -1,0 +1,106 @@
+---
+baslik: "Kafede Wi-Fi'ye bağlandım ama internet yok"
+ozet: "Karşılama sayfası açılmıyorsa sebep neredeyse her zaman kurumsal ağdan kalan sabit DNS ayarıdır. Betik beş adımı sırayla dener."
+konu: "ag"
+etiketler: ["wifi", "dns", "hotspot", "captive-portal"]
+belirtiler:
+  - "Wi-Fi bağlı görünüyor ama sayfa açılmıyor"
+  - "Giriş/karşılama sayfası hiç gelmiyor"
+  - "Telefonumda çalışıyor, bilgisayarımda çalışmıyor"
+  - "İnternet erişimi yok uyarısı (sarı ünlem)"
+  - "169.254 ile başlayan IP adresi"
+yayin: 2026-08-02
+sure: 4
+dosya: "/araclar/hotspot-tamir.ps1"
+dosyaAdi: "hotspot-tamir.ps1"
+dosyaAciklama: "Beş adımı sırayla dener, değişiklikleri kaydeder ve -GeriAl ile geri alır."
+komut: "Set-DnsClientServerAddress -InterfaceIndex (Get-NetAdapter -Physical | Where-Object Status -eq Up).ifIndex -ResetServerAddresses; Clear-DnsClientCache"
+platform: "windows"
+ilgiliRehberler: ["ag-ip-plani-ve-dhcp-kapsami", "ag-vpn-site-mi-istemci-mi"]
+sira: 1
+---
+
+Telefonunuz sorunsuz bağlanıyor, dizüstünüz bağlanmıyor. Wi-Fi simgesi bağlı gösteriyor ama hiçbir sayfa açılmıyor ve o giriş ekranı bir türlü gelmiyor.
+
+Bunun sebebi neredeyse her zaman aynı: **bilgisayarınızda sabit bir DNS sunucusu tanımlı.**
+
+## Neden sabit DNS portalı bozar
+
+Karşılama sayfaları bir hile üzerine kuruludur. Siz herhangi bir adrese gitmeye çalıştığınızda, kafenin yönlendiricisi DNS sorgunuza yalan söyler ve sizi kendi giriş sayfasına yönlendirir.
+
+Bilgisayarınızda `8.8.8.8` gibi sabit bir DNS sunucusu tanımlıysa, sorgu kafenin yönlendiricisine hiç uğramaz — doğrudan dışarı çıkmaya çalışır. Ama henüz giriş yapmadığınız için dışarı çıkamaz. Sonuç: ne portal açılır ne internet gelir. Bilgisayar sessizce bekler.
+
+Telefonunuzda çalışmasının sebebi de budur: telefonda kimse sabit DNS tanımlamamıştır.
+
+Sabit DNS genelde şuralardan kalır: kurumsal ağ yapılandırması, eski bir VPN kurulumu, "internetim yavaştı, DNS değiştirdim" denemeleri.
+
+## Elle çözüm
+
+Tek satırda halletmek isterseniz, yönetici PowerShell'de:
+
+```powershell
+Set-DnsClientServerAddress -InterfaceIndex (Get-NetAdapter -Physical | Where-Object Status -eq 'Up').ifIndex -ResetServerAddresses
+Clear-DnsClientCache
+```
+
+Ardından tarayıcıda `http://neverssl.com` adresine gidin. HTTPS olmayan bir adres olması önemlidir — HTTPS sayfalarda yönlendirme sertifika hatası verir ve portal açılmaz.
+
+## Betikle çözüm
+
+Aşağıdaki betik beş adımı sırayla dener ve her adımda ne yaptığını söyler:
+
+1. Sabit DNS varsa kaldırır (DHCP'ye çevirir)
+2. Kurumsal ağdan kalan vekil (proxy) ayarını kapatır
+3. DNS önbelleğini temizler
+4. DHCP kirasını yeniler
+5. Karşılama sayfasını algılayıp tarayıcıda açar
+
+Önce ne olduğunu görmek isterseniz hiçbir şeyi değiştirmeden çalıştırın:
+
+```powershell
+.\hotspot-tamir.ps1 -Rapor
+```
+
+Onarımı çalıştırmak için:
+
+```powershell
+.\hotspot-tamir.ps1
+```
+
+Betik, değiştirdiği ayarları `%LOCALAPPDATA%` altına kaydeder. **Ofise döndüğünüzde** eski ayarlarınızı geri almak için:
+
+```powershell
+.\hotspot-tamir.ps1 -GeriAl
+```
+
+Bu son adım önemli: kurumsal ağda sabit DNS gerçekten gerekiyor olabilir. Betik onu sizin yerinize hatırlar.
+
+## Çalışma ilkesi engeli
+
+İndirilen betikler varsayılan olarak çalışmayabilir. Tek seferlik izin vermek için:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\hotspot-tamir.ps1
+```
+
+Bu, makinenin genel ilkesini değiştirmez; yalnızca o çalıştırma için geçerlidir.
+
+## Hâlâ olmuyorsa
+
+Sırayla şunları deneyin.
+
+**Ağdan çıkıp yeniden bağlanın.** "Bu ağı unut" deyip yeniden bağlanmak, saklanmış bozuk bir yapılandırmayı temizler.
+
+**Tarayıcı önbelleğini atlayın.** Gizli pencerede `http://neverssl.com` açın.
+
+**MAC rastgeleleştirmesini kapatın.** Windows'un rastgele donanım adresi özelliği, bazı otel ve kafe sistemlerinde giriş yaptığınızı unutturur: Ayarlar → Ağ → Wi-Fi → Rastgele donanım adresleri.
+
+**IPv6'yı geçici kapatın.** Bazı eski portal sistemleri IPv6 ile başa çıkamaz.
+
+**Son çare:** yönetici olarak `netsh winsock reset` ve yeniden başlatma. Bu, ağ yığınını sıfırlar; VPN istemcileri gibi araçların yeniden yapılandırılması gerekebilir, o yüzden gerçekten son çare olsun.
+
+## Güvenlik notu
+
+Açık hotspot'ta trafiğiniz aynı ağdaki herkes tarafından görülebilir. Portal girişini yaptıktan **sonra** kurumsal VPN'inizi açın ve öyle çalışın.
+
+Portal giriş sayfasında sizden e-posta veya telefon isteniyorsa, kurumsal adresinizi vermeyin — bu bilgiler çoğu zaman pazarlama listelerine gider.

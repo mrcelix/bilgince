@@ -74,4 +74,29 @@ const komutlar = defineCollection({
   }),
 });
 
-export const collections = { rehberler, ipuclari, projeler, komutlar };
+// Hızlı Çözümler: belirtiden başlayıp indirilebilir bir araçla biten kayıtlar.
+// Diğer koleksiyonlardaki ilgili içeriği de bir araya getirir.
+const cozumler = defineCollection({
+  loader: glob({ pattern: '**/*.{md,mdx}', base: './src/content/cozumler' }),
+  schema: z.object({
+    baslik: z.string(),
+    ozet: z.string(),
+    konu: z.string(),
+    etiketler: z.array(z.string()).default([]),
+    // kullanıcının gördüğü belirtiler — sayfada arama bunlara da bakar
+    belirtiler: z.array(z.string()).default([]),
+    yayin: z.coerce.date(),
+    sure: z.number().default(5),
+    // indirilebilir araç (public/ altındaki yol)
+    dosya: z.string().optional(),
+    dosyaAdi: z.string().optional(),
+    dosyaAciklama: z.string().optional(),
+    // tek satırlık hızlı çözüm
+    komut: z.string().optional(),
+    platform: z.enum(['windows', 'macos', 'linux', 'genel']).default('windows'),
+    ilgiliRehberler: z.array(z.string()).default([]),
+    sira: z.number().default(50),
+  }),
+});
+
+export const collections = { rehberler, ipuclari, projeler, komutlar, cozumler };

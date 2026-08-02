@@ -1,0 +1,74 @@
+---
+baslik: "VPN seçimi: site-to-site mi, istemci VPN mi?"
+ozet: "Şube bağlantısı ile uzaktan çalışan erişimi farklı sorunlardır. Yanlış araç seçimi ya güvenlik ya performans bedeli üretir."
+konu: "ag"
+etiketler: ["vpn", "uzaktan-erisim", "tasarim"]
+yayin: 2026-03-13
+sure: 11
+---
+
+"VPN kuralım" cümlesi iki tamamen farklı ihtiyacı gizler. Biri şubeyi merkeze bağlamaktır; diğeri evdeki kullanıcıyı iç kaynaklara ulaştırmak. Aynı kelimeyi kullanmaları, aynı çözümü paylaştıkları anlamına gelmez.
+
+## Site-to-site: her zaman açık, cihaz tabanlı
+
+İki ağı kalıcı olarak birleştirir. Kullanıcı bir şey yapmaz, hatta VPN olduğunu bilmez. Tünel iki güvenlik duvarı arasında kurulur ve sürekli ayakta durur.
+
+Doğru olduğu yerler: şube–merkez bağlantısı, veri merkezi–bulut bağlantısı, iş ortağıyla sınırlı entegrasyon.
+
+Tasarımda üç noktaya dikkat edin.
+
+**Adres çakışması.** İki taraf aynı özel bloğu kullanıyorsa tünel kurulur ama trafik akmaz. Kurmadan önce her iki tarafın adres planını karşılaştırın.
+
+**Yedeklilik.** Tek tünel, tek hat demektir. Kritik şubelerde ikinci bir hat üzerinden ikinci tünel kurun ve yük devretmeyi test edin.
+
+**Şifreleme yükü.** Yüksek bant genişliğinde şifreleme, güvenlik duvarının işlemcisini doldurabilir. Cihaz seçerken "VPN verimi" değerine bakın; genel verim değerinden çok daha düşüktür.
+
+## İstemci VPN: talebe bağlı, kullanıcı tabanlı
+
+Tek bir kullanıcının cihazını iç ağa bağlar. Kimlik doğrulama kullanıcı bazlıdır, dolayısıyla erişim de kullanıcıya göre sınırlanabilir.
+
+Burada asıl tasarım kararı **tünel kapsamıdır**.
+
+**Tam tünel (full tunnel):** Tüm trafik VPN'den akar, internet dahil. Denetim kolaydır ama merkezin internet hattını kullanıcı sayısıyla çarparsınız. Video toplantılar ve bulut uygulamaları merkeze gidip geri döner; gecikme belirgin biçimde artar.
+
+**Bölünmüş tünel (split tunnel):** Yalnızca iç kaynaklara giden trafik tünelden geçer. Performans çok daha iyidir, merkez hattı rahatlar. Karşılığında kullanıcının internet trafiği denetiminizden çıkar.
+
+Bulut uygulamalarına geçmiş kurumlarda bölünmüş tünel neredeyse her zaman doğru cevaptır — ama uç nokta güvenliğinin (EDR, DNS filtreleme) cihazda çalışıyor olması şartıyla. Tünel daraldıkça uç nokta önem kazanır.
+
+## MFA pazarlık konusu değil
+
+İstemci VPN, internete açık bir kimlik doğrulama uç noktasıdır. Yalnızca kullanıcı adı ve parola ile korunan her VPN, er ya da geç kaba kuvvet ve kimlik bilgisi doldurma saldırılarının hedefi olur.
+
+Çok faktörlü doğrulamayı ilk günden zorunlu kılın. Ayrıca:
+
+- Başarısız giriş denemelerini izleyin ve eşik aşımında uyarı üretin
+- Coğrafi kısıtlama uygulanabiliyorsa uygulayın
+- Kullanılmayan hesapları düzenli temizleyin — VPN hesapları, ayrılan çalışanlarda en sık unutulanlardır
+
+## Cihaz uyumluluğu
+
+Kullanıcının kişisel bilgisayarından bağlanmasına izin veriyor musunuz? Bu, teknik değil politika sorusudur ve cevabı mimariyi belirler.
+
+İzin veriyorsanız en azından şunları kontrol edin: işletim sistemi güncel mi, disk şifreli mi, uç nokta koruması çalışıyor mu. Çoğu VPN çözümü bu kontrolleri bağlantı öncesi yapabilir.
+
+İzin vermiyorsanız sertifika tabanlı kimlik doğrulama kullanın: yalnızca kurumsal cihazda bulunan bir sertifika olmadan bağlantı kurulamaz. Bu, parola çalınsa bile erişimi engeller.
+
+## VPN'siz alternatifler
+
+Her erişim ihtiyacı VPN gerektirmez ve gerektirmemesi daha iyidir.
+
+Web tabanlı bir iç uygulamaya erişim için ters vekil (reverse proxy) + kimlik sağlayıcı yeterlidir; kullanıcı iç ağa hiç girmez. Uzak masaüstü için ağ geçidi çözümleri aynı işi yapar.
+
+Bu yaklaşım — kaynağa erişim, ağa erişim değil — hem daha güvenlidir hem kullanıcı deneyimi daha iyidir. Yeni bir erişim ihtiyacı geldiğinde ilk sorulacak soru "VPN'e mi eklemeliyiz" değil, "**VPN olmadan çözülebilir mi**" olmalıdır.
+
+## Kapasite planlaması
+
+İstemci VPN'de eşzamanlı kullanıcı sayısını, lisans ve donanım sınırlarını bilerek planlayın. Yirmi kişilik tasarlanmış bir VPN, iki yüz kişiyle çalışmaz — ve bunu genelde en yoğun günde öğrenirsiniz.
+
+Bant genişliği hesabı da yapın. Yüz kullanıcının video toplantısı, tam tünelde merkez hattınızın tamamını yer.
+
+## Doğrulama adımı
+
+Kurulumdan sonra dört testi yapın ve sonuçlarını kaydedin: **iç kaynağa erişim** (çalışmalı), **erişimi olmaması gereken bir kaynağa erişim** (engellenmeli), **MFA olmadan bağlanma denemesi** (reddedilmeli) ve **yedek hat üzerinden bağlantı** (site-to-site ise).
+
+Dördüncüsü en çok atlanandır. Yedek tüneli hiç denemediyseniz, birincil hat kesildiğinde yedeğin çalışıp çalışmadığını en kötü anda öğrenirsiniz.

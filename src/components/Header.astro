@@ -6,6 +6,7 @@ import { SITE, KONULAR, GRUPLAR, POPULER_ARAMALAR, slugla, sayi } from '../site.
 const rehberler = (await getCollection('rehberler')).filter((r) => !r.data.taslak);
 const ipuclari = await getCollection('ipuclari');
 const komutlar = await getCollection('komutlar');
+const cozumler = await getCollection('cozumler');
 
 const say = (slug: string) =>
   rehberler.filter((r) => r.data.konu === slug).length +
@@ -171,6 +172,13 @@ const etkin = (p: string) => (yol === p || yol.startsWith(p + '/') ? 'page' : un
       <div class="mega-sutun">
         <span class="mega-etiket">Araçlar</span>
         <span class="mega-grup-ozet">Kopyala ve çalıştır</span>
+        <a class="mega-bag" href="/hizli-cozumler">
+          <span class="ikon" aria-hidden="true"><KonuIkon ad="kalkan" /></span>
+          <span>
+            <span class="ad">Hızlı Çözümler<span class="say">{cozumler.length}</span></span>
+            <span class="ac">Belirtiden çözüme, indirilebilir araçlarla</span>
+          </span>
+        </a>
         <a class="mega-bag" href="/komutlar">
           <span class="ikon" aria-hidden="true"><KonuIkon ad="terminal" /></span>
           <span>
@@ -258,6 +266,7 @@ const etkin = (p: string) => (yol === p || yol.startsWith(p + '/') ? 'page' : un
       ))
     }
     <a href="/rehberler">Tüm rehberler <span class="say">{rehberler.length}</span></a>
+    <a href="/hizli-cozumler">Hızlı Çözümler <span class="say">{cozumler.length}</span></a>
     <a href="/komutlar">Komut kütüphanesi <span class="say">{komutlar.length}</span></a>
     <a href="/ipuclari">Hızlı ipuçları <span class="say">{ipuclari.length}</span></a>
     <a href="/portfolyo">Portfolyo</a>

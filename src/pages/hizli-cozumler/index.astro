@@ -1,0 +1,241 @@
+---
+import Base from '../../layouts/Base.astro';
+import { getCollection } from 'astro:content';
+import { KONULAR, SITE } from '../../site.js';
+
+const cozumler = (await getCollection('cozumler')).sort(
+  (a, b) => a.data.sira - b.data.sira || +b.data.yayin - +a.data.yayin
+);
+const konuAdi = (slug: string) => KONULAR.find((k) => k.slug === slug)?.ad ?? slug;
+const platformlar = [...new Set(cozumler.map((c) => c.data.platform))];
+const platformAdi: Record<string, string> = {
+  windows: 'Windows',
+  macos: 'macOS',
+  linux: 'Linux',
+  genel: 'Genel',
+};
+const araclı = cozumler.filter((c) => c.data.dosya).length;
+---
+
+<Base
+  baslik="Hızlı Çözümler"
+  aciklama={`Belirtiden başlayıp indirilebilir araca ulaşan ${cozumler.length} çözüm. Uzun rehbere girmeden sorunu kapatın.`}
+  jsonLd={{
+    '@context': 'https://schema.org',
+    '@type': 'CollectionPage',
+    name: 'Hızlı Çözümler',
+    url: `${SITE.url}/hizli-cozumler`,
+    numberOfItems: cozumler.length,
+  }}
+>
+  <div class="lavanta">
+    <div class="kap">
+      <nav class="kirinti" aria-label="Kırıntı yolu">
+        <a href="/">Ana sayfa</a><span class="ayrac">/</span><span aria-current="page">Hızlı Çözümler</span>
+      </nav>
+      <div class="konu-bas" style="padding-top:8px">
+        <span class="etiket">Hızlı Çözümler</span>
+        <h1>Belirtiden çözüme</h1>
+        <p class="ozet">
+          Burada teori yok. Yaşadığınız belirtiyi arayın, altındaki komutu çalıştırın ya da hazır
+          betiği indirin. Her çözümün altında konuyu derinleştiren rehberler var.
+        </p>
+        <div class="konu-sayac">
+          <span><b>{cozumler.length}</b> çözüm</span>
+          <span><b>{araclı}</b> indirilebilir araç</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="suzgec">
+    <div class="kap">
+      <label class="atla" for="cozum-ara">Belirti ara</label>
+      <input
+        id="cozum-ara"
+        class="cip"
+        type="search"
+        placeholder="Belirtiyi yazın: &quot;internet yok&quot;, &quot;yazıcı&quot;…"
+        style="min-width:280px;font-family:inherit"
+      />
+      <button class="cip" type="button" data-platform="hepsi" aria-current="page">
+        Tümü <span style="opacity:.7">{cozumler.length}</span>
+      </button>
+      {
+        platformlar.map((p) => (
+          <button class="cip" type="button" data-platform={p}>
+            {platformAdi[p] ?? p}{' '}
+            <span style="opacity:.6">{cozumler.filter((c) => c.data.platform === p).length}</span>
+          </button>
+        ))
+      }
+    </div>
+  </div>
+
+  <div class="kap">
+    <div id="cozum-liste" style="display:flex;flex-direction:column;gap:18px;padding-top:30px">
+      {
+        cozumler.map((c) => (
+          <article
+            class="cozum-kart"
+            data-platform={c.data.platform}
+            data-ara={`${c.data.baslik} ${c.data.ozet} ${c.data.belirtiler.join(' ')} ${c.data.etiketler.join(' ')}`.toLocaleLowerCase('tr')}
+          >
+            <div class="cozum-ust">
+              <span class="etiket">{konuAdi(c.data.konu)}</span>
+              <span class="cozum-platform">{platformAdi[c.data.platform] ?? c.data.platform}</span>
+            </div>
+
+            <h2>
+              <a href={`/hizli-cozumler/${c.id}`}>{c.data.baslik}</a>
+            </h2>
+            <p class="cozum-ozet">{c.data.ozet}</p>
+
+            {c.data.belirtiler.length > 0 && (
+              <div class="belirtiler">
+                <span class="yan-etiket">Belirtiler</span>
+                <ul>
+                  {c.data.belirtiler.map((b) => (
+                    <li>{b}</li>
+                  ))}
+                </ul>
+              </div>
+            )}
+
+            <div class="cozum-alt">
+              <a class="dg" href={`/hizli-cozumler/${c.id}`}>
+                Çözümü aç →
+              </a>
+              {c.data.dosya && (
+                <a class="dg dg-hayalet" href={c.data.dosya} download>
+                  <svg width="15" height="15" viewBox="0 0 16 16" fill="none" aria-hidden="true">
+                    <path
+                      d="M8 2v8m0 0L5 7m3 3l3-3M3 13h10"
+                      stroke="currentColor"
+                      stroke-width="1.7"
+                      stroke-linecap="round"
+                      stroke-linejoin="round"
+                    />
+                  </svg>
+                  {c.data.dosyaAdi}
+                </a>
+              )}
+            </div>
+          </article>
+        ))
+      }
+    </div>
+
+    <p id="cozum-bos" hidden style="color:var(--muted);padding:30px 0;font-size:14.5px">
+      Bu belirtiyle eşleşen çözüm yok.
+      <a href="/hakkimda#iletisim" style="color:var(--indigo);font-weight:800">Sorununuzu yazın</a> —
+      sık gelenler buraya ekleniyor.
+    </p>
+  </div>
+</Base>
+
+<style>
+  .cozum-kart {
+    background: var(--paper);
+    border: 1px solid var(--line);
+    border-left: 3px solid var(--indigo);
+    border-radius: var(--r-m);
+    padding: 22px 24px;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+  }
+  .cozum-ust {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    flex-wrap: wrap;
+  }
+  .cozum-platform {
+    font-family: var(--mono);
+    font-size: 11px;
+    color: var(--muted);
+    border: 1px solid var(--line);
+    border-radius: 6px;
+    padding: 2px 8px;
+  }
+  .cozum-kart h2 {
+    font-size: 21px;
+    font-weight: 900;
+    letter-spacing: -0.03em;
+    line-height: 1.2;
+  }
+  .cozum-kart h2 a:hover {
+    color: var(--indigo);
+  }
+  .cozum-ozet {
+    font-size: 14.5px;
+    color: var(--muted);
+    line-height: 1.6;
+    max-width: 72ch;
+  }
+  .belirtiler {
+    background: var(--bg);
+    border-radius: var(--r-s);
+    padding: 14px 16px;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+  .belirtiler ul {
+    margin: 0;
+    padding-left: 18px;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+  }
+  .belirtiler li {
+    font-size: 13.5px;
+    color: var(--ink-soft);
+    line-height: 1.45;
+  }
+  .belirtiler li::marker {
+    color: var(--amber);
+  }
+  .cozum-alt {
+    display: flex;
+    gap: 10px;
+    flex-wrap: wrap;
+    padding-top: 4px;
+  }
+</style>
+
+<script>
+  const girdi = document.getElementById('cozum-ara') as HTMLInputElement | null;
+  const dugmeler = [...document.querySelectorAll<HTMLButtonElement>('[data-platform]')].filter(
+    (d) => d.tagName === 'BUTTON'
+  );
+  const kartlar = [...document.querySelectorAll<HTMLElement>('.cozum-kart')];
+  const bos = document.getElementById('cozum-bos');
+  let etkin = 'hepsi';
+
+  function suz() {
+    const q = (girdi?.value ?? '').trim().toLocaleLowerCase('tr');
+    let gorunen = 0;
+    kartlar.forEach((k) => {
+      const goster =
+        (etkin === 'hepsi' || k.dataset.platform === etkin) &&
+        (!q || (k.dataset.ara ?? '').includes(q));
+      k.hidden = !goster;
+      if (goster) gorunen++;
+    });
+    if (bos) bos.hidden = gorunen > 0;
+  }
+
+  dugmeler.forEach((d) =>
+    d.addEventListener('click', () => {
+      etkin = d.dataset.platform ?? 'hepsi';
+      dugmeler.forEach((x) =>
+        x === d ? x.setAttribute('aria-current', 'page') : x.removeAttribute('aria-current')
+      );
+      suz();
+    })
+  );
+  girdi?.addEventListener('input', suz);
+</script>

@@ -1,0 +1,199 @@
+---
+import Base from '../../layouts/Base.astro';
+import { getCollection, render } from 'astro:content';
+import { SITE, KONULAR, trTarih } from '../../site.js';
+
+export async function getStaticPaths() {
+  const cozumler = await getCollection('cozumler');
+  const rehberler = (await getCollection('rehberler')).filter((r) => !r.data.taslak);
+
+  return cozumler.map((c) => ({
+    params: { slug: c.id },
+    props: {
+      cozum: c,
+      ilgili: c.data.ilgiliRehberler
+        .map((s) => rehberler.find((r) => r.id === s))
+        .filter((r): r is (typeof rehberler)[number] => Boolean(r)),
+    },
+  }));
+}
+
+const { cozum, ilgili } = Astro.props;
+const { Content } = await render(cozum);
+const d = cozum.data;
+const konu = KONULAR.find((k) => k.slug === d.konu);
+const url = `${SITE.url}/hizli-cozumler/${cozum.id}`;
+---
+
+<Base
+  baslik={d.baslik}
+  aciklama={d.ozet}
+  tur="article"
+  jsonLd={[
+    {
+      '@context': 'https://schema.org',
+      '@type': 'HowTo',
+      name: d.baslik,
+      description: d.ozet,
+      inLanguage: 'tr-TR',
+      totalTime: `PT${d.sure}M`,
+      author: { '@type': 'Person', name: SITE.author.name, url: `${SITE.url}/hakkimda` },
+    },
+    {
+      '@context': 'https://schema.org',
+      '@type': 'BreadcrumbList',
+      itemListElement: [
+        { '@type': 'ListItem', position: 1, name: 'Ana sayfa', item: SITE.url },
+        { '@type': 'ListItem', position: 2, name: 'Hızlı Çözümler', item: `${SITE.url}/hizli-cozumler` },
+        { '@type': 'ListItem', position: 3, name: d.baslik, item: url },
+      ],
+    },
+  ]}
+>
+  <div class="kap">
+    <nav class="kirinti" aria-label="Kırıntı yolu">
+      <a href="/">Ana sayfa</a><span class="ayrac">/</span>
+      <a href="/hizli-cozumler">Hızlı Çözümler</a><span class="ayrac">/</span>
+      <span aria-current="page">{d.baslik}</span>
+    </nav>
+
+    <header class="yazi-bas">
+      <span class="etiket">
+        <a href={`/konu/${d.konu}`}>{konu?.ad ?? d.konu}</a> · {d.platform}
+      </span>
+      <h1>{d.baslik}</h1>
+      <p class="ozet">{d.ozet}</p>
+      <div class="imza">
+        <span class="tarih">{trTarih(d.yayin)} · yaklaşık {d.sure} dakika</span>
+      </div>
+    </header>
+
+    {
+      d.belirtiler.length > 0 && (
+        <div class="uyari" style="max-width:66ch">
+          <span class="ikon" aria-hidden="true">
+            <svg width="17" height="17" viewBox="0 0 18 18" fill="none">
+              <circle cx="9" cy="9" r="6.5" stroke="currentColor" stroke-width="1.5" />
+              <path d="M9 5.5v4M9 12v.01" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" />
+            </svg>
+          </span>
+          <div>
+            <span class="baslik">Bu belirtileri yaşıyorsanız doğru yerdesiniz</span>
+            <ul style="margin:6px 0 0;padding-left:18px;display:flex;flex-direction:column;gap:4px">
+              {d.belirtiler.map((b) => (
+                <li style="font-size:14px;line-height:1.5;color:#5b4415">{b}</li>
+              ))}
+            </ul>
+          </div>
+        </div>
+      )
+    }
+
+    {
+      d.komut && (
+        <section style="margin-top:24px;max-width:66ch">
+          <span class="yan-etiket">30 saniyelik çözüm</span>
+          <pre class="kod" style="margin-top:8px"><code>{d.komut}</code></pre>
+        </section>
+      )
+    }
+
+    {
+      d.dosya && (
+        <section class="arac-kutusu">
+          <div>
+            <span class="yan-etiket">Hazır araç</span>
+            <h2>{d.dosyaAdi}</h2>
+            {d.dosyaAciklama && <p>{d.dosyaAciklama}</p>}
+          </div>
+          <a class="dg" href={d.dosya} download>
+            <svg width="15" height="15" viewBox="0 0 16 16" fill="none" aria-hidden="true">
+              <path
+                d="M8 2v8m0 0L5 7m3 3l3-3M3 13h10"
+                stroke="currentColor"
+                stroke-width="1.7"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+              />
+            </svg>
+            İndir
+          </a>
+        </section>
+      )
+    }
+
+    <div class="yazi-duzen" style="margin-top:26px">
+      <article class="metin">
+        <Content />
+      </article>
+
+      <aside class="yan">
+        {
+          ilgili.length > 0 && (
+            <div class="yan-kutu">
+              <span class="yan-etiket">Konuyu derinleştir</span>
+              {ilgili.map((r) => (
+                <a class="baslikli" href={`/rehberler/${r.id}`}>
+                  {r.data.baslik}
+                  <span>{r.data.sure} dk</span>
+                </a>
+              ))}
+            </div>
+          )
+        }
+        <div class="yan-tanitim">
+          <h3>Yeni çözüm eklendiğinde haber ver</h3>
+          <p>Sık gelen sorunlar buraya ekleniyor. Takvim yok, yalnızca yeni içerik.</p>
+          <a class="dg" href="/#bulten">Bültene katıl</a>
+        </div>
+        {
+          d.etiketler.length > 0 && (
+            <div class="yan-kutu">
+              <span class="yan-etiket">Etiketler</span>
+              <span class="yigin">
+                {d.etiketler.map((e) => (
+                  <a href={`/etiket/${e}`}>{e}</a>
+                ))}
+              </span>
+            </div>
+          )
+        }
+      </aside>
+    </div>
+
+    <p style="margin-top:26px;font-size:13px;color:var(--muted);max-width:66ch">
+      Bu çözüm işinize yaramadıysa ya da eksik bir adım varsa
+      <a href="/hakkimda#iletisim" style="color:var(--indigo);font-weight:800">yazın</a> — güncelliyorum.
+    </p>
+  </div>
+</Base>
+
+<style>
+  .arac-kutusu {
+    margin-top: 24px;
+    max-width: 66ch;
+    border: 1px solid var(--line);
+    border-radius: var(--r-m);
+    padding: 22px 24px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 20px;
+    flex-wrap: wrap;
+    background: radial-gradient(80% 120% at 100% 0%, rgba(58, 69, 224, 0.14), transparent 62%),
+      linear-gradient(150deg, var(--tint), var(--paper));
+  }
+  .arac-kutusu h2 {
+    font-family: var(--mono);
+    font-size: 17px;
+    font-weight: 800;
+    letter-spacing: -0.01em;
+    margin-top: 6px;
+  }
+  .arac-kutusu p {
+    font-size: 13.5px;
+    color: var(--muted);
+    margin-top: 5px;
+    max-width: 48ch;
+  }
+</style>

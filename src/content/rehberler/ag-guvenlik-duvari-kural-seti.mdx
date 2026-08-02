@@ -1,0 +1,94 @@
+---
+baslik: "Güvenlik duvarı kural setini okunabilir tutmak"
+ozet: "Dört yüz kurallı bir set, kimsenin dokunmaya cesaret edemediği bir sete dönüşür. Kuralları anlaşılır ve silinebilir tutmanın disiplini."
+konu: "ag"
+etiketler: ["guvenlik-duvari", "operasyon", "belgeleme"]
+yayin: 2026-02-20
+sure: 11
+---
+
+Devraldığım bir güvenlik duvarında 412 kural vardı. İlk yüz tanesi bir düzene sahipti; gerisi yıllar içinde eklenmiş, açıklamasız, sahipsiz satırlardı. Kimse hiçbirini silmiyordu çünkü neyi kıracağını bilen yoktu.
+
+Bu, teknik bir sorun değil, süreç sorunudur — ve çözümü de süreçtedir.
+
+## Her kuralın dört alanı olmalı
+
+Kural eklerken şu dördü zorunlu olsun:
+
+**Amaç.** "Muhasebe uygulamasının SQL sunucusuna erişimi" — hangi iş ihtiyacı.
+**Sahip.** Bir kişi adı. "BT" değil.
+**Talep referansı.** Değişiklik kaydı veya bilet numarası.
+**Gözden geçirme tarihi.** Geçici kurallar için mutlaka; kalıcılar için yılda bir.
+
+Çoğu güvenlik duvarı ürünü kural açıklaması için tek bir metin alanı verir. Yapılandırılmış yazın:
+
+```
+AMAC=Muhasebe->SQL | SAHIP=F.Yildiz | TALEP=CHG-2291 | GOZDEN=2027-01
+```
+
+Bu biçim, sonradan dışa aktarıp süzmenizi de sağlar. Altı ay sonra "gözden geçirme tarihi geçmiş kurallar" listesini çıkarmak tek satırlık bir işlem olur.
+
+## Nesne kullanın, IP yazmayın
+
+Kuralın içine ham IP adresi yazmak, o adresi değiştirmek gerektiğinde tüm seti taramak demektir. Adres nesneleri ve gruplar tanımlayın:
+
+```
+nesne: SRV-SQL-URETIM = 10.10.20.15
+grup:  GRP-MUHASEBE-ISTEMCI = 10.10.10.0/24, 10.21.10.0/24
+kural: GRP-MUHASEBE-ISTEMCI -> SRV-SQL-URETIM : tcp/1433 : izin
+```
+
+Sunucu taşındığında tek bir nesneyi güncellersiniz. Ayrıca kural setini okuyan kişi, `10.10.20.15` yerine `SRV-SQL-URETIM` gördüğünde ne olduğunu anlar.
+
+Aynı şey servisler için de geçerli: `tcp/1433` yerine `SVC-SQL` nesnesi tanımlayın.
+
+## Geniş kuralı daraltmadan önce ölçün
+
+`any/any` kuralı bulduğunuzda ilk içgüdü silmektir; doğrusu önce oradan ne geçtiğini görmektir. Kuralın günlüğünü açın, bir hafta bekleyin, gerçek trafiği listeleyin.
+
+Sonra sıralama şöyle olmalı:
+
+1. Ölçülen trafiğe göre dar kuralları yazın ve **geniş kuralın üstüne** koyun.
+2. Bir hafta izleyin — dar kurallar trafiği alıyor mu?
+3. Geniş kuralın sayaçları sıfırlanıyorsa devre dışı bırakın (silmeyin).
+4. Bir ay sonra silin.
+
+Her adım geri alınabilir. Doğrudan silme, gece yarısı geri alma telaşı demektir.
+
+## Kullanılmayan kuralları bulun
+
+Modern güvenlik duvarları kural bazlı isabet sayacı tutar. Bu sayaç, temizliğin en güçlü aracıdır:
+
+- **Sıfır isabet, 6 aydan uzun süredir:** silmeye aday. Önce sahibine sorun; yılda bir çalışan bir iş olabilir.
+- **Çok yüksek isabet, geniş kapsam:** daraltmaya aday. En çok riski bu kurallar taşır.
+- **Gölgede kalmış kurallar:** üstündeki bir kural aynı trafiği zaten yakalıyorsa alttaki hiç çalışmaz. Çoğu ürün bunu raporlar.
+
+Sayaçları sıfırlayıp üç ay beklemek, "bu kural gerekli mi" tartışmasını veriyle bitirir.
+
+## Sıralama performansı ve güvenliği etkiler
+
+Kurallar yukarıdan aşağı değerlendirilir ve ilk eşleşen kazanır. Bunun iki sonucu var.
+
+**Güvenlik:** Geniş bir izin kuralı, altındaki dar bir reddetme kuralını etkisiz kılar. Reddetmeler genelde üstte olmalıdır.
+
+**Performans:** En çok trafik alan kurallar üstte olursa değerlendirme daha kısa sürer. Modern donanımlarda bu fark küçüktür ama binlerce kurallı setlerde ölçülebilir hâle gelir.
+
+## Değişiklik yönetimine bağlayın
+
+Güvenlik duvarı değişikliği, değişiklik kaydı olmadan yapılmamalıdır. Kural şu olsun: **kayıtsız kural, bir sonraki gözden geçirmede silinir.**
+
+Bu kural sert görünür ama tek uygulanabilir olanıdır. "Acil" diye eklenen ve kaydı sonra açılacak olan kurallar, hiçbir zaman kaydedilmez.
+
+Acil durumlar için ayrı bir yol tanımlayın: geçici kural, 72 saat ömürlü, otomatik uyarı üreten. Süresi dolduğunda kaldırılır ya da kalıcıya dönüştürülür.
+
+## Yedekleyin ve sürümleyin
+
+Yapılandırmayı düzenli olarak dışa aktarıp bir depoda tutun. Metin tabanlıysa fark alabilirsiniz — "geçen hafta ne değişti" sorusunun cevabı böylece bir komut uzağınızda olur.
+
+Bu, hem sorun gidermede hem denetimde işinize yarar. Cihazın kendi yapılandırma geçmişine güvenmeyin; cihaz arızalanırsa o geçmiş de gider.
+
+## Doğrulama adımı
+
+Temizlikten sonra üç sayıyı ölçün ve kaydedin: **toplam kural sayısı**, **sahipsiz (açıklamasız) kural sayısı** ve **son 6 ayda hiç isabet almamış kural sayısı**.
+
+Üç ay sonra aynı üç sayıyı tekrar alın. İlki düşmüş, ikincisi sıfıra yaklaşmışsa disiplin tutuyordur. İkinci sayı yeniden büyüyorsa, kural ekleme süreciniz açıklamayı zorunlu kılmıyor demektir — temizlik değil, süreç düzeltilmeli.

@@ -8,12 +8,14 @@ export async function getStaticPaths() {
   const rehberler = (await getCollection('rehberler')).filter((r) => !r.data.taslak);
   const komutlar = await getCollection('komutlar');
   const ipuclari = await getCollection('ipuclari');
+  const cozumler = await getCollection('cozumler');
 
   const etiketler = [
     ...new Set([
       ...rehberler.flatMap((r) => r.data.etiketler),
       ...komutlar.flatMap((k) => k.data.etiketler),
       ...ipuclari.flatMap((i) => i.data.etiketler),
+      ...cozumler.flatMap((c) => c.data.etiketler),
     ]),
   ];
 
@@ -28,12 +30,13 @@ export async function getStaticPaths() {
       ipuclari: ipuclari
         .filter((i) => i.data.etiketler.includes(etiket))
         .sort((a, b) => a.data.populerlik - b.data.populerlik),
+      cozumler: cozumler.filter((c) => c.data.etiketler.includes(etiket)),
     },
   }));
 }
 
-const { etiket, yazilar, komutlar, ipuclari } = Astro.props;
-const toplam = yazilar.length + komutlar.length + ipuclari.length;
+const { etiket, yazilar, komutlar, ipuclari, cozumler } = Astro.props;
+const toplam = yazilar.length + komutlar.length + ipuclari.length + cozumler.length;
 ---
 
 <Base
@@ -58,6 +61,7 @@ const toplam = yazilar.length + komutlar.length + ipuclari.length;
         <span class="etiket">Etiket</span>
         <h1 style="font-family:var(--mono);font-size:30px;letter-spacing:-.02em">#{etiket}</h1>
         <div class="konu-sayac">
+          {cozumler.length > 0 && <span><b>{cozumler.length}</b> hızlı çözüm</span>}
           {yazilar.length > 0 && <span><b>{yazilar.length}</b> rehber</span>}
           {ipuclari.length > 0 && <span><b>{ipuclari.length}</b> ipucu</span>}
           {komutlar.length > 0 && <span><b>{komutlar.length}</b> komut</span>}
@@ -67,6 +71,27 @@ const toplam = yazilar.length + komutlar.length + ipuclari.length;
   </div>
 
   <div class="kap">
+    {
+      cozumler.length > 0 && (
+        <section class="bolum">
+          <div class="bolum-bas">
+            <div>
+              <h2>Hızlı çözümler</h2>
+            </div>
+            <a href="/hizli-cozumler">Tüm çözümler →</a>
+          </div>
+          <div style="display:flex;flex-direction:column;gap:14px">
+            {cozumler.map((c) => (
+              <a class="uclu-kart" href={`/hizli-cozumler/${c.id}`} style="gap:8px">
+                <span class="etiket">{c.data.baslik}</span>
+                <p style="font-size:14px;color:var(--muted);line-height:1.6">{c.data.ozet}</p>
+              </a>
+            ))}
+          </div>
+        </section>
+      )
+    }
+
     {
       yazilar.length > 0 && (
         <section class="bolum">
