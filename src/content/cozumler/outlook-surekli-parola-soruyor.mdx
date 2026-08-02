@@ -1,0 +1,86 @@
+---
+baslik: "Outlook sürekli parola soruyor"
+ozet: "Parola doğru, yine de pencere geri geliyor. Sebep genelde parolada değil; bozuk bir kimlik bilgisi kaydında ya da eski kimlik doğrulama yönteminde."
+konu: "windows"
+etiketler: ["outlook", "kimlik", "m365"]
+belirtiler:
+  - "Parolayı giriyorum, pencere tekrar açılıyor"
+  - "Beni hatırla işaretli ama yine soruyor"
+  - "Sabahları bir kez soruyor sonra düzeliyor"
+  - "Sadece bir kullanıcıda oluyor"
+yayin: 2026-08-02
+sure: 4
+komut: "cmdkey /list | Select-String 'MicrosoftOffice|outlook'"
+platform: "windows"
+ilgiliRehberler: ["azure-kosullu-erisim-rapor-modu", "entra-id-mfa-zorlama"]
+sira: 5
+---
+
+Kullanıcı parolayı giriyor, Outlook kabul ediyor gibi görünüyor, birkaç dakika sonra pencere yeniden açılıyor. Parola sıfırlanıyor, sorun devam ediyor.
+
+Bu döngünün sebebi neredeyse hiç parola değildir.
+
+## 1. Bozuk kimlik bilgisi kaydı
+
+Windows Kimlik Bilgisi Yöneticisi'nde eski veya çakışan bir kayıt varsa Outlook onu kullanmayı dener, başarısız olur ve sorar.
+
+Mevcut kayıtları görün:
+
+```powershell
+cmdkey /list | Select-String 'MicrosoftOffice|outlook|office'
+```
+
+Office'e ait olanları silin:
+
+```powershell
+cmdkey /list | Select-String 'Target: (.*(MicrosoftOffice|outlook).*)' |
+  ForEach-Object { cmdkey /delete:($_.Matches.Groups[1].Value.Trim()) }
+```
+
+Ardından Outlook'u kapatıp açın. İlk açılışta bir kez soracak, sonra susmalı.
+
+Bu adım vakaların yarısını kapatır.
+
+## 2. Eski kimlik doğrulama açık
+
+Modern kimlik doğrulama devre dışıysa Outlook temel kimlik doğrulamaya düşer ve MFA ile birlikte bu kombinasyon sürekli istem üretir.
+
+Kayıt defterinde kontrol edin:
+
+```powershell
+Get-ItemProperty 'HKCU:\Software\Microsoft\Office\16.0\Common\Identity' -Name EnableADAL, DisableADALatopWAMOverride -ErrorAction SilentlyContinue
+```
+
+`EnableADAL` değeri `0` ise modern kimlik doğrulama kapatılmış demektir. Kurumsal ortamda bu ayar genelde eski bir grup ilkesinden kalır — tek makinede düzeltmek yerine ilkeyi bulup kaldırın.
+
+## 3. Koşullu erişim politikası
+
+Belirti tipik: **sabah bir kez soruyor, sonra gün boyu susuyor.** Bu, oturum ömrünü sınırlayan bir koşullu erişim politikasının normal davranışıdır.
+
+Kullanıcı bunu arıza sanır; aslında tasarım gereğidir. Yanıt "düzeltmek" değil, politikanın oturum ömrünü bilinçli seçmektir. Günde bir kez sorması kabul edilebilir; saatte bir sorması kullanıcıyı MFA yorgunluğuna iter ve onay reflekslerini bozar — bu bir güvenlik riskidir.
+
+## 4. Profil bozulması
+
+Yukarıdakiler çözmediyse Outlook profilini yeniden oluşturun. Silmeden önce yenisini ekleyin ki geri dönüş kolay olsun:
+
+```
+Denetim Masası → Mail (Microsoft Outlook) → Profilleri Göster → Ekle
+```
+
+Yeni profille sorun yoksa eskisini kaldırın. Bu, veri kaybı riski taşımaz — posta kutusu sunucuda durur.
+
+## Sırayla deneyin
+
+Hepsini birden yapmayın; hangisinin çözdüğünü bilemezsiniz ve bir sonraki kullanıcıda baştan başlarsınız.
+
+Sıra: kimlik bilgisi temizliği → Outlook yeniden başlat → hâlâ sürüyorsa modern kimlik doğrulama kontrolü → hâlâ sürüyorsa profil.
+
+## Tek kullanıcıda mı, herkeste mi?
+
+Bu soru teşhisi ikiye böler. **Tek kullanıcıdaysa** sebep o makinededir: kimlik bilgisi, profil, saat farkı. **Herkeste ise** sebep merkezîdir: politika değişikliği, sertifika süresi, kimlik sağlayıcı sorunu.
+
+Merkezî bir sorunu makine makine kovalamak, en çok zaman kaybettiren hatadır. Çağrı sayısına bakın; iki farklı kullanıcıdan aynı gün geldiyse merkeze bakın.
+
+## Doğrulama
+
+Düzelttikten sonra makineyi yeniden başlatıp Outlook'u açın ve **bir istem gelmesini bekleyin**. Bir kez sorup sonra susuyorsa normaldir. Hiç sormuyorsa kimlik bilgisi kaydı yeniden oluşmuştur, o da normaldir. Dakikalar içinde tekrar soruyorsa iş bitmemiştir.

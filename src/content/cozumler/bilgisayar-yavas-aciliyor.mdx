@@ -1,0 +1,92 @@
+---
+baslik: "Bilgisayar çok yavaş açılıyor"
+ozet: "\"Yavaş\" ölçülmeden çözülmez. Windows açılış sürelerini zaten kaydediyor; betik o kayıtları okuyup suçluyu isimle söylüyor."
+konu: "windows"
+etiketler: ["performans", "acilis", "tanilama"]
+belirtiler:
+  - "Açılış birkaç dakika sürüyor"
+  - "Masaüstü geliyor ama uzun süre tıklanamıyor"
+  - "Oturum açtıktan sonra 'lütfen bekleyin' ekranında kalıyor"
+  - "Eskiden hızlıydı, zamanla yavaşladı"
+yayin: 2026-08-02
+sure: 5
+dosya: "/araclar/acilis-analiz.ps1"
+dosyaAdi: "acilis-analiz.ps1"
+dosyaAciklama: "Gerçek açılış sürelerini, gecikmeye sebep olan bileşenleri ve başlangıç öğelerini raporlar. Hiçbir değişiklik yapmaz."
+komut: "Get-WinEvent -FilterHashtable @{LogName='Microsoft-Windows-Diagnostics-Performance/Operational'; Id=100} -MaxEvents 5 | Format-List TimeCreated, Message"
+platform: "windows"
+ilgiliRehberler: ["ws-yeni-sunucu-kurmadan-once"]
+sira: 3
+---
+
+"Bilgisayar yavaş açılıyor" çağrısı, en çok tahminle uğraşılan çağrıdır. Başlangıç programları kapatılır, disk temizlenir, antivirüs suçlanır — ve genelde hiçbiri ölçülmez.
+
+Oysa Windows açılış sürelerini zaten kaydediyor. Sadece kimse bakmıyor.
+
+## Windows ne kaydediyor
+
+`Microsoft-Windows-Diagnostics-Performance/Operational` günlüğünde her açılış için bir kayıt var. **Olay 100** toplam süreyi verir ve üçe ayırır:
+
+- **BootTime** — toplam süre
+- **MainPathBootTime** — çekirdek ve sürücülerin yüklenmesi
+- **BootPostBootTime** — masaüstü geldikten sonra sistemin oturması
+
+Son değer önemlidir: kullanıcının "açıldı ama kullanılamıyor" dediği süre budur ve genelde asıl sorun oradadır.
+
+Ayrıca **olay 101, 102, 103, 106** hangi uygulamanın, sürücünün veya servisin ne kadar geciktirdiğini isimle söyler.
+
+## Elle bakmak
+
+```powershell
+Get-WinEvent -FilterHashtable @{
+  LogName = 'Microsoft-Windows-Diagnostics-Performance/Operational'; Id = 100
+} -MaxEvents 5 | Format-List TimeCreated, Message
+```
+
+Mesaj metninde süreleri milisaniye olarak görürsünüz. Okuması zahmetlidir; betik bunu tabloya çeviriyor.
+
+## Betikle bakmak
+
+```powershell
+.\acilis-analiz.ps1
+```
+
+Betik dört bölüm üretir: son 14 günün açılış süreleri, gecikmeye sebep olan bileşenler (ortalama süreyle sıralı), başlangıç öğeleri ve grup ilkesi süreleri.
+
+Raporu saklamak isterseniz:
+
+```powershell
+.\acilis-analiz.ps1 -Gun 30 -DosyayaYaz
+```
+
+Betik hiçbir şey değiştirmez. Ne kapatacağınıza siz karar verirsiniz — ve artık neyi kapatacağınızı biliyorsunuzdur.
+
+## Sayıları nasıl okumalı
+
+**90 saniyenin altı** normaldir. **90–180 saniye** iyileştirme gerektirir. **180 saniyenin üstü** genelde tek bir bileşenden kaynaklanır ve betik onu size gösterir.
+
+Gecikme tablosunda aynı isim sürekli en üstteyse cevap bulunmuştur. Genelde şunlardan biri çıkar: bir yedekleme ajanı, eski bir VPN istemcisi, ağ sürücüsü eşleme betiği ya da bir envanter aracı.
+
+## En sık iki yanılgı
+
+**"Kapat-aç yaptım, ölçtüm."** Hızlı başlatma açıkken kapatma tam kapatma değildir; ölçtüğünüz sayı gerçek açılış süresi olmaz. Ölçüm için **Yeniden Başlat** kullanın.
+
+**"Başlangıç programlarını kapattım, düzelmedi."** Görev Yöneticisi'ndeki liste her şeyi göstermez. Zamanlanmış görevler, kayıt defteri girdileri ve grup ilkesi betikleri de açılışta çalışır. Betik hepsine bakar.
+
+## Yazılımdan çözülmeyen durum
+
+Disk mekanik (HDD) ise ölçümler ne derse desin çözüm donanımdır. SSD'ye geçiş, tüm yazılım iyileştirmelerinin toplamından daha fazla fark yaratır.
+
+Bunu erken tespit edin ki iki hafta boşuna optimizasyon yapmayasınız:
+
+```powershell
+Get-PhysicalDisk | Select-Object FriendlyName, MediaType, Size, HealthStatus
+```
+
+`MediaType` değeri `HDD` ise raporun geri kalanı ikincil önemdedir.
+
+## Doğrulama
+
+İyileştirmelerden sonra **iki kez yeniden başlatın** ve betiği tekrar çalıştırın. İlk yeniden başlatma değişikliklerin oturmasıdır; ölçümü ikincisinden alın.
+
+Ortalama süre düşmediyse doğru bileşene dokunmamışsınız demektir — tabloya dönün, ikinci sıradakine bakın.

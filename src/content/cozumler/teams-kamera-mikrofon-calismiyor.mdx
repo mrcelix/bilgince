@@ -1,0 +1,80 @@
+---
+baslik: "Teams'te kamera veya mikrofon çalışmıyor"
+ozet: "Cihaz listede görünüyor ama karşı taraf duymuyor. Sıra önemli: önce Windows gizlilik izni, sonra cihazı kimin tuttuğu, en son uygulama ayarı."
+konu: "windows"
+etiketler: ["teams", "ses", "kamera", "gizlilik"]
+belirtiler:
+  - "Kamera görüntüsü siyah geliyor"
+  - "Mikrofonum çalışıyor ama karşı taraf duymuyor"
+  - "Zoom'da çalışıyor Teams'te çalışmıyor"
+  - "Cihaz listede yok"
+yayin: 2026-08-02
+sure: 4
+komut: "Get-PnpDevice -Class Camera,AudioEndpoint | Where-Object Status -ne 'OK' | Select-Object FriendlyName, Status, Class"
+platform: "windows"
+ilgiliRehberler: []
+sira: 6
+---
+
+Toplantı başlıyor, kamera siyah. Ayarlarda cihaz görünüyor, seçili, ama görüntü yok. Kullanıcı sürücü güncellemeye çalışıyor — genelde gereksiz.
+
+Doğru sıra şu üç adımdır ve sırayı bozmak zaman kaybettirir.
+
+## 1. Windows gizlilik izni
+
+En sık sebep budur ve en hızlı kontrol edilendir. Windows, uygulamaların kameraya ve mikrofona erişimini ayrı ayrı denetler; bir güncelleme veya politika bu izni kapatmış olabilir.
+
+**Ayarlar → Gizlilik ve güvenlik → Kamera** (ve **Mikrofon**). İki anahtara birden bakın:
+
+- "Uygulamaların kameraya erişmesine izin ver" — genel anahtar
+- "Masaüstü uygulamalarının kameraya erişmesine izin ver" — **Teams masaüstü istemcisi bunun altındadır**
+
+İkincisi kapalıysa liste doludur, cihaz seçilebilir, ama görüntü gelmez. Belirtinin bu kadar kafa karıştırıcı olmasının sebebi budur.
+
+Kayıt defterinden kontrol:
+
+```powershell
+Get-ItemProperty 'HKCU:\Software\Microsoft\Windows\CurrentVersion\CapabilityAccessManager\ConsentStore\webcam' -Name Value
+Get-ItemProperty 'HKCU:\Software\Microsoft\Windows\CurrentVersion\CapabilityAccessManager\ConsentStore\microphone' -Name Value
+```
+
+`Deny` dönüyorsa sebep bulunmuştur.
+
+## 2. Cihazı başka bir uygulama tutuyor
+
+Kamerayı aynı anda yalnızca bir uygulama kullanabilir. Arka planda açık kalmış bir Zoom, tarayıcı sekmesi ya da kamera uygulaması cihazı kilitler.
+
+Görev Yöneticisi'nde şunları kapatın: tarayıcıdaki toplantı sekmeleri, Zoom, Kamera uygulaması, OBS benzeri yayın araçları.
+
+Cihaz durumunu kontrol edin:
+
+```powershell
+Get-PnpDevice -Class Camera, AudioEndpoint |
+  Select-Object FriendlyName, Status, Class | Sort-Object Class
+```
+
+`Status` değeri `OK` değilse sorun sürücü tarafındadır ve o zaman sürücüye bakmak anlamlıdır.
+
+## 3. Teams içindeki cihaz seçimi
+
+Teams kendi cihaz tercihini saklar ve bir kulaklık takıp çıkardığınızda yanlış cihazda kalabilir.
+
+**Ayarlar → Cihazlar** bölümünde hoparlör, mikrofon ve kamerayı tek tek seçin ve **test çağrısı** yapın. Test çağrısı, karşı tarafa sormadan sesinizi geri dinletir — teşhis için en hızlı yol budur.
+
+## Zoom'da çalışıyor Teams'te çalışmıyorsa
+
+Bu belirti, sorunun donanımda olmadığını kesinleştirir. İki olasılık kalır: masaüstü uygulaması gizlilik izni (adım 1) veya Teams'in kendi cihaz seçimi (adım 3).
+
+Sürücü güncellemeye gerek yoktur; donanım çalışıyor.
+
+## Kurumsal ortamda: politika kontrolü
+
+İzinler grup ilkesiyle merkezî olarak kapatılmış olabilir. Tek makinede açsanız bile bir sonraki ilke yenilemesinde geri kapanır.
+
+Aynı sorun birden çok kullanıcıda görünüyorsa makineyle uğraşmayı bırakın ve ilkeye bakın — bu, kaybedilen zamanın en büyük kalemidir.
+
+## Doğrulama
+
+Düzelttikten sonra Teams'in **test çağrısını** yapın ve üçünü de doğrulayın: kendi sesinizi duyuyor musunuz, kamera görüntüsü geliyor mu, ses seviyesi göstergesi hareket ediyor mu.
+
+Üçü de çalışıyorsa iş bitmiştir. Yalnızca gerçek bir toplantıda test etmek, sorunu toplantı sırasında bulmak demektir.

@@ -1,0 +1,94 @@
+---
+baslik: "VPN bağlandı ama iç kaynaklara erişemiyorum"
+ozet: "Bağlantı kurulu görünüyor, dosya sunucusu açılmıyor. Dört sebepten biridir ve hangisi olduğunu üç komut söyler."
+konu: "ag"
+etiketler: ["vpn", "dns", "yonlendirme", "uzaktan-erisim"]
+belirtiler:
+  - "VPN bağlı ama paylaşıma erişilemiyor"
+  - "Sunucu adı çözülmüyor, IP ile erişiliyor"
+  - "Bazı iç uygulamalar açılıyor, bazıları açılmıyor"
+  - "Evden çalışırken oluyor, ofiste olmuyor"
+yayin: 2026-08-02
+sure: 5
+dosya: "/araclar/vpn-teshis.ps1"
+dosyaAdi: "vpn-teshis.ps1"
+dosyaAciklama: "Yönlendirme, DNS, tünel kapsamı ve uçtan uca erişimi sırayla kontrol eder. Değişiklik yapmaz."
+komut: "Find-NetRoute -RemoteIPAddress 10.10.0.10 | Select-Object -Last 1 InterfaceAlias, NextHop"
+platform: "windows"
+ilgiliRehberler: ["ag-vpn-site-mi-istemci-mi", "ag-ip-plani-ve-dhcp-kapsami"]
+sira: 4
+---
+
+VPN istemcisi yeşil yanıyor, "bağlandı" diyor. Ama `\\dosya01\pay` açılmıyor, iç portal gelmiyor. Kullanıcı haklı olarak "VPN çalışmıyor" diyor; oysa VPN çalışıyor — eksik olan başka bir şey.
+
+Dört olasılık var ve hangisi olduğu üç komutla anlaşılır.
+
+## 1. Trafik VPN'den gitmiyor
+
+Bölünmüş tünelde yalnızca tanımlı ağlar tünelden geçer. Erişmek istediğiniz ağ o listede yoksa, trafik ev internetinizden çıkar ve hiçbir yere varmaz.
+
+```powershell
+Find-NetRoute -RemoteIPAddress 10.10.0.10 | Select-Object -Last 1 InterfaceAlias, NextHop
+```
+
+`InterfaceAlias` değeri VPN arayüzü değilse sebep budur. Çözüm sizde değil: VPN yöneticisinin tünel kapsamına o ağı eklemesi gerekir.
+
+## 2. DNS hâlâ ev yönlendiricisini kullanıyor
+
+En sık ikinci sebep. Rota doğru ama isim çözülemiyor, çünkü sorgu iç DNS sunucusuna değil ev modeminize gidiyor.
+
+```powershell
+Get-DnsClientServerAddress -AddressFamily IPv4 | Where-Object ServerAddresses
+Resolve-DnsName dosya01.sirket.local
+```
+
+Belirti tipik: **IP ile erişebiliyorsunuz, isimle erişemiyorsunuz.** Bu ikisini ayırt etmek teşhisi anında bitirir.
+
+## 3. Arayüz ölçütü yanlış sırada
+
+VPN bağlıyken iki ağ arayüzünüz vardır ve Windows, düşük ölçütlü olanın DNS'ini önce sorar. VPN arayüzünün ölçütü yüksekse iç isimler önce ev DNS'ine sorulur, "bulunamadı" cevabı gelir ve iş orada biter.
+
+```powershell
+Get-NetIPInterface -AddressFamily IPv4 | Where-Object ConnectionState -eq 'Connected' |
+  Select-Object InterfaceAlias, InterfaceMetric | Sort-Object InterfaceMetric
+```
+
+VPN listenin üstünde değilse sorun budur.
+
+## 4. Erişim var ama engelli
+
+İsim çözülüyor, rota doğru, yine de bağlanamıyorsunuz. Bu durumda sorun ağda değil, izinde: güvenlik duvarı kuralı VPN havuzundan gelen trafiği kabul etmiyor olabilir ya da sunucu yalnızca belirli ağlara açık olabilir.
+
+```powershell
+Test-NetConnection dosya01.sirket.local -Port 445
+```
+
+`TcpTestSucceeded` `False` ama isim çözülüyorsa cevap budur.
+
+## Betikle hepsini birden
+
+```powershell
+.\vpn-teshis.ps1 -HedefAg 10.10.0.0/16 -HedefSunucu dosya01.sirket.local
+```
+
+Betik dört bölümü sırayla kontrol eder ve sonunda hangi katmanda takıldığınızı söyler. Hiçbir şeyi değiştirmez — yardım masasına gönderilecek çıktıyı üretir.
+
+Parametresiz de çalışır; o zaman yalnızca arayüz, rota ve DNS durumunu raporlar.
+
+## Yardım masasına ne göndermeli
+
+Bu betiğin çıktısını olduğu gibi göndermek, "VPN çalışmıyor" demekten kıyaslanamayacak kadar hızlı sonuç verir. Karşı taraf sorunun tünel kapsamında mı, DNS'te mi yoksa güvenlik duvarında mı olduğunu tek bakışta görür.
+
+## Kendiniz düzeltebilecekleriniz
+
+Dördünden yalnızca biri sizin elinizde: **arayüz ölçütü**. VPN arayüzünün önceliğini elle yükseltebilirsiniz:
+
+```powershell
+Set-NetIPInterface -InterfaceAlias 'VPN Baglantisi' -InterfaceMetric 1
+```
+
+Diğer üçü sunucu tarafı yapılandırmasıdır. Kendi makinenizde çözmeye çalışmak zaman kaybıdır — teşhisi yapıp doğru ekibe iletmek doğru adımdır.
+
+## Doğrulama
+
+Düzeltmeden sonra betiği tekrar çalıştırın ve dört bölümün de temiz döndüğünü görün. Özellikle son testte `TCP/445 erişimi başarılı` satırını arayın; rota ve DNS doğru görünse bile bu satır gelmiyorsa iş bitmemiştir.

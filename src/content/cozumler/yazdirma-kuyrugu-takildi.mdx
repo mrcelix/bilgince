@@ -1,0 +1,88 @@
+---
+baslik: "Yazdırma kuyruğu takıldı, iş silinmiyor"
+ozet: "Kuyruktaki iş ne siliniyor ne yazdırılıyor. Biriktiriciyi durdurmadan klasörü temizlemek işe yaramaz — dosyalar kilitlidir."
+konu: "windows"
+etiketler: ["yazici", "onarim", "spooler"]
+belirtiler:
+  - "Yazdırma kuyruğunda 'siliniyor' yazan ama gitmeyen iş"
+  - "Yazıcıya gönderilen belgeler hiç çıkmıyor"
+  - "Yazıcı çevrimdışı görünüyor ama açık"
+  - "Aynı belge defalarca yazdırılıyor"
+yayin: 2026-08-02
+sure: 3
+dosya: "/araclar/yazici-kuyruk-sifirla.ps1"
+dosyaAdi: "yazici-kuyruk-sifirla.ps1"
+dosyaAciklama: "Kuyruğu temizler ve sorunun neden tekrarladığını raporlar."
+komut: "Stop-Service Spooler -Force; Remove-Item \"$env:SystemRoot\\System32\\spool\\PRINTERS\\*\" -Force; Start-Service Spooler"
+platform: "windows"
+ilgiliRehberler: ["ws-dosya-sunucusu-izinleri"]
+sira: 2
+---
+
+Kullanıcı bir belge gönderiyor, çıkmıyor. Kuyruktan silmeye çalışıyor, "siliniyor" yazısında takılıyor. Yazıcıyı kapatıp açıyor, değişen bir şey olmuyor.
+
+Sorun yazıcıda değil, Windows'un yazdırma biriktiricisinde.
+
+## Neden klasörü silmek yetmez
+
+Yazdırma işleri `C:\Windows\System32\spool\PRINTERS` altında iki dosya olarak durur: `.SPL` (verinin kendisi) ve `.SHD` (iş bilgisi).
+
+Biriktirici servisi çalışırken bu dosyalar **kilitlidir**. Explorer'dan silmeye çalışırsanız "başka bir program tarafından kullanılıyor" hatası alırsınız. Bu yüzden sıra önemlidir: önce servis durur, sonra dosyalar silinir, sonra servis başlar.
+
+## Elle çözüm
+
+Yönetici PowerShell'de:
+
+```powershell
+Stop-Service -Name Spooler -Force
+Remove-Item "$env:SystemRoot\System32\spool\PRINTERS\*" -Force
+Start-Service -Name Spooler
+```
+
+Servisin gerçekten durduğundan emin olmadan silmeye çalışırsanız bazı dosyalar kalır. Betik bunu bekleyerek yapıyor.
+
+## Betikle çözüm
+
+Betik aynı işi yapar, üstüne bir şey daha: **neden tekrarladığını** söyler.
+
+Önce sadece bakmak için:
+
+```powershell
+.\yazici-kuyruk-sifirla.ps1 -Rapor
+```
+
+Temizlemek için:
+
+```powershell
+.\yazici-kuyruk-sifirla.ps1
+```
+
+Çıktının son bölümü iki şeyi raporlar: hiçbir yazıcı tarafından kullanılmayan sürücüler ve son 24 saatteki yazdırma hataları. Aynı olay kimliği tekrar tekrar görünüyorsa sorun kuyrukta değildir.
+
+## Tekrarlıyorsa asıl sebep
+
+Kuyruk temizliği bir belirtiyi giderir. Ayda birkaç kez tekrarlıyorsa sebep genelde şu üçünden biridir.
+
+**Bozuk veya çakışan sürücü.** Zamanla biriken, artık kullanılmayan sürücüler biriktiriciyi çökertebilir. Betiği `-SurucuTemizle` ile çalıştırarak boşta duranları kaldırın.
+
+**Yazıcı sunucusundaki sürücü uyumsuzluğu.** İstemci 64-bit, sunucuda yalnızca 32-bit sürücü varsa (ya da tersi) işler takılır. Sunucuda her iki mimariyi de yükleyin.
+
+**Ağ yazıcısına doğrudan IP ile bağlanmak.** Her istemci kendi sürücüsünü yönetir, sürüm farkları çoğalır. Yazıcı sunucusu üzerinden paylaşmak bakımı tek noktada toplar.
+
+## Kullanıcıya vermeden önce
+
+Bu betiği son kullanıcıya vermeyin — yönetici hakkı gerektiriyor. Bunun yerine yardım masası için bir kısayol hâline getirin ya da uzaktan çalıştırın:
+
+```powershell
+Invoke-Command -ComputerName PC-042 -FilePath .\yazici-kuyruk-sifirla.ps1
+```
+
+## Doğrulama
+
+Temizlikten sonra bir test sayfası yazdırın ve kuyruğun boşaldığını görün:
+
+```powershell
+Get-PrintJob -PrinterName * | Measure-Object
+```
+
+Sayı sıfır olmalı ve test sayfası çıkmalı. İkisinden biri olmuyorsa sorun biriktiricide değil; yazıcıyla ağ bağlantısına ya da sürücüye bakın.
