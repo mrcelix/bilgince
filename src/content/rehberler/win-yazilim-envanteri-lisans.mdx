@@ -1,0 +1,141 @@
+---
+baslik: "Yazılım envanteri: neyin kurulu olduğunu gerçekten biliyor musunuz?"
+ozet: "Lisans denetimi geldiğinde envanter çıkarmaya başlamak geç kalmaktır. Sürekli envanter ve gereksiz lisansı ayıklamak."
+konu: "windows"
+etiketler: ["envanter", "lisans", "uyum"]
+yayin: 2026-06-19
+sure: 12
+---
+
+Bir lisans denetimi bildirimi geldiğinde ekiplerin çoğu aynı şeyi yapar: makine makine dolaşıp ne kurulu olduğunu listelemeye çalışır. Bu çalışma haftalar sürer ve sonucu hiçbir zaman tam güvenilir olmaz.
+
+Oysa aynı bilgi sürekli toplanabilir ve ikinci bir faydası daha vardır: **ödediğiniz ama kullanılmayan lisansları görürsünüz.**
+
+## Envanteri nereden almalı
+
+Yaygın bir hata `Win32_Product` sınıfını kullanmaktır:
+
+```powershell
+Get-CimInstance Win32_Product   # KULLANMAYIN
+```
+
+Bu sınıf, sorgulandığında kurulu her MSI paketini yeniden doğrular. Yavaştır ve bazı durumlarda onarım tetikleyip uygulamaları yeniden yapılandırır. Üretimde bir makineyi dakikalarca meşgul edebilir.
+
+Doğru yol kayıt defterini okumaktır:
+
+```powershell
+$yollar = @(
+  'HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall\*',
+  'HKLM:\SOFTWARE\WOW6432Node\Microsoft\Windows\CurrentVersion\Uninstall\*',
+  'HKCU:\SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall\*'
+)
+
+Get-ItemProperty $yollar -ErrorAction SilentlyContinue |
+  Where-Object { $_.DisplayName -and -not $_.SystemComponent } |
+  Select-Object @{n='Makine';e={$env:COMPUTERNAME}},
+                DisplayName, DisplayVersion, Publisher, InstallDate |
+  Sort-Object DisplayName
+```
+
+Üç yolun hepsine bakmak önemlidir: 32-bit uygulamalar `WOW6432Node` altında, kullanıcı bazlı kurulumlar `HKCU` altında durur. Yalnızca ilkine bakan envanterler eksik çıkar.
+
+## Filo genelinde toplama
+
+```powershell
+$makineler = (Get-ADComputer -Filter { OperatingSystem -like '*Windows 1*' }).Name
+
+$envanter = Invoke-Command -ComputerName $makineler -ErrorAction SilentlyContinue -ScriptBlock {
+    $y = @(
+      'HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall\*',
+      'HKLM:\SOFTWARE\WOW6432Node\Microsoft\Windows\CurrentVersion\Uninstall\*'
+    )
+    Get-ItemProperty $y -EA SilentlyContinue |
+      Where-Object { $_.DisplayName -and -not $_.SystemComponent } |
+      Select-Object DisplayName, DisplayVersion, Publisher
+}
+
+$envanter | Group-Object DisplayName |
+  Select-Object @{n='Uygulama';e={$_.Name}}, @{n='Kurulum';e={$_.Count}} |
+  Sort-Object Kurulum -Descending
+```
+
+Bu tablo tek başına birçok soruyu cevaplar: hangi uygulama kaç makinede kurulu, hangi sürümler karışık, hangi yayıncılardan yazılım var.
+
+## Kurulu olmak kullanılmak değildir
+
+Lisans maliyetini asıl düşüren şey, kurulum sayısı değil **kullanım** verisidir. Bir uygulama yüz makinede kurulu olabilir ama yalnızca yirmisinde açılıyor olabilir.
+
+Kullanım verisi için yönetim aracınızın raporlarına ya da uygulama kendi telemetrisine bakın. Basit bir gösterge olarak son erişim tarihine de bakılabilir, ama güvenilirliği sınırlıdır.
+
+Pahalı ve az kullanılan uygulamalar listesi, lisans bütçesinde en hızlı kazancı üretir. Bu listeyi yılda bir çıkarıp ilgili birim yöneticileriyle konuşun.
+
+## Onaylanmamış yazılım
+
+Envanterin ikinci faydası budur. Filoda ne olduğunu görünce şaşırtıcı şeyler çıkar: kişisel kullanım için indirilmiş araçlar, süresi dolmuş deneme sürümleri, ticari kullanımda lisans gerektiren "ücretsiz" yazılımlar.
+
+Son kategori en risklidir. Bazı popüler araçlar kişisel kullanımda ücretsizdir ama kurumsal kullanımda lisans ister — ve denetimde bu fark pahalıya patlar.
+
+Envanteri bir onaylı yazılım listesiyle karşılaştırın:
+
+```powershell
+$onayli = Get-Content .\onayli-yazilimlar.txt
+$envanter | Where-Object { $_.DisplayName -notin $onayli } |
+  Group-Object DisplayName | Sort-Object Count -Descending |
+  Select-Object Name, Count
+```
+
+Liste uzun çıkacaktır; paniklemeyin. Önce yaygın olanlara ve ticari risk taşıyanlara odaklanın.
+
+## Sürüm dağılımını izleyin
+
+Aynı uygulamanın filoda beş farklı sürümü varsa, güncelleme süreciniz çalışmıyor demektir. Bu, hem güvenlik hem destek sorunudur: eski sürümlerdeki açıklar açık kalır ve destek ekibi hangi sürümde ne olduğunu bilemez.
+
+Sürüm dağılımını uygulama bazında çıkarıp en dağınık üçüne odaklanın.
+
+## Tarayıcı eklentileri
+
+Sık atlanan bir kategori. Tarayıcı eklentileri kurulu yazılım listesinde görünmez ama geniş yetkilerle çalışır ve veri sızdırabilir.
+
+Kurumsal tarayıcı politikalarıyla yalnızca izin verilen eklentilere izin verin. Bu, envanter çalışmasının doğal bir uzantısıdır ve genelde hiç yapılmaz.
+
+## Otomatikleştirin
+
+Bu sorguyu ayda bir zamanlanmış görevle çalıştırıp sonucu bir dosyaya yazın. Aylık dosyaları karşılaştırmak, filoda ne değiştiğini gösterir:
+
+```powershell
+$bugun = Import-Csv .\envanter-2026-06.csv
+$onceki = Import-Csv .\envanter-2026-05.csv
+Compare-Object $onceki $bugun -Property DisplayName -PassThru |
+  Where-Object SideIndicator -eq '=>' |
+  Select-Object DisplayName, DisplayVersion
+```
+
+Bu fark listesi, yeni kurulan yazılımları gösterir — hem lisans hem güvenlik açısından bakılması gereken tek liste budur.
+
+## Lisans türlerini karıştırmayın
+
+Envanter sayısı, lisans ihtiyacını doğrudan vermez. Aynı uygulamanın lisansı farklı modellerde satılır ve hangisinin geçerli olduğunu bilmeden sayım yapmak yanıltıcıdır.
+
+**Cihaz bazlı.** Kaç makinede kurulu olduğu önemlidir. Envanter sayınız doğrudan lisans sayınızdır.
+
+**Kullanıcı bazlı.** Bir kullanıcı birden çok cihaza kurabilir. Bu durumda makine sayısı değil, kullanıcı sayısı önemlidir ve envanter fazla gösterir.
+
+**Eşzamanlı kullanım.** Aynı anda kaç kişinin kullandığı önemlidir. Envanter bu bilgiyi hiç vermez; lisans sunucusu raporlarına bakmak gerekir.
+
+**Çekirdek/işlemci bazlı.** Sunucu tarafında yaygındır. Sanal makinelerde ana makine çekirdek sayısı önemli olabilir; bu, en çok hata yapılan alandır.
+
+Envanter tablonuza bir sütun ekleyin: **lisans modeli**. Bu tek sütun, denetim sırasında yapılacak hesabı baştan doğru kurar.
+
+## Sözleşme tarihlerini de takip edin
+
+Yazılım envanterinin unutulan yarısı sözleşmelerdir: yenileme tarihleri, destek bitişleri, fiyat artış maddeleri.
+
+Basit bir tablo yeterlidir: ürün, satıcı, lisans sayısı, yıllık bedel, yenileme tarihi, sorumlu. Yenileme tarihinden 90 gün önce uyarı üretsin.
+
+Bu uyarı olmadan yenilemeler otomatik geçer ve kullanılmayan lisanslar için bir yıl daha ödeme yaparsınız — envanter çalışmasının en somut getirisi genelde buradan çıkar.
+
+## Doğrulama adımı
+
+Envanteri kurduktan sonra tek bir testle sağlamasını yapın: **rastgele üç makineye fiziksel olarak bakın** ve kurulu uygulamaları envanter kaydıyla karşılaştırın.
+
+Fark varsa sebebi bulun — genelde kullanıcı bazlı kurulumlar (`HKCU`) ya da taşınabilir (kurulum gerektirmeyen) uygulamalardır. İkincisi envanterle hiç yakalanmaz; onlar için farklı bir kontrol gerekir ve bu sınırı bilerek kabul etmelisiniz.

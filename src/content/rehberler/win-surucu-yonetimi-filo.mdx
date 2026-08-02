@@ -1,0 +1,107 @@
+---
+baslik: "Filo genelinde sürücü yönetimi"
+ozet: "Tek makinede sürücü güncellemek kolay. Üç yüz makinede, beş farklı modelde ve hepsi aynı anda kırılmadan yapmak ayrı bir iş."
+konu: "windows"
+etiketler: ["surucu", "dagitim", "donanim"]
+yayin: 2026-05-08
+sure: 12
+---
+
+Sürücüler, istemci yönetiminin en az konuşulan ama en çok kesinti üreten alanıdır. Bir ekran kartı sürücüsü güncellemesi, tek bir dizüstü modelinde mavi ekran üretir ve o modelden altmış tane vardır.
+
+Sorun sürücünün kendisinden çok, güncellemenin **nasıl dağıtıldığından** kaynaklanır.
+
+## Üç kaynak, üç davranış
+
+Filodaki sürücüler üç yoldan gelir ve hangisinin ne zaman devreye girdiğini bilmek gerekir.
+
+**Windows Update.** Microsoft'un onayladığı sürücüleri otomatik dağıtır. Genelde güvenlidir ama üreticinin en güncel sürümü olmayabilir ve bazen özel yapılandırmaları ezer.
+
+**Üretici araçları.** Dell Command, HP Image Assistant, Lenovo Vantage gibi araçlar en güncel ve modele özel sürücüleri getirir. Ama her biri ayrı bir ajan, ayrı bir yönetim yüzeyi demektir.
+
+**Elle kurulum.** Sorun giderirken yapılan tek seferlik kurulumlar. Belgelenmediği için sonradan kimse ne olduğunu bilmez.
+
+Sağlıklı bir filoda üçüncüsü istisna olmalı, birincisi kontrollü, ikincisi hedeflenmiş olmalıdır.
+
+## Windows Update'ten sürücüyü ayırın
+
+Kurumsal ortamda en yüksek getirili karar budur: işletim sistemi yamalarını Windows Update'ten alın, **sürücüleri ayrı yönetin**.
+
+Sebep basit — yama takviminiz aylık ve öngörülebilirdir; sürücüler ise üretici takvimine göre rastgele gelir. İkisini aynı kanaldan almak, öngörülemeyen bir değişkeni öngörülebilir sürecinize sokar.
+
+Sürücü güncellemelerini ertelemek politikayla yapılır. Ertelemek "hiç güncellemeyin" demek değildir; ne zaman geleceğine sizin karar vermeniz demektir.
+
+## Model bazlı gruplayın
+
+Filoyu donanım modeline göre gruplayın. Bir sürücü güncellemesi tüm filoya değil, yalnızca ilgili modele gider.
+
+```powershell
+Get-ADComputer -Filter * -Properties Name |
+  ForEach-Object {
+    $m = (Get-CimInstance Win32_ComputerSystem -ComputerName $_.Name -EA SilentlyContinue)
+    [pscustomobject]@{ Makine = $_.Name; Uretici = $m.Manufacturer; Model = $m.Model }
+  } | Group-Object Model | Sort-Object Count -Descending |
+  Select-Object Name, Count
+```
+
+Bu tablo iki işe yarar: hangi modellerin çoğunlukta olduğunu ve hangi tekil modellerin ayrı ilgi gerektirdiğini gösterir. Filoda tek bir örneği olan modeller genelde en çok sorun çıkaranlardır — çünkü kimse onlar için test yapmaz.
+
+## Pilot her modelde ayrı olmalı
+
+Güncelleme halkalarında en sık yapılan hata, pilot grubu rastgele seçmektir. Sürücü söz konusu olduğunda pilot **her donanım modelinden en az bir cihaz** içermelidir.
+
+Aksi hâlde pilot temiz geçer, genel yayımda o modelde sorun çıkar ve pilotun hiçbir değeri olmaz.
+
+## Mevcut sürücüleri görün
+
+Bir makinedeki üçüncü taraf sürücüleri listelemek:
+
+```powershell
+Get-WindowsDriver -Online -All |
+  Where-Object { $_.Inbox -eq $false } |
+  Select-Object Driver, ProviderName, ClassName, Version, Date |
+  Sort-Object Date -Descending | Select-Object -First 20
+```
+
+`Inbox -eq $false` filtresi, Windows'la gelenleri eleyip sonradan kurulanları gösterir. Sorun gidermede ilk bakılacak liste budur: son değişen sürücü, genelde son çıkan sorunun sebebidir.
+
+## Geri alma yolu hazır olsun
+
+Sorunlu sürücüde iki seçenek vardır ve ikisini de bilmelisiniz.
+
+**Geri alma (rollback)** — bir önceki sürüme döner, en güvenli yoldur:
+
+```powershell
+# Aygıt Yöneticisi üzerinden ya da:
+pnputil /enum-drivers
+pnputil /delete-driver oem42.inf /uninstall /force
+```
+
+**Yayımı durdurma** — asıl önlem budur. Sorunlu sürücüyü kaldırmakla uğraşmadan önce, dağıtımını durdurun; yoksa temizlediğiniz makinelere yeniden iner.
+
+Windows Update'in belirli bir sürücüyü yeniden kurmasını engellemek için Microsoft'un "show or hide updates" aracı ya da politika tabanlı engelleme kullanılır.
+
+## Sürücü deposu temizliği
+
+Zamanla eski sürücü sürümleri birikir ve disk yer. Ayrıca kullanılmayan sürücüler, yazdırma biriktiricisi gibi bileşenlerde sorun çıkarabilir.
+
+```powershell
+# kullanılmayan sürücü paketlerini görmek
+pnputil /enum-drivers | Select-String -Pattern 'Published Name|Original Name|Driver Version' -Context 0,2
+```
+
+Temizliği otomatikleştirmeyin; hangi sürücünün gerçekten kullanılmadığını doğrulamak gerekir. Yılda bir elle gözden geçirme yeterlidir.
+
+## Sık yapılan üç hata
+
+**Tüm filoya aynı anda.** Sürücü güncellemesi, işletim sistemi yamasından daha risklidir; halka disiplini burada daha da önemlidir.
+
+**Üretici aracını sınırsız bırakmak.** Vantage veya benzeri araçlar kullanıcıya "güncelle" düğmesi sunar. Kurumsal ortamda bu araçları yönetilen modda çalıştırın; aksi hâlde filoda sürüm kaosu oluşur.
+
+**BIOS/UEFI'yi unutmak.** Bellenim güncellemeleri de sürücü kadar önemlidir ve genelde hiç yapılmaz. Yılda bir bellenim döngüsü planlayın — BitLocker koruması duraklatılarak yapılmalıdır.
+
+## Doğrulama adımı
+
+Bir sürücü güncellemesini yayımladıktan sonra **o modelden bir cihazda** üç şeyi kontrol edin: aygıt yöneticisinde sarı ünlem var mı, güvenilirlik geçmişinde (`perfmon /rel`) yeni bir çökme kaydı oluştu mu, ve kullanıcının asıl kullandığı işlev çalışıyor mu.
+
+Üçüncüsü en önemlisidir ve en çok atlanandır: dock istasyonu üzerinden iki monitör kullanan bir kullanıcı için asıl test, aygıt yöneticisinin temiz görünmesi değil, iki monitörün de gelmesidir.

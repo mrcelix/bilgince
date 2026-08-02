@@ -1,0 +1,93 @@
+---
+baslik: "Ağ belgelemesi: kimsenin okumadığı 80 sayfa yerine 4 tablo"
+ozet: "Kapsamlı ağ dokümanı yazılır, güncellenmez, kullanılmaz. Gerçekten işe yarayan minimum set ve güncel tutma yöntemi."
+konu: "ag"
+etiketler: ["belgeleme", "operasyon", "envanter"]
+yayin: 2026-05-08
+sure: 11
+---
+
+Çoğu kurumda bir ağ dokümanı vardır. Kalın, kapsamlı ve iki yıl önce güncellenmiştir. Bir arıza sırasında kimse açmaz çünkü güncel olmadığını herkes bilir.
+
+Sorun belgelemenin kendisinde değil, kapsamındadır. Her şeyi belgelemeye çalışan doküman güncellenemez; güncellenmeyen doküman kullanılmaz.
+
+## İşe yarayan minimum set
+
+Dört tablo, bir de çizim. Hepsi bu.
+
+**1. IP adres planı.** Hangi alt ağ ne için, VLAN numarası, ağ geçidi, DHCP aralığı, sabit adres aralığı.
+
+| VLAN | Alt ağ | Amaç | Ağ geçidi | DHCP aralığı |
+| --- | --- | --- | --- | --- |
+| 10 | 10.10.10.0/24 | Sunucu | .1 | yok (sabit) |
+| 20 | 10.10.20.0/24 | İstemci | .1 | .100–.250 |
+| 30 | 10.10.30.0/24 | Yazıcı | .1 | .50–.99 |
+| 40 | 10.10.40.0/24 | Misafir | .1 | .20–.250 |
+
+Bu tablo olmadan yeni bir sistem eklerken adres çakışması yaşarsınız.
+
+**2. Cihaz envanteri.** Ad, model, yönetim IP'si, konum, seri numarası, garanti bitişi.
+
+Garanti sütunu önemlidir: arıza anında cihazın destek kapsamında olup olmadığını aramak vakit kaybettirir.
+
+**3. Bağlantı tablosu.** Hangi cihazın hangi portu, nereye gidiyor.
+
+| Cihaz | Port | Karşı taraf | Açıklama |
+| --- | --- | --- | --- |
+| SW-CORE-01 | Gi1/0/1 | SW-KAT2-01 Gi1/0/49 | Kat 2 uplink |
+| SW-CORE-01 | Gi1/0/24 | FW-01 eth1 | Güvenlik duvarı |
+
+Yalnızca **omurga bağlantılarını** yazın. Her kullanıcı portunu belgelemeye kalkarsanız tablo güncellenemez hâle gelir.
+
+**4. Dış bağlantılar.** İnternet hatları, MPLS/VPN devreleri, sağlayıcı adı, devre numarası, hız, destek telefonu, sözleşme bitişi.
+
+Bu tablo, hat koptuğunda ilk açılan şeydir. Devre numarası olmadan sağlayıcı destek hattı size yardımcı olamaz.
+
+## Bir de çizim
+
+Tek sayfalık mantıksal topoloji: internet, güvenlik duvarı, omurga, dağıtım, kritik sunucular. Fiziksel kablo detayı değil, **trafiğin nereden nereye aktığı**.
+
+Bu çizim, yeni gelen birinin ortamı 5 dakikada anlamasını sağlar. Detay eklendikçe o özelliğini kaybeder.
+
+## Güncel tutmanın tek yolu: otomatikleştirin
+
+Elle güncellenen doküman eskir. Elde edilebilecek her veriyi cihazlardan çekin.
+
+Anahtarlardan komşu keşfi (LLDP/CDP) ile bağlantı tablosunun büyük kısmını otomatik üretebilirsiniz. DHCP sunucusundan kiralanan adresleri, DNS'ten kayıtları alabilirsiniz.
+
+Windows tarafında hızlı bir envanter:
+
+```powershell
+Get-DhcpServerv4Scope | Select-Object ScopeId, Name, StartRange, EndRange, State
+Get-DhcpServerv4Reservation -ScopeId 10.10.30.0 | Select-Object IPAddress, Name, ClientId
+```
+
+Bu çıktıları haftalık bir görevle dosyaya yazdırıp sürüm kontrolüne koyun. Böylece hem güncel kalır hem de neyin ne zaman değiştiğini görürsünüz.
+
+## Değişiklikleri kaynağında yakalayın
+
+Belgeleme, değişiklik sürecinin **parçası** olmalı, sonrasında yapılan ek iş değil.
+
+Pratik kural: bir değişiklik talebi, ilgili tablo güncellenmeden kapatılmaz. Bu, süreci yavaşlatmaz — tablo güncellemesi iki dakikadır — ama dokümanın ömrünü belirler.
+
+## Nerede saklanmalı
+
+İki kural var ve ikisi de arıza anında anlaşılır.
+
+**Ağa bağımlı olmayan bir kopya bulunsun.** Doküman yalnızca iç dosya sunucusundaysa ve ağ çöktüyse, dokümana erişemezsiniz.
+
+**Sürüm geçmişi olsun.** "Geçen hafta çalışıyordu" durumunda, neyin değiştiğini görmek en hızlı teşhis yoludur. Wiki ya da git deposu bunu ücretsiz verir.
+
+## Kimlik bilgileri dokümanda olmaz
+
+Yönetim arayüzü şifrelerini ağ dokümanına yazmak yaygın ve yanlıştır. Doküman geniş erişimlidir; şifreler değil.
+
+Dokümanda yalnızca "kimlik bilgileri parola kasasında, X kaydı altında" yazsın. Kasaya erişimin ağdan bağımsız bir yolu olduğundan emin olun.
+
+## Doğrulama adımı
+
+Belgelemenizin gerçekten çalışıp çalışmadığını anlamanın tek sınavı şudur: **ekipten birine, hiç dokunmadığı bir sistemi dokümanı kullanarak bulmasını isteyin.**
+
+Örneğin: "İkinci kattaki toplantı odası yazıcısının IP'sini ve hangi anahtar portuna bağlı olduğunu bul." Beş dakikada bulabiliyorsa dokümanınız işini yapıyordur.
+
+Bulamıyorsa, eksik olan sayfa sayısı değil — güncellik ve erişilebilirliktir. İkisini düzeltmeden sayfa eklemek durumu iyileştirmez.

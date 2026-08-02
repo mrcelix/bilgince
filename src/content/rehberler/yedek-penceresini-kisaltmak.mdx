@@ -1,0 +1,101 @@
+---
+baslik: "Yedekleme penceresi sabaha taşıyorsa"
+ozet: "Veri büyüdükçe pencere uzar ve bir gün iş saatine girer. Süreyi kısaltmanın dört yolu ve hangisinin ne zaman doğru olduğu."
+konu: "yedekleme"
+etiketler: ["performans", "operasyon", "planlama"]
+yayin: 2026-02-06
+sure: 11
+---
+
+Yedekleme işi gece 22:00'de başlıyor, sabah 07:00'de hâlâ sürüyor. Kullanıcılar geliyor, sistem yavaş, herkes şikâyet ediyor. Ve iş her hafta biraz daha uzuyor.
+
+Bu, veri büyümesinin doğal sonucudur ve çözümü genelde "daha hızlı donanım" değildir.
+
+## Önce nerede yavaşladığını ölçün
+
+Dört olası darboğaz var ve hangisi olduğunu bilmeden yapılan her iyileştirme tahmindir.
+
+**Kaynak okuma.** Üretim diskinden veri okunması. Yoğun bir veritabanı sunucusunda I/O zaten doludur.
+
+**Ağ.** Kaynak ile yedekleme sunucusu arasındaki bant genişliği.
+
+**Hedef yazma.** Yedekleme deposunun yazma hızı; özellikle tekilleştirme yapan sistemlerde işlemci de darboğaz olabilir.
+
+**İşleme.** Sıkıştırma, şifreleme, tekilleştirme, doğrulama.
+
+İşin çalıştığı sırada kaynak ve hedefte sayaçlara bakın:
+
+```powershell
+Get-Counter '\PhysicalDisk(_Total)\Avg. Disk sec/Read',
+            '\PhysicalDisk(_Total)\Disk Read Bytes/sec',
+            '\Network Interface(*)\Bytes Sent/sec' -SampleInterval 5 -MaxSamples 24
+```
+
+Ağ doluysa ve disk boştaysa çözüm başka, tersi ise başkadır.
+
+## Yol 1: Daha az veri taşıyın
+
+En etkili yol budur ve genelde en son akla gelir.
+
+**Artımlı sonsuz (incremental forever).** Tam yedeği bir kez alıp sonra yalnızca değişenleri taşımak. Modern ürünlerin çoğu bunu destekler ama varsayılan olarak haftalık tam yedek yapılandırılmış olabilir.
+
+**Değişen blok takibi.** Sanal makinelerde, diskin tamamını okumak yerine yalnızca değişen blokları okur. Kapalıysa açın — tek başına süreyi kat kat kısaltır.
+
+**Kapsamı gözden geçirin.** Gerçekten her şey yedekleniyor mu, yedeklenmeli mi? Geçici dosyalar, önbellekler, sayfa dosyaları, yeniden indirilebilir yazılım depoları. Bunları dışlamak hem süreyi hem depolamayı düşürür.
+
+## Yol 2: Paralel çalıştırın
+
+Çoğu ürün aynı anda birden fazla iş çalıştırabilir. Varsayılan eşzamanlılık genelde muhafazakârdır.
+
+Artırırken dikkatli olun: paralellik, darboğazı kaynak diskten hedefe kaydırır. İki iş yerine sekiz iş çalıştırmak, hedef depolama doyduğunda toplam süreyi uzatabilir.
+
+Kademeli artırın ve her adımda toplam süreyi ölçün. Süre düşmüyorsa darboğazı bulmuşsunuzdur.
+
+## Yol 3: Pencereyi bölün
+
+Tüm sistemleri aynı pencereye sığdırmaya çalışmak yerine kademelere ayırın:
+
+- Kritik sistemler: her gece
+- Orta önem: gün aşırı
+- Düşük önem: haftalık
+
+Ayrıca farklı sistemleri farklı saatlere yayın. Hepsinin 22:00'de başlaması, ilk saatte depolamayı doyurur ve sonrasında her şey yavaşlar.
+
+## Yol 4: Anlık görüntü tabanlı yaklaşım
+
+Depolama dizisi anlık görüntü destekliyorsa, yedekleme penceresini üretimden tamamen ayırabilirsiniz: üretimde saniyeler süren bir anlık görüntü alınır, yedekleme o görüntüden yapılır.
+
+Bu, üretim üzerindeki etkiyi neredeyse sıfıra indirir. Pencere hâlâ uzun sürer ama artık kullanıcıyı etkilemez — ve asıl sorun genelde süre değil, etkidir.
+
+## Sanal makine yedeklemesinde tuzak
+
+Sanal ortamda tüm makineleri aynı anda yedeklemeye kalkmak, ana makinede I/O fırtınası yaratır ve **yedeklenen makineler değil, aynı depolamadaki diğer makineler** yavaşlar.
+
+Ana makine başına eşzamanlı iş sayısını sınırlayın. Çoğu üründe bu ayar vardır ve varsayılanı ortamınız için fazla iyimser olabilir.
+
+## Uygulama tutarlılığı süreyi uzatır — ama gereklidir
+
+VSS ile uygulama tutarlı yedek almak, yazmaları kısa süre duraklatır ve toplam süreyi uzatır. Bu maliyeti ödemeye değer: çökme tutarlı bir veritabanı yedeği, geri yüklendiğinde açılmayabilir.
+
+Süre baskısı yüzünden tutarlılığı kapatmak, sorunu yedekleme penceresinden geri yükleme anına ertelemektir — ve orada çok daha pahalıdır.
+
+## Ölçün ve eğilime bakın
+
+Tek bir gecenin süresi değil, **eğilim** önemlidir. Haftalık süreyi kaydedin:
+
+```powershell
+# örnek: ürün günlüğünden süre çıkarımı
+Import-Csv .\yedekleme-gecmisi.csv |
+  Select-Object Tarih, @{n='SureDk';e={ [int]$_.SureDakika }} |
+  Sort-Object Tarih | Select-Object -Last 12
+```
+
+Süre her hafta biraz artıyorsa, mevcut kapasiteyle ne zaman pencereyi aşacağınızı hesaplayabilirsiniz. Bu tarihi önceden bilmek, aniden öğrenmekten çok daha ucuzdur — kapasite planlamasının tamamı bu tek grafikten çıkar.
+
+## Doğrulama adımı
+
+İyileştirmelerden sonra iki şeyi birlikte ölçün: **toplam süre** ve **geri yükleme süresi**.
+
+İkincisi kritiktir. Artımlı zincirleri uzatarak yedekleme penceresini kısaltmak mümkündür ama geri yükleme, uzun bir zinciri birleştirmek zorunda kalacağı için yavaşlar. Yedekleme süresini yarıya indirip geri yükleme süresini ikiye katlamak, çoğu ortamda kötü bir takas olur.
+
+Bu iki sayıyı yan yana ölçmeden hiçbir yedekleme optimizasyonunu başarılı saymayın.

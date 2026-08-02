@@ -1,0 +1,106 @@
+---
+baslik: "Sanal disk türleri ve depolama yerleşimi"
+ozet: "Dinamik mi sabit mi, hangi birime, hangi blok boyutuyla? Sonradan değiştirmesi en zahmetli kararlar."
+konu: "sanallastirma"
+etiketler: ["depolama", "hyper-v", "performans"]
+yayin: 2026-04-03
+sure: 11
+---
+
+Sanal makine oluştururken disk ayarları varsayılan bırakılır ve genelde uzun süre sorun çıkarmaz. Sorun, depolama dolduğunda ya da performans şikâyeti geldiğinde ortaya çıkar — ve o noktada değiştirmek kesinti gerektirir.
+
+## Dinamik mi sabit mi
+
+**Dinamik genişleyen (dynamically expanding):** Dosya, kullanıldıkça büyür. Alan tasarrufu sağlar.
+
+**Sabit boyutlu (fixed):** Oluşturulurken tüm alan ayrılır. Performansı bir miktar daha iyidir ve öngörülebilirdir.
+
+Modern depolama üzerinde performans farkı eskisi kadar belirgin değil. Asıl fark **risktedir**: dinamik diskler, altındaki birim dolduğunda büyüyemez ve sanal makine durur.
+
+Aşırı taahhüt (thin provisioning) yapıyorsanız — ki dinamik disk tam olarak budur — birim doluluğunu izlemek zorunludur:
+
+```powershell
+Get-Volume | Where-Object DriveType -eq 'Fixed' |
+  Select-Object DriveLetter, FileSystemLabel,
+    @{n='BosGB';e={[math]::Round($_.SizeRemaining/1GB,1)}},
+    @{n='Bos%';e={[math]::Round($_.SizeRemaining/$_.Size*100,1)}} |
+  Sort-Object 'Bos%'
+```
+
+Kritik iş yüklerinde sabit disk kullanmak, bu riski tamamen ortadan kaldırdığı için genelde doğru tercihtir.
+
+## Fark diski: üretimde kullanmayın
+
+Fark diski (differencing), bir üst diske bağlı olarak yalnızca değişiklikleri tutar. Laboratuvar ve test için mükemmeldir: tek bir temel diskten onlarca makine türetirsiniz.
+
+Üretimde ise iki sorun üretir: zincir uzadıkça performans düşer ve üst disk bozulursa tüm alt diskler kaybolur. Üretim makinelerinde fark diski görüyorsanız, muhtemelen unutulmuş bir checkpoint vardır.
+
+## VHDX kullanın, VHD değil
+
+Eski VHD biçiminin sınırları var: 2 TB maksimum boyut ve ani güç kesintilerine karşı daha zayıf koruma.
+
+VHDX 64 TB'a kadar destekler ve dahili günlükleme sayesinde bozulmaya karşı daha dayanıklıdır. Yeni disklerde VHDX varsayılan olmalı; eski VHD'leri fırsat buldukça dönüştürün:
+
+```powershell
+Convert-VHD -Path 'D:\VM\eski.vhd' -DestinationPath 'D:\VM\yeni.vhdx' -VHDType Fixed
+```
+
+Dönüştürme makine kapalıyken yapılır ve alan gerektirir — kaynak disk kadar boş alan olmalıdır.
+
+## Blok boyutu ve hizalama
+
+VHDX oluştururken mantıksal sektör boyutu ve blok boyutu seçilebilir. Varsayılanlar çoğu iş yükü için uygundur ama iki istisna vardır:
+
+**Veritabanları.** 64 KB ayırma birimi ile biçimlendirilmiş bir birim, SQL Server için önerilir.
+
+**4K yerel diskler.** Altındaki fiziksel disk 4K sektör kullanıyorsa, sanal diskin de uyumlu olması hizalama sorunlarını önler.
+
+Hizalama bozukluğu sessizce performans yer; ölçmeden fark edilmez.
+
+## Yerleşim: neyi nereye koymalı
+
+Tek bir büyük birime her şeyi koymak yönetimi kolaylaştırır ama arıza alanını büyütür. Pratik bir ayrım:
+
+- **İşletim sistemi diskleri** — orta hızlı katman yeterli
+- **Veritabanı veri dosyaları** — en hızlı katman
+- **Veritabanı günlük dosyaları** — ayrı birim, sıralı yazma için optimize
+- **Yedekleme hedefi** — tamamen ayrı fiziksel depolama
+
+Son madde pazarlık konusu değildir. Yedekleri, yedeklediğiniz sistemle aynı depolama dizisinde tutmak, dizi arızasında ikisini birden kaybetmek demektir.
+
+## Checkpoint yerleşimi
+
+Checkpoint dosyaları varsayılan olarak sanal makinenin yapılandırma dizinine yazılır. Yoğun bir makinede bu dosyalar hızla büyür.
+
+Yapılandırma dizinini disk dosyalarından ayrı bir birime koymak, checkpoint kaynaklı doluluk riskini izole eder:
+
+```powershell
+Get-VM | Select-Object Name, Path, SnapshotFileLocation, SmartPagingFilePath
+```
+
+## Depolama katmanı kararı
+
+Her makineyi en hızlı katmana koymak pahalıdır; hepsini yavaş katmana koymak kullanılamaz. Ayrımı iş yüküne göre yapın:
+
+Yüksek IOPS gerektirenler (veritabanı, sanal masaüstü) hızlı katmana. Sıralı ve düşük yoğunluklu olanlar (dosya sunucusu, arşiv) daha ucuz katmana.
+
+Karar vermeden önce ölçün — tahmin edilen ile gerçek IOPS arasında genelde büyük fark olur:
+
+```powershell
+Get-Counter '\Hyper-V Virtual Storage Device(*)\Read Operations/Sec',
+            '\Hyper-V Virtual Storage Device(*)\Write Operations/Sec' `
+  -SampleInterval 10 -MaxSamples 30
+```
+
+## Doğrulama adımı
+
+Yeni bir sanal makine oluşturduktan sonra üç şeyi kontrol edin: disk türü beklediğiniz mi, dosya doğru birimde mi, ve birimde makinenin tam boyutu kadar boş alan var mı.
+
+```powershell
+Get-VM 'yeni01' | Get-VMHardDiskDrive | ForEach-Object {
+    Get-VHD $_.Path | Select-Object Path, VhdType, @{n='BoyutGB';e={[math]::Round($_.Size/1GB)}},
+      @{n='DosyaGB';e={[math]::Round($_.FileSize/1GB,1)}}
+}
+```
+
+Üçüncü kontrol, dinamik disk kullanıyorsanız en önemlisidir: bugün 20 GB yer kaplayan bir disk, tanımlı boyutu 500 GB ise bir gün oraya kadar büyüyebilir. Birimde o alan yoksa, sorunu bugün değil altı ay sonra yaşarsınız.

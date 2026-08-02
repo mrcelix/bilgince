@@ -1,0 +1,127 @@
+---
+baslik: "Kullanıcı profili sorunları: geçici profille açılan oturum"
+ozet: "\"Masaüstüm boş geldi\" çağrısının arkasında genelde bozuk bir profil vardır. Teşhis sırası ve kalıcı çözümler."
+konu: "windows"
+etiketler: ["profil", "onarim", "tanilama"]
+yayin: 2026-04-17
+sure: 12
+---
+
+Kullanıcı sabah oturum açıyor ve masaüstünde hiçbir şey yok. Belgeler boş, tarayıcı sıfırlanmış, imza kaybolmuş. Panikliyor ve haklı olarak "dosyalarım silindi" diyor.
+
+Dosyalar silinmedi. Windows, asıl profili yükleyemediği için geçici bir profil oluşturdu.
+
+## Önce kullanıcıyı sakinleştirin
+
+Geçici profille açılan oturumda yapılan değişiklikler oturum kapanınca **kaybolur**. Bu yüzden ilk söylenecek şey şudur: bu oturumda çalışmayın, bir şey kaydetmeyin.
+
+Asıl profil genelde yerinde durur:
+
+```powershell
+Get-ChildItem C:\Users | Select-Object Name, LastWriteTime
+```
+
+Kullanıcının klasörü orada ve dolu ise veri kaybı yoktur.
+
+## Teşhis: kayıt defteri profil listesi
+
+Windows, profilleri kayıt defterinde tutar ve bozulma neredeyse her zaman buradadır:
+
+```powershell
+Get-ChildItem 'HKLM:\SOFTWARE\Microsoft\Windows NT\CurrentVersion\ProfileList' |
+  ForEach-Object {
+    $sid = Split-Path $_.Name -Leaf
+    [pscustomobject]@{
+      SID   = $sid
+      Yol   = (Get-ItemProperty $_.PSPath).ProfileImagePath
+      Durum = (Get-ItemProperty $_.PSPath).State
+    }
+  } | Format-Table -AutoSize
+```
+
+İki belirti arayın:
+
+**`.bak` ile biten SID.** Windows bozuk profili `.bak` uzantısıyla yeniden adlandırıp yenisini oluşturur. Asıl profil `.bak` olanıdır.
+
+**Sıfır olmayan `State` değeri.** Genelde profilin düzgün kapatılmadığını gösterir.
+
+## Onarım sırası
+
+`.bak` girdisi varsa klasik onarım şudur:
+
+1. Kullanıcının oturumunu tamamen kapatın
+2. `.bak` olmayan (yeni, boş) girdiyi silin ya da yeniden adlandırın
+3. `.bak` girdisinden uzantıyı kaldırın
+4. `State` değerini `0` yapın
+5. `RefCount` değerini `0` yapın
+
+```powershell
+$yol = 'HKLM:\SOFTWARE\Microsoft\Windows NT\CurrentVersion\ProfileList\S-1-5-21-...'
+Set-ItemProperty $yol -Name State -Value 0
+Set-ItemProperty $yol -Name RefCount -Value 0
+```
+
+Bu işlemi yapmadan önce **kayıt defteri anahtarını dışa aktarın**. Yanlış SID'e dokunmak başka bir kullanıcının profilini bozar.
+
+## Kök sebep genelde bunlardan biri
+
+Onarım belirtiyi giderir; tekrarlamaması için sebebe bakın.
+
+**Disk doluluğu.** C: sürücüsünde yer kalmadığında profil yüklenemez. En sık sebep budur ve en kolay atlanır.
+
+**Antivirüs kilidi.** Tarama, profil klasöründeki `NTUSER.DAT` dosyasını oturum açma anında kilitleyebilir. Profil yollarını tarama istisnasına eklemek çözer.
+
+**Gezici profil (roaming) senkronizasyonu.** Ağ yavaşsa veya paylaşım erişilemezse profil yüklenemez. Gezici profil kullanıyorsanız, bu mimarinin kendisi kırılganlık kaynağıdır.
+
+**Ani kapanma.** Elektrik kesintisi ya da zorla kapatma, `NTUSER.DAT` dosyasını bozabilir.
+
+## Kalıcı çözüm: profili taşınabilir yapın
+
+Asıl mesele şudur: profilde ne kadar az kritik veri olursa, profil bozulması o kadar önemsizleşir.
+
+**Bilinen klasörleri buluta yönlendirin.** Masaüstü, Belgeler ve Resimler bulut depolamada olursa profil bozulsa bile veri yerinde kalır.
+
+**Tarayıcı ve uygulama ayarlarını hesaba bağlayın.** Modern tarayıcılar profili hesapla senkronize eder.
+
+**Gezici profilden vazgeçin.** Klasör yönlendirme + bulut senkronizasyonu, gezici profilin çözdüğü sorunu daha az kırılganlıkla çözer.
+
+Bu üçü yapıldığında profil sorunu bir felaket olmaktan çıkıp on dakikalık bir işe döner: profili sil, kullanıcı yeniden oturum açsın, her şey yerine gelsin.
+
+## Profili temizlemek
+
+Bozuk profili tamamen kaldırmak bazen en hızlı yoldur — ama yalnızca veri güvendeyse.
+
+```powershell
+# önce yedek al
+$kaynak = 'C:\Users\m.demir'
+Copy-Item $kaynak "D:\ProfilYedek\m.demir-$(Get-Date -f yyyyMMdd)" -Recurse -Force
+
+# sonra CIM ile düzgün kaldır (klasör + kayıt defteri birlikte)
+Get-CimInstance Win32_UserProfile |
+  Where-Object LocalPath -eq $kaynak |
+  Remove-CimInstance
+```
+
+`Win32_UserProfile` üzerinden kaldırmak, klasörü elle silmekten daha güvenlidir: kayıt defteri girdisini de temizler. Elle silinen klasör, geride kalan kayıt girdisi yüzünden aynı sorunu tekrar üretir.
+
+## Eski profilleri düzenli temizleyin
+
+Ortak kullanılan makinelerde profiller birikir ve diski doldurur. 90 günden eski profilleri temizleyen bir görev, disk kaynaklı profil sorunlarının çoğunu önler:
+
+```powershell
+Get-CimInstance Win32_UserProfile |
+  Where-Object { -not $_.Special -and $_.LastUseTime -lt (Get-Date).AddDays(-90) } |
+  Select-Object LocalPath, LastUseTime
+```
+
+Listeyi önce görün, sonra silin. `-not $_.Special` filtresi sistem profillerini korur; bu filtre olmadan çalıştırılan bir temizlik makineyi bozar.
+
+## Doğrulama adımı
+
+Onarımdan sonra kullanıcı oturum açtığında üçünü kontrol edin: masaüstü öğeleri geldi mi, `%USERPROFILE%` doğru yolu gösteriyor mu, kayıt defterinde `.bak` girdisi kaldı mı.
+
+```powershell
+$env:USERPROFILE
+```
+
+`C:\Users\TEMP` ya da benzeri bir yol dönüyorsa hâlâ geçici profildedir ve onarım tutmamıştır. Kullanıcıya "düzeldi" demeden önce bu tek satırı çalıştırın.

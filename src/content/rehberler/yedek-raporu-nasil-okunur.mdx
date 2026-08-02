@@ -1,0 +1,105 @@
+---
+baslik: "Yedekleme raporunu okumak: yeşil her zaman iyi değil"
+ozet: "\"Başarılı\" yazan bir iş, hiçbir şey yedeklememiş olabilir. Rapordan gerçekten bakılması gereken dört alan."
+konu: "yedekleme"
+etiketler: ["izleme", "operasyon", "raporlama"]
+yayin: 2026-04-10
+sure: 11
+---
+
+Yedekleme panosuna her sabah bakılır ve yeşil görülür. Bu, çoğu ekipte kontrolün tamamıdır.
+
+Sorun şu: "başarılı" durumu, işin **hatasız tamamlandığını** söyler. Doğru veriyi, doğru miktarda, kullanılabilir biçimde yedeklediğini söylemez.
+
+## Dört alan, dört soru
+
+**1. Kapsam — neyi yedekledi?**
+
+En sık atlanan alan budur. Yeni eklenen bir sunucu yedekleme işine dahil edilmemişse, iş yine yeşil biter — çünkü kendisine verilen listeyi başarıyla tamamlamıştır.
+
+Bu yüzden yedekleme raporu tek başına yetmez; **envanterle karşılaştırılmalıdır**:
+
+```powershell
+$tumSunucular = (Get-ADComputer -Filter { OperatingSystem -like '*Server*' }).Name
+$yedeklenenler = Import-Csv .\yedekleme-kapsami.csv | Select-Object -ExpandProperty Makine
+Compare-Object $tumSunucular $yedeklenenler |
+  Where-Object SideIndicator -eq '<=' |
+  Select-Object @{n='YedeklenmeyenSunucu';e={$_.InputObject}}
+```
+
+Bu sorgunun çıktısı boş olmalıdır. Değilse, yedeklenmeyen sistemleriniz var ve panonuz yeşil.
+
+**2. Boyut — beklenen kadar veri taşındı mı?**
+
+Bir veritabanı sunucusunun yedeği her gece 200 GB iken bugün 2 GB ise, iş "başarılı" olsa bile bir şey yanlıştır. Genelde bir birim eklenmemiş ya da bir yol değişmiştir.
+
+Boyut eğilimini izleyin; ani düşüş, ani artıştan daha tehlikelidir.
+
+**3. Süre — normalden sapma var mı?**
+
+Süre aniden kısaldıysa muhtemelen daha az veri işlenmiştir. Aniden uzadıysa bir darboğaz ya da tam yedeğe düşme durumu vardır.
+
+**4. Uyarılar — "başarılı ama uyarılı" durumu**
+
+Birçok ürün, bazı dosyalar atlandığında işi yine başarılı sayar ve uyarı ekler. Atlanan dosyalar genelde kilitli olanlardır — yani kullanımdaki, yani önemli olanlar.
+
+Uyarıları "başarısız" gibi ele alın; en azından okuyun.
+
+## Doğrulanmış geri yükleme sayısı
+
+Rapordaki en değerli metrik, çoğu panoda hiç bulunmaz: **son 30 günde kaç geri yükleme testi yapıldı ve kaçı başarılı oldu.**
+
+Bu sayı sıfırsa, yedekleme sisteminizin çalıştığına dair kanıtınız yok demektir — yalnızca çalıştığına dair raporunuz var.
+
+## Haftalık özet nasıl olmalı
+
+Yönetime ya da kendinize gönderilecek haftalık özet dört satır olsun:
+
+```
+Kapsam      : 84/84 sunucu (%100)
+Başarı      : 587/588 iş (%99,8) — 1 başarısız: SQL02 (disk dolu, çözüldü)
+Doğrulama   : 3 geri yükleme testi, 3 başarılı, ortalama 42 dk
+En eski RPO : 26 saat (DOSYA01 — gecelik iş)
+```
+
+Son satır önemlidir: hangi sistemin en eski kurtarma noktasına sahip olduğunu gösterir. Taahhüt ettiğiniz RPO ile karşılaştırıldığında, gerçek durumunuzu tek satırda verir.
+
+## Başarısız işi kapatmadan önce
+
+Bir iş başarısız olduğunda tekrar çalıştırıp yeşil görmek yeterli değildir. İki soru sorun:
+
+**Neden başarısız oldu?** Disk dolu, ağ kesildi, VSS hatası, kimlik doğrulama. Sebep tekrarlayacak mı?
+
+**O gece için kurtarma noktası var mı?** Tekrar çalıştırdıysanız var. Çalıştırmadıysanız o günün verisi yedeksizdir ve bu, RPO taahhüdünüzü ihlal eder.
+
+İkinci sorunun cevabını kayda geçirin; denetimde sorulan tam olarak budur.
+
+## Saklama politikasını da rapordan doğrulayın
+
+Rapor genelde "hangi işler çalıştı" sorusuna odaklanır. Bir de "elimizde ne kadar geriye giden kopya var" sorusu vardır ve cevabı ayrı bir yerde durur.
+
+Saklama politikası 30 gün diyorsa, depoda gerçekten 30 günlük kurtarma noktası olduğunu doğrulayın. Alan sıkışması yaşandığında birçok ürün eski noktaları erken siler ve bunu bir uyarı olarak değil, normal bakım olarak raporlar.
+
+En eski ve en yeni kurtarma noktası tarihlerini haftalık özete ekleyin. Aradaki fark, politikada yazandan kısaysa uyumluluk taahhüdünüz fiilen ihlal ediliyor demektir.
+
+## Zamanlamayı da okuyun
+
+İşin başarılı olması, doğru saatte çalıştığı anlamına gelmez. Gecelik yedek 22:00'de başlaması gerekirken 03:00'te başlıyorsa, kuyrukta bekliyor demektir — ve bu, pencerenin dolduğunun ilk işaretidir.
+
+Başlangıç saatlerinin haftalık dağılımına bakın. Kayma varsa, henüz başarısızlık üretmeden kapasite planlaması yapma şansınız var.
+
+## Uyarıları doğru kurun
+
+Yedekleme uyarıları iki yönlü olmalıdır ve çoğu ortamda yalnızca biri kuruludur.
+
+**Başarısızlık uyarısı** — herkes kurar.
+
+**Sessizlik uyarısı** — neredeyse kimse kurmaz. Yedekleme sunucusu çökerse hiç iş çalışmaz, dolayısıyla hiç başarısızlık uyarısı da gelmez. Her şey sessizdir ve sessizlik iyi sanılır.
+
+Beklenen sayıda iş raporlanmadığında uyarı üretin. Bu, en sinsi arıza modunu yakalar.
+
+## Doğrulama adımı
+
+Bu hafta, panoda yeşil görünen üç işi seçin ve her biri için üç soruyu cevaplayın: **kaç GB taşıdı, ne kadar sürdü, kapsamındaki her şey dahil miydi?**
+
+Üçünü de cevaplayabiliyorsanız raporunuz işini yapıyordur. Cevaplayamıyorsanız, her sabah baktığınız şey bir durum göstergesi değil, bir renktir.

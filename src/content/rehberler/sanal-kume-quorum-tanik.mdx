@@ -1,0 +1,97 @@
+---
+baslik: "Küme quorum ve tanık: iki düğümlü kümenin gerçek riski"
+ozet: "İki düğümlü bir küme, tanık olmadan yedeklilik sağlamaz. Quorum mantığı ve doğru tanık seçimi."
+konu: "sanallastirma"
+etiketler: ["kume", "yuksek-erisilebilirlik", "hyper-v"]
+yayin: 2026-04-24
+sure: 11
+---
+
+İki düğümlü bir küme kurup "artık yedekliyiz" demek yaygın bir yanılgıdır. Tanık yapılandırılmamışsa, o küme tek düğüm kaybında tamamen durur — yani yedeklilik yoktur.
+
+Sebep quorum mantığındadır ve anlaşıldığında basittir.
+
+## Quorum neden var
+
+Küme düğümleri birbirini kaybettiğinde iki ihtimal vardır: diğer düğüm gerçekten çöktü ya da yalnızca aradaki ağ koptu.
+
+İkinci durumda her iki düğüm de "ben ayaktayım, diğeri öldü" düşünüp aynı iş yükünü çalıştırmaya kalkarsa, aynı diske iki taraftan yazılır ve veri bozulur. Buna **split-brain** denir ve kümenin önlemesi gereken asıl felaket budur.
+
+Quorum, bu durumu önleyen oylama mekanizmasıdır: çoğunluğu elinde tutan taraf çalışmaya devam eder, diğeri kendini kapatır.
+
+## İki düğümde çoğunluk olmaz
+
+İki düğümlü kümede her düğüm bir oy taşır. Bağlantı koptuğunda her taraf 1 oya sahiptir — çoğunluk yoktur. Sonuç: **her iki düğüm de kendini kapatır** ve küme tamamen durur.
+
+Tanık, üçüncü bir oy ekleyerek bunu çözer. Bağlantı koptuğunda tanığa ulaşabilen taraf 2 oyla çoğunluğu sağlar ve çalışmaya devam eder.
+
+Bu yüzden çift sayıda düğümü olan her kümede tanık zorunludur.
+
+## Tanık türleri
+
+**Dosya paylaşımı tanığı.** Üçüncü bir sunucudaki bir paylaşım. Kurması kolaydır ve en yaygın seçimdir.
+
+**Bulut tanığı.** Bulut depolama hesabı kullanır. İki ayrı lokasyondaki düğümler için idealdir çünkü tanık her iki lokasyondan da bağımsızdır.
+
+**Disk tanığı.** Paylaşımlı depolamada küçük bir birim. Klasik yöntemdir; paylaşımlı depolama zaten varsa uygundur.
+
+```powershell
+# bulut tanığı
+Set-ClusterQuorum -CloudWitness -AccountName 'sirketkume' -AccessKey '<anahtar>'
+
+# dosya paylaşımı tanığı
+Set-ClusterQuorum -FileShareWitness '\\tanik01\KumeTanik'
+```
+
+## Tanığın yeri kritiktir
+
+En sık yapılan hata, tanığı küme düğümlerinden birinin üzerine ya da aynı arıza alanına koymaktır.
+
+Tanık, küme düğümlerinden **bağımsız** olmalıdır. Aynı ana makinede çalışan bir sanal sunucudaki paylaşım, o ana makine çökerse hem düğümü hem tanığı birlikte götürür.
+
+İki lokasyona yayılmış kümelerde tanık üçüncü bir lokasyonda ya da bulutta olmalıdır. Lokasyonlardan birine koyarsanız, diğer lokasyon o bağlantıyı kaybettiğinde çalışamaz — yani coğrafi yedekliliğin amacı boşa çıkar.
+
+## Dinamik quorum
+
+Modern Windows Server sürümlerinde dinamik quorum varsayılan olarak açıktır: düğümler kaybedildikçe oy hakları yeniden hesaplanır ve küme daha fazla kayba dayanabilir.
+
+Bu iyi bir özelliktir ama tanık ihtiyacını ortadan kaldırmaz. Kapatmak için bir gerekçeniz yoksa açık bırakın:
+
+```powershell
+Get-Cluster | Select-Object Name, DynamicQuorum, WitnessDynamicWeight
+(Get-ClusterNode).NodeWeight
+```
+
+## Küme durumunu izleyin
+
+Tanığın çalıştığını varsaymayın; izleyin.
+
+```powershell
+Get-ClusterQuorum | Select-Object Cluster, QuorumResource, QuorumType
+Get-ClusterResource | Where-Object ResourceType -like '*Witness*' |
+  Select-Object Name, State, OwnerGroup
+```
+
+Tanık kaynağı `Online` değilse quorum korumasız demektir ve bu, sessizce aylarca sürebilir. Bu kontrolü izleme sisteminize ekleyin.
+
+## Ağ tasarımı
+
+Küme düğümleri arasındaki iletişim (heartbeat) kesilirse quorum devreye girer. Bu yüzden düğümler arası ağ, tek bir bağlantıya bağımlı olmamalıdır.
+
+En az iki ayrı ağ yolu olsun ve tercihen farklı fiziksel anahtarlardan geçsin. Tek anahtar üzerinden giden bir küme, o anahtarın bakımında kesinti yaşar.
+
+Ayrıca küme ağı için yeterli önceliği ayırın; yedekleme trafiğinin heartbeat'i geciktirmesi, gereksiz yük devretmelere yol açar.
+
+## Yamalarken dikkat
+
+Küme düğümlerini aynı anda yamamak, quorum kaybına ve tüm kümenin durmasına yol açar. Küme farkında güncelleme (Cluster-Aware Updating) tam olarak bunun için vardır: düğümleri sırayla boşaltır, yamalar, geri alır.
+
+Elle yapıyorsanız aynı sırayı izleyin ve her düğümden sonra küme sağlığını doğrulayın.
+
+## Doğrulama adımı
+
+Kümeyi kurduktan sonra **gerçek bir yük devretme testi** yapın: bir düğümü planlı olarak kapatın ve iş yüklerinin diğerine geçtiğini doğrulayın.
+
+Sonra ikinci testi yapın ve asıl önemlisi budur: **düğümler arası ağı kesin** (tanığa erişim açık kalsın). Bir taraf çalışmaya devam etmeli, diğeri kendini kapatmalı.
+
+İkinci test yapılmadan tanık yapılandırmasının doğru olduğunu bilemezsiniz — ve bunu gerçek bir ağ arızasında öğrenmek, kümenin var olma sebebini ortadan kaldırır.

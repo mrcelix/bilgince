@@ -1,0 +1,103 @@
+---
+baslik: "Veritabanı yedeklemesi: dosyayı kopyalamak yetmez"
+ozet: "Çalışan bir veritabanının dosyalarını kopyalamak, geri yüklendiğinde açılmayan bir yedek üretir. Doğru yöntem ve kurtarma modeli."
+konu: "yedekleme"
+etiketler: ["veritabani", "sql", "kurtarma"]
+yayin: 2026-02-27
+sure: 12
+---
+
+Bir sunucu arızasından sonra veritabanını geri yüklemeye çalıştık. Dosyalar yedekteydi, boyutları doğruydu. Ama veritabanı "kurtarma bekleniyor" durumunda takıldı ve açılmadı.
+
+Sebep basitti: çalışan bir veritabanının `.mdf` ve `.ldf` dosyaları kopyalanmıştı. Kopyalama sırasında yazma devam ettiği için dosyalar birbiriyle tutarsızdı.
+
+## Neden dosya kopyası çalışmaz
+
+Veritabanı, veriyi diske yazarken bellekte tutar ve işlem günlüğüyle senkronize eder. Herhangi bir anda disk üzerindeki dosyalar **tutarlı bir duruma karşılık gelmeyebilir**.
+
+Dosyayı kopyaladığınızda, kopyalamanın başladığı an ile bittiği an arasında binlerce işlem gerçekleşir. Sonuç, hiçbir zaman var olmamış bir "durum"dur.
+
+Bu yüzden veritabanı yedeklemesi, veritabanı motorunun kendisi tarafından ya da onunla konuşan bir mekanizma tarafından yapılmalıdır.
+
+## Doğru yöntemler
+
+**Yerel yedekleme komutu.** En güvenilir yol:
+
+```sql
+BACKUP DATABASE [Uretim]
+  TO DISK = 'D:\Yedek\Uretim_20260227.bak'
+  WITH COMPRESSION, CHECKSUM, STATS = 10;
+```
+
+`CHECKSUM` önemlidir: yedek alınırken sayfa bütünlüğü doğrulanır. Bozuk bir sayfayı yedeğe taşımak yerine, o anda hata verir.
+
+**VSS ile uygulama tutarlı yedek.** Yedekleme yazılımı, VSS yazıcısı üzerinden veritabanına "yazmaları duraklat" der, anlık görüntü alır, devam ettirir. Doğru yapılandırıldığında güvenilirdir.
+
+VSS yazıcısının sağlıklı olduğunu doğrulayın; bozuk bir yazıcı sessizce çökme tutarlı yedek üretir:
+
+```cmd
+vssadmin list writers
+```
+
+Çıktıda ilgili yazıcının durumu `Stable` ve son hata `No error` olmalıdır.
+
+## Kurtarma modelini bilin
+
+Bu, en çok karıştırılan konudur ve doğrudan veri kaybı miktarını belirler.
+
+**Simple (basit):** İşlem günlüğü otomatik temizlenir. Yalnızca tam ve fark yedekleri alabilirsiniz. Son yedekten sonraki tüm işlemler kaybolur. Test ortamları için uygundur.
+
+**Full (tam):** İşlem günlüğü korunur, günlük yedeği alabilirsiniz. Belirli bir zamana geri dönüş (point-in-time) mümkündür.
+
+Kritik veritabanlarında Full modda çalışmalısınız — **ama günlük yedeği almıyorsanız Full mod zarar verir.** Günlük büyür, diski doldurur ve veritabanı durur.
+
+Bu, sahada en sık gördüğüm veritabanı kaynaklı kesinti sebebidir: mod Full'a alınmış, günlük yedeği kurulmamış.
+
+```sql
+SELECT name, recovery_model_desc, log_reuse_wait_desc
+FROM sys.databases;
+```
+
+`log_reuse_wait_desc` sütununda `LOG_BACKUP` görüyorsanız günlük yedeği bekleniyor demektir ve büyüme başlamıştır.
+
+## Yedek zinciri
+
+Full modda tipik bir düzen şöyledir:
+
+- **Tam yedek:** haftada bir
+- **Fark yedeği:** her gece
+- **Günlük yedeği:** 15 dakikada bir
+
+Bu şema, en fazla 15 dakikalık veri kaybı (RPO) sağlar. Geri yükleme sırası: tam → son fark → o günden sonraki tüm günlükler.
+
+Zincirin bir halkası eksikse sonrasına geri dönemezsiniz. Bu yüzden günlük yedeklerini de tam yedekle aynı özenle saklayın.
+
+## Geri yükleme provası
+
+Yedeğin geçerliliğini geri yüklemeden test etmenin bir yolu var:
+
+```sql
+RESTORE VERIFYONLY FROM DISK = 'D:\Yedek\Uretim_20260227.bak' WITH CHECKSUM;
+```
+
+Bu, dosyanın okunabilir ve tutarlı olduğunu doğrular ama gerçek geri yükleme testinin yerini tutmaz — yalnızca dosyanın sağlam olduğunu söyler, içeriğin doğru olduğunu değil.
+
+Gerçek test, ayrı bir sunucuya geri yükleyip uygulamayı bağlamaktır.
+
+## Diğer veritabanları
+
+Aynı ilkeler farklı adlarla geçerlidir. PostgreSQL'de `pg_dump` mantıksal, `pg_basebackup` + WAL arşivleme fiziksel yedek verir. MySQL'de `mysqldump` mantıksal, ikili günlükler zamana dönüş sağlar.
+
+Ortak kural şudur: **veritabanı motorunun kendi aracını kullanın ve işlem günlüğünü arşivleyin.** Dosya kopyalama, yalnızca veritabanı kapalıyken güvenlidir.
+
+## Sistem veritabanlarını unutmayın
+
+SQL Server'da `master`, `msdb` ve `model` yedeklenmezse; oturum açma bilgileri, işler ve zamanlanmış görevler kaybolur. Kullanıcı veritabanını geri yüklersiniz ama kimse bağlanamaz.
+
+Bu, felaket kurtarma tatbikatlarında en sık karşılaşılan sürprizdir.
+
+## Doğrulama adımı
+
+Ayda bir, üretim veritabanının bir yedeğini **ayrı bir sunucuya** geri yükleyin ve üç şeyi kontrol edin: veritabanı çevrimiçi oluyor mu, satır sayıları beklenen aralıkta mı, uygulama bağlanabiliyor mu.
+
+Üçüncüsü kritik: veritabanı açılsa bile oturum açma bilgileri eksikse uygulama bağlanamaz. Bu farkı ancak gerçek bir bağlantı denemesi gösterir — ve gerçek bir olayda bunu keşfetmek istemezsiniz.

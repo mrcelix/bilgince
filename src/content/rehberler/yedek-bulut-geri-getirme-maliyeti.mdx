@@ -1,0 +1,90 @@
+---
+baslik: "Bulut yedeklemede asıl maliyet geri getirmede"
+ozet: "Depolama ucuz, çıkış pahalı. Soğuk katmanların gizli bedelleri ve felaket anında ödenecek fatura."
+konu: "yedekleme"
+etiketler: ["bulut", "maliyet", "sureklilik"]
+yayin: 2026-03-20
+sure: 11
+---
+
+Bulut yedeklemenin fiyat karşılaştırması genelde tek bir sayı üzerinden yapılır: gigabayt başına aylık depolama bedeli. O sayı gerçekten düşüktür.
+
+Ama felaket anında ödeyeceğiniz faturayı belirleyen o sayı değildir.
+
+## Üç ayrı maliyet kalemi
+
+**Depolama.** Verinin durduğu yer için aylık ücret. Soğuk katmanlarda çok ucuzdur.
+
+**İşlem (API çağrısı).** Her yükleme, listeleme ve indirme isteği ücretlendirilir. Milyonlarca küçük dosya yedekliyorsanız bu kalem şaşırtıcı biçimde büyür.
+
+**Çıkış (egress).** Veriyi buluttan geri indirirken ödediğiniz bedel. Normal işleyişte sıfıra yakındır; felaket anında ise faturanın tamamı olur.
+
+Üçüncü kalem, karşılaştırma tablolarında genelde yoktur ve asıl sürprizi orada yaşarsınız.
+
+## Soğuk katmanın gizli bedelleri
+
+Ucuz katmanlar (arşiv sınıfları) üç ek kısıt getirir:
+
+**Minimum saklama süresi.** 90 ya da 180 gün. Bu süreden önce silerseniz kalan süre kadar ücret ödersiniz. Yedek rotasyonunuz bu süreden kısaysa, ucuz katman pahalıya gelir.
+
+**Geri getirme süresi.** Arşiv katmanlarında veri anında erişilebilir değildir; saatler sürebilir. Hızlandırılmış geri getirme mümkündür ama ek ücretlidir.
+
+**Geri getirme ücreti.** Depolamadan ayrı olarak, veriyi erişilebilir hâle getirmek için gigabayt başına ücret alınır.
+
+Bu üçü birleştiğinde, "arşivde tutalım ucuz olsun" kararı felaket anında hem yavaş hem pahalı bir kurtarma üretir.
+
+## Hesabı önceden yapın
+
+Karar vermeden önce iki senaryonun maliyetini çıkarın.
+
+**Senaryo 1 — Tek dosya kurtarma.** Ayda birkaç kez olur. Küçük veri, düşük maliyet. Sıcak katman gerektirir.
+
+**Senaryo 2 — Tam felaket kurtarma.** 5 TB veriyi geri indirmek gerekirse: çıkış ücreti + geri getirme ücreti + geçen süre.
+
+İkinci senaryonun sayısını yazın ve yönetime gösterin. Bu sayı genelde bulut yedekleme mimarisini değiştirir — ve değiştirmesi de doğrudur.
+
+## Kademeli yaklaşım
+
+İşleyen model genelde şudur:
+
+- **Son 30 gün:** yerel disk. Hızlı geri yükleme, çıkış maliyeti yok.
+- **30–90 gün:** bulut sıcak/soğuk katman. Tesis dışı kopya görevi görür.
+- **90 gün+:** arşiv katmanı. Uyumluluk ve uzun dönem saklama.
+
+Günlük operasyondaki geri yüklemelerin neredeyse tamamı ilk 30 günden yapılır. Bulut kopyası, yerel her şeyi kaybettiğiniz senaryo içindir.
+
+Bu model, çıkış maliyetini gerçek felaket durumuna sınırlar.
+
+## Bant genişliği: asıl kısıt
+
+Maliyetten önce fiziksel bir sınır var: 5 TB veriyi 200 Mbps hattan indirmek yaklaşık iki buçuk gün sürer. RTO taahhüdünüz dört saatse, bulut yedekten tam kurtarma o taahhüdü karşılayamaz.
+
+Bu hesabı yapın ve sonucu yazılı hâle getirin:
+
+```
+Süre (saat) ≈ Veri (GB) × 8 / (Hat hızı Mbps × 0,7) / 3600
+```
+
+0,7 çarpanı, gerçek verim için gerçekçi bir varsayımdır.
+
+Süre kabul edilemezse iki seçenek var: kritik sistemler için yerel kopya tutmak ya da sağlayıcının fiziksel veri transfer hizmetini planlamak (günler sürer ama büyük veride daha hızlıdır).
+
+## Şifreleme anahtarı
+
+Bulut yedeğiniz şifreli ve anahtar yalnızca kaybettiğiniz sistemde duruyorsa, yedeğiniz yok demektir.
+
+Anahtarı ayrı ve erişilebilir bir yerde saklayın; tercihen çevrimdışı bir kopya da bulunsun. Bu, felaket tatbikatlarında en sık karşılaşılan tıkanma noktasıdır.
+
+## SaaS verisi ayrı bir konudur
+
+M365, Google Workspace ve benzeri hizmetlerdeki veri, bulut yedekleme stratejinizin parçası olmalıdır. Sağlayıcı altyapı sürekliliğini sağlar; kullanıcı hatasıyla silinen veriyi ya da fidye yazılımıyla şifrelenen dosyaları geri getirmek sizin sorumluluğunuzdur.
+
+Bu veri için ayrı bir yedekleme çözümü gerekir ve maliyeti genelde kullanıcı başına hesaplanır — planlarken unutmayın.
+
+## Doğrulama adımı
+
+Yılda bir kez **gerçek bir geri getirme** yapın ve iki şeyi ölçün: **süre** ve **fatura**.
+
+Küçük bir örneklem yeterlidir — 100 GB geri indirin, süreyi ve o ayki fatura farkını kaydedin. Oradan tam kurtarma senaryosuna ölçekleyin.
+
+Bu ölçüm olmadan yaptığınız tüm maliyet ve süre hesapları tahmindir; ve felaket anında tahminlerin yanlış çıktığını öğrenmek istemezsiniz.

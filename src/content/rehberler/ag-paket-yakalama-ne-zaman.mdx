@@ -1,0 +1,121 @@
+---
+baslik: "Paket yakalama ne zaman gerekir, ne zaman vakit kaybıdır"
+ozet: "Her sorunda Wireshark açmak refleks haline gelir. Yakalamadan önce cevaplanması gereken üç soru ve doğru yakalama noktası."
+konu: "ag"
+etiketler: ["teshis", "wireshark", "sorun-giderme"]
+yayin: 2026-05-29
+sure: 12
+---
+
+Bir sorun uzadığında paket yakalamaya başvurulur. Bazen doğrudur ve saatlerce süren tartışmayı bir dakikada bitirir. Çoğu zaman ise, daha basit araçlarla cevaplanabilecek bir soruya en pahalı yoldan yaklaşmaktır.
+
+## Önce üç soruyu cevaplayın
+
+**1. Sorun tekrarlanabilir mi?**
+
+Tekrarlanamıyorsa yakalama yapmak zordur; sürekli yakalama ve halka arabellek gerekir. Tekrarlanabiliyorsa yakalama kolay ve etkilidir.
+
+**2. Daha ucuz bir araç cevap verir mi?**
+
+Bağlantı kuruluyor mu? `Test-NetConnection` söyler. Ad çözümleniyor mu? `Resolve-DnsName` söyler. Yol nereden geçiyor? `tracert` söyler.
+
+```powershell
+Test-NetConnection sunucu01 -Port 443 -InformationLevel Detailed
+Resolve-DnsName sunucu01 -Type A
+```
+
+Bu araçlar cevabı veriyorsa yakalamaya gerek yok.
+
+**3. Ne aradığınızı biliyor musunuz?**
+
+"Bir bakalım ne çıkacak" yaklaşımı, gigabaytlarca veriyle sonuçlanır ve hiçbir sonuç üretmez. Yakalamadan önce hipotez kurun: "İstemcinin SYN'i sunucuya ulaşıyor ama SYN-ACK dönmüyor sanıyorum."
+
+Hipotez, hem filtreyi hem yakalama noktasını belirler.
+
+## Paket yakalamanın gerçekten gerektiği durumlar
+
+**Kim sessiz kalıyor?** Bağlantı zaman aşımına uğruyor ve iki taraf da "ben gönderdim" diyor. Yakalama, paketin gerçekten çıkıp çıkmadığını kesin olarak gösterir.
+
+**Sıfırlama nereden geliyor?** Bağlantı aniden kesiliyorsa, RST paketini kimin gönderdiğini yalnızca yakalama söyler. Genelde arada bir güvenlik duvarı çıkar.
+
+**Yavaşlığın kaynağı ağ mı uygulama mı?** İstek ile cevap arasındaki süre ağda mı geçiyor, sunucuda mı? Bu ayrım, tartışmayı bitirir.
+
+**El sıkışma başarısızlıkları.** TLS sürüm ve şifre takımı uyuşmazlıkları, yakalamada net görünür.
+
+## Yakalama noktası her şeyi belirler
+
+En sık yapılan hata, yalnızca tek taraftan yakalamaktır. İstemcide yakalarsanız istemcinin gönderdiğini görürsünüz — paketin sunucuya ulaşıp ulaşmadığını göremezsiniz.
+
+Mümkünse **iki uçtan aynı anda** yakalayın. Aradaki fark, paketin nerede kaybolduğunu doğrudan gösterir.
+
+Ara noktalarda yakalamak gerekiyorsa anahtarda port yansıtma (SPAN) kullanın. Yansıtılan portun trafiğe yetiştiğinden emin olun; 10 Gbps'lik bir portu 1 Gbps'lik bir porta yansıtırsanız paket düşer ve düşen paketleri "kayıp" sanırsınız.
+
+## Windows'ta ek araç kurmadan yakalama
+
+Sunucuya Wireshark kuramadığınız durumlarda yerleşik araçlar yeterlidir:
+
+```cmd
+netsh trace start capture=yes tracefile=C:\Temp\iz.etl maxsize=512
+:: sorunu tekrarlayın
+netsh trace stop
+```
+
+Üretilen `.etl` dosyası, `etl2pcapng` ile pcap biçimine çevrilip Wireshark'ta açılabilir.
+
+PowerShell tarafında daha hedefli bir yol:
+
+```powershell
+New-NetEventSession -Name Iz -LocalFilePath C:\Temp\iz.etl
+Add-NetEventPacketCaptureProvider -SessionName Iz -TruncationLength 128
+Start-NetEventSession -Name Iz
+# ... sorunu tekrarlayın ...
+Stop-NetEventSession -Name Iz
+```
+
+`TruncationLength` önemlidir: yalnızca başlıkları saklar, dosya boyutunu küçük tutar ve içerik gizliliğini korur.
+
+## Filtre kullanın, sonra değil önce
+
+Yakalama filtresi (capture filter) ile görüntüleme filtresi (display filter) farklıdır. İlki neyin diske yazılacağını, ikincisi neyin ekranda görüneceğini belirler.
+
+Yoğun bir sunucuda filtresiz yakalama, saniyeler içinde gigabaytlara ulaşır. Hedefi baştan daraltın:
+
+```
+host 10.10.20.55 and port 443
+```
+
+## Gizlilik ve saklama
+
+Paket yakalama, ağdaki gerçek veriyi içerir: kimlik bilgileri, kişisel veriler, iş içerikleri. Bu, sıradan bir günlük dosyası değildir.
+
+Üç kural: yalnızca başlıkları yakalayın (mümkünse), dosyayı erişimi kısıtlı bir yerde tutun ve sorun çözülünce silin. Yakalama izni gerektiren kurumlarda önceden onay alın.
+
+## Saat senkronizasyonu
+
+İki uçtan yakalama yapıyorsanız, iki makinenin saati birbirini tutmalıdır. Aksi hâlde paketleri yan yana koyduğunuzda sıralama yanlış çıkar ve olmayan bir gecikme görürsünüz.
+
+Yakalamadan önce her iki tarafta saati doğrulayın:
+
+```powershell
+w32tm /query /status
+```
+
+Sapma birkaç yüz milisaniyeyi geçiyorsa, önce saati düzeltin. Aradığınız gecikmeler genelde bu mertebededir ve senkron olmayan saatler teşhisi tamamen yanlış yöne çevirir.
+
+## Şifreli trafikte sınır
+
+TLS ile korunan trafiği yakaladığınızda içeriği göremezsiniz. Bu, çoğu senaryoda sorun değildir: bağlantı kurulup kurulmadığı, ne kadar sürdüğü, kimin sıfırladığı zaten başlıklarda görünür.
+
+İçerik gerekiyorsa iki yol var. Uygulama tarafında oturum anahtarlarını dışa aktarmak (`SSLKEYLOGFILE`), ya da sorunu daha yüksek katmanda — uygulama günlüklerinde — aramak. İkincisi genelde daha hızlı ve daha az risklidir.
+
+## Okurken nereye bakılır
+
+Wireshark'ta ilk bakılacak yer **Statistics → Conversations** ve **Expert Information**'dır. İkincisi, yeniden iletimleri, sıfırlamaları ve sıra dışı durumları özetler.
+
+Zaman sütununu "önceki pakete göre geçen süre" olarak ayarlamak, gecikmenin nerede oluştuğunu doğrudan gösterir. Üç saniyelik bir boşluk gördüğünüz yer, sorunun yaşandığı yerdir.
+
+## Doğrulama adımı
+
+Yakalamaya başlamadan önce şu cümleyi yazın: **"Şunu görürsem hipotezim doğrulanır, şunu görürsem çürütülür."**
+
+Yakalamadan sonra o cümleye dönün. Cevap veremiyorsanız yanlış noktadan ya da yanlış filtreyle yakalamışsınızdır — ve doğrusu, gigabaytları taramak yerine hipotezi düzeltip yeniden yakalamaktır.

@@ -1,0 +1,87 @@
+---
+baslik: "Kablosuz kanal ve güç planlaması: gücü kısmak neden işe yarar"
+ozet: "Kapsama sorununa çözüm olarak gücü artırmak, çoğu ofiste sorunu büyütür. Kanal seçimi ve doğru güç ayarı."
+konu: "ag"
+etiketler: ["kablosuz", "wifi", "tasarim"]
+yayin: 2026-04-17
+sure: 11
+---
+
+Kablosuz şikâyeti geldiğinde ilk refleks erişim noktalarının gücünü artırmaktır. Bu, kapsama sorununu çözer gibi görünür ve genelde işleri kötüleştirir.
+
+Sebebi anlamak için kablosuzun iki yönlü olduğunu hatırlamak gerekir.
+
+## Güç artırmanın yarattığı sorun
+
+Erişim noktasının gücünü artırdığınızda, sinyal daha uzağa gider. Ama dizüstü bilgisayarın ya da telefonun gücü değişmez.
+
+Sonuç: cihaz erişim noktasını duyar, bağlanır, ama kendi cevabı geri ulaşmaz. Bağlantı "var" görünür, veri akmaz. Kullanıcı "wifi bağlı ama internet yok" der.
+
+İkinci sorun daha yaygın: yüksek güçle çalışan bir erişim noktası, cihazların **daha yakındaki** bir noktaya geçmesini engeller. Cihaz uzaktaki güçlü sinyale tutunur, düşük hızda çalışır ve ortamdaki hava süresini gereksiz yere işgal eder.
+
+Yani bir cihazın yapışkan davranışı, tüm hücrenin performansını düşürür.
+
+## Doğru yaklaşım: hücreleri küçültün
+
+Modern kablosuz tasarımın temel kuralı şudur: **daha fazla erişim noktası, daha düşük güç.**
+
+Küçük hücreler üç fayda sağlar. Cihazlar daha yakın noktalara bağlanır, dolayısıyla daha yüksek hızda çalışır. Aynı kanalı kullanan noktalar birbirini daha az duyar. Ve kullanıcı yürüdüğünde geçiş daha temiz olur.
+
+Pratik başlangıç noktası: iletim gücünü orta seviyeye (genelde 8–14 dBm aralığı) çekip kapsamayı ölçmektir.
+
+## Kanal seçimi: 2,4 GHz'de yalnızca üç kanal var
+
+2,4 GHz bandında 13 kanal görünür ama yalnızca **1, 6 ve 11** birbiriyle çakışmaz. Diğerlerini kullanmak, komşu kanallarda parazit üretir.
+
+Kanal 3 ya da 9 seçen bir erişim noktası, hem 1'i hem 6'yı bozar. Otomatik kanal seçimi bazen bunu yapar; sabitleyin.
+
+2,4 GHz'i mümkün olduğunca yalnızca eski cihazlar ve IoT için bırakın. Modern istemcileri 5 veya 6 GHz'e yönlendirin.
+
+## 5 GHz: kanal genişliği tuzağı
+
+5 GHz'de bol kanal var, bu yüzden 80 MHz hatta 160 MHz genişlik kullanmak cazip gelir. Tek bir erişim noktası olan evde bu doğrudur.
+
+Yoğun bir ofiste değildir. Geniş kanal, kullanılabilir bağımsız kanal sayısını düşürür ve noktalar birbirini duymaya başlar. Sonuçta tek bir cihazın tepe hızı artar ama toplam kapasite düşer.
+
+Kurumsal ortamda **40 MHz** genelde doğru dengedir; çok yoğun alanlarda 20 MHz bile daha iyi sonuç verir.
+
+## DFS kanalları
+
+5 GHz'in bir bölümü radar tarafından paylaşılır (DFS kanalları). Bu kanallar ek kapasite sunar ama radar algılandığında erişim noktası kanal değiştirmek zorundadır ve o anda bağlantılar kopar.
+
+Havalimanı ya da liman yakınındaysanız DFS kanallarından kaçının. Değilseniz kullanın; kapasite kazancı gerçektir.
+
+## Ölçmeden tasarlamayın
+
+Kâğıt üzerinde yapılan kapsama planı, gerçek duvarları bilmez. Beton, asansör boşluğu, metal raf ve cam bölme sinyali farklı biçimde etkiler.
+
+Bir istemci üzerinden gerçek ölçüm alın:
+
+```powershell
+netsh wlan show interfaces
+netsh wlan show networks mode=bssid | Select-String 'SSID|Sinyal|Signal|Kanal|Channel'
+```
+
+Bakmanız gereken üç sayı: sinyal seviyesi, bağlanılan BSSID ve kanal. Aynı odada iki farklı noktaya bağlanan cihazlar varsa hücre sınırı orada demektir.
+
+Hedef değerler: veri için −67 dBm, ses/görüntü için −65 dBm ve üzeri.
+
+## Gürültü tabanı da önemlidir
+
+Sinyal seviyesi iyi ama performans kötüyse gürültüye bakın. Mikrodalga fırınlar, kablosuz kameralar, Bluetooth cihazlar ve komşu ofisin ağı 2,4 GHz'i doldurur.
+
+Sinyal-gürültü oranı (SNR) 25 dB üzerinde olmalıdır. Sinyal −60 dBm ve gürültü −70 dBm ise SNR yalnızca 10'dur ve bağlantı kötü çalışır — sinyal seviyesi "iyi" görünmesine rağmen.
+
+## Düşük hızları kapatın
+
+Varsayılan olarak erişim noktaları 1 Mbps gibi çok düşük hızları destekler. Bu, uzaktaki bir cihazın çok düşük hızda bağlanmasına ve **kanalı uzun süre işgal etmesine** yol açar.
+
+En düşük desteklenen hızı 12 veya 24 Mbps'e çekmek, hem hücre sınırını netleştirir hem toplam kapasiteyi artırır. Eski cihazlarınız varsa önce test edin.
+
+## Doğrulama adımı
+
+Değişiklikten sonra üç noktada ölçüm yapın: en uzak köşe, iki erişim noktası arasındaki geçiş bölgesi ve en yoğun toplantı odası.
+
+Her noktada sinyal seviyesini, bağlanılan noktayı ve gerçek aktarım hızını kaydedin. Ardından bir cihazla yürüyerek geçiş yapın ve bağlantının kopup kopmadığını izleyin.
+
+Kullanıcı şikâyeti "yavaş" olduğunda, elinizde bu üç ölçüm varsa sorunun kapsama mı, kapasite mi, yoksa istemci mi kaynaklı olduğunu ayırt edebilirsiniz. Ölçüm yoksa her seferinde gücü artırma refleksine dönersiniz — ve döngü baştan başlar.

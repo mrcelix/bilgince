@@ -1,0 +1,104 @@
+---
+baslik: "Cihaz yenileme döngüsü ve emeklilik"
+ozet: "Ne zaman değiştirileceğini bütçe değil veri belirlemeli. Yenileme kararını ölçüme bağlamanın ve eski cihazı güvenle elden çıkarmanın yolu."
+konu: "windows"
+etiketler: ["envanter", "donanim", "yasam-dongusu"]
+yayin: 2026-05-29
+sure: 12
+---
+
+Cihaz yenileme kararı çoğu kurumda iki şekilde verilir: ya bütçe kalınca alınır ya da kullanıcı yeterince şikâyet edince. İkisi de yanlış zamanlama üretir — bazı cihazlar erken değişir, bazıları yıllarca insanları yavaşlatır.
+
+Karar ölçüme bağlanabilir ve bağlanmalıdır.
+
+## Yaş tek başına ölçüt değil
+
+"Dört yılda bir yenileriz" kuralı basit ama kaba. Aynı yaştaki iki cihazdan biri sorunsuz çalışırken diğeri haftada iki destek çağrısı üretiyor olabilir.
+
+Yaşı bir tetikleyici olarak kullanın, karar ölçütü olarak değil: dört yılı geçen cihazlar **değerlendirmeye alınır**, otomatik değişmez.
+
+## Dört sinyal
+
+Değerlendirmede bakılacaklar:
+
+**Destek çağrısı sayısı.** Cihaz başına açılan çağrı, filo ortalamasının belirgin üstündeyse yenileme adayıdır. Bu, en dürüst sinyaldir çünkü doğrudan kaybedilen zamanı ölçer.
+
+**Donanım sağlığı.** Disk aşınması, batarya kapasitesi, bellek hataları.
+
+```powershell
+# batarya sağlığı — tasarım kapasitesinin altına düşüş
+powercfg /batteryreport /output "$env:TEMP\batarya.html"
+
+# disk sağlığı
+Get-PhysicalDisk | Select-Object FriendlyName, MediaType, HealthStatus,
+  @{n='Asinma';e={ ($_ | Get-StorageReliabilityCounter).Wear }}
+```
+
+**İşletim sistemi desteği.** Cihaz yeni Windows sürümünü destekliyor mu? TPM ve işlemci gereksinimleri, bazı cihazları yaşından bağımsız olarak sınırlar.
+
+**Kullanıcı iş yükü uyumu.** Geliştiriciye verilen 8 GB bellekli bir makine, iki yaşında bile yetersizdir.
+
+## Basit bir puanlama
+
+Dört sinyali tek bir tabloya dökün ve puanlayın. Karmaşık bir model gerekmez:
+
+| Sinyal | 0 puan | 1 puan | 2 puan |
+| --- | --- | --- | --- |
+| Yaş | < 3 yıl | 3–4 yıl | > 4 yıl |
+| Çağrı sayısı (yıllık) | 0–1 | 2–4 | 5+ |
+| Donanım sağlığı | İyi | Uyarı | Kötü |
+| OS desteği | Tam | Sınırlı | Yok |
+
+Toplam 5 ve üzeri olan cihazlar yenileme listesine girer. Tablo basit olduğu için tartışma yaratmaz ve bütçe görüşmesinde savunulabilir.
+
+## Yenileme bütçesini yayın
+
+Tüm filoyu aynı yıl almak, dört yıl sonra tüm filoyu aynı yıl değiştirmek demektir. Bu, hem bütçe hem operasyon açısından kötüdür.
+
+Filoyu dört gruba bölüp her yıl birini yenilemek, harcamayı düzleştirir ve BT ekibinin yükünü dağıtır. Yeni bir kuruma geçiyorsanız ilk alımı bilinçli olarak dilimlere ayırın.
+
+## Emeklilik: veri güvenliği
+
+Cihaz elden çıkarken en çok atlanan adım budur. Bir kontrol listesi olmadan, şirket verisi ikinci el pazarına gider.
+
+**Şifrelenmiş disklerde kripto silme.** BitLocker açıksa anahtarı yok etmek, veriyi erişilemez kılar ve saatler süren silme işlemine gerek bırakmaz.
+
+```powershell
+# koruyucuları kaldırmak anahtarı geçersizleştirir
+manage-bde -off C:   # dikkat: bu şifre çözer, kripto silme değil
+```
+
+Kripto silme için doğru yol, diski güvenli silme komutuyla temizlemek ya da üreticinin güvenli silme aracını kullanmaktır. SSD'lerde klasik "üzerine yazma" yöntemi güvenilir değildir; denetleyici verinin nerede olduğunu gizler.
+
+**Envanterden düşürme.** Cihaz yönetiminden, AD'den, lisans envanterinden ve varlık kayıtlarından silin. Bu adım atlanırsa envanteriniz hayali cihazlarla dolar ve uyumluluk raporlarınız yanlış olur.
+
+**Sertifika ve anahtar iptali.** Cihazda kurumsal sertifika varsa iptal edin.
+
+**Elden çıkarma belgesi.** Kim aldı, ne zaman, hangi yöntemle silindi. Denetimde sorulan bir kayıttır.
+
+## Bağış ve ikinci el
+
+Eski cihazları bağışlamak iyi bir uygulamadır ama silme adımı aynı titizlikle yapılmalıdır. "Formatladık" yeterli değildir; format, veriyi silmez.
+
+Ayrıca bağışlanan cihazda kurumsal yazılım lisansları kalmamalıdır. İşletim sistemi lisansı genelde cihaza bağlıdır ve kalabilir; uygulama lisansları kalmamalıdır.
+
+## Ölçün: filo yaş dağılımı
+
+Yılda bir kez filonun yaş dağılımını çıkarın:
+
+```powershell
+Get-ADComputer -Filter * -Properties whenCreated |
+  Select-Object Name, @{n='Yas';e={ [math]::Round(((Get-Date) - $_.whenCreated).Days / 365, 1) }} |
+  Group-Object { [math]::Floor($_.Yas) } | Sort-Object Name |
+  Select-Object @{n='Yil';e={$_.Name}}, Count
+```
+
+`whenCreated` gerçek satın alma tarihi değildir ama yaklaşık bir gösterge verir; varlık envanteriniz varsa oradan daha doğru veri alırsınız.
+
+Dağılımda bir yılda yığılma varsa, o yıl büyük bir yenileme faturası sizi bekliyor demektir — ve bunu üç yıl önceden bilmek, aniden öğrenmekten iyidir.
+
+## Doğrulama adımı
+
+Elden çıkarılan üç cihazı rastgele seçin ve dört soruyu sorun: envanterden düşürüldü mü, AD'den silindi mi, disk silme kaydı var mı, teslim belgesi var mı.
+
+Dördü de "evet" değilse emeklilik süreciniz kâğıt üzerindedir. Bu kontrolü altı ayda bir yapmak, sürecin gerçekten işlediğini doğrulamanın tek yoludur.

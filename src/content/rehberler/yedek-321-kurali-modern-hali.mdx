@@ -1,0 +1,90 @@
+---
+baslik: "3-2-1 kuralının bugünkü hâli"
+ozet: "Klasik kural doğal afetlere göre yazılmıştı. Fidye yazılımı çağında iki madde daha eklenmesi gerekiyor."
+konu: "yedekleme"
+etiketler: ["strateji", "fidye-yazilimi", "sureklilik"]
+yayin: 2026-01-16
+sure: 11
+---
+
+Klasik kural basit ve iyidir: **3 kopya, 2 farklı ortam, 1 tanesi tesis dışında.** Yangın, sel ve donanım arızasına karşı yeterlidir.
+
+Bugünkü asıl tehdit ise bunların hiçbiri değil. Fidye yazılımı, kuralın varsaymadığı bir şey yapıyor: **yedeklerinizi de hedef alıyor.**
+
+## Eksik kalan iki madde
+
+Modern hâli genelde **3-2-1-1-0** olarak ifade edilir:
+
+- **3** kopya
+- **2** farklı ortam
+- **1** tesis dışında
+- **1** çevrimdışı ya da değiştirilemez
+- **0** doğrulanmamış geri yükleme
+
+Son iki madde farkı yaratanlardır ve ikisi de yeni.
+
+## Dördüncü madde: değiştirilemezlik
+
+Ağdan erişilebilen ve silinebilen bir yedek, saldırganın da erişebildiği bir yedektir. Saldırganların standart sıralamasında şifrelemeden **önce** yedekleri silmek vardır.
+
+Üç yaklaşım işe yarar:
+
+**Değiştirilemez depolama.** Nesne kilidi (object lock) ile yazılan veri, saklama süresi dolmadan silinemez — yönetici bile silemez. Bulut nesne depolamada ve modern yedekleme cihazlarında bulunur.
+
+**Çevrimdışı kopya.** Teyp hâlâ geçerli bir çözümdür; çünkü kasadaki bir teybe ağdan erişilemez.
+
+**Ayrı kimlik alanı.** Yedek sistemine üretim etki alanı hesaplarıyla erişilememeli. Etki alanı yöneticisi ele geçtiğinde yedekler de gidiyorsa, dördüncü madde karşılanmamıştır.
+
+Bu üçünden en az biri olmalı; ikisi daha iyidir.
+
+## Beşinci madde: sıfır doğrulanmamış geri yükleme
+
+Yedeğin varlığı, geri gelebileceğini kanıtlamaz. Kanıt yalnızca geri yükleme testinden gelir.
+
+Bu maddeyi bir takvime bağlayın: aylık dosya düzeyinde test, çeyreklik tam sistem testi, yıllık felaket tatbikatı. Her testin süresi ve sonucu kaydedilsin.
+
+Test edilmemiş bir yedek stratejisi, üzerinde çalışılmış bir umuttur.
+
+## Ortam çeşitliliği neden hâlâ önemli
+
+"2 farklı ortam" maddesi bugün gereksiz görünebilir — her şey diskte. Ama madde aslında **aynı arıza moduna maruz kalmama**yı ifade eder.
+
+Aynı depolama dizisindeki iki kopya, dizi arızasında birlikte gider. Aynı bulut hesabındaki iki kopya, hesap ele geçtiğinde birlikte gider. Aynı yazılımla alınmış iki kopya, o yazılımın bir hatasından birlikte etkilenir.
+
+Modern okuması şudur: **kopyalar farklı arıza alanlarında olmalı.** Farklı depolama, farklı hesap, mümkünse farklı teknoloji.
+
+## Saklama süresi ve sürüm derinliği
+
+Fidye yazılımı bazen aylarca fark edilmez. Yalnızca son yedeği tutuyorsanız, geri döneceğiniz nokta zaten bulaşmış olabilir.
+
+Sürüm derinliği bu yüzden önemlidir: günlük yedeklerin 30 gün, haftalıkların 12 hafta, aylıkların 12 ay tutulması yaygın ve makul bir şemadır.
+
+Saklama süresi maliyet üretir; bu yüzden kademeli depolama kullanın — eski kopyalar ucuz katmana insin. Ama silme kuralını yazarken erken silme cezalarını hesaba katın.
+
+## Neyi yedeklediğinizi bilin
+
+Şaşırtıcı biçimde sık atlanan soru: kapsamda ne var?
+
+Sanal makineler kapsamda ama şunlar genelde değildir: bulut SaaS verileri (M365 posta kutuları, SharePoint), ağ cihazı yapılandırmaları, sertifikalar ve özel anahtarlar, kod depoları, kimlik yapılandırması.
+
+M365 özellikle yanlış anlaşılır: sağlayıcı altyapı sürekliliğini garanti eder, **sizin verinizi silmenize karşı korumaz**. Saklama politikaları bir dereceye kadar yardımcı olur ama yedek değildir.
+
+## Yedekleme sunucusunun kendisi
+
+Yedekleme sunucusu ele geçirilirse tüm strateji çöker. Bu makineyi filodaki en sıkı korunan sistem gibi ele alın: ayrı kimlik, MFA, ağ segmenti, sıkı yama, ayrı yönetici hesapları.
+
+Yapılandırma veritabanını da yedekleyin. Yedekleriniz duruyor ama katalog kayıpsa geri yükleme çok daha zordur.
+
+## Doğrulama adımı
+
+Beş maddeyi bir tabloya yazın ve her biri için **kanıt** sütunu doldurun:
+
+| Madde | Karşılanıyor mu | Kanıt |
+| --- | --- | --- |
+| 3 kopya | | hangi üç konum |
+| 2 ortam | | hangi teknolojiler |
+| 1 tesis dışı | | konum ve erişim yöntemi |
+| 1 değiştirilemez | | hangi mekanizma, kim silebilir |
+| 0 doğrulanmamış | | son test tarihi ve süresi |
+
+Kanıt sütununu dolduramadığınız her satır, karşılanmamış sayılır. Bu tabloyu yılda bir güncelleyin; en çok değişen satır dördüncüsü olur çünkü altyapı değiştikçe erişim yolları sessizce genişler.

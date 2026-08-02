@@ -1,0 +1,104 @@
+---
+baslik: "Hyper-V sanal anahtar türleri ve ağ tasarımı"
+ozet: "Yanlış anahtar türü seçimi, ana makineye erişimi kesmenin en hızlı yoludur. Üç tür, doğru kullanım ve ekip yapılandırması."
+konu: "sanallastirma"
+etiketler: ["hyper-v", "ag", "tasarim"]
+yayin: 2026-03-13
+sure: 11
+---
+
+Uzaktan bağlı olduğunuz bir Hyper-V ana makinesinde sanal anahtar oluştururken yanlış seçim yaparsanız, bağlantınız o anda kopar. Bu, sahada sık yaşanan ve tamamen önlenebilir bir olaydır.
+
+Üç anahtar türü var ve farkları basit ama kritik.
+
+## Üç tür
+
+**Harici (external).** Fiziksel ağ adaptörüne bağlanır. Sanal makineler fiziksel ağa çıkar. Üretimde en çok kullanılan türdür.
+
+**Dahili (internal).** Sanal makineler birbirine ve **ana makineye** erişir; fiziksel ağa çıkmaz. Test ve izole senaryolar için uygundur.
+
+**Özel (private).** Yalnızca sanal makineler birbirine erişir; ana makine bile göremez. Tamamen izole laboratuvarlar için.
+
+## Tehlikeli olan: harici anahtar
+
+Harici anahtar oluşturduğunuzda Hyper-V, fiziksel adaptörü sanal anahtara bağlar. Ana makinenin o adaptör üzerinden olan bağlantısı, anahtar üzerinden yeniden kurulur.
+
+Bu geçiş sırasında bağlantı birkaç saniye kesilir — ve `-AllowManagementOS` parametresini yanlış verirseniz **kalıcı olarak** kesilir:
+
+```powershell
+# ana makinenin de bu ağa erişimini koru
+New-VMSwitch -Name 'Uretim' -NetAdapterName 'Ethernet 2' -AllowManagementOS $true
+```
+
+`$false` verirseniz ana makine o adaptör üzerinden ağa çıkamaz. Uzaktan bağlıysanız ve o tek adaptörse, makineye fiziksel erişim gerekir.
+
+## Kural: yönetim için ayrı adaptör
+
+Bu sorunu tamamen ortadan kaldıran tasarım şudur: **ana makine yönetimi için ayrı bir fiziksel adaptör ayırın** ve sanal anahtarlara asla dahil etmeyin.
+
+Minimum sağlıklı düzen:
+
+- 1 adaptör: ana makine yönetimi
+- 1+ adaptör: sanal makine trafiği (harici anahtar)
+- 1 adaptör: küme/canlı geçiş trafiği (küme varsa)
+- 1 adaptör: depolama (iSCSI/SMB kullanılıyorsa)
+
+Adaptör sayısı yetmiyorsa ekip (teaming) ve VLAN ile ayırın, ama yönetimi mutlaka ayrı tutun.
+
+## Anahtar Gömülü Ekip (SET)
+
+Modern Hyper-V'de ağ ekibi, işletim sistemi ekibi yerine sanal anahtar içinde kurulur:
+
+```powershell
+New-VMSwitch -Name 'Uretim' -NetAdapterName 'Ethernet 2','Ethernet 3' `
+  -EnableEmbeddedTeaming $true -AllowManagementOS $false
+```
+
+SET, klasik NIC ekibine göre daha az sorun çıkarır ve RDMA gibi özelliklerle uyumludur. Klasik LBFO ekibi üzerine sanal anahtar kurmak artık önerilmez.
+
+Ekipteki adaptörler aynı hızda ve tercihen aynı model olmalıdır; karışık ekipler öngörülemeyen davranır.
+
+## VLAN yapılandırması
+
+Sanal makineleri farklı VLAN'lara koymak için ana makinede ayrı anahtarlar oluşturmaya gerek yok. Tek bir harici anahtar kullanıp sanal makine bazında VLAN atayın:
+
+```powershell
+Set-VMNetworkAdapterVlan -VMName 'web01' -Access -VlanId 20
+Get-VMNetworkAdapterVlan -VMName * | Select-Object VMName, OperationMode, AccessVlanId
+```
+
+Fiziksel anahtar portu **trunk** olarak yapılandırılmalı ve ilgili VLAN'lara izin vermelidir. Bu adım atlandığında sanal makine ağ görmez ve sorun Hyper-V'de aranır — oysa fiziksel anahtardadır.
+
+## Bant genişliği yönetimi
+
+Tek bir sanal makinenin ağı doldurması, komşularını etkiler. Minimum ve maksimum bant genişliği tanımlayabilirsiniz:
+
+```powershell
+Set-VMNetworkAdapter -VMName 'yedek01' -MaximumBandwidth 200MB
+Set-VMNetworkAdapter -VMName 'sql01' -MinimumBandwidthWeight 50
+```
+
+Yedekleme ve çoğaltma yapan makinelerde üst sınır koymak, gece pencerelerinde diğer iş yüklerini korur.
+
+## MAC adresi çakışması
+
+Sanal makine kopyalandığında ya da farklı ana makinelerde aynı MAC havuzu kullanıldığında çakışma olur. Belirti sinsi: aralıklı bağlantı kopmaları, bazı paketlerin kaybolması.
+
+Ana makinelerde MAC havuzlarının farklı olduğunu doğrulayın:
+
+```powershell
+Get-VMHost | Select-Object Name, MacAddressMinimum, MacAddressMaximum
+```
+
+Aynı havuzu kullanan iki ana makine varsa birini değiştirin ve etkilenen makineleri yeniden başlatın.
+
+## Doğrulama adımı
+
+Yeni bir anahtar oluşturmadan **önce** iki şeyi hazırlayın: ana makineye alternatif bir erişim yolu (ILO/iDRAC ya da ikinci adaptör) ve mevcut ağ yapılandırmasının çıktısı.
+
+```powershell
+Get-NetAdapter | Select-Object Name, InterfaceDescription, Status, LinkSpeed | Format-Table -AutoSize
+Get-VMSwitch | Select-Object Name, SwitchType, NetAdapterInterfaceDescription, AllowManagementOS
+```
+
+Oluşturduktan sonra aynı iki komutu tekrar çalıştırıp karşılaştırın ve ana makinenin hâlâ erişilebilir olduğunu **başka bir makineden** doğrulayın. Kendi oturumunuzun ayakta olması yeterli kanıt değildir; mevcut oturum kopmadan da yeni bağlantılar engellenmiş olabilir.

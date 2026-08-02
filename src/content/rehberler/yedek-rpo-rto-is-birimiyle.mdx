@@ -1,0 +1,89 @@
+---
+baslik: "RPO ve RTO'yu iş birimiyle konuşmak"
+ozet: "\"Hiç veri kaybetmeyelim\" cevabı bir gereksinim değildir. Sayıyı maliyetle birlikte konuşmanın yolu."
+konu: "yedekleme"
+etiketler: ["rpo", "rto", "sureklilik", "planlama"]
+yayin: 2026-05-01
+sure: 11
+---
+
+Yedekleme mimarisi tartışmalarının çoğu teknolojiyle başlar ve orada tıkanır. Doğru başlangıç iki sayıdır ve o sayıları BT belirlemez.
+
+**RPO** (Recovery Point Objective): kabul edilebilir veri kaybı. "En fazla kaç dakikalık işi yeniden yapabiliriz?"
+
+**RTO** (Recovery Time Objective): kabul edilebilir kesinti. "Hizmet kaç saat içinde dönmeli?"
+
+## İlk cevap her zaman sıfırdır
+
+İş birimine sorduğunuzda alacağınız ilk cevap "hiç veri kaybetmemeliyiz, hemen dönmeli" olur. Bu bir gereksinim değil, bir temennidir.
+
+Cevabı işe yarar hâle getirmenin yolu, maliyeti masaya koymaktır:
+
+> Sıfır veri kaybı için senkron çoğaltma gerekir; bu, ikinci bir veri merkezi ve aralarında düşük gecikmeli özel hat demektir. Yıllık maliyeti şu kadar.
+>
+> 15 dakikalık kayıp için 15 dakikada bir günlük yedeği yeterli; ek maliyeti şu kadar.
+>
+> 24 saatlik kayıp için gecelik yedek yeterli; zaten var.
+
+Bu üç seçenek konduğunda konuşma değişir. Artık "ne istiyoruz" değil, "neye değer" konuşulur — ve bu, doğru sorudur.
+
+## Soruyu doğru sorun
+
+"Kaç dakikalık veri kaybını kabul edersiniz?" soyut bir sorudur. Somutlaştırın:
+
+> Bugün saat 14:00'te sistem çöktü ve sabah 09:00'dan sonraki tüm kayıtlar kayboldu. Ne olur? Kaç kişi, kaç saat çalışır bunu geri getirmek için? Müşteriye ne söylersiniz?
+
+Bu soru, cevabı iş etkisine bağlar. Bazen cevap şaşırtır: kâğıt üzerinde kritik görünen bir sistem için "yarım günü telafi ederiz" denirken, önemsiz sanılan bir sistem için "bir saat bile duramaz" çıkabilir.
+
+## Hizmetleri kademelendirin
+
+Tek bir RPO/RTO tüm sistemlere uygulanamaz. Üç kademe çoğu kurum için yeterlidir:
+
+| Kademe | Örnek | RPO | RTO |
+| --- | --- | --- | --- |
+| 1 — Kritik | ERP, üretim, ödeme | 15 dk | 4 saat |
+| 2 — Önemli | Dosya, e-posta, portal | 24 saat | 1 gün |
+| 3 — Destek | Arşiv, test, raporlama | 1 hafta | 3 gün |
+
+Kademe atamasını iş birimi yapar, BT uygular. Bu ayrım önemlidir: BT kendi belirlediği kademeyi savunmak zorunda kalmaz.
+
+## Bağımlılıkları da kademelendirin
+
+Kademe 1'deki bir uygulama, kademe 3'teki bir bileşene bağımlıysa gerçek kademesi 3'tür.
+
+Her kademe 1 hizmeti için bağımlılık listesi çıkarın: kimlik, DNS, lisans sunucusu, dosya paylaşımı, entegrasyon servisleri. Hepsinin aynı ya da daha yüksek kademede olduğunu doğrulayın.
+
+Bu kontrol, tatbikatlarda en çok sürpriz üreten yerdir.
+
+## Yazılı hâle getirin
+
+Konuşma bittiğinde bir sayfa çıksın: hizmet adı, kademe, RPO, RTO, sahibi ve onay tarihi. İş birimi yöneticisi imzalasın.
+
+Bu belge iki işe yarar. Birincisi: bir kesinti yaşandığında "neden bu kadar sürdü" sorusunun cevabı taahhütle karşılaştırılabilir. İkincisi: bütçe görüşmesinde daha iyi bir RTO isteniyorsa, maliyeti önceden konuşulmuş olur.
+
+Belge olmadan her kesinti sonrası aynı tartışma sıfırdan yapılır.
+
+## Ölçülen ile taahhüt edilen
+
+Taahhüt bir hedeftir; gerçek performans ölçülmeden bilinmez. Her tatbikatta ve her gerçek olayda iki sayıyı kaydedin: **gerçekleşen RPO** (kaybedilen veri) ve **gerçekleşen RTO** (kesinti süresi).
+
+Bu iki sayıyı taahhütle yan yana koyan basit bir tablo, süreklilik programınızın sağlığını tek bakışta gösterir:
+
+| Hizmet | Taahhüt RTO | Son ölçüm | Fark |
+| --- | --- | --- | --- |
+| ERP | 4 sa | 6 sa 20 dk | +2 sa 20 dk |
+| Dosya | 24 sa | 3 sa | uygun |
+
+Farkın pozitif olduğu satırlar ya mimari yatırım ya da taahhüt revizyonu gerektirir. İkisi de yönetim kararıdır ve bu tablo o kararı mümkün kılar.
+
+## Gözden geçirme takvimi
+
+RPO/RTO bir kez belirlenip unutulmaz. İş değişir, sistemler değişir. Yılda bir gözden geçirin ve şu iki durumda ara gözden geçirme yapın: yeni bir kritik sistem devreye alındığında ve bir kesinti yaşandıktan sonra.
+
+İkincisi özellikle değerlidir; gerçek bir kesinti, taahhütlerin gerçekçi olup olmadığını en dürüst biçimde gösterir.
+
+## Doğrulama adımı
+
+Elinizdeki listeyi alın ve rastgele üç hizmet seçin. Her biri için iki soruyu **belgeye bakmadan** cevaplamayı deneyin: RPO'su ne, RTO'su ne?
+
+Cevaplayamıyorsanız belge var ama kullanılmıyordur. Ardından aynı soruyu o hizmetin iş sahibine sorun — cevapları tutuyorsa ortak bir anlayış vardır. Tutmuyorsa, kesinti anında beklenti çatışması yaşayacaksınız demektir ve bunu şimdi öğrenmek çok daha ucuz.
