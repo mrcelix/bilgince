@@ -19,7 +19,8 @@ export default defineConfig({
   // İçerik sayfaları statik üretilir; yalnızca /keystatic ve /api/keystatic
   // sunucu tarafında çalışır. Adaptör bunun için gerekli.
   output: 'static',
-  adapter: vercel(),
+  // AI görsel üretimi 10 sn'lik varsayılanı aşabiliyor
+  adapter: vercel({ maxDuration: 60 }),
 
   // panel /keystatic altında; /admin alışkanlığı için kısayol
   redirects: {
