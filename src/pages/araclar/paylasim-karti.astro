@@ -51,11 +51,15 @@ const boyutlar = [
     <section class="pk-blok">
       <h2 class="pk-h2"><span class="pk-no">1</span> Site adresi</h2>
       <form id="pk-form" class="pk-form">
+        <!-- type="url" değil: şemasız girdide tarayıcı doğrulaması gönderimi
+             engeller ve şemayı biz tamamlayamayız -->
         <input
           id="pk-adres"
-          type="url"
+          type="text"
           inputmode="url"
-          placeholder="https://ornek.com"
+          autocomplete="url"
+          spellcheck="false"
+          placeholder="ornek.com — https:// gerekmez"
           required
           aria-label="Analiz edilecek site adresi"
         />
@@ -76,8 +80,14 @@ const boyutlar = [
         <label>Başlık<textarea id="pk-baslik" rows="2" maxlength="140"></textarea></label>
         <label>Alt metin<textarea id="pk-ozet" rows="2" maxlength="200"></textarea></label>
       </div>
+      <label class="pk-onay" id="pk-logo-satir" hidden>
+        <input type="checkbox" id="pk-logo" checked />
+        <span>Site logosunu kartın ortasında göster</span>
+        <img id="pk-logo-onizleme" alt="" width="24" height="24" />
+      </label>
     </section>
 
+    <div class="pk-ikili">
     <!-- 3. Stil -->
     <section class="pk-blok" id="pk-stil-blok" hidden>
       <h2 class="pk-h2"><span class="pk-no">3</span> Stil galerisi</h2>
@@ -135,6 +145,7 @@ const boyutlar = [
       </div>
       <p id="pk-ai-durum" class="pk-durum" role="status" aria-live="polite"></p>
     </section>
+    </div>
 
     <!-- 5. Metinler -->
     <section class="pk-blok" id="pk-metin-blok" hidden>
@@ -179,6 +190,7 @@ const boyutlar = [
       let boyutId = 'manset';
       let aiGorsel = null; // yüklendiğinde prosedürel zemin yerine bu kullanılır
       let aiStil = null;
+      let logoGorsel = null;
 
       /* ==================================================================
          Yardımcılar
@@ -583,6 +595,39 @@ const boyutlar = [
         ctx.fillText(rozet, pad + 17 * u, pad + rh / 2 + u);
         ctx.letterSpacing = '0px';
 
+        /* --- Site logosu ----------------------------------------------------
+           Rozetin altı ile metin bloğunun üstü arasındaki boşluğun ortasına
+           oturur; o boşluk logoyu taşıyamayacak kadar darsa çizilmez. */
+        if (logoGorsel && el('#pk-logo').checked) {
+          const serbestUst = pad + rh;
+          const serbest = metinUst - serbestUst;
+          const dolgu = 18 * u; // levhanın iç boşluğu
+          const marj = 20 * u; // levha ile rozet/metin arasındaki nefes payı
+          // Sınır logonun kendisine değil, levhanın dış ölçüsüne konmalı:
+          // aksi hâlde levha boşluğu birebir doldurup rozete değiyor.
+          const kutu = Math.min(132 * u, serbest - 2 * (dolgu + marj), w * 0.3);
+          if (kutu >= 40 * u) {
+            const o = Math.min(kutu / logoGorsel.naturalWidth, kutu / logoGorsel.naturalHeight);
+            const lw = logoGorsel.naturalWidth * o;
+            const lh = logoGorsel.naturalHeight * o;
+            const lx = (w - lw) / 2;
+            const ly = serbestUst + (serbest - lh) / 2;
+
+            // Logolar çoğunlukla tek renk; her zemin üzerinde durması için
+            // arkasına yumuşak bir levha koyuyoruz.
+            ctx.save();
+            ctx.fillStyle = acikMetin ? 'rgba(255,255,255,0.92)' : 'rgba(17,24,39,0.9)';
+            ctx.shadowColor = 'rgba(0,0,0,0.28)';
+            ctx.shadowBlur = 18 * u;
+            ctx.shadowOffsetY = 4 * u;
+            ctx.beginPath();
+            ctx.roundRect(lx - dolgu, ly - dolgu, lw + dolgu * 2, lh + dolgu * 2, 22 * u);
+            ctx.fill();
+            ctx.restore();
+            ctx.drawImage(logoGorsel, lx, ly, lw, lh);
+          }
+        }
+
         let y = metinUst;
 
         // AI zemininde metin, arkasındaki lekeden bağımsız okunmalı: metin
@@ -810,8 +855,26 @@ const boyutlar = [
         });
       });
 
+      el('#pk-logo').addEventListener('change', ciz);
+
+      /**
+       * "ornek.com" da geçerli bir girdi; şemayı biz tamamlıyoruz. Alan
+       * görünür biçimde güncellenir ki kullanıcı ne istendiğini görsün.
+       * type="url" doğrulaması da ancak şema varsa geçer.
+       */
+      function adresiDuzelt() {
+        const alan = el('#pk-adres');
+        const ham = alan.value.trim();
+        if (!ham) return '';
+        const tam = /^[a-z][a-z0-9+.-]*:\/\//i.test(ham) ? ham : `https://${ham.replace(/^\/+/, '')}`;
+        alan.value = tam;
+        return tam;
+      }
+      el('#pk-adres').addEventListener('blur', adresiDuzelt);
+
       el('#pk-form').addEventListener('submit', async (e) => {
         e.preventDefault();
+        adresiDuzelt();
         const durum = el('#pk-durum');
         const btn = el('#pk-btn');
         btn.disabled = true;
@@ -827,6 +890,24 @@ const boyutlar = [
           el('#pk-rozet').value = d.siteAdi.slice(0, 40);
           el('#pk-baslik').value = d.baslik;
           el('#pk-ozet').value = d.aciklama;
+
+          // Logo data URI olarak geliyor; tuvali kirletmez, indirme bozulmaz.
+          logoGorsel = null;
+          el('#pk-logo-satir').hidden = true;
+          if (d.logo) {
+            const im = new Image();
+            const yuklendi = await new Promise((coz) => {
+              im.onload = () => coz(true);
+              im.onerror = () => coz(false);
+              im.src = d.logo;
+            });
+            // .ico gibi bazı biçimler her tarayıcıda çözülmez; sessizce atlanır
+            if (yuklendi && im.naturalWidth) {
+              logoGorsel = im;
+              el('#pk-logo-onizleme').src = d.logo;
+              el('#pk-logo-satir').hidden = false;
+            }
+          }
 
           const tema = el('#pk-tema');
           tema.querySelector('.pk-tema-ad').textContent =
@@ -959,10 +1040,59 @@ const boyutlar = [
       resize: vertical;
     }
 
+    /* Stil galerisi solda dar bir sütun, önizleme sağda kalan alanı alır.
+       İkisi de kendi yüksekliğinde başlar; align-items:start olmazsa kısa olan
+       uzun olanın boyuna gerilir. */
+    .pk-ikili {
+      display: grid;
+      gap: 30px;
+      align-items: start;
+    }
+    @media (min-width: 940px) {
+      .pk-ikili {
+        grid-template-columns: minmax(300px, 27%) 1fr;
+      }
+      /* iki kutu aynı satırda başlasın diye dış ızgaranın boşluğu devralınır */
+      .pk-ikili > .pk-blok {
+        margin: 0;
+      }
+    }
+
     .pk-galeri {
       display: grid;
-      grid-template-columns: repeat(auto-fill, minmax(112px, 1fr));
+      grid-template-columns: repeat(auto-fill, minmax(96px, 1fr));
       gap: 12px;
+    }
+    @media (min-width: 940px) {
+      .pk-galeri {
+        grid-template-columns: repeat(3, 1fr);
+      }
+    }
+
+    .pk-onay {
+      display: flex;
+      align-items: center;
+      gap: 9px;
+      margin-top: 16px;
+      padding-top: 14px;
+      border-top: 1px solid var(--line);
+      font-size: 13px;
+      font-weight: 700;
+      color: var(--ink-soft);
+      cursor: pointer;
+    }
+    .pk-onay input {
+      accent-color: var(--indigo);
+      width: 16px;
+      height: 16px;
+    }
+    #pk-logo-onizleme {
+      width: 24px;
+      height: 24px;
+      object-fit: contain;
+      border-radius: 5px;
+      background: var(--bg);
+      padding: 2px;
     }
     .pk-stil {
       position: relative;
@@ -1050,7 +1180,7 @@ const boyutlar = [
     }
     #pk-tuval {
       max-width: 100%;
-      max-height: 62vh;
+      max-height: 54vh;
       height: auto;
       border-radius: var(--r-s);
       box-shadow: 0 2px 10px rgb(22 32 58 / 16%);

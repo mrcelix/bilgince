@@ -215,6 +215,64 @@ function paletCikar(sayac: Map<string, number>, temaRengi: string | null) {
 }
 
 /* --------------------------------------------------------------------------
+   Site logosu
+   -------------------------------------------------------------------------- */
+
+const EN_BUYUK_LOGO = 512 * 1024;
+
+/** rel=icon bağlantılarını boyuta göre sıralar; en büyüğü en iyisidir. */
+function logoAdaylari(html: string, kok: URL): URL[] {
+  const adaylar: { adres: URL; puan: number }[] = [];
+
+  for (const e of html.matchAll(/<link[^>]+>/gi)) {
+    const etiket = e[0];
+    const rel = etiket.match(/rel=["']([^"']+)["']/i)?.[1]?.toLowerCase() ?? '';
+    if (!/\b(apple-touch-icon|icon|shortcut icon|mask-icon)\b/.test(rel)) continue;
+
+    const href = etiket.match(/href=["']([^"']+)["']/i)?.[1];
+    if (!href || href.startsWith('data:')) continue;
+
+    // "180x180" → 180. Belirtilmemişse apple-touch-icon genelde 180'dir.
+    const olcu = Number(etiket.match(/sizes=["'](\d+)x\d+["']/i)?.[1] ?? 0);
+    const puan = olcu || (rel.includes('apple') ? 180 : rel.includes('mask') ? 64 : 32);
+
+    try {
+      adaylar.push({ adres: new URL(href, kok), puan });
+    } catch {
+      // bozuk href
+    }
+  }
+
+  // 512'den büyük ikonlar gereksiz; 64–256 arası ideal
+  adaylar.sort((a, b) => Math.abs(180 - a.puan) - Math.abs(180 - b.puan));
+  const siralı = adaylar.map((a) => a.adres);
+  siralı.push(new URL('/favicon.ico', kok)); // hiçbiri yoksa kök favicon
+  return siralı.slice(0, 3);
+}
+
+async function logoGetir(html: string, kok: URL): Promise<string | null> {
+  for (const aday of logoAdaylari(html, kok)) {
+    try {
+      const { cevap } = await guvenliGetir(aday, 'image/*');
+      const tur = cevap.headers.get('content-type') ?? '';
+      if (!tur.startsWith('image/')) continue;
+
+      const bayt = new Uint8Array(await cevap.arrayBuffer());
+      if (!bayt.length || bayt.length > EN_BUYUK_LOGO) continue;
+
+      let ikili = '';
+      for (const b of bayt) ikili += String.fromCharCode(b);
+      // Tuvalin kirlenmemesi için logoyu data URI olarak veriyoruz: favicon'lar
+      // çoğu sitede CORS başlığı taşımaz, doğrudan yüklenirse indirme bozulurdu.
+      return `data:${tur.split(';')[0]};base64,${btoa(ikili)}`;
+    } catch {
+      // sıradaki adaya geç
+    }
+  }
+  return null;
+}
+
+/* --------------------------------------------------------------------------
    Uç nokta
    -------------------------------------------------------------------------- */
 
@@ -286,8 +344,10 @@ export const GET: APIRoute = async ({ url }) => {
   }
 
   const palet = paletCikar(renkleriTopla(css), temaRengi && /^#/.test(temaRengi) ? hexNormalle(temaRengi) : null);
+  const logo = await logoGetir(kok, sonAdres);
 
   return json({
+    logo,
     adres: sonAdres.href,
     alan: sonAdres.hostname.replace(/^www\./, ''),
     siteAdi,
