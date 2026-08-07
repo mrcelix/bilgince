@@ -29,6 +29,13 @@ const gorunenGruplar = GRUPLAR.filter((g) =>
   KONULAR.some((k) => k.grup === g.ad && !k.oneCikan)
 );
 
+// Araçlar menüsü: indirilebilir betikler tek tek elle yazılmıyor, çözüm
+// kayıtlarındaki `dosya` alanından türüyor — yeni betik eklenince menü kendi
+// kendine büyür.
+const betikler = cozumler
+  .filter((c) => c.data.dosya)
+  .sort((a, b) => a.data.sira - b.data.sira);
+
 const yol = Astro.url.pathname.replace(/\/$/, '') || '/';
 const etkin = (p: string) => (yol === p || yol.startsWith(p + '/') ? 'page' : undefined);
 ---
@@ -67,6 +74,14 @@ const etkin = (p: string) => (yol === p || yol.startsWith(p + '/') ? 'page' : un
         <li>
           <button class="gez-bag" type="button" aria-expanded="false" aria-controls="mega-kaynaklar" data-mega="kaynaklar">
             Kaynaklar
+            <svg class="ok" width="11" height="11" viewBox="0 0 12 12" fill="none" aria-hidden="true"
+              ><path d="M3 4.5L6 7.5L9 4.5" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"></path></svg
+            >
+          </button>
+        </li>
+        <li>
+          <button class="gez-bag" type="button" aria-expanded="false" aria-controls="mega-araclar" data-mega="araclar">
+            Araçlar
             <svg class="ok" width="11" height="11" viewBox="0 0 12 12" fill="none" aria-hidden="true"
               ><path d="M3 4.5L6 7.5L9 4.5" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"></path></svg
             >
@@ -171,7 +186,7 @@ const etkin = (p: string) => (yol === p || yol.startsWith(p + '/') ? 'page' : un
   <div class="mega mega-kaynaklar" id="mega-kaynaklar" data-acik="hayir">
     <div class="kap">
       <div class="mega-sutun">
-        <span class="mega-etiket">Araçlar</span>
+        <span class="mega-etiket">Kütüphaneler</span>
         <span class="mega-grup-ozet">Kopyala ve çalıştır</span>
         <a class="mega-bag" href="/hizli-cozumler">
           <span class="ikon" aria-hidden="true"><KonuIkon ad="kalkan" /></span>
@@ -232,6 +247,65 @@ const etkin = (p: string) => (yol === p || yol.startsWith(p + '/') ? 'page' : un
       </div>
     </div>
   </div>
+
+  <!-- ------------------------------------------------- Araçlar mega menüsü -->
+  <div class="mega mega-araclar" id="mega-araclar" data-acik="hayir">
+    <div class="kap">
+      <div class="mega-sutun">
+        <span class="mega-etiket">Üreteçler</span>
+        <span class="mega-grup-ozet">Tarayıcıda çalışır, kurulum yok</span>
+        <a class="mega-bag" href="/araclar/paylasim-karti">
+          <span class="ikon" aria-hidden="true"><KonuIkon ad="kutu" /></span>
+          <span>
+            <span class="ad">Paylaşım kartı üreteci<span class="say">yeni</span></span>
+            <span class="ac">Adresi girin, temasına uygun post görseli çıksın</span>
+          </span>
+        </a>
+        <a class="mega-bag" href="/komutlar">
+          <span class="ikon" aria-hidden="true"><KonuIkon ad="terminal" /></span>
+          <span>
+            <span class="ad">Komut kütüphanesi<span class="say">{komutlar.length}</span></span>
+            <span class="ac">Konuya göre süz, tek tıkla kopyala</span>
+          </span>
+        </a>
+        <a class="mega-bag" href="/ozgecmis/yazdir">
+          <span class="ikon" aria-hidden="true"><KonuIkon ad="pencere" /></span>
+          <span>
+            <span class="ad">Özgeçmiş yazdırma düzeni</span>
+            <span class="ac">Tarayıcıdan PDF olarak kaydedilir</span>
+          </span>
+        </a>
+      </div>
+
+      <div class="mega-sutun">
+        <span class="mega-etiket">İndirilebilir betikler</span>
+        <span class="mega-grup-ozet">PowerShell · değişiklik yapmadan önce okuyun</span>
+        {
+          betikler.map((b) => (
+            <a class="mega-bag" href={`/hizli-cozumler/${b.id}`}>
+              <span class="ikon" aria-hidden="true">
+                <KonuIkon ad="akis" />
+              </span>
+              <span>
+                <span class="ad">{b.data.dosyaAdi ?? b.data.dosya}</span>
+                <span class="ac">{b.data.baslik}</span>
+              </span>
+            </a>
+          ))
+        }
+      </div>
+
+      <div class="mega-tanitim">
+        <span class="mega-etiket">Nereden başlamalı</span>
+        <a class="mega-kart" href="/hizli-cozumler">
+          <span class="ust">Hızlı Çözümler</span>
+          <h3>Belirtiyi yazın, aracıyla birlikte çözümü alın</h3>
+          <span class="alt">{cozumler.length} kayıt · {betikler.length} indirilebilir betik</span>
+        </a>
+        <a class="mega-tum" href="/ipuclari">Hızlı ipuçları · {ipuclari.length} not →</a>
+      </div>
+    </div>
+  </div>
 </header>
 
 <!-- ------------------------------------------------------- mobil çekmece -->
@@ -270,6 +344,7 @@ const etkin = (p: string) => (yol === p || yol.startsWith(p + '/') ? 'page' : un
     <a href="/hizli-cozumler">Hızlı Çözümler <span class="say">{cozumler.length}</span></a>
     <a href="/komutlar">Komut kütüphanesi <span class="say">{komutlar.length}</span></a>
     <a href="/ipuclari">Hızlı ipuçları <span class="say">{ipuclari.length}</span></a>
+    <a href="/araclar/paylasim-karti">Paylaşım kartı üreteci</a>
     <a href="/portfolyo">Portfolyo</a>
     <a href="/ozgecmis">Özgeçmiş</a>
     <a href="/hakkimda">Hakkımda</a>

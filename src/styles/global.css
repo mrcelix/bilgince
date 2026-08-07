@@ -389,7 +389,8 @@ code {
 .mega-konular .kap {
   grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
 }
-.mega-kaynaklar .kap {
+.mega-kaynaklar .kap,
+.mega-araclar .kap {
   grid-template-columns: 1.1fr 1fr 0.85fr;
 }
 /* öne çıkan konu şeridi — mega menünün altında tam genişlik */
@@ -854,6 +855,21 @@ code {
   padding-top: 16px;
   padding-bottom: 22px;
   font-size: 12px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 10px 20px;
+  flex-wrap: wrap;
+}
+/* Derleme damgası: hangi commit'in yayında olduğunu söyler, okumayı bölmez */
+.derleme {
+  font-family: var(--mono);
+  font-size: 11px;
+  opacity: 0.62;
+  white-space: nowrap;
+}
+.derleme b {
+  font-weight: 700;
 }
 
 /* ------------------------------------------------------------------ bölümler */

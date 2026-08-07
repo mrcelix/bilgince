@@ -127,6 +127,22 @@ RSS, site haritası ve `robots.txt` hepsi oradan türer. Değiştirmek için tek
 **Şu anki kişisel içeriğin tamamı uydurmadır** — iş yerleri, tarihler, sertifikalar ve proje
 sayıları gerçekçi görünsün diye yazıldı. Yayına almadan önce değiştirin.
 
+## Paylaşım kartı üreteci
+
+`/araclar/paylasim-karti` bir adresi okuyup sosyal medya görselleri üretir. Kart
+tuvalde çizilir, iki yetenek dışarıdan servis ister:
+
+| Değişken | Ne için |
+| --- | --- |
+| `CLOUDFLARE_ACCOUNT_ID` | İkisinin de ortak hesap kimliği |
+| `CLOUDFLARE_AI_TOKEN` | "AI arka plan üret" — Workers AI, FLUX.1-schnell |
+| `CLOUDFLARE_TARAYICI_TOKEN` | "Site önizleme" stili — Browser Rendering ile ekran görüntüsü. AI jetonuna bu izin de verildiyse gerekmez |
+
+Değişkenler tanımlı değilken araç çalışmaya devam eder: "Site önizleme" stili
+önce ekran görüntüsünü dener, alamazsa sayfanın kendi `og:image` etiketine düşer,
+o da yoksa tarayıcı penceresini sitenin renkleri ve logosuyla çizer. Durum satırı
+hangi kaynağın kullanıldığını söyler.
+
 ## Bülten
 
 `src/site.js` içindeki `newsletter.endpoint` boşken sayfalarda form yerine "sağlayıcı bağlanmadı"

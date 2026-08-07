@@ -3,6 +3,7 @@ import Base from '../../layouts/Base.astro';
 
 const stiller = [
   { id: 'site', ad: 'Site teması', ikon: '🎯', kart: 'linear-gradient(140deg,#3a45e0,#7b3fd4)' },
+  { id: 'onizleme', ad: 'Site önizleme', ikon: '🖼️', kart: 'linear-gradient(140deg,#1f2a44,#4b5b7d)' },
   { id: 'neon', ad: 'Neon Cyber', ikon: '🌃', kart: 'linear-gradient(140deg,#a855f7,#6366f1)' },
   { id: 'doga', ad: 'Doğa', ikon: '🌿', kart: 'linear-gradient(140deg,#34d399,#4ade80)' },
   { id: 'okyanus', ad: 'Okyanus', ikon: '🌊', kart: 'linear-gradient(140deg,#38bdf8,#3b82f6)' },
@@ -27,7 +28,7 @@ const boyutlar = [
 
 <Base
   baslik="Paylaşım kartı üreteci"
-  aciklama="Bir site adresi girin; sitenin kendi renk temasını okuyup sosyal medya için hazır paylaşım görselleri ve metinleri üretsin. 13 farklı stille yeniden üretilebilir."
+  aciklama="Bir site adresi girin; sitenin kendi renk temasını okuyup sosyal medya için hazır paylaşım görselleri ve metinleri üretsin. 14 farklı stille yeniden üretilebilir."
   aramaya={false}
 >
   <div class="arama-bas">
@@ -40,8 +41,9 @@ const boyutlar = [
       <h1>Paylaşım kartı üreteci</h1>
       <p style="color:var(--muted);font-size:14px;margin-top:8px;max-width:62ch">
         Adresi girin: sayfanın başlığı, açıklaması ve <strong>gerçek CSS renkleri</strong> okunur, ondan
-        bir paylaşım kartı çizilir. Sonra aynı içeriği 12 hazır stille yeniden üretebilirsiniz. Her şey
-        tarayıcınızda çizilir; PNG olarak iner.
+        bir paylaşım kartı çizilir. Sonra aynı içeriği 13 hazır stille yeniden üretebilirsiniz —
+        <strong>Site önizleme</strong> stili sitenin ekran görüntüsünü bulanık zemin yapıp üstüne tarayıcı
+        çerçevesinde net hâlini koyar. Her şey tarayıcınızda çizilir; PNG olarak iner.
       </p>
     </div>
   </div>
@@ -142,6 +144,7 @@ const boyutlar = [
         <button type="button" class="dg dg-ikincil" id="pk-tumu">Dört boyutu da indir</button>
         <button type="button" class="dg dg-ai" id="pk-ai">✨ AI arka plan üret</button>
         <button type="button" class="dg dg-ikincil" id="pk-ai-sil" hidden>AI arka planı kaldır</button>
+        <button type="button" class="dg dg-ikincil" id="pk-goruntu" hidden>🔄 Site görüntüsünü yenile</button>
       </div>
       <p id="pk-ai-durum" class="pk-durum" role="status" aria-live="polite"></p>
     </section>
@@ -191,6 +194,10 @@ const boyutlar = [
       let aiGorsel = null; // yüklendiğinde prosedürel zemin yerine bu kullanılır
       let aiStil = null;
       let logoGorsel = null;
+      let siteGorsel = null; // "Site önizleme" stilinin ekran görüntüsü
+      let gorselKaynak = null; // 'ekran' (gerçek görüntü) | 'og' (sayfanın paylaşım görseli)
+      let gorselAlan = null; // görüntünün hangi siteye ait olduğu
+      let gorselIstegi = null; // aynı anda ikinci istek gitmesin
 
       /* ==================================================================
          Yardımcılar
@@ -264,8 +271,28 @@ const boyutlar = [
         };
       }
 
+      /**
+       * "Site önizleme": zemin sitenin kendi görüntüsü olduğu için palet yalnızca
+       * perde ve vurgu renklerini belirler. Perde koyu tutulur — açık temalı bir
+       * sitenin ekran görüntüsü üstünde beyaz metin ancak böyle okunur.
+       */
+      function onizlemeStili(p) {
+        const v = p.vurgu;
+        return {
+          zemin: [tonla(v, 0.1), tonla(v, 0.24), tonla(v, 0.14)],
+          ink: '#ffffff',
+          alt: tonla(v, 0.84, 0.3),
+          vurgu: tonla(v, 0.62, 0.55),
+          desen: 'izgara',
+          onizleme: true,
+        };
+      }
+
       function aktifStil() {
-        return stilId === 'site' && veri ? siteStili(veri.palet) : STIL[stilId] || STIL.minimal;
+        if (!veri) return STIL[stilId] || STIL.minimal;
+        if (stilId === 'site') return siteStili(veri.palet);
+        if (stilId === 'onizleme') return onizlemeStili(veri.palet);
+        return STIL[stilId] || STIL.minimal;
       }
 
       function sarmala(metin, enBoy, satirSiniri) {
@@ -500,11 +527,284 @@ const boyutlar = [
       }
 
       /* ==================================================================
+         Site önizleme — bulanık ekran görüntüsü + tarayıcı çerçevesi
+         ================================================================== */
+
+      // Safari 17 öncesi ctx.filter tanımıyor; desteği bir kez ölçüp saklıyoruz.
+      const filtreVar = (() => {
+        try {
+          ctx.filter = 'blur(2px)';
+          const sonuc = ctx.filter === 'blur(2px)';
+          ctx.filter = 'none';
+          return sonuc;
+        } catch {
+          return false;
+        }
+      })();
+
+      /** Görüntüyü tuvali dolduracak şekilde (cover) ve bulanık çizer. */
+      function bulanikCiz(im, w, h, yaricap) {
+        // %14 taşırma: bulanıklık kenarlarda saydamlığa dönmesin
+        const olcek = Math.max(w / im.naturalWidth, h / im.naturalHeight) * 1.14;
+        const gw = im.naturalWidth * olcek;
+        const gh = im.naturalHeight * olcek;
+        const x = (w - gw) / 2;
+        const y = (h - gh) / 2;
+
+        if (filtreVar) {
+          ctx.save();
+          ctx.filter = `blur(${yaricap}px)`;
+          ctx.drawImage(im, x, y, gw, gh);
+          ctx.restore();
+          return;
+        }
+        // Yedek yol: küçült–büyüt. Ara tuval küçüldükçe bulanıklık artar.
+        const k = document.createElement('canvas');
+        k.width = Math.max(24, Math.round(w / (yaricap * 0.55)));
+        k.height = Math.max(16, Math.round((k.width * h) / w));
+        const kc = k.getContext('2d');
+        kc.drawImage(im, (x * k.width) / w, (y * k.height) / h, (gw * k.width) / w, (gh * k.height) / h);
+        ctx.drawImage(k, 0, 0, w, h);
+      }
+
+      /** Ekran görüntüsünü macOS benzeri bir tarayıcı penceresi içinde çizer. */
+      function tarayiciCiz(x, y, cw, ch, s, u, yazi) {
+        const r = 16 * u;
+        const barH = Math.max(24 * u, ch * 0.11);
+
+        ctx.save();
+        ctx.shadowColor = 'rgba(2,6,23,0.55)';
+        ctx.shadowBlur = 42 * u;
+        ctx.shadowOffsetY = 16 * u;
+        ctx.fillStyle = '#0b1220';
+        ctx.beginPath();
+        ctx.roundRect(x, y, cw, ch, r);
+        ctx.fill();
+        ctx.restore();
+
+        ctx.save();
+        ctx.beginPath();
+        ctx.roundRect(x, y, cw, ch, r);
+        ctx.clip();
+
+        // başlık çubuğu: üç nokta + adres hapı
+        ctx.fillStyle = 'rgba(255,255,255,0.08)';
+        ctx.fillRect(x, y, cw, barH);
+        const nr = Math.min(5.5 * u, barH * 0.17);
+        ['#ff5f57', '#febc2e', '#28c840'].forEach((renk, i) => {
+          ctx.fillStyle = renk;
+          ctx.beginPath();
+          ctx.arc(x + barH * 0.62 + i * nr * 3.2, y + barH / 2, nr, 0, Math.PI * 2);
+          ctx.fill();
+        });
+        const hapBoy = barH * 0.54;
+        const hapEn = Math.min(cw * 0.44, cw - barH * 2.6);
+        const hapX = x + (cw - hapEn) / 2;
+        if (hapEn > barH) {
+          ctx.fillStyle = 'rgba(255,255,255,0.13)';
+          ctx.beginPath();
+          ctx.roundRect(hapX, y + (barH - hapBoy) / 2, hapEn, hapBoy, hapBoy / 2);
+          ctx.fill();
+          ctx.fillStyle = 'rgba(255,255,255,0.72)';
+          ctx.font = `600 ${hapBoy * 0.6}px ${yazi}`;
+          ctx.textBaseline = 'middle';
+          ctx.textAlign = 'center';
+          ctx.fillText(veri.alan, x + cw / 2, y + barH / 2 + u * 0.5, hapEn - 16 * u);
+          ctx.textAlign = 'left';
+        }
+
+        // sayfa alanı: görüntü üstten hizalı, cover
+        const ekY = y + barH;
+        const ekBoy = ch - barH;
+        ctx.save();
+        ctx.beginPath();
+        ctx.rect(x, ekY, cw, ekBoy);
+        ctx.clip();
+        if (siteGorsel) {
+          const olcek = Math.max(cw / siteGorsel.naturalWidth, ekBoy / siteGorsel.naturalHeight);
+          const gw = siteGorsel.naturalWidth * olcek;
+          const gh = siteGorsel.naturalHeight * olcek;
+          // Ekran görüntüsü sayfanın üstünden başlar; og:image ise bütün olarak
+          // tasarlanmış bir kart, ortalanınca doğru görünür.
+          const gy = gorselKaynak === 'og' ? ekY + (ekBoy - gh) / 2 : ekY;
+          ctx.drawImage(siteGorsel, x + (cw - gw) / 2, gy, gw, gh);
+        } else {
+          // Görüntü alınamadıysa çerçeve boş kalmasın: palet zemini + logo
+          const g = ctx.createLinearGradient(x, ekY, x + cw, ekY + ekBoy);
+          s.zemin.forEach((c, i) => g.addColorStop(i / (s.zemin.length - 1), c));
+          ctx.fillStyle = g;
+          ctx.fillRect(x, ekY, cw, ekBoy);
+          if (logoGorsel) {
+            const kutu = Math.min(cw, ekBoy) * 0.34;
+            const o = Math.min(kutu / logoGorsel.naturalWidth, kutu / logoGorsel.naturalHeight);
+            const lw = logoGorsel.naturalWidth * o;
+            const lh = logoGorsel.naturalHeight * o;
+            ctx.drawImage(logoGorsel, x + (cw - lw) / 2, ekY + (ekBoy - lh) / 2, lw, lh);
+          }
+        }
+        ctx.restore();
+
+        ctx.restore();
+
+        // ince kenar — koyu zeminde pencerenin sınırını belli eder
+        ctx.strokeStyle = 'rgba(255,255,255,0.18)';
+        ctx.lineWidth = Math.max(1, 1.4 * u);
+        ctx.beginPath();
+        ctx.roundRect(x, y, cw, ch, r);
+        ctx.stroke();
+      }
+
+      function onizlemeCiz(w, h, s, u) {
+        const yazi = 'Nunito, system-ui, sans-serif';
+        const pad = w * 0.062;
+        // Manşet yatay çalışır (metin solda, pencere sağda); kare ve dikey
+        // boyutlarda metin üstte, pencere altta.
+        const yatay = w / h > 1.3;
+
+        /* --- Zemin: bulanık site görüntüsü + renkli perde ------------------- */
+        if (siteGorsel) {
+          bulanikCiz(siteGorsel, w, h, 26 * u);
+        } else {
+          const g = ctx.createLinearGradient(0, 0, w * 0.85, h);
+          s.zemin.forEach((c, i) => g.addColorStop(i / (s.zemin.length - 1), c));
+          ctx.fillStyle = g;
+          ctx.fillRect(0, 0, w, h);
+        }
+        const koyu = tonla(veri.palet.vurgu, 0.11, 0.3);
+        const perde = ctx.createLinearGradient(0, 0, w * 0.75, h);
+        perde.addColorStop(0, koyu + 'f0');
+        perde.addColorStop(1, koyu + 'c4');
+        ctx.fillStyle = perde;
+        ctx.fillRect(0, 0, w, h);
+
+        /* --- Metin bloğu, çizimden önce ölçülür ----------------------------- */
+        const siteAdi = (el('#pk-rozet').value || veri.siteAdi || veri.alan).trim();
+        const metinEn = yatay ? w * 0.4 : w - pad * 2;
+        const logoKutu = 74 * u;
+        const adPx = 30 * u;
+        const baslikPx = (yatay ? 50 : 58) * u;
+        const ozetPx = 25 * u;
+        const bSat = baslikPx * 1.14;
+        const oSat = ozetPx * 1.5;
+        // Alt şeridin kapladığı yükseklik + pencerenin ondan uzak durması gereken pay
+        const altBar = 68 * u;
+        const logoVar = Boolean(logoGorsel && el('#pk-logo').checked);
+
+        ctx.font = `900 ${baslikPx}px ${yazi}`;
+        const bSatir = sarmala(el('#pk-baslik').value || veri.baslik, metinEn, 3);
+        ctx.font = `500 ${ozetPx}px ${yazi}`;
+        const oSatir = el('#pk-ozet').value.trim() ? sarmala(el('#pk-ozet').value, metinEn, 2) : [];
+
+        const adSatirBoy = logoVar ? logoKutu : adPx * 1.2;
+        const metinBoy =
+          adSatirBoy + 26 * u + bSatir.length * bSat + (oSatir.length ? 16 * u + oSatir.length * oSat : 0);
+
+        /* --- Yerleşim -------------------------------------------------------- */
+        const oran = 0.625; // pencere 16:10
+        let kartEn;
+        let kartBoy;
+        let kartX;
+        let kartY;
+        let metinY;
+
+        if (yatay) {
+          kartX = w * 0.485;
+          kartEn = w - kartX - pad * 0.55;
+          kartBoy = kartEn * oran;
+          if (kartBoy > h - pad * 2) {
+            kartBoy = h - pad * 2;
+            kartEn = kartBoy / oran;
+          }
+          kartY = (h - kartBoy) / 2;
+          metinY = Math.max(pad, (h - altBar - metinBoy) / 2);
+        } else {
+          // Gerçek ekran görüntüsü sayfanın üstünü gösterir, daha uzun bir pencereyi
+          // kaldırır; og:image ise 1.91:1 tasarlanmış bir kart, 16:10 çerçevede durur.
+          const dikeyOran = gorselKaynak === 'ekran' ? 0.76 : oran;
+          const bosluk = 26 * u;
+          kartEn = w - pad * 2;
+          kartBoy = Math.min(kartEn * dikeyOran, h - pad * 2 - altBar - metinBoy - bosluk);
+          if (kartBoy < kartEn * dikeyOran) kartEn = kartBoy / dikeyOran;
+          kartX = (w - kartEn) / 2;
+          // Metin ve pencere tek blok: artan boşluk üstte ve altta eşit paylaşılır
+          metinY = Math.max(pad, (h - altBar - (metinBoy + bosluk + kartBoy)) / 2);
+          kartY = metinY + metinBoy + bosluk;
+        }
+
+        if (kartBoy > 60 * u) tarayiciCiz(kartX, kartY, kartEn, kartBoy, s, u, yazi);
+
+        /* --- Logo + site adı -------------------------------------------------- */
+        let y = metinY;
+        ctx.font = `900 ${adPx}px ${yazi}`;
+        if (logoVar) {
+          const o = Math.min(logoKutu / logoGorsel.naturalWidth, logoKutu / logoGorsel.naturalHeight);
+          const lw = logoGorsel.naturalWidth * o;
+          const lh = logoGorsel.naturalHeight * o;
+          ctx.save();
+          ctx.fillStyle = 'rgba(255,255,255,0.94)';
+          ctx.shadowColor = 'rgba(2,6,23,0.35)';
+          ctx.shadowBlur = 16 * u;
+          ctx.shadowOffsetY = 4 * u;
+          ctx.beginPath();
+          ctx.roundRect(pad, y, logoKutu, logoKutu, 18 * u);
+          ctx.fill();
+          ctx.restore();
+          ctx.drawImage(logoGorsel, pad + (logoKutu - lw) / 2, y + (logoKutu - lh) / 2, lw, lh);
+          ctx.fillStyle = s.ink;
+          ctx.textBaseline = 'middle';
+          ctx.fillText(sarmala(siteAdi, metinEn - logoKutu - 20 * u, 1)[0] ?? '', pad + logoKutu + 20 * u, y + logoKutu / 2);
+        } else {
+          ctx.fillStyle = s.ink;
+          ctx.textBaseline = 'top';
+          ctx.fillText(sarmala(siteAdi, metinEn, 1)[0] ?? '', pad, y);
+        }
+        y += adSatirBoy + 26 * u;
+
+        /* --- Başlık ve özet ---------------------------------------------------- */
+        ctx.textBaseline = 'top';
+        ctx.save();
+        ctx.shadowColor = 'rgba(2,6,23,0.55)';
+        ctx.shadowBlur = 18 * u;
+        ctx.font = `900 ${baslikPx}px ${yazi}`;
+        ctx.fillStyle = s.ink;
+        for (const satir of bSatir) {
+          ctx.fillText(satir, pad, y);
+          y += bSat;
+        }
+        if (oSatir.length) {
+          y += 16 * u;
+          ctx.font = `500 ${ozetPx}px ${yazi}`;
+          ctx.fillStyle = s.alt;
+          for (const satir of oSatir) {
+            ctx.fillText(satir, pad, y);
+            y += oSat;
+          }
+        }
+        ctx.restore();
+
+        /* --- Alt şerit: diğer stillerle aynı dil -------------------------------- */
+        const barY = h - pad - 26 * u;
+        ctx.fillStyle = s.vurgu;
+        ctx.fillRect(pad, barY - 16 * u, 64 * u, 6 * u);
+        ctx.font = `700 ${24 * u}px ${yazi}`;
+        ctx.fillStyle = s.ink;
+        ctx.textBaseline = 'middle';
+        ctx.fillText(veri.alan, pad + 80 * u, barY - 12 * u);
+      }
+
+      /* ==================================================================
          Kart çizimi
          ================================================================== */
 
       function ciz() {
         if (!veri) return;
+        if (stilId === 'onizleme') {
+          const [ow, oh] = BOYUT[boyutId];
+          tuval.width = ow;
+          tuval.height = oh;
+          onizlemeCiz(ow, oh, aktifStil(), Math.sqrt((ow * oh) / (1200 * 630)));
+          return;
+        }
         const [w, h] = BOYUT[boyutId];
         tuval.width = w;
         tuval.height = h;
@@ -809,6 +1109,69 @@ const boyutlar = [
         }
       });
 
+      /* ==================================================================
+         Site görüntüsü — /api/site-goruntu
+         ================================================================== */
+
+      // Durum satırı AI ile ortak: ikisi de aynı eylem satırının altında konuşur.
+      function goruntuGetir(zorla = false) {
+        if (!veri) return;
+        if (gorselIstegi) return gorselIstegi;
+        if (!zorla && siteGorsel && gorselAlan === veri.alan) return;
+
+        const btn = el('#pk-goruntu');
+        btn.disabled = true;
+        aiDurum.className = 'pk-durum';
+        aiDurum.textContent = 'Sitenin görüntüsü alınıyor — ilk istek 20 saniyeyi bulabilir…';
+
+        gorselIstegi = (async () => {
+          try {
+            // `zorla` istekte önbelleği atla: "yenile" düğmesi gerçekten yenilesin
+            const adres =
+              '/api/site-goruntu?adres=' +
+              encodeURIComponent(veri.adres) +
+              (zorla ? '&y=' + Date.now() : '');
+            const c = await fetch(adres, zorla ? { cache: 'reload' } : undefined);
+            if (!c.ok) {
+              const d = await c.json().catch(() => ({}));
+              throw new Error(d.hata || 'Site görüntüsü alınamadı.');
+            }
+            const kaynak = c.headers.get('x-kaynak');
+            const blob = await c.blob();
+            const im = new Image();
+            const nesneAdres = URL.createObjectURL(blob);
+            await new Promise((coz, at) => {
+              im.onload = coz;
+              im.onerror = () => at(new Error('Site görüntüsü çözülemedi.'));
+              im.src = nesneAdres;
+            });
+            URL.revokeObjectURL(nesneAdres);
+
+            siteGorsel = im;
+            gorselKaynak = kaynak;
+            gorselAlan = veri.alan;
+            aiDurum.textContent =
+              kaynak === 'ekran'
+                ? 'Sitenin ekran görüntüsü alındı.'
+                : 'Ekran görüntüsü servisi yapılandırılmamış; sitenin kendi paylaşım görseli (og:image) kullanıldı.';
+            aiDurum.classList.add(kaynak === 'ekran' ? 'ok' : 'hata');
+          } catch (hata) {
+            siteGorsel = null;
+            gorselKaynak = null;
+            gorselAlan = null;
+            aiDurum.textContent = hata.message;
+            aiDurum.classList.add('hata');
+          } finally {
+            gorselIstegi = null;
+            btn.disabled = false;
+            ciz();
+          }
+        })();
+        return gorselIstegi;
+      }
+
+      el('#pk-goruntu').addEventListener('click', () => goruntuGetir(true));
+
       el('#pk-tumu').addEventListener('click', async () => {
         const onceki = boyutId;
         for (const b of Object.keys(BOYUT)) {
@@ -837,14 +1200,22 @@ const boyutlar = [
       }
       secimBagla('.pk-stil', (d) => {
         stilId = d.dataset.stil;
+
+        // Site önizleme kendi zeminini getiriyor; AI arka planının orada işi yok
+        const onizlemeMi = stilId === 'onizleme';
+        el('#pk-ai').hidden = onizlemeMi;
+        el('#pk-goruntu').hidden = !onizlemeMi;
+
         // AI görseli üretildiği stile bağlı; başka stile geçince prosedürel zemine dönülür
-        const eslesti = aiStil === stilId;
+        const eslesti = !onizlemeMi && aiStil === stilId;
         el('#pk-ai').textContent = eslesti ? '✨ Yeniden üret' : '✨ AI arka plan üret';
         el('#pk-ai-sil').hidden = !eslesti;
         if (!eslesti) {
           aiDurum.textContent = '';
           aiDurum.className = 'pk-durum';
         }
+        // Görüntü ilk seçimde kendiliğinden gelir; sonrasında önbellekten çizilir
+        if (onizlemeMi) goruntuGetir();
       });
       secimBagla('.pk-boyut', (d) => (boyutId = d.dataset.boyut));
 
@@ -887,6 +1258,11 @@ const boyutlar = [
           if (!c.ok) throw new Error(d.hata || 'Site analiz edilemedi.');
           veri = d;
 
+          // Başka bir site: önceki görüntü artık geçersiz
+          siteGorsel = null;
+          gorselKaynak = null;
+          gorselAlan = null;
+
           el('#pk-rozet').value = d.siteAdi.slice(0, 40);
           el('#pk-baslik').value = d.baslik;
           el('#pk-ozet').value = d.aciklama;
@@ -927,6 +1303,7 @@ const boyutlar = [
           await (document.fonts ? document.fonts.ready : Promise.resolve());
           ciz();
           metinleriYaz();
+          if (stilId === 'onizleme') goruntuGetir();
           el('#pk-onizleme-blok').scrollIntoView({ behavior: 'smooth', block: 'start' });
         } catch (hata) {
           durum.textContent = hata.message;

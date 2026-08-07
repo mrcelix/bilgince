@@ -1,107 +1,11 @@
 import type { APIRoute } from 'astro';
-import { lookup } from 'node:dns/promises';
-import { isIP } from 'node:net';
+import { guvenliGetir, metniOku } from '../../guvenli-adres';
 
 // Keystatic gibi bu uç da sunucu tarafında çalışmalı: hedef siteyi tarayıcıdan
 // çekmek CORS'a takılır, ayrıca SSRF denetimini istemciye bırakamayız.
+// Adres doğrulama ve güvenli getirme src/guvenli-adres.ts içinde; site görüntüsü
+// ucu da aynı katmanı kullanıyor.
 export const prerender = false;
-
-const ZAMAN_ASIMI = 8000;
-const EN_BUYUK_GOVDE = 2 * 1024 * 1024; // 2 MB
-const EN_COK_YONLENDIRME = 3;
-
-/* --------------------------------------------------------------------------
-   Güvenlik: yalnızca genel internete çıkılabilir
-   -------------------------------------------------------------------------- */
-
-/** RFC1918, loopback, link-local ve benzeri iç ağ blokları */
-function ozelAdres(ip: string): boolean {
-  if (isIP(ip) === 6) {
-    const d = ip.toLowerCase();
-    if (d === '::1' || d === '::') return true;
-    if (d.startsWith('fe80') || d.startsWith('fc') || d.startsWith('fd')) return true;
-    // IPv4 eşlemeli IPv6: ::ffff:10.0.0.1
-    const esleme = d.match(/::ffff:(\d+\.\d+\.\d+\.\d+)$/);
-    return esleme ? ozelAdres(esleme[1]) : false;
-  }
-
-  const [a, b] = ip.split('.').map(Number);
-  if (a === 10 || a === 127 || a === 0) return true;
-  if (a === 172 && b >= 16 && b <= 31) return true;
-  if (a === 192 && b === 168) return true;
-  if (a === 169 && b === 254) return true; // bulut meta veri uçları burada
-  if (a === 100 && b >= 64 && b <= 127) return true;
-  return false;
-}
-
-async function adresGuvenliMi(adres: URL): Promise<string | null> {
-  if (adres.protocol !== 'http:' && adres.protocol !== 'https:') {
-    return 'Yalnızca http ve https adresleri desteklenir.';
-  }
-  const ad = adres.hostname.replace(/^\[|\]$/g, '');
-  if (ad === 'localhost' || ad.endsWith('.localhost') || ad.endsWith('.internal')) {
-    return 'İç ağ adresleri çözümlenemez.';
-  }
-  if (isIP(ad)) {
-    return ozelAdres(ad) ? 'İç ağ adresleri çözümlenemez.' : null;
-  }
-  try {
-    const kayitlar = await lookup(ad, { all: true });
-    if (kayitlar.some((k) => ozelAdres(k.address))) {
-      return 'İç ağ adresleri çözümlenemez.';
-    }
-  } catch {
-    return 'Alan adı çözümlenemedi.';
-  }
-  return null;
-}
-
-/** Her yönlendirme adımını ayrı ayrı doğrulayarak getirir. */
-async function guvenliGetir(baslangic: URL, kabul: string) {
-  let su = baslangic;
-  for (let adim = 0; adim <= EN_COK_YONLENDIRME; adim++) {
-    const hata = await adresGuvenliMi(su);
-    if (hata) throw new Error(hata);
-
-    const cevap = await fetch(su, {
-      redirect: 'manual',
-      signal: AbortSignal.timeout(ZAMAN_ASIMI),
-      headers: {
-        accept: kabul,
-        'accept-language': 'tr,en;q=0.8',
-        'user-agent': 'bilgince-paylasim-karti/1.0 (+https://www.bilgince.com/araclar/paylasim-karti)',
-      },
-    });
-
-    if (cevap.status >= 300 && cevap.status < 400) {
-      const hedef = cevap.headers.get('location');
-      if (!hedef) throw new Error('Yönlendirme hedefi okunamadı.');
-      su = new URL(hedef, su);
-      continue;
-    }
-    if (!cevap.ok) throw new Error(`Sunucu ${cevap.status} döndürdü.`);
-    return { cevap, sonAdres: su };
-  }
-  throw new Error('Çok fazla yönlendirme.');
-}
-
-/** Gövdeyi üst sınıra kadar okur; dev dosyalarda belleği korur. */
-async function metniOku(cevap: Response, sinir = EN_BUYUK_GOVDE): Promise<string> {
-  const govde = cevap.body;
-  if (!govde) return '';
-  const okuyucu = govde.getReader();
-  const cozucu = new TextDecoder('utf-8');
-  let metin = '';
-  let bayt = 0;
-  while (bayt < sinir) {
-    const { done, value } = await okuyucu.read();
-    if (done) break;
-    bayt += value.byteLength;
-    metin += cozucu.decode(value, { stream: true });
-  }
-  await okuyucu.cancel().catch(() => {});
-  return metin;
-}
 
 /* --------------------------------------------------------------------------
    HTML ayrıştırma — tam bir ayrıştırıcı yerine hedefli desenler

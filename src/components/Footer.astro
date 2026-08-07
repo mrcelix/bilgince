@@ -1,5 +1,6 @@
 ---
 import { SITE, KONULAR } from '../site.js';
+import { DERLEME } from '../derleme.js';
 const yil = new Date().getFullYear();
 ---
 
@@ -35,6 +36,12 @@ const yil = new Date().getFullYear();
     </div>
   </div>
   <div class="alt-cizgi">
-    <div class="kap">© {yil} {SITE.name} · Reklam yok, sponsor yok.</div>
+    <div class="kap">
+      <span>© {yil} {SITE.name} · Reklam yok, sponsor yok.</span>
+      <span class="derleme" title={DERLEME.tamSurum ? `Commit ${DERLEME.tamSurum}` : 'Yerel derleme'}>
+        Derleme <b>{DERLEME.surum}</b> ·
+        <time datetime={DERLEME.zamanISO}>{DERLEME.zamanMetin}</time>
+      </span>
+    </div>
   </div>
 </footer>
