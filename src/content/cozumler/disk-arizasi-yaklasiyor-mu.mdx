@@ -1,0 +1,75 @@
+---
+baslik: "Disk arızası yaklaşıyor mu?"
+ozet: "Disk bir günde ölmez: önce yeniden denenen okumalar, sonra yavaşlık, en sonda kayıp. Erken işaretleri okumak, veriyi kurtarmakla kaybetmek arasındaki farktır."
+konu: "windows-server"
+etiketler: ["disk", "smart", "depolama", "izleme"]
+belirtiler:
+  - "Sunucu ara sıra donuyor"
+  - "Kopyalama bazen çok yavaşlıyor"
+  - "Olay günlüğünde disk uyarıları var"
+  - "RAID uyarı verdi ama sistem çalışıyor"
+yayin: 2026-08-09
+sure: 5
+dosya: "/araclar/depolama-sagligi.ps1"
+dosyaAdi: "depolama-sagligi.ps1"
+dosyaAciklama: "Fiziksel disk sağlığı, güvenilirlik sayaçları (okuma/yazma hataları, sıcaklık, çalışma saati), depolama havuzu ve sanal disk durumu, birim doluluğu ve son disk olaylarını tek raporda toplar."
+komut: "Get-PhysicalDisk | Get-StorageReliabilityCounter | Select-Object DeviceId, ReadErrorsTotal, ReadErrorsUncorrected, Temperature"
+platform: "windows"
+ilgiliRehberler: []
+sira: 25
+---
+
+Disk arızası ani görünür ama değildir. Kayıttan geriye bakıldığında neredeyse her zaman **haftalar önce başlamış** bir iz vardır: önce yeniden denenen okumalar, sonra ara ara donmalar, en sonda kayıp.
+
+Fark, o izi okuyup okumadığınızdadır.
+
+## 1. Olay günlüğü ilk söyleyendir
+
+| Olay | Anlamı |
+| --- | --- |
+| `153` | G/Ç isteği yeniden denendi — en erken işaret |
+| `129` | Denetleyici sıfırlandı |
+| `7` / `55` | Kötü blok / NTFS bozulması |
+| `51` | Sayfalama işleminde disk hatası |
+| `157` | Disk beklenmedik biçimde kayboldu |
+
+**153 ve 129, arıza değil uyarıdır** — ve tam da bu yüzden göz ardı edilirler. Sayıları artıyorsa diskin ya da yolun ömrü doluyordur.
+
+## 2. Güvenilirlik sayaçları
+
+Windows, SMART verisinin bir kısmını doğrudan verir:
+
+```powershell
+Get-PhysicalDisk | Get-StorageReliabilityCounter |
+  Select-Object DeviceId, ReadErrorsTotal, ReadErrorsUncorrected, Temperature, PowerOnHours
+```
+
+- **ReadErrorsUncorrected > 0** → düzeltilemeyen hata. Bu disk üretimden çıkmalı; `chkdsk` ile uğraşmak zaman kaybıdır.
+- **Sıcaklık 55 °C üstü** → havalandırma sorunu; ömrü kısaltır.
+- **PowerOnHours** → beş yılı geçen diskleri değişim planına alın.
+
+Donanım RAID denetleyicisi arkasındaki diskler bu komutta görünmez; o durumda üreticinin aracıyla bakmak gerekir.
+
+## 3. RAID uyarı verdiyse
+
+Sistem çalışmaya devam ediyor olması sizi rahatlatmasın: **korumasız durumdasınız**. Tek eşlikli bir dizide ikinci disk gitmeden önce yeniden yapılandırmanın bitmesi gerekir ve bu, büyük disklerde günler sürebilir.
+
+Yeniden yapılandırma süresini önceden bilmek için
+[RAID hesaplayıcıyı](/araclar/raid-hesaplayici) kullanın: 8 TB'lık bir diskte bu süre iyimser hesapla bile bir günden uzundur.
+
+## Sıra önemli
+
+Disk değiştirmeden önce yapılacak ilk iş **yedeği doğrulamaktır**. Yeniden yapılandırma sırasında diğer diskler en yoğun çalıştıkları ana girer; ikinci arıza en çok o sırada olur.
+
+1. Yedeği doğrula (yalnızca "iş başarılı" değil, **geri dönüş testi**)
+2. Diski üretimden çıkar
+3. Yeniden yapılandırmayı başlat ve bitene kadar başka değişiklik yapma
+4. Aynı partiden alınan diğer diskleri izlemeye al
+
+## Doğrulama
+
+Değişimden sonra betiği yeniden çalıştırın: sağlık `Healthy`, sanal disk `Healthy`, olay sayacı sıfır olmalı. Olaylar devam ediyorsa sorun diskte değil **yolda**dır — kablo, arka panel (backplane) ya da denetleyici.
+
+## Bir daha sürpriz olmaması için
+
+Bu betiği haftalık zamanlanmış görev olarak çalıştırıp çıktısını dosyaya yazdırın. Hata sayaçları **mutlak değeriyle değil eğilimiyle** anlamlıdır: geçen hafta 12, bu hafta 340 ise cevap bellidir.

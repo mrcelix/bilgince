@@ -1,0 +1,297 @@
+---
+import Base from '../../layouts/Base.astro';
+---
+
+<Base
+  baslik="IP planı ve VLAN alt ağ tahsisi"
+  aciklama="Bir ana ağı, ihtiyaç duyulan host sayısına göre VLAN'lara böler (VLSM): her VLAN'a ağ adresi, aralık, yayın adresi ve DHCP kapsamı önerisi çıkarır."
+  aramaya={true}
+  kategori="Araç"
+>
+  <div class="arama-bas">
+    <div class="kap">
+      <nav class="kirinti" aria-label="Kırıntı yolu" style="padding-top:0">
+        <a href="/">Ana sayfa</a><span class="ayrac">/</span><a href="/araclar">Araçlar</a><span
+          class="ayrac">/</span
+        ><span aria-current="page">IP planı</span>
+      </nav>
+      <h1>IP planı ve VLAN alt ağ tahsisi</h1>
+      <p style="color:var(--muted);font-size:14px;margin-top:8px;max-width:64ch">
+        Eşit bölmek kolaydır ama israftır: 30 kullanıcılık VLAN'a /24 vermek adres alanının
+        %88'ini boşa yazmaktır. Burada her VLAN ihtiyacı kadar yer alır (VLSM).
+      </p>
+    </div>
+  </div>
+
+  <div class="kap arac-sayfa">
+    <section class="arac-blok">
+      <h2 class="arac-h2"><span class="arac-no">1</span> Ana ağ</h2>
+      <div class="arac-alanlar">
+        <label class="arac-alan"
+          >Ana ağ (CIDR)
+          <input id="p-ag" type="text" spellcheck="false" value="10.20.0.0/16" placeholder="10.20.0.0/16" />
+        </label>
+        <label class="arac-alan"
+          >Büyüme payı
+          <span class="arac-kaydirac">
+            <input id="p-pay" type="range" min="0" max="100" step="10" value="30" />
+            <output for="p-pay" id="p-pay-deger">30</output>
+          </span>
+        </label>
+      </div>
+      <p class="arac-not">
+        Büyüme payı, istenen host sayısını şu oranda büyütür ve alt ağ ona göre seçilir. Yeniden
+        numaralandırmak, baştan geniş vermekten çok daha pahalıdır.
+      </p>
+      <p class="arac-durum" id="p-durum" role="status" aria-live="polite"></p>
+    </section>
+
+    <section class="arac-blok">
+      <h2 class="arac-h2"><span class="arac-no">2</span> VLAN'lar</h2>
+      <table class="p-tablo" id="p-girdiler"></table>
+      <div class="arac-dugmeler">
+        <button type="button" class="dg arac-ikincil" id="p-ekle">VLAN ekle</button>
+      </div>
+    </section>
+
+    <section class="arac-blok">
+      <h2 class="arac-h2"><span class="arac-no">3</span> Tahsis</h2>
+      <div style="overflow-x:auto"><table class="p-tablo" id="p-sonuc"></table></div>
+      <div class="arac-dugmeler">
+        <button type="button" class="dg" id="p-kopya">Tabloyu kopyala</button>
+      </div>
+      <div id="p-ozet" style="margin-top:16px"></div>
+    </section>
+
+    <section class="arac-blok">
+      <h2 class="arac-h2"><span class="arac-no">4</span> Plan yaparken</h2>
+      <div class="arac-kutu">
+        <ul style="margin:0">
+          <li><b>Büyükten küçüğe tahsis edin.</b> Araç bunu kendisi yapıyor: küçük ağları önce vermek, büyük ağlara hizalı yer bırakmaz.</li>
+          <li><b>Rakamları anlamlı seçin.</b> VLAN numarasıyla üçüncü sekizli aynı olsun (VLAN 30 → 10.20.30.0). Sorun anında bu, adrese bakınca VLAN'ı bilmek demektir.</li>
+          <li><b>Uzak ofisler için ayrı blok ayırın.</b> VPN kurduğunuzda çakışan 192.168.1.0/24 ağları en sık karşılaşılan ve en can sıkıcı sorundur.</li>
+          <li><b>DHCP kapsamını ağın tamamı yapmayın.</b> İlk 20 adresi sabit cihazlara (ağ geçidi, yazıcı, anahtar) ayırın; araç bunu öneride hesaba katıyor.</li>
+        </ul>
+      </div>
+    </section>
+  </div>
+
+  <script>
+    const el = (s) => document.querySelector(s);
+    const sayiyaCevir = (ip) => ip.split('.').reduce((t, p) => (t << 8) + (parseInt(p, 10) & 255), 0) >>> 0;
+    const metneCevir = (n) => [24, 16, 8, 0].map((k) => (n >>> k) & 255).join('.');
+    const maskeUret = (onek) => (onek === 0 ? 0 : (0xffffffff << (32 - onek)) >>> 0);
+
+    const vlanlar = [
+      { no: 10, ad: 'Sunucular', host: 40 },
+      { no: 20, ad: 'Kullanıcılar', host: 220 },
+      { no: 30, ad: 'Yazıcılar', host: 20 },
+      { no: 40, ad: 'Kameralar', host: 60 },
+      { no: 50, ad: 'Misafir', host: 100 },
+      { no: 99, ad: 'Yönetim', host: 12 },
+    ];
+
+    function girdileriCiz() {
+      el('#p-girdiler').innerHTML =
+        '<tr><th>VLAN</th><th>Ad</th><th>Host ihtiyacı</th><th></th></tr>' +
+        vlanlar
+          .map(
+            (v, i) => `<tr>
+              <td><input type="number" value="${v.no}" min="1" max="4094" data-i="${i}" data-alan="no" style="width:6rem" /></td>
+              <td><input type="text" value="${v.ad}" data-i="${i}" data-alan="ad" /></td>
+              <td><input type="number" value="${v.host}" min="1" max="60000" data-i="${i}" data-alan="host" style="width:7rem" /></td>
+              <td><button type="button" class="p-sil" data-i="${i}">×</button></td>
+            </tr>`
+          )
+          .join('');
+
+      el('#p-girdiler')
+        .querySelectorAll('input')
+        .forEach((g) =>
+          g.addEventListener('input', () => {
+            const v = vlanlar[+g.dataset.i];
+            v[g.dataset.alan] = g.dataset.alan === 'ad' ? g.value : +g.value;
+            hesapla();
+          })
+        );
+      el('#p-girdiler')
+        .querySelectorAll('.p-sil')
+        .forEach((b) =>
+          b.addEventListener('click', () => {
+            vlanlar.splice(+b.dataset.i, 1);
+            girdileriCiz();
+            hesapla();
+          })
+        );
+      hesapla();
+    }
+
+    /** İhtiyacı karşılayan en küçük öneki bulur (ağ + yayın adresi payıyla). */
+    function onekBul(host) {
+      for (let onek = 30; onek >= 8; onek--) {
+        if (2 ** (32 - onek) - 2 >= host) return onek;
+      }
+      return 8;
+    }
+
+    function hesapla() {
+      const durum = el('#p-durum');
+      const ham = el('#p-ag').value.trim();
+      const pay = +el('#p-pay').value / 100;
+      el('#p-pay-deger').textContent = el('#p-pay').value;
+
+      const e = ham.match(/^(\d{1,3}(?:\.\d{1,3}){3})\/(\d{1,2})$/);
+      if (!e || +e[2] > 30) {
+        durum.className = 'arac-durum hata';
+        durum.textContent = 'Ana ağı CIDR biçiminde yazın: 10.20.0.0/16';
+        el('#p-sonuc').innerHTML = '';
+        return;
+      }
+
+      const anaOnek = +e[2];
+      const anaAg = (sayiyaCevir(e[1]) & maskeUret(anaOnek)) >>> 0;
+      const anaBoyut = 2 ** (32 - anaOnek);
+
+      // Büyükten küçüğe: hizalama boşluğu en aza insin
+      const sirali = [...vlanlar]
+        .map((v) => ({ ...v, gereken: Math.ceil(v.host * (1 + pay)) }))
+        .map((v) => ({ ...v, onek: onekBul(v.gereken) }))
+        .sort((a, b) => a.onek - b.onek);
+
+      let konum = anaAg;
+      const satirlar = [];
+      let sigmayan = 0;
+
+      for (const v of sirali) {
+        const boyut = 2 ** (32 - v.onek);
+        // hizalama: alt ağ kendi boyutunun katına oturmalı
+        if (konum % boyut !== 0) konum = konum + (boyut - (konum % boyut));
+        if (konum + boyut > anaAg + anaBoyut) {
+          sigmayan++;
+          continue;
+        }
+        const yayin = konum + boyut - 1;
+        satirlar.push({
+          ...v,
+          ag: metneCevir(konum),
+          onekMetin: `/${v.onek}`,
+          maske: metneCevir(maskeUret(v.onek)),
+          gecit: metneCevir(konum + 1),
+          ilk: metneCevir(konum + 21),
+          son: metneCevir(yayin - 1),
+          yayin: metneCevir(yayin),
+          kapasite: boyut - 2,
+        });
+        konum += boyut;
+      }
+
+      const kullanilan = konum - anaAg;
+      durum.className = 'arac-durum ok';
+      durum.textContent =
+        `${satirlar.length} VLAN yerleştirildi · ana ağın %${Math.round((kullanilan / anaBoyut) * 100)}'i kullanıldı` +
+        (sigmayan ? ` · ${sigmayan} VLAN sığmadı` : '');
+
+      el('#p-sonuc').innerHTML =
+        '<tr><th>VLAN</th><th>Ad</th><th>Ağ</th><th>Maske</th><th>Ağ geçidi</th><th>DHCP kapsamı</th><th>Yayın</th><th>Kapasite</th></tr>' +
+        satirlar
+          .sort((a, b) => a.no - b.no)
+          .map(
+            (s) => `<tr>
+              <td>${s.no}</td><td>${s.ad}</td>
+              <td><b>${s.ag}${s.onekMetin}</b></td>
+              <td>${s.maske}</td>
+              <td>${s.gecit}</td>
+              <td>${s.ilk} – ${s.son}</td>
+              <td>${s.yayin}</td>
+              <td>${s.kapasite}</td>
+            </tr>`
+          )
+          .join('');
+
+      el('#p-sonuc').dataset.metin = satirlar
+        .sort((a, b) => a.no - b.no)
+        .map((s) => `VLAN ${s.no}\t${s.ad}\t${s.ag}${s.onekMetin}\t${s.gecit}\t${s.ilk} – ${s.son}`)
+        .join('\n');
+
+      const yorumlar = [];
+      if (sigmayan) {
+        yorumlar.push({ sinif: 'kotu', metin: `${sigmayan} VLAN ana ağa sığmadı. Daha geniş bir blok seçin ya da host ihtiyaçlarını gözden geçirin.` });
+      }
+      if (kullanilan / anaBoyut > 0.75) {
+        yorumlar.push({ sinif: 'uyari', metin: 'Ana ağın dörtte üçünden fazlası kullanıldı; yeni VLAN için yeriniz azalıyor.' });
+      } else {
+        yorumlar.push({ sinif: 'iyi', metin: `Ana ağın %${Math.round(100 - (kullanilan / anaBoyut) * 100)}'i boşta — büyümeye yeriniz var.` });
+      }
+      const buyuk = satirlar.find((s) => s.kapasite > s.gereken * 4);
+      if (buyuk) {
+        yorumlar.push({
+          sinif: 'uyari',
+          metin: `<b>${buyuk.ad}</b> VLAN'ında ${buyuk.kapasite} adres var ama ${buyuk.gereken} isteniyor. Alt ağlar ikinin kuvvetiyle büyür; bu israf kaçınılmaz ama bilerek yapılmalı.`,
+        });
+      }
+      el('#p-ozet').innerHTML = yorumlar
+        .map((y) => `<div class="arac-kutu ${y.sinif}" style="margin-bottom:10px">${y.metin}</div>`)
+        .join('');
+    }
+
+    el('#p-ekle').addEventListener('click', () => {
+      const enBuyuk = Math.max(0, ...vlanlar.map((v) => v.no));
+      vlanlar.push({ no: enBuyuk + 10, ad: 'Yeni VLAN', host: 30 });
+      girdileriCiz();
+    });
+
+    el('#p-kopya').addEventListener('click', async (e) => {
+      await navigator.clipboard.writeText(el('#p-sonuc').dataset.metin ?? '');
+      e.currentTarget.textContent = 'Kopyalandı';
+      setTimeout(() => (e.currentTarget.textContent = 'Tabloyu kopyala'), 1600);
+    });
+
+    el('#p-ag').addEventListener('input', hesapla);
+    el('#p-pay').addEventListener('input', hesapla);
+    girdileriCiz();
+  </script>
+
+  <style>
+    .p-tablo {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 13.5px;
+    }
+    .p-tablo :is(th, td) {
+      text-align: left;
+      padding: 8px 9px;
+      border-bottom: 1px solid var(--line);
+      white-space: nowrap;
+    }
+    .p-tablo th {
+      color: var(--muted);
+      font-size: 12px;
+      text-transform: uppercase;
+      letter-spacing: 0.03em;
+    }
+    .p-tablo td {
+      font-family: var(--mono);
+      font-size: 13px;
+    }
+    .p-tablo input {
+      font: inherit;
+      font-size: 13.5px;
+      padding: 6px 8px;
+      border: 1px solid var(--line);
+      border-radius: var(--r-s);
+      background: var(--bg);
+      width: 100%;
+    }
+    .p-sil {
+      font: inherit;
+      font-size: 16px;
+      line-height: 1;
+      padding: 4px 9px;
+      border-radius: var(--r-s);
+      border: 1px solid var(--line);
+      background: var(--paper);
+      color: var(--clay-ink);
+      cursor: pointer;
+    }
+  </style>
+</Base>

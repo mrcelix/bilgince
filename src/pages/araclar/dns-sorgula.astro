@@ -1,0 +1,235 @@
+---
+import Base from '../../layouts/Base.astro';
+---
+
+<Base
+  baslik="DNS kayıt sorgulayıcı"
+  aciklama="Bir alan adının A, AAAA, MX, TXT, NS, SOA, CAA ve CNAME kayıtlarını tek seferde sorgular; eksik ya da dikkat çeken kayıtları işaretler."
+  aramaya={true}
+  kategori="Araç"
+>
+  <div class="arama-bas">
+    <div class="kap">
+      <nav class="kirinti" aria-label="Kırıntı yolu" style="padding-top:0">
+        <a href="/">Ana sayfa</a><span class="ayrac">/</span><a href="/araclar">Araçlar</a><span
+          class="ayrac">/</span
+        ><span aria-current="page">DNS sorgulayıcı</span>
+      </nav>
+      <h1>DNS kayıt sorgulayıcı</h1>
+      <p style="color:var(--muted);font-size:14px;margin-top:8px;max-width:64ch">
+        Bir alan adının tüm temel kayıtlarını tek ekranda görün. Sorgu, tarayıcınızdan
+        <strong>DNS-over-HTTPS</strong> ile yapılır; sonuç yerel DNS önbelleğinizden etkilenmez —
+        değişikliğin yayılıp yayılmadığını bu yüzden buradan doğru görürsünüz.
+      </p>
+    </div>
+  </div>
+
+  <div class="kap arac-sayfa">
+    <section class="arac-blok">
+      <h2 class="arac-h2"><span class="arac-no">1</span> Alan adı</h2>
+      <form id="d-form" class="arac-alanlar" style="align-items:end">
+        <label class="arac-alan"
+          >Sorgulanacak ad
+          <input id="d-ad" type="text" spellcheck="false" placeholder="ornek.com" value="bilgince.com" required />
+        </label>
+        <button type="submit" class="dg" id="d-btn" style="height:40px">Sorgula</button>
+      </form>
+      <p class="arac-durum" id="d-durum" role="status" aria-live="polite"></p>
+    </section>
+
+    <div id="d-sonuc"></div>
+
+    <section class="arac-blok">
+      <h2 class="arac-h2">Kayıt türleri</h2>
+      <div class="arac-kutu">
+        <ul style="margin:0">
+          <li><b>A / AAAA</b> — adın IPv4 ve IPv6 adresi. Yoksa site açılmaz.</li>
+          <li><b>MX</b> — postayı hangi sunucu alır. Yoksa bu alana e-posta teslim edilemez.</li>
+          <li><b>TXT</b> — SPF, DMARC, alan doğrulamaları ve çeşitli servis kayıtları burada durur.</li>
+          <li><b>NS</b> — alanın yetkili ad sunucuları. Devralınan bir alanda ilk bakılacak kayıt budur: DNS gerçekte nerede yönetiliyor?</li>
+          <li><b>SOA</b> — bölgenin ana kaydı; seri numarası değişiklik yapıldığında artar.</li>
+          <li><b>CAA</b> — hangi sertifika otoritesinin bu alan için sertifika verebileceğini sınırlar. Yoksa herkes verebilir.</li>
+        </ul>
+      </div>
+      <p class="arac-not">
+        E-posta kayıtlarını üretmek için <a href="/araclar/eposta-guvenlik-kayitlari">SPF, DKIM, DMARC üreteci</a>;
+        sunucu tarafında toplu denetim için <a href="/hizli-cozumler/eposta-spama-dusuyor">eposta-tanilama.ps1</a>.
+      </p>
+    </section>
+  </div>
+
+  <script>
+    const el = (s) => document.querySelector(s);
+    const kacir = (m) => String(m).replace(/[<>&]/g, (c) => ({ '<': '&lt;', '>': '&gt;', '&': '&amp;' })[c]);
+
+    const TURLER = [
+      { tur: 'A', ad: 'A — IPv4' },
+      { tur: 'AAAA', ad: 'AAAA — IPv6' },
+      { tur: 'CNAME', ad: 'CNAME — takma ad' },
+      { tur: 'MX', ad: 'MX — posta sunucusu' },
+      { tur: 'TXT', ad: 'TXT — metin kayıtları' },
+      { tur: 'NS', ad: 'NS — ad sunucuları' },
+      { tur: 'SOA', ad: 'SOA — bölge başlangıcı' },
+      { tur: 'CAA', ad: 'CAA — sertifika otoritesi kısıtı' },
+    ];
+
+    async function sorgula(ad, tur) {
+      const adres = `https://cloudflare-dns.com/dns-query?name=${encodeURIComponent(ad)}&type=${tur}`;
+      const cevap = await fetch(adres, { headers: { accept: 'application/dns-json' } });
+      if (!cevap.ok) throw new Error(`DNS servisi ${cevap.status} döndürdü.`);
+      const govde = await cevap.json();
+      return govde.Answer ?? [];
+    }
+
+    /**
+     * DoH, CAA kayıtlarını genel biçimde (\# uzunluk onaltılık…) döndürüyor.
+     * Yapı: 1 bayt bayrak, 1 bayt etiket uzunluğu, etiket, değer.
+     */
+    function caaCoz(veri) {
+      const e = veri.match(/^\\#\s+\d+\s+([0-9a-f\s]+)$/i);
+      if (!e) return veri;
+      const bayt = e[1].trim().split(/\s+/).map((h) => parseInt(h, 16));
+      if (bayt.length < 3) return veri;
+      const bayrak = bayt[0];
+      const etiketUzunluk = bayt[1];
+      const etiket = String.fromCharCode(...bayt.slice(2, 2 + etiketUzunluk));
+      const deger = String.fromCharCode(...bayt.slice(2 + etiketUzunluk));
+      return `${bayrak} ${etiket} "${deger}"`;
+    }
+
+    function sureMetni(ttl) {
+      if (ttl < 60) return `${ttl} sn`;
+      if (ttl < 3600) return `${Math.round(ttl / 60)} dk`;
+      if (ttl < 86400) return `${Math.round(ttl / 3600)} sa`;
+      return `${Math.round(ttl / 86400)} gün`;
+    }
+
+    el('#d-form').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const ad = el('#d-ad').value.trim().replace(/^https?:\/\//, '').replace(/\/.*$/, '');
+      if (!ad) return;
+
+      const btn = el('#d-btn');
+      const durum = el('#d-durum');
+      btn.disabled = true;
+      durum.className = 'arac-durum';
+      durum.textContent = `${ad} sorgulanıyor…`;
+      el('#d-sonuc').innerHTML = '';
+
+      try {
+        const sonuclar = await Promise.all(
+          TURLER.map(async (t) => ({ ...t, kayitlar: await sorgula(ad, t.tur).catch(() => []) }))
+        );
+
+        const dolu = sonuclar.filter((s) => s.kayitlar.length);
+        durum.className = 'arac-durum ok';
+        durum.textContent = `${dolu.length} kayıt türünde sonuç bulundu.`;
+
+        /* --- bulgular ------------------------------------------------------- */
+        const bul = (t) => sonuclar.find((s) => s.tur === t)?.kayitlar ?? [];
+        const txt = bul('TXT').map((k) => k.data.replace(/^"|"$/g, ''));
+        const bulgular = [];
+
+        if (!bul('A').length && !bul('AAAA').length && !bul('CNAME').length) {
+          bulgular.push({ sinif: 'kotu', metin: 'A, AAAA ya da CNAME kaydı yok — bu ad bir siteye çözümlenmiyor.' });
+        }
+        if (!bul('MX').length) {
+          bulgular.push({ sinif: 'uyari', metin: 'MX kaydı yok: bu alana e-posta teslim edilemez.' });
+        }
+        if (!txt.some((t) => t.startsWith('v=spf1'))) {
+          bulgular.push({ sinif: 'uyari', metin: 'SPF kaydı yok: adınız adına herkes e-posta gönderebilir.' });
+        } else if (txt.filter((t) => t.startsWith('v=spf1')).length > 1) {
+          bulgular.push({ sinif: 'kotu', metin: 'Birden çok SPF kaydı var — RFC bunu hata sayar, ikisi de yok sayılabilir.' });
+        }
+        if (!bul('CAA').length) {
+          bulgular.push({ sinif: 'uyari', metin: 'CAA kaydı yok: herhangi bir sertifika otoritesi bu ad için sertifika verebilir.' });
+        }
+        if (!bul('AAAA').length) {
+          bulgular.push({ sinif: 'iyi', metin: 'IPv6 (AAAA) kaydı yok. Zorunlu değil ama bazı ağlarda erişimi yavaşlatabilir.' });
+        }
+        const ns = bul('NS').map((k) => k.data);
+        if (ns.length) {
+          bulgular.push({ sinif: 'iyi', metin: `DNS yönetimi: ${ns.map((n) => n.replace(/\.$/, '')).join(', ')}` });
+        }
+
+        /* --- çizim ---------------------------------------------------------- */
+        el('#d-sonuc').innerHTML =
+          `<section class="arac-blok"><h2 class="arac-h2"><span class="arac-no">2</span> Bulgular</h2>${bulgular
+            .map((b) => `<div class="arac-kutu ${b.sinif}" style="margin-bottom:10px">${kacir(b.metin)}</div>`)
+            .join('')}</section>` +
+          `<section class="arac-blok"><h2 class="arac-h2"><span class="arac-no">3</span> Kayıtlar</h2>` +
+          sonuclar
+            .map((s) => {
+              if (!s.kayitlar.length) {
+                return `<div class="d-grup"><h3>${s.ad}</h3><p class="d-yok">kayıt yok</p></div>`;
+              }
+              const satirlar = s.kayitlar
+                .map((k) => {
+                  const veri = s.tur === 'CAA' ? caaCoz(k.data) : k.data;
+                  return `<tr><td class="d-veri">${kacir(veri)}</td><td class="d-ttl">${sureMetni(k.TTL)}</td></tr>`;
+                })
+                .join('');
+              return `<div class="d-grup"><h3>${s.ad} <span>${s.kayitlar.length}</span></h3>
+                      <table class="d-tablo">${satirlar}</table></div>`;
+            })
+            .join('') +
+          '</section>';
+      } catch (hata) {
+        durum.className = 'arac-durum hata';
+        durum.textContent = hata.message;
+      } finally {
+        btn.disabled = false;
+      }
+    });
+
+    el('#d-form').dispatchEvent(new Event('submit'));
+  </script>
+
+  <style>
+    .d-grup {
+      margin-bottom: 18px;
+    }
+    .d-grup h3 {
+      font-size: 14px;
+      margin: 0 0 6px;
+      color: var(--ink-soft);
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .d-grup h3 span {
+      font-family: var(--mono);
+      font-size: 11px;
+      font-weight: 700;
+      background: var(--tint);
+      color: var(--indigo-d);
+      border-radius: 999px;
+      padding: 2px 8px;
+    }
+    .d-yok {
+      margin: 0;
+      font-size: 13px;
+      color: var(--muted);
+    }
+    .d-tablo {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 13px;
+    }
+    .d-tablo td {
+      padding: 7px 10px;
+      border-bottom: 1px solid var(--line);
+      vertical-align: top;
+    }
+    .d-veri {
+      font-family: var(--mono);
+      word-break: break-all;
+    }
+    .d-ttl {
+      width: 5.5rem;
+      text-align: right;
+      color: var(--muted);
+      white-space: nowrap;
+    }
+  </style>
+</Base>

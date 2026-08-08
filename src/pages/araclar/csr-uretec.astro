@@ -1,0 +1,279 @@
+---
+import Base from '../../layouts/Base.astro';
+---
+
+<Base
+  baslik="Sertifika isteği (CSR) üreteci"
+  aciklama="Sertifika isteği için openssl komutunu, yapılandırma dosyasını ve Windows certreq INF içeriğini üretir; SAN listesini denetler ve sık yapılan hataları önceden söyler."
+  aramaya={true}
+  kategori="Araç"
+>
+  <div class="arama-bas">
+    <div class="kap">
+      <nav class="kirinti" aria-label="Kırıntı yolu" style="padding-top:0">
+        <a href="/">Ana sayfa</a><span class="ayrac">/</span><a href="/araclar">Araçlar</a><span
+          class="ayrac">/</span
+        ><span aria-current="page">CSR üreteci</span>
+      </nav>
+      <h1>Sertifika isteği (CSR) üreteci</h1>
+      <p style="color:var(--muted);font-size:14px;margin-top:8px;max-width:64ch">
+        CSR'ı yanlış üretmenin bedeli, sertifika geldikten sonra ortaya çıkar. Alanları burada
+        doldurun; komut, yapılandırma ve Windows karşılığı birlikte çıksın.
+      </p>
+    </div>
+  </div>
+
+  <div class="kap arac-sayfa">
+    <section class="arac-blok">
+      <h2 class="arac-h2"><span class="arac-no">1</span> Kimlik bilgileri</h2>
+      <div class="arac-alanlar">
+        <label class="arac-alan"
+          >Ortak ad (CN) — asıl alan adı
+          <input id="c-cn" type="text" spellcheck="false" value="portal.ornek.com" />
+        </label>
+        <label class="arac-alan"
+          >Kurum (O)
+          <input id="c-o" type="text" value="Ornek Anonim Sirketi" />
+        </label>
+        <label class="arac-alan"
+          >Birim (OU)
+          <input id="c-ou" type="text" value="Bilgi Islem" />
+        </label>
+        <label class="arac-alan"
+          >Şehir (L)
+          <input id="c-l" type="text" value="Istanbul" />
+        </label>
+        <label class="arac-alan"
+          >İl / bölge (ST)
+          <input id="c-st" type="text" value="Istanbul" />
+        </label>
+        <label class="arac-alan"
+          >Ülke (C) — iki harf
+          <input id="c-c" type="text" maxlength="2" value="TR" style="text-transform:uppercase" />
+        </label>
+      </div>
+
+      <div class="arac-alan" style="margin-top:14px">
+        <label for="c-san">Kapsanacak adlar (SAN) — her satıra bir ad ya da IP</label>
+        <textarea id="c-san" rows="4" spellcheck="false" style="font-family:var(--mono);font-size:13px">portal.ornek.com
+www.portal.ornek.com</textarea>
+      </div>
+
+      <div class="arac-alanlar" style="margin-top:14px">
+        <label class="arac-alan"
+          >Anahtar
+          <select id="c-anahtar">
+            <option value="rsa:2048">RSA 2048 — en yaygın</option>
+            <option value="rsa:3072" selected>RSA 3072 — önerilen</option>
+            <option value="rsa:4096">RSA 4096</option>
+            <option value="ec:prime256v1">ECDSA P-256</option>
+            <option value="ec:secp384r1">ECDSA P-384</option>
+          </select>
+        </label>
+        <label class="arac-alan"
+          >Dosya adı ön eki
+          <input id="c-dosya" type="text" spellcheck="false" value="portal" />
+        </label>
+      </div>
+    </section>
+
+    <section class="arac-blok">
+      <h2 class="arac-h2"><span class="arac-no">2</span> openssl</h2>
+      <h3 class="c-h3">1. Yapılandırma dosyası (<code id="c-cnfAd">portal.cnf</code>)</h3>
+      <pre class="c-kod" id="c-cnf"></pre>
+      <h3 class="c-h3">2. Anahtar ve istek üretimi</h3>
+      <pre class="c-kod" id="c-komut"></pre>
+      <h3 class="c-h3">3. Doğrulama (göndermeden önce)</h3>
+      <pre class="c-kod" id="c-dogrula"></pre>
+      <div class="arac-dugmeler">
+        <button type="button" class="dg" id="c-kopya">Komutları kopyala</button>
+      </div>
+    </section>
+
+    <section class="arac-blok">
+      <h2 class="arac-h2"><span class="arac-no">3</span> Windows (certreq)</h2>
+      <p class="arac-not" style="margin-top:0">
+        IIS ya da Windows sunucularında openssl olmadan aynı isteği üretmek için. Dosyayı
+        <code>istek.inf</code> olarak kaydedin.
+      </p>
+      <pre class="c-kod" id="c-inf"></pre>
+      <pre class="c-kod" id="c-certreq" style="margin-top:10px"></pre>
+    </section>
+
+    <section class="arac-blok">
+      <h2 class="arac-h2"><span class="arac-no">4</span> Denetim</h2>
+      <div id="c-uyari"></div>
+    </section>
+  </div>
+
+  <script>
+    const el = (s) => document.querySelector(s);
+
+    function sanListesi() {
+      return el('#c-san').value.split('\n').map((s) => s.trim()).filter(Boolean);
+    }
+    const ipMi = (s) => /^\d{1,3}(\.\d{1,3}){3}$/.test(s);
+
+    function uret() {
+      const cn = el('#c-cn').value.trim();
+      const o = el('#c-o').value.trim();
+      const ou = el('#c-ou').value.trim();
+      const l = el('#c-l').value.trim();
+      const st = el('#c-st').value.trim();
+      const c = el('#c-c').value.trim().toUpperCase();
+      const dosya = (el('#c-dosya').value.trim() || 'istek').replace(/[^\w.-]/g, '');
+      const [anahtarTur, anahtarDeger] = el('#c-anahtar').value.split(':');
+      const sanlar = sanListesi();
+
+      el('#c-cnfAd').textContent = `${dosya}.cnf`;
+
+      /* --- openssl yapılandırması ------------------------------------------- */
+      const sanSatirlari = sanlar
+        .map((s, i) => (ipMi(s) ? `IP.${i + 1} = ${s}` : `DNS.${i + 1} = ${s}`))
+        .join('\n');
+
+      el('#c-cnf').textContent = `[req]
+default_bits       = ${anahtarTur === 'rsa' ? anahtarDeger : '2048'}
+prompt             = no
+default_md         = sha256
+distinguished_name = dn
+req_extensions     = uzantilar
+
+[dn]
+CN = ${cn}
+O  = ${o}
+OU = ${ou}
+L  = ${l}
+ST = ${st}
+C  = ${c}
+
+[uzantilar]
+subjectAltName = @adlar
+keyUsage = digitalSignature, keyEncipherment
+extendedKeyUsage = serverAuth
+
+[adlar]
+${sanSatirlari}`;
+
+      /* --- komutlar ---------------------------------------------------------- */
+      const anahtarKomut =
+        anahtarTur === 'rsa'
+          ? `openssl genrsa -out ${dosya}.key ${anahtarDeger}`
+          : `openssl ecparam -name ${anahtarDeger} -genkey -noout -out ${dosya}.key`;
+
+      el('#c-komut').textContent = `${anahtarKomut}
+openssl req -new -key ${dosya}.key -out ${dosya}.csr -config ${dosya}.cnf`;
+
+      el('#c-dogrula').textContent = `openssl req -in ${dosya}.csr -noout -text | findstr /i "Subject: DNS: Signature"`;
+
+      /* --- certreq INF -------------------------------------------------------- */
+      const dnMetin = [`CN=${cn}`, o && `O=${o}`, ou && `OU=${ou}`, l && `L=${l}`, st && `S=${st}`, c && `C=${c}`]
+        .filter(Boolean)
+        .join(', ');
+      const infSan = sanlar.map((s) => `_continue_ = "${ipMi(s) ? 'ipaddress' : 'dns'}=${s}&"`).join('\n');
+
+      el('#c-inf').textContent = `[Version]
+Signature = "$Windows NT$"
+
+[NewRequest]
+Subject = "${dnMetin}"
+KeyLength = ${anahtarTur === 'rsa' ? anahtarDeger : 256}
+KeyAlgorithm = ${anahtarTur === 'rsa' ? 'RSA' : 'ECDSA_P256'}
+HashAlgorithm = SHA256
+Exportable = TRUE
+MachineKeySet = TRUE
+KeyUsage = 0xa0
+ProviderName = "Microsoft RSA SChannel Cryptographic Provider"
+RequestType = PKCS10
+
+[Extensions]
+2.5.29.17 = "{text}"
+${infSan}
+
+[EnhancedKeyUsageExtension]
+OID = 1.3.6.1.5.5.7.3.1`;
+
+      el('#c-certreq').textContent = `certreq -new istek.inf ${dosya}.csr`;
+
+      /* --- denetim ------------------------------------------------------------ */
+      const uyarilar = [];
+      if (cn && !sanlar.includes(cn)) {
+        uyarilar.push({
+          sinif: 'kotu',
+          metin:
+            `<b>CN (${cn}) SAN listesinde yok.</b> Modern tarayıcılar yalnızca SAN alanına bakar; ` +
+            'CN eşleşse bile sertifika reddedilir. En sık yapılan CSR hatası budur.',
+        });
+      }
+      if (c.length !== 2) {
+        uyarilar.push({ sinif: 'kotu', metin: 'Ülke kodu iki harf olmalı (TR, DE, US). Uzun yazım sertifika otoritesince reddedilir.' });
+      }
+      if (anahtarTur === 'rsa' && +anahtarDeger < 2048) {
+        uyarilar.push({ sinif: 'kotu', metin: '2048 bitin altındaki RSA anahtarları kabul edilmiyor.' });
+      }
+      if (sanlar.some((s) => s.startsWith('*.'))) {
+        uyarilar.push({
+          sinif: 'uyari',
+          metin:
+            'Joker (wildcard) ad var. Tek bir özel anahtarın çalınması tüm alt alan adlarını etkiler; ' +
+            'ayrıca joker yalnızca bir seviyeyi kapsar: <code>*.ornek.com</code>, <code>a.b.ornek.com</code> için geçerli değildir.',
+        });
+      }
+      if (sanlar.some(ipMi)) {
+        uyarilar.push({
+          sinif: 'uyari',
+          metin: 'SAN listesinde IP adresi var. Genel sertifika otoriteleri çoğu zaman IP için sertifika vermez; iç PKI için sorun değildir.',
+        });
+      }
+      if (!sanlar.length) {
+        uyarilar.push({ sinif: 'kotu', metin: 'SAN listesi boş: bu istekle üretilen sertifika hiçbir tarayıcıda kabul edilmez.' });
+      }
+      uyarilar.push({
+        sinif: 'iyi',
+        metin:
+          '<b>Özel anahtarı (<code>.key</code>) kimseye göndermeyin.</b> Sertifika otoritesine yalnızca ' +
+          '<code>.csr</code> dosyası gider. Anahtar kaybolursa sertifika işe yaramaz; yedekleyin ve erişimi kısıtlayın.',
+      });
+
+      el('#c-uyari').innerHTML = uyarilar
+        .map((u) => `<div class="arac-kutu ${u.sinif}" style="margin-bottom:10px">${u.metin}</div>`)
+        .join('');
+    }
+
+    document
+      .querySelectorAll('#c-cn, #c-o, #c-ou, #c-l, #c-st, #c-c, #c-san, #c-anahtar, #c-dosya')
+      .forEach((d) => d.addEventListener('input', uret));
+
+    el('#c-kopya').addEventListener('click', async (e) => {
+      const metin = `# ${el('#c-cnfAd').textContent}\n${el('#c-cnf').textContent}\n\n# komutlar\n${el('#c-komut').textContent}\n${el('#c-dogrula').textContent}`;
+      await navigator.clipboard.writeText(metin);
+      e.currentTarget.textContent = 'Kopyalandı';
+      setTimeout(() => (e.currentTarget.textContent = 'Komutları kopyala'), 1600);
+    });
+
+    uret();
+  </script>
+
+  <style>
+    .c-h3 {
+      font-size: 14px;
+      margin: 16px 0 6px;
+      color: var(--ink-soft);
+    }
+    .c-h3:first-of-type {
+      margin-top: 0;
+    }
+    .c-kod {
+      margin: 0;
+      padding: 13px 15px;
+      background: var(--navy);
+      color: #f2f5ff;
+      border-radius: var(--r-s);
+      font-size: 13px;
+      line-height: 1.55;
+      overflow-x: auto;
+      white-space: pre-wrap;
+      word-break: break-word;
+    }
+  </style>
+</Base>

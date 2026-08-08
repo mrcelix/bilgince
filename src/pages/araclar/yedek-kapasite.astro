@@ -1,0 +1,242 @@
+---
+import Base from '../../layouts/Base.astro';
+---
+
+<Base
+  baslik="Yedekleme kapasitesi planlayıcı"
+  aciklama="Veri boyutu, değişim oranı ve saklama politikasından gereken yedek deposu kapasitesini hesaplar; günlük, haftalık, aylık ve yıllık kopyaların payını ayrı ayrı gösterir."
+  aramaya={true}
+  kategori="Araç"
+>
+  <div class="arama-bas">
+    <div class="kap">
+      <nav class="kirinti" aria-label="Kırıntı yolu" style="padding-top:0">
+        <a href="/">Ana sayfa</a><span class="ayrac">/</span><a href="/araclar">Araçlar</a><span
+          class="ayrac">/</span
+        ><span aria-current="page">Yedek kapasitesi</span>
+      </nav>
+      <h1>Yedekleme kapasitesi planlayıcı</h1>
+      <p style="color:var(--muted);font-size:14px;margin-top:8px;max-width:64ch">
+        "Ne kadar disk alalım?" sorusunun cevabı veri boyutunda değil, <strong>saklama
+        politikasında</strong> saklıdır. Politikayı girin, gereken alan çıksın.
+      </p>
+    </div>
+  </div>
+
+  <div class="kap arac-sayfa">
+    <section class="arac-blok">
+      <h2 class="arac-h2"><span class="arac-no">1</span> Veri</h2>
+      <div class="arac-alanlar">
+        <label class="arac-alan"
+          >Yedeklenecek veri (TB)
+          <input id="y-veri" type="number" min="0.1" step="0.5" value="5" />
+        </label>
+        <label class="arac-alan"
+          >Günlük değişim oranı (%)
+          <span class="arac-kaydirac">
+            <input id="y-degisim" type="range" min="1" max="20" step="1" value="3" />
+            <output for="y-degisim" id="y-degisim-deger">3</output>
+          </span>
+        </label>
+        <label class="arac-alan"
+          >Sıkıştırma + tekilleştirme kazancı (%)
+          <span class="arac-kaydirac">
+            <input id="y-kazanc" type="range" min="0" max="80" step="5" value="50" />
+            <output for="y-kazanc" id="y-kazanc-deger">50</output>
+          </span>
+        </label>
+        <label class="arac-alan"
+          >Yıllık veri büyümesi (%)
+          <span class="arac-kaydirac">
+            <input id="y-buyume" type="range" min="0" max="60" step="5" value="20" />
+            <output for="y-buyume" id="y-buyume-deger">20</output>
+          </span>
+        </label>
+      </div>
+    </section>
+
+    <section class="arac-blok">
+      <h2 class="arac-h2"><span class="arac-no">2</span> Saklama politikası (GFS)</h2>
+      <div class="arac-alanlar">
+        <label class="arac-alan"
+          >Günlük kopya
+          <input id="y-gunluk" type="number" min="0" max="90" value="14" />
+        </label>
+        <label class="arac-alan"
+          >Haftalık kopya
+          <input id="y-haftalik" type="number" min="0" max="52" value="4" />
+        </label>
+        <label class="arac-alan"
+          >Aylık kopya
+          <input id="y-aylik" type="number" min="0" max="36" value="12" />
+        </label>
+        <label class="arac-alan"
+          >Yıllık kopya
+          <input id="y-yillik" type="number" min="0" max="10" value="2" />
+        </label>
+      </div>
+      <div class="arac-onaylar">
+        <label class="arac-onay"
+          ><input type="checkbox" id="y-sentetik" checked />
+          <span>Sentetik tam yedek (günlükler artımlı tutulur)</span></label
+        >
+      </div>
+      <p class="arac-not">
+        Sentetik kipte günlük kopyalar yalnızca değişimi tutar; haftalık, aylık ve yıllık kopyalar
+        tam boyuttadır. Kapalıyken her kopya tam yedek sayılır — geleneksel kaset düzeni budur.
+      </p>
+    </section>
+
+    <section class="arac-blok">
+      <h2 class="arac-h2"><span class="arac-no">3</span> Gereken kapasite</h2>
+      <output class="arac-cikti" id="y-cikti"></output>
+      <table class="y-tablo" id="y-dagilim" style="margin-top:16px"></table>
+      <div id="y-uyari" style="margin-top:16px"></div>
+    </section>
+
+    <section class="arac-blok">
+      <h2 class="arac-h2"><span class="arac-no">4</span> Kapasite tek başına yetmez</h2>
+      <div class="arac-kutu">
+        <ul style="margin:0">
+          <li><b>3-2-1:</b> üç kopya, iki farklı ortam, biri dışarıda. Bu hesap tek bir deponun kapasitesidir; ikinci kopyanın yerini ayrıca planlayın.</li>
+          <li><b>Değişmezlik (immutability).</b> Fidye yazılımının ilk hedefi yedeklerdir. Silinemeyen kopya olmadan kapasite planı, saldırgana ne kadar veri sunduğunuzu ölçmekten ibarettir.</li>
+          <li><b>Geri dönüş süresi.</b> 5 TB'ı yazmak, okumaktan yavaştır. Kurtarma süresini <a href="/araclar/aktarim-suresi">aktarım süresi hesaplayıcıyla</a> ayrıca ölçün.</li>
+          <li><b>Tekilleştirme oranı garanti değildir.</b> Sanal makine imajlarında yüksektir; şifreli, sıkıştırılmış ya da medya ağırlıklı verilerde neredeyse sıfırdır.</li>
+        </ul>
+      </div>
+    </section>
+  </div>
+
+  <script>
+    const el = (s) => document.querySelector(s);
+    const sayi = (n, b = 1) => new Intl.NumberFormat('tr-TR', { maximumFractionDigits: b }).format(n);
+
+    function hesapla() {
+      const veri = +el('#y-veri').value;
+      const degisim = +el('#y-degisim').value / 100;
+      const kazanc = +el('#y-kazanc').value / 100;
+      const buyume = +el('#y-buyume').value / 100;
+      const gunluk = +el('#y-gunluk').value;
+      const haftalik = +el('#y-haftalik').value;
+      const aylik = +el('#y-aylik').value;
+      const yillik = +el('#y-yillik').value;
+      const sentetik = el('#y-sentetik').checked;
+
+      for (const [k, g] of [['#y-degisim', '#y-degisim-deger'], ['#y-kazanc', '#y-kazanc-deger'], ['#y-buyume', '#y-buyume-deger']]) {
+        el(g).textContent = el(k).value;
+      }
+      if (!veri) return;
+
+      const carpan = 1 - kazanc;
+      const tam = veri * carpan;
+      const artimli = veri * degisim * carpan;
+
+      // İlk tam kopya her zaman vardır; sentetik kipte günlükler yalnızca değişim
+      const ilkTam = tam;
+      const gunlukAlan = sentetik ? gunluk * artimli : gunluk * tam;
+      const haftalikAlan = haftalik * tam;
+      const aylikAlan = aylik * tam;
+      const yillikAlan = yillik * tam;
+
+      const toplam = ilkTam + gunlukAlan + haftalikAlan + aylikAlan + yillikAlan;
+      const birYilSonra = toplam * (1 + buyume);
+      const ucYilSonra = toplam * Math.pow(1 + buyume, 3);
+
+      el('#y-cikti').textContent = `${sayi(toplam)} TB — bugünkü ihtiyaç · ${sayi(ucYilSonra)} TB — üç yıl sonra`;
+
+      const satirlar = [
+        ['Temel tam kopya', ilkTam, '1 adet'],
+        ['Günlük kopyalar', gunlukAlan, `${gunluk} adet${sentetik ? ' (artımlı)' : ' (tam)'}`],
+        ['Haftalık kopyalar', haftalikAlan, `${haftalik} adet (tam)`],
+        ['Aylık kopyalar', aylikAlan, `${aylik} adet (tam)`],
+        ['Yıllık kopyalar', yillikAlan, `${yillik} adet (tam)`],
+        ['TOPLAM (bugün)', toplam, ''],
+        ['Bir yıl sonra', birYilSonra, `%${el('#y-buyume').value} büyüme ile`],
+        ['Üç yıl sonra', ucYilSonra, ''],
+      ];
+
+      el('#y-dagilim').innerHTML = satirlar
+        .map(
+          ([ad, deger, not], i) =>
+            `<tr${i === 5 ? ' class="vurgu"' : ''}><th>${ad}</th><td>${sayi(deger)} TB</td><td>${not}</td></tr>`
+        )
+        .join('');
+
+      /* --- uyarılar --------------------------------------------------------- */
+      const uyarilar = [];
+      const enEskiGun = gunluk + haftalik * 7 + aylik * 30 + yillik * 365;
+      uyarilar.push({
+        sinif: 'iyi',
+        metin: `Bu politikayla en eski kurtarma noktanız yaklaşık <b>${Math.round(enEskiGun / 30)} ay</b> öncesine gidiyor.`,
+      });
+
+      if (!sentetik && gunluk > 7) {
+        uyarilar.push({
+          sinif: 'uyari',
+          metin: `${gunluk} günlük <b>tam</b> kopya çok yer tutuyor. Artımlı/sentetik tam yedeğe geçmek kapasiteyi ${sayi((gunluk * tam - gunluk * artimli))} TB azaltır.`,
+        });
+      }
+      if (kazanc >= 0.6) {
+        uyarilar.push({
+          sinif: 'uyari',
+          metin: '%60 üstü tekilleştirme kazancı yalnızca çok sayıda benzer sanal makinede görülür. Satın alma kararını bu varsayıma dayandırmayın.',
+        });
+      }
+      if (gunluk < 7) {
+        uyarilar.push({
+          sinif: 'uyari',
+          metin: `Günlük kopya sayısı ${gunluk}. Fidye yazılımı ortalama olarak fark edilene kadar günlerce sessiz kalır; ${gunluk} günlük geçmiş yetmeyebilir.`,
+        });
+      }
+      if (yillik === 0 && aylik < 12) {
+        uyarilar.push({
+          sinif: 'uyari',
+          metin: 'Bir yıldan eski kurtarma noktası yok. Yasal saklama yükümlülüğünüz varsa bu politika onu karşılamıyor.',
+        });
+      }
+      uyarilar.push({
+        sinif: 'iyi',
+        metin: `Depoyu <b>%75 doluluk</b> üstünde çalıştırmayın: ${sayi(toplam / 0.75)} TB'lık bir alanla bugünkü politika rahat çalışır.`,
+      });
+
+      el('#y-uyari').innerHTML = uyarilar
+        .map((u) => `<div class="arac-kutu ${u.sinif}" style="margin-bottom:10px">${u.metin}</div>`)
+        .join('');
+    }
+
+    document
+      .querySelectorAll('#y-veri, #y-degisim, #y-kazanc, #y-buyume, #y-gunluk, #y-haftalik, #y-aylik, #y-yillik, #y-sentetik')
+      .forEach((d) => d.addEventListener('input', hesapla));
+    hesapla();
+  </script>
+
+  <style>
+    .y-tablo {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 14.5px;
+    }
+    .y-tablo :is(th, td) {
+      text-align: left;
+      padding: 9px 10px;
+      border-bottom: 1px solid var(--line);
+    }
+    .y-tablo th {
+      color: var(--ink-soft);
+      font-weight: 700;
+      width: 42%;
+    }
+    .y-tablo td {
+      font-family: var(--mono);
+      font-size: 14px;
+    }
+    .y-tablo tr.vurgu {
+      background: var(--tint);
+      font-weight: 800;
+    }
+    .y-tablo tr.vurgu th,
+    .y-tablo tr.vurgu td {
+      color: var(--indigo-d);
+    }
+  </style>
+</Base>

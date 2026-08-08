@@ -144,6 +144,54 @@
     "cevrimici": false
   },
   {
+    "slug": "ip-plani",
+    "ad": "IP planı ve VLAN tahsisi",
+    "ozet": "Ana ağı ihtiyaca göre alt ağlara böler (VLSM); ağ geçidi ve DHCP kapsamı önerir.",
+    "ikon": "dugum",
+    "etiket": "yeni",
+    "cevrimici": false
+  },
+  {
+    "slug": "csr-uretec",
+    "ad": "Sertifika isteği (CSR) üreteci",
+    "ozet": "openssl komutu, yapılandırma dosyası ve Windows certreq INF içeriği; SAN denetimiyle.",
+    "ikon": "kalkan",
+    "etiket": "yeni",
+    "cevrimici": false
+  },
+  {
+    "slug": "metin-farki",
+    "ad": "Metin ve yapılandırma farkı",
+    "ozet": "İki çıktıyı satır satır karşılaştırır: ne eklendi, ne silindi, ne değişmedi.",
+    "ikon": "akis",
+    "etiket": "yeni",
+    "cevrimici": false
+  },
+  {
+    "slug": "yedek-kapasite",
+    "ad": "Yedek kapasitesi planlayıcı",
+    "ozet": "Saklama politikasından gereken depolama; günlük, haftalık, aylık ve yıllık kopyaların payı.",
+    "ikon": "kutu",
+    "etiket": "yeni",
+    "cevrimici": false
+  },
+  {
+    "slug": "guvenlik-basliklari",
+    "ad": "HTTP güvenlik başlığı denetleyicisi",
+    "ozet": "HSTS, CSP, nosniff ve diğerlerini puanlar; sürüm sızdıran başlıkları işaretler.",
+    "ikon": "kalkan",
+    "etiket": "yeni",
+    "cevrimici": true
+  },
+  {
+    "slug": "dns-sorgula",
+    "ad": "DNS kayıt sorgulayıcı",
+    "ozet": "A, MX, TXT, NS, SOA, CAA kayıtlarını DNS-over-HTTPS ile sorgular; eksikleri söyler.",
+    "ikon": "kure",
+    "etiket": "yeni",
+    "cevrimici": true
+  },
+  {
     "slug": "paylasim-karti",
     "ad": "Paylaşım kartı üreteci",
     "ozet": "Bir adresin temasını okuyup sosyal medya görselleri üretir; 14 stil, dört boyut.",

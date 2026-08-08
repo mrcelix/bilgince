@@ -1,0 +1,279 @@
+---
+import Base from '../../layouts/Base.astro';
+---
+
+<Base
+  baslik="Metin ve yapılandırma farkı"
+  aciklama="İki metni satır satır karşılaştırır: neyin eklendiğini, neyin silindiğini ve neyin değişmediğini gösterir. Yapılandırma dosyalarını ve komut çıktılarını karşılaştırmak için."
+  aramaya={true}
+  kategori="Araç"
+>
+  <div class="arama-bas">
+    <div class="kap">
+      <nav class="kirinti" aria-label="Kırıntı yolu" style="padding-top:0">
+        <a href="/">Ana sayfa</a><span class="ayrac">/</span><a href="/araclar">Araçlar</a><span
+          class="ayrac">/</span
+        ><span aria-current="page">Metin farkı</span>
+      </nav>
+      <h1>Metin ve yapılandırma farkı</h1>
+      <p style="color:var(--muted);font-size:14px;margin-top:8px;max-width:64ch">
+        "Çalışan sunucuda ne farklı?" sorusunun en hızlı cevabı iki çıktıyı yan yana koymaktır.
+        Karşılaştırma tarayıcıda yapılır; yapılandırma dosyanız hiçbir yere gitmez.
+      </p>
+    </div>
+  </div>
+
+  <div class="kap arac-sayfa">
+    <section class="arac-blok">
+      <h2 class="arac-h2"><span class="arac-no">1</span> İki metin</h2>
+      <div class="f-ikili">
+        <div class="arac-alan">
+          <label for="f-sol">Önceki / çalışan</label>
+          <textarea id="f-sol" rows="12" spellcheck="false"></textarea>
+        </div>
+        <div class="arac-alan">
+          <label for="f-sag">Sonraki / bozuk</label>
+          <textarea id="f-sag" rows="12" spellcheck="false"></textarea>
+        </div>
+      </div>
+      <div class="arac-onaylar">
+        <label class="arac-onay"><input type="checkbox" id="f-bosluk" checked /> <span>Baştaki/sondaki boşluğu yok say</span></label>
+        <label class="arac-onay"><input type="checkbox" id="f-buyukKucuk" /> <span>Büyük/küçük harf ayrımı yapma</span></label>
+        <label class="arac-onay"><input type="checkbox" id="f-ayni" /> <span>Değişmeyen satırları da göster</span></label>
+      </div>
+      <div class="arac-dugmeler">
+        <button type="button" class="dg arac-ikincil" id="f-ornek">Örnek doldur</button>
+        <button type="button" class="dg arac-ikincil" id="f-temizle">Temizle</button>
+      </div>
+    </section>
+
+    <section class="arac-blok">
+      <h2 class="arac-h2"><span class="arac-no">2</span> Fark</h2>
+      <div class="arac-olcum" id="f-ozet"></div>
+      <div class="f-cikti" id="f-cikti"></div>
+      <div class="arac-dugmeler">
+        <button type="button" class="dg arac-ikincil" id="f-kopya">Farkı kopyala</button>
+      </div>
+    </section>
+
+    <section class="arac-blok">
+      <h2 class="arac-h2"><span class="arac-no">3</span> Nerede işe yarar</h2>
+      <div class="arac-kutu">
+        <ul style="margin:0">
+          <li><b>Çalışan ve çalışmayan sunucu.</b> Aynı komutu ikisinde çalıştırıp çıktıları karşılaştırın: <code>Get-Service | Out-String</code>, <code>ipconfig /all</code>, <code>gpresult /r</code>.</li>
+          <li><b>Değişiklik öncesi ve sonrası.</b> Bir ayarı değiştirmeden önce çıktıyı alın; sonra alın. Fark, gerçekten neyin değiştiğini gösterir — sizin değiştirdiğinizi sandığınızı değil.</li>
+          <li><b>Yapılandırma dosyaları.</b> web.config, nginx.conf, hosts, kayıt defteri dışa aktarımları.</li>
+          <li><b>Envanter listeleri.</b> Dün kurulu olanla bugün kurulu olan yazılım listesi.</li>
+        </ul>
+      </div>
+      <p class="arac-not">
+        PowerShell'de aynı işin yerel karşılığı: <code>Compare-Object (Get-Content a.txt) (Get-Content b.txt)</code>
+      </p>
+    </section>
+  </div>
+
+  <script>
+    const el = (s) => document.querySelector(s);
+    const kacir = (m) => String(m).replace(/[<>&]/g, (c) => ({ '<': '&lt;', '>': '&gt;', '&': '&amp;' })[c]);
+
+    const ORNEK_SOL = `RequireSecuritySignature : True
+EnableSMB1Protocol      : False
+EncryptData             : True
+MaxThreadsPerQueue      : 20
+AutoShareServer         : True`;
+
+    const ORNEK_SAG = `RequireSecuritySignature : False
+EnableSMB1Protocol      : True
+EncryptData             : True
+MaxThreadsPerQueue      : 20
+AutoShareServer         : True
+AuditSmb1Access         : False`;
+
+    /** Satır bazlı en uzun ortak alt dizi — klasik dinamik programlama. */
+    function fark(solSatirlar, sagSatirlar, normalle) {
+      const n = solSatirlar.length;
+      const m = sagSatirlar.length;
+      const sol = solSatirlar.map(normalle);
+      const sag = sagSatirlar.map(normalle);
+
+      // Bellek için tek boyutlu değil, satır satır tablo tutuyoruz (n,m ≤ 2000)
+      const tablo = Array.from({ length: n + 1 }, () => new Uint32Array(m + 1));
+      for (let i = n - 1; i >= 0; i--) {
+        for (let j = m - 1; j >= 0; j--) {
+          tablo[i][j] = sol[i] === sag[j] ? tablo[i + 1][j + 1] + 1 : Math.max(tablo[i + 1][j], tablo[i][j + 1]);
+        }
+      }
+
+      const sonuc = [];
+      let i = 0;
+      let j = 0;
+      while (i < n && j < m) {
+        if (sol[i] === sag[j]) {
+          sonuc.push({ tur: 'ayni', metin: solSatirlar[i], solNo: i + 1, sagNo: j + 1 });
+          i++;
+          j++;
+        } else if (tablo[i + 1][j] >= tablo[i][j + 1]) {
+          sonuc.push({ tur: 'silindi', metin: solSatirlar[i], solNo: i + 1 });
+          i++;
+        } else {
+          sonuc.push({ tur: 'eklendi', metin: sagSatirlar[j], sagNo: j + 1 });
+          j++;
+        }
+      }
+      while (i < n) sonuc.push({ tur: 'silindi', metin: solSatirlar[i], solNo: ++i });
+      while (j < m) sonuc.push({ tur: 'eklendi', metin: sagSatirlar[j], sagNo: ++j });
+      return sonuc;
+    }
+
+    function hesapla() {
+      const solHam = el('#f-sol').value;
+      const sagHam = el('#f-sag').value;
+      const cikti = el('#f-cikti');
+
+      if (!solHam && !sagHam) {
+        cikti.innerHTML = '<p class="arac-not" style="margin:0">İki metni doldurun ya da örnek düğmesine basın.</p>';
+        el('#f-ozet').innerHTML = '';
+        return;
+      }
+
+      const bosluk = el('#f-bosluk').checked;
+      const harf = el('#f-buyukKucuk').checked;
+      const normalle = (s) => {
+        let m = s;
+        if (bosluk) m = m.trim().replace(/\s+/g, ' ');
+        if (harf) m = m.toLocaleLowerCase('tr');
+        return m;
+      };
+
+      const solSatirlar = solHam.split('\n');
+      const sagSatirlar = sagHam.split('\n');
+
+      if (solSatirlar.length > 2000 || sagSatirlar.length > 2000) {
+        cikti.innerHTML = '<div class="arac-kutu kotu">Metinler 2000 satırdan uzun. Karşılaştırmak istediğiniz bölümü ayırıp yeniden deneyin.</div>';
+        return;
+      }
+
+      const sonuc = fark(solSatirlar, sagSatirlar, normalle);
+      const eklendi = sonuc.filter((s) => s.tur === 'eklendi').length;
+      const silindi = sonuc.filter((s) => s.tur === 'silindi').length;
+      const ayni = sonuc.filter((s) => s.tur === 'ayni').length;
+
+      el('#f-ozet').innerHTML = `
+        <span>Değişmeyen: <b>${ayni}</b></span>
+        <span style="color:var(--green-ink)">Eklenen: <b>${eklendi}</b></span>
+        <span style="color:var(--clay-ink)">Silinen: <b>${silindi}</b></span>
+        <span>Toplam fark: <b>${eklendi + silindi}</b></span>`;
+
+      const hepsi = el('#f-ayni').checked;
+      const gosterilecek = hepsi ? sonuc : sonuc.filter((s) => s.tur !== 'ayni');
+
+      if (!gosterilecek.length) {
+        cikti.innerHTML = '<div class="arac-kutu iyi">İki metin birebir aynı.</div>';
+        cikti.dataset.metin = '';
+        return;
+      }
+
+      cikti.innerHTML = gosterilecek
+        .map((s) => {
+          const isaret = s.tur === 'eklendi' ? '+' : s.tur === 'silindi' ? '−' : ' ';
+          const no = s.tur === 'eklendi' ? s.sagNo : s.solNo;
+          return `<div class="f-satir ${s.tur}"><span class="f-no">${no ?? ''}</span><span class="f-isaret">${isaret}</span><span class="f-metin">${kacir(s.metin) || '&nbsp;'}</span></div>`;
+        })
+        .join('');
+
+      cikti.dataset.metin = gosterilecek
+        .map((s) => `${s.tur === 'eklendi' ? '+' : s.tur === 'silindi' ? '-' : ' '} ${s.metin}`)
+        .join('\n');
+    }
+
+    ['#f-sol', '#f-sag', '#f-bosluk', '#f-buyukKucuk', '#f-ayni'].forEach((s) =>
+      el(s).addEventListener('input', hesapla)
+    );
+
+    el('#f-ornek').addEventListener('click', () => {
+      el('#f-sol').value = ORNEK_SOL;
+      el('#f-sag').value = ORNEK_SAG;
+      hesapla();
+    });
+    el('#f-temizle').addEventListener('click', () => {
+      el('#f-sol').value = '';
+      el('#f-sag').value = '';
+      hesapla();
+    });
+    el('#f-kopya').addEventListener('click', async (e) => {
+      await navigator.clipboard.writeText(el('#f-cikti').dataset.metin ?? '');
+      e.currentTarget.textContent = 'Kopyalandı';
+      setTimeout(() => (e.currentTarget.textContent = 'Farkı kopyala'), 1600);
+    });
+
+    hesapla();
+  </script>
+
+  <style>
+    .f-ikili {
+      display: grid;
+      gap: 14px;
+      grid-template-columns: 1fr;
+    }
+    @media (min-width: 820px) {
+      .f-ikili {
+        grid-template-columns: 1fr 1fr;
+      }
+    }
+    .f-ikili textarea {
+      font-family: var(--mono);
+      font-size: 13px;
+      line-height: 1.55;
+    }
+    .f-cikti {
+      margin-top: 14px;
+      border: 1px solid var(--line);
+      border-radius: var(--r-s);
+      overflow: auto;
+      max-height: 60vh;
+      background: var(--paper);
+    }
+    .f-satir {
+      display: flex;
+      font-family: var(--mono);
+      font-size: 13px;
+      line-height: 1.6;
+      border-bottom: 1px solid color-mix(in srgb, var(--line) 60%, transparent);
+    }
+    .f-no {
+      flex: none;
+      width: 3.4rem;
+      text-align: right;
+      padding: 2px 8px;
+      color: var(--muted);
+      font-size: 11.5px;
+      background: var(--bg);
+      user-select: none;
+    }
+    .f-isaret {
+      flex: none;
+      width: 1.6rem;
+      text-align: center;
+      padding: 2px 0;
+      font-weight: 700;
+      user-select: none;
+    }
+    .f-metin {
+      padding: 2px 10px 2px 2px;
+      white-space: pre-wrap;
+      word-break: break-word;
+    }
+    .f-satir.eklendi {
+      background: color-mix(in srgb, var(--green) 10%, var(--paper));
+    }
+    .f-satir.eklendi .f-isaret {
+      color: var(--green-ink);
+    }
+    .f-satir.silindi {
+      background: color-mix(in srgb, var(--clay) 10%, var(--paper));
+    }
+    .f-satir.silindi .f-isaret {
+      color: var(--clay-ink);
+    }
+  </style>
+</Base>

@@ -1,0 +1,279 @@
+---
+import Base from '../../layouts/Base.astro';
+---
+
+<Base
+  baslik="HTTP güvenlik başlığı denetleyicisi"
+  aciklama="Bir sitenin HSTS, CSP, X-Content-Type-Options ve diğer güvenlik başlıklarını denetler; eksikleri, zayıf ayarları ve bilgi sızdıran başlıkları puanlayarak listeler."
+  aramaya={true}
+  kategori="Araç"
+>
+  <div class="arama-bas">
+    <div class="kap">
+      <nav class="kirinti" aria-label="Kırıntı yolu" style="padding-top:0">
+        <a href="/">Ana sayfa</a><span class="ayrac">/</span><a href="/araclar">Araçlar</a><span
+          class="ayrac">/</span
+        ><span aria-current="page">Güvenlik başlıkları</span>
+      </nav>
+      <h1>HTTP güvenlik başlığı denetleyicisi</h1>
+      <p style="color:var(--muted);font-size:14px;margin-top:8px;max-width:64ch">
+        Güvenlik başlıkları, tek satırlık yapılandırmayla kapatılan gerçek saldırı yollarıdır.
+        Adresi girin: hangisi var, hangisi zayıf, hangisi eksik.
+      </p>
+    </div>
+  </div>
+
+  <div class="kap arac-sayfa">
+    <section class="arac-blok">
+      <h2 class="arac-h2"><span class="arac-no">1</span> Adres</h2>
+      <form id="b-form" class="arac-alanlar" style="align-items:end">
+        <label class="arac-alan"
+          >Denetlenecek adres
+          <input id="b-adres" type="text" inputmode="url" spellcheck="false" placeholder="ornek.com — https:// gerekmez" required />
+        </label>
+        <button type="submit" class="dg" id="b-btn" style="height:40px">Denetle</button>
+      </form>
+      <p class="arac-durum" id="b-durum" role="status" aria-live="polite"></p>
+    </section>
+
+    <section class="arac-blok" id="b-sonuc-blok" hidden>
+      <h2 class="arac-h2"><span class="arac-no">2</span> Sonuç</h2>
+      <output class="arac-cikti" id="b-puan"></output>
+      <div class="arac-olcer" id="b-olcer" data-guc="zayif"><i style="width:0%"></i></div>
+      <div id="b-liste" style="margin-top:18px"></div>
+    </section>
+
+    <section class="arac-blok">
+      <h2 class="arac-h2"><span class="arac-no">3</span> Başlıklar ne işe yarar</h2>
+      <div class="arac-kutu">
+        <ul style="margin:0">
+          <li><b>HSTS</b> — tarayıcıya "bu siteye sadece HTTPS ile gel" der. Olmadan ilk istek http üzerinden gider ve araya girilebilir.</li>
+          <li><b>CSP</b> — hangi kaynaktan betik/stil yüklenebileceğini sınırlar. XSS'in etkisini sınırlayan tek gerçek katman.</li>
+          <li><b>X-Content-Type-Options: nosniff</b> — tarayıcının içerik türünü tahmin etmesini engeller. Tek satır, bedava kazanç.</li>
+          <li><b>X-Frame-Options</b> (ya da CSP <code>frame-ancestors</code>) — sitenizin başka bir sayfada çerçevelenip tıklama hırsızlığına alet edilmesini engeller.</li>
+          <li><b>Server / X-Powered-By</b> — sürüm bilgisi sızdırır. Saldırgana hangi açıkları deneyeceğini söylemenin gereği yok.</li>
+        </ul>
+      </div>
+      <p class="arac-not">
+        Bu araç yalnızca yanıt başlıklarına bakar; sitenin güvenli olduğunu ya da olmadığını söylemez.
+        Başlıklar kolay kazançtır — ama tek başına yeterli değildir.
+      </p>
+    </section>
+  </div>
+
+  <script>
+    const el = (s) => document.querySelector(s);
+    const kacir = (m) => String(m).replace(/[<>&]/g, (c) => ({ '<': '&lt;', '>': '&gt;', '&': '&amp;' })[c]);
+
+    /** Her denetim: puan (0–2), durum ve açıklama üretir. */
+    const DENETIMLER = [
+      {
+        ad: 'Strict-Transport-Security',
+        agirlik: 2,
+        denet: (b, v) => {
+          const h = b['strict-transport-security'];
+          if (!h) return { puan: 0, not: 'Yok. Tarayıcı ilk isteği http üzerinden yapabilir.' };
+          const yas = +(h.match(/max-age=(\d+)/)?.[1] ?? 0);
+          if (yas < 15768000) return { puan: 1, not: `max-age=${yas} — altı aydan kısa. En az 15768000 önerilir.` };
+          const alt = /includesubdomains/i.test(h);
+          return {
+            puan: 2,
+            not: `max-age ${Math.round(yas / 86400)} gün${alt ? ', alt alan adları dahil' : '; includeSubDomains eklenebilir'}.`,
+          };
+        },
+      },
+      {
+        ad: 'Content-Security-Policy',
+        agirlik: 2,
+        denet: (b) => {
+          const h = b['content-security-policy'];
+          const rapor = b['content-security-policy-report-only'];
+          if (!h && !rapor) return { puan: 0, not: 'Yok. XSS olduğunda etkisini sınırlayacak bir katman bulunmuyor.' };
+          if (!h && rapor) return { puan: 1, not: 'Yalnızca rapor kipinde: ihlalleri kaydeder, hiçbir şeyi engellemez.' };
+          const gevsek = /unsafe-inline|unsafe-eval/i.test(h);
+          const yildiz = /default-src[^;]*\*/i.test(h);
+          if (gevsek || yildiz) {
+            return { puan: 1, not: `Tanımlı ama gevşek (${gevsek ? "unsafe-inline/eval" : 'joker kaynak'}). Koruma değeri sınırlı.` };
+          }
+          return { puan: 2, not: 'Tanımlı ve unsafe yönergesi içermiyor.' };
+        },
+      },
+      {
+        ad: 'X-Content-Type-Options',
+        agirlik: 1,
+        denet: (b) => {
+          const h = b['x-content-type-options'];
+          return h && /nosniff/i.test(h)
+            ? { puan: 2, not: 'nosniff tanımlı.' }
+            : { puan: 0, not: 'Yok. Tek satırla eklenir: X-Content-Type-Options: nosniff' };
+        },
+      },
+      {
+        ad: 'Çerçeveleme koruması',
+        agirlik: 1,
+        denet: (b) => {
+          const xfo = b['x-frame-options'];
+          const csp = b['content-security-policy'] ?? '';
+          if (/frame-ancestors/i.test(csp)) return { puan: 2, not: "CSP'de frame-ancestors tanımlı (tercih edilen yol)." };
+          if (xfo) return { puan: /deny/i.test(xfo) ? 2 : 1, not: `X-Frame-Options: ${xfo}` };
+          return { puan: 0, not: 'Yok. Site başka bir sayfada çerçevelenebilir.' };
+        },
+      },
+      {
+        ad: 'Referrer-Policy',
+        agirlik: 1,
+        denet: (b) => {
+          const h = b['referrer-policy'];
+          if (!h) return { puan: 0, not: 'Yok. Adres bilgisi dış sitelere sızabilir.' };
+          return /no-referrer|strict-origin/i.test(h)
+            ? { puan: 2, not: h }
+            : { puan: 1, not: `${h} — strict-origin-when-cross-origin daha korumalı.` };
+        },
+      },
+      {
+        ad: 'Permissions-Policy',
+        agirlik: 1,
+        denet: (b) => {
+          const h = b['permissions-policy'];
+          return h
+            ? { puan: 2, not: h.length > 90 ? h.slice(0, 90) + '…' : h }
+            : { puan: 0, not: 'Yok. Kamera, mikrofon ve konum izinleri varsayılan davranışa bırakılmış.' };
+        },
+      },
+      {
+        ad: 'Sürüm bilgisi sızıntısı',
+        agirlik: 1,
+        denet: (b) => {
+          const sizan = ['server', 'x-powered-by', 'x-aspnet-version', 'x-aspnetmvc-version']
+            .filter((k) => b[k])
+            .map((k) => `${k}: ${b[k]}`);
+          if (!sizan.length) return { puan: 2, not: 'Sürüm bilgisi veren başlık yok.' };
+          const ayrintili = sizan.some((s) => /\d+\.\d+/.test(s));
+          return {
+            puan: ayrintili ? 0 : 1,
+            not: sizan.join(' · ') + (ayrintili ? ' — sürüm numarası açıkça yazıyor.' : ''),
+          };
+        },
+      },
+      {
+        ad: 'Çerez bayrakları',
+        agirlik: 1,
+        denet: (b) => {
+          const c = b['set-cookie'];
+          if (!c) return { puan: 2, not: 'Bu yanıtta çerez ayarlanmıyor.' };
+          const eksik = [];
+          if (!/httponly/i.test(c)) eksik.push('HttpOnly');
+          if (!/secure/i.test(c)) eksik.push('Secure');
+          if (!/samesite/i.test(c)) eksik.push('SameSite');
+          return eksik.length
+            ? { puan: eksik.length > 1 ? 0 : 1, not: `Eksik bayraklar: ${eksik.join(', ')}` }
+            : { puan: 2, not: 'HttpOnly, Secure ve SameSite tanımlı.' };
+        },
+      },
+    ];
+
+    el('#b-form').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const adres = el('#b-adres').value.trim();
+      const durum = el('#b-durum');
+      const btn = el('#b-btn');
+      if (!adres) return;
+
+      btn.disabled = true;
+      durum.className = 'arac-durum';
+      durum.textContent = 'Başlıklar okunuyor…';
+      el('#b-sonuc-blok').hidden = true;
+
+      try {
+        const cevap = await fetch('/api/guvenlik-basliklari?adres=' + encodeURIComponent(adres));
+        const veri = await cevap.json();
+        if (!cevap.ok) throw new Error(veri.hata ?? 'Denetlenemedi.');
+
+        const b = veri.basliklar ?? {};
+        const sonuclar = DENETIMLER.map((d) => ({ ...d, ...d.denet(b, veri) }));
+
+        const enCok = DENETIMLER.reduce((t, d) => t + d.agirlik * 2, 0);
+        const alinan = sonuclar.reduce((t, s) => t + s.puan * s.agirlik, 0);
+        const yuzde = Math.round((alinan / enCok) * 100);
+
+        el('#b-sonuc-blok').hidden = false;
+        el('#b-puan').textContent = `${veri.adres} — %${yuzde} (${alinan}/${enCok} puan)`;
+
+        const olcer = el('#b-olcer');
+        olcer.dataset.guc = yuzde >= 85 ? 'cok-guclu' : yuzde >= 60 ? 'guclu' : yuzde >= 35 ? 'orta' : 'zayif';
+        olcer.firstElementChild.style.width = Math.max(4, yuzde) + '%';
+
+        const rozet = (p) =>
+          p === 2 ? '<span class="b-rozet iyi">var</span>'
+          : p === 1 ? '<span class="b-rozet orta">zayıf</span>'
+          : '<span class="b-rozet yok">eksik</span>';
+
+        el('#b-liste').innerHTML =
+          (veri.https ? '' : '<div class="arac-kutu kotu" style="margin-bottom:12px">Site HTTPS üzerinden sunulmuyor. Diğer başlıkların çoğu bu durumda anlamsızdır.</div>') +
+          sonuclar
+            .map(
+              (s) => `<div class="b-satir">
+                <div>${rozet(s.puan)}</div>
+                <div><b>${s.ad}</b><span>${kacir(s.not)}</span></div>
+              </div>`
+            )
+            .join('');
+
+        durum.className = 'arac-durum ok';
+        durum.textContent = `HTTP ${veri.durum} · ${Object.keys(b).length} ilgili başlık okundu.`;
+      } catch (hata) {
+        durum.className = 'arac-durum hata';
+        durum.textContent = hata.message;
+      } finally {
+        btn.disabled = false;
+      }
+    });
+  </script>
+
+  <style>
+    .b-satir {
+      display: flex;
+      gap: 14px;
+      align-items: flex-start;
+      padding: 12px 0;
+      border-bottom: 1px solid var(--line);
+    }
+    .b-satir > div:first-child {
+      flex: none;
+      width: 4.6rem;
+    }
+    .b-satir b {
+      display: block;
+      font-size: 14.5px;
+    }
+    .b-satir span {
+      display: block;
+      font-size: 13px;
+      color: var(--muted);
+      line-height: 1.55;
+      margin-top: 3px;
+      word-break: break-word;
+    }
+    .b-rozet {
+      display: inline-block;
+      font-size: 11px;
+      font-weight: 800;
+      padding: 3px 9px;
+      border-radius: 999px;
+      text-transform: uppercase;
+      letter-spacing: 0.03em;
+    }
+    .b-rozet.iyi {
+      background: color-mix(in srgb, var(--green) 18%, var(--paper));
+      color: var(--green-ink);
+    }
+    .b-rozet.orta {
+      background: color-mix(in srgb, var(--amber) 26%, var(--paper));
+      color: var(--amber-ink);
+    }
+    .b-rozet.yok {
+      background: color-mix(in srgb, var(--clay) 18%, var(--paper));
+      color: var(--clay-ink);
+    }
+  </style>
+</Base>

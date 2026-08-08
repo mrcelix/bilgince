@@ -1,0 +1,87 @@
+---
+baslik: "Active Directory'de bir şeyler ters — nereden başlamalı"
+ozet: "Oturum açılmıyor, ilke gelmiyor, parola bir yerde geçerli diğerinde değil. Farklı belirtilerin altında genelde aynı üç şey var: çoğaltma, zaman, FSMO."
+konu: "windows-server"
+etiketler: ["active-directory", "cogaltma", "fsmo", "kerberos"]
+belirtiler:
+  - "Parolayı değiştirdim, bazı yerlerde eski parola geçerli"
+  - "Bazı kullanıcılar giremiyor"
+  - "Grup üyeliği bazı sunucularda görünmüyor"
+  - "Devraldığım ortamın sağlığını bilmiyorum"
+yayin: 2026-08-09
+sure: 6
+dosya: "/araclar/ad-saglik-kontrol.ps1"
+dosyaAdi: "ad-saglik-kontrol.ps1"
+dosyaAciklama: "Denetleyici envanteri, çoğaltma hataları, FSMO rol sahipleri ve erişilebilirlikleri, SYSVOL/DFSR durumu, zaman hiyerarşisi, çöp kutusu, işlevsel seviyeler ve ayrıcalıklı grup üyeliklerini tek raporda toplar."
+komut: "repadmin /replsummary"
+platform: "windows"
+ilgiliRehberler: []
+sira: 24
+---
+
+Active Directory bozulduğunda kimse "AD bozuk" demez. Şikâyetler dağınık gelir: biri giremiyor, biri paylaşımı göremiyor, bir sunucuda ilke eski. Bu dağınıklığın altında genelde **üç şeyden biri** vardır.
+
+## 1. Çoğaltma
+
+Denetleyiciler birbirine yazamıyorsa, yaptığınız değişiklik yalnızca bir makinede geçerlidir. Belirti tam olarak budur: **"bir yerde oluyor, bir yerde olmuyor."**
+
+```powershell
+repadmin /replsummary
+repadmin /showrepl * /csv | ConvertFrom-Csv | Where-Object { $_.'Number of Failures' -gt 0 }
+```
+
+Çoğaltma günlerce durabilir ve kimse fark etmez — ta ki bir kullanıcı parolasını değiştirip başka bir binada oturum açmaya çalışana kadar.
+
+**Tombstone süresi** (varsayılan 180 gün) aşılırsa denetleyici artık kendiliğinden katılamaz; temiz kurulum gerekir. Bu yüzden çoğaltma hatası "sonra bakarım" işi değildir.
+
+## 2. Zaman
+
+Kerberos, beş dakikadan büyük saat farkını reddeder. Parola doğru olsa bile bilet alınamaz ve kullanıcı "parolam kabul edilmiyor" der.
+
+Hiyerarşi tektir ve şöyledir:
+
+1. **PDC öykünücüsü** dış bir NTP kaynağına bağlanır
+2. Diğer denetleyiciler PDC'den alır
+3. Üye sunucular ve istemciler denetleyicilerden alır
+
+```powershell
+w32tm /query /source
+w32tm /query /computer:PDCADI /source
+```
+
+PDC'nin kaynağı **"Local CMOS Clock"** görünüyorsa tüm etki alanı yavaşça kayıyor demektir.
+
+## 3. FSMO rolleri
+
+Beş rol tek tek makinelerde durur ve hepsinin farklı bir etkisi vardır. En kritiği **PDC öykünücüsüdür**: hesap kilitleri, parola değişiklikleri, zaman kaynağı ve grup ilkesi düzenleme varsayılanı ondadır.
+
+```powershell
+netdom query fsmo
+```
+
+Rolü taşıyan makine kapalıysa bazı işlemler çalışır, bazıları çalışmaz — ve hangisinin hangisi olduğu ilk bakışta anlaşılmaz.
+
+## Devralınan bir ortamda ilk gün
+
+Betiği çalıştırıp şu beş şeyi not edin:
+
+1. Kaç denetleyici var, hangileri genel katalog
+2. Çoğaltma temiz mi
+3. FSMO rolleri kimde ve o makineler ayakta mı
+4. PDC dış zaman kaynağına bağlı mı
+5. **AD çöp kutusu açık mı** — kapalıysa açın; silinen bir nesneyi geri almanın kolay yolu budur ve açmanın riski yoktur
+
+## Doğrulama
+
+Düzelttikten sonra çoğaltmayı zorlayın ve sonucu görün:
+
+```powershell
+repadmin /syncall /AdeP
+repadmin /replsummary
+```
+
+Özet tablosunda **"largest delta"** sütununun makul (dakikalar) olduğunu görmeden iş bitmemiştir.
+
+## İzleme
+
+Bu betiği ayda bir çalıştırıp çıktısını saklayın. AD sorunlarının çoğu, aylar önce başlamış ve fark edilmemiş bir çoğaltma hatasının sonucudur; iki rapor arasındaki fark, sebebi tek bakışta gösterir.
