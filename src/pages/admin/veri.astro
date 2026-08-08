@@ -1,0 +1,244 @@
+---
+import Yonetim from '../../layouts/Yonetim.astro';
+import { dizinListele, dosyaOku } from '../../admin/depo';
+
+export const prerender = false;
+
+const SABIT = [
+  {
+    yol: 'src/data/ayarlar.json',
+    ad: 'Site ayarları',
+    aciklama: 'Site adı, adres, yazar bilgileri, bülten ve popüler aramalar. Alan adı değişirse canonical, OG ve site haritası da onu izler.',
+  },
+  {
+    yol: 'src/data/menu.json',
+    ad: 'Menü ve altlık',
+    aciklama:
+      'kumeler: Konular menüsündeki grup başlıkları (her konunun "grup" alanı buraya bağlanır). altlik: sayfa altındaki bağlantı sütunları.',
+  },
+  {
+    yol: 'src/data/araclar.json',
+    ad: 'Araç kütüğü',
+    aciklama:
+      'Araçlar menüsü ve /araclar dizini bu listeden üretilir. slug, sayfanın adresidir: /araclar/<slug>. ikon: akis, bulut, dugum, geri, kalkan, kure, kutu, pencere, sunucu, terminal.',
+  },
+];
+
+const url = Astro.url;
+const secili = url.searchParams.get('dosya') ?? SABIT[0].yol;
+
+let konular: string[] = [];
+try {
+  konular = (await dizinListele('src/data/konu')).filter((a) => a.endsWith('.json'));
+} catch {
+  konular = [];
+}
+
+const tumDosyalar = [
+  ...SABIT,
+  ...konular.map((k) => ({
+    yol: `src/data/konu/${k}`,
+    ad: `Konu: ${k.replace('.json', '')}`,
+    aciklama:
+      "Kategori tanımı. Dosya adı slug'dır: /konu/&lt;dosya adı&gt;. Menüdeki yeri &quot;grup&quot; alanından gelir.",
+  })),
+];
+
+const dosya = tumDosyalar.find((d) => d.yol === secili) ?? tumDosyalar[0];
+
+let icerik = '';
+let hata: string | null = null;
+try {
+  icerik = (await dosyaOku(dosya.yol)).icerik;
+} catch (e) {
+  hata = e instanceof Error ? e.message : 'Dosya okunamadı.';
+}
+---
+
+<Yonetim baslik="Veri">
+  <section class="y-blok">
+    <h2>Menü, konu, araç ve ayarlar</h2>
+    <p style="color:var(--muted);font-size:13.5px;margin:0 0 16px">
+      Sitenin yapısını belirleyen dosyalar. Kaydetmeden önce biçim denetlenir; bozuk JSON
+      kaydedilmez.
+    </p>
+    <div class="y-liste">
+      {
+        tumDosyalar.map((d) => (
+          <a class="y-satir" href={`/admin/veri?dosya=${encodeURIComponent(d.yol)}`}
+             style={d.yol === dosya.yol ? 'background:var(--tint)' : ''}>
+            <b>{d.ad}</b>
+            <code>{d.yol.replace('src/data/', '')}</code>
+          </a>
+        ))
+      }
+    </div>
+  </section>
+
+  <section class="y-blok">
+    <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:8px">
+      <h2 style="margin:0;flex:1">{dosya.ad}</h2>
+      <code style="font-size:12px;color:var(--muted)">{dosya.yol}</code>
+    </div>
+    <p style="color:var(--muted);font-size:13px;margin:0 0 14px" set:html={dosya.aciklama}></p>
+
+    {hata && <div class="y-kutu kotu" style="margin-bottom:14px">{hata}</div>}
+
+    <div class="y-alan">
+      <label for="v-icerik">JSON içeriği</label>
+      <textarea id="v-icerik" rows="24" spellcheck="false">{icerik}</textarea>
+    </div>
+
+    <div class="y-dugmeler">
+      <button type="button" class="y-dg" id="v-kaydet">Kaydet</button>
+      <button type="button" class="y-dg ikincil" id="v-bicimle">Biçimlendir</button>
+    </div>
+    <p class="y-durum" id="v-durum" style="margin-top:12px" role="status" aria-live="polite"></p>
+  </section>
+
+  <section class="y-blok">
+    <h2>Yeni konu ekle</h2>
+    <p style="color:var(--muted);font-size:13.5px;margin:0 0 14px">
+      Yeni bir kategori, <code>src/data/konu/</code> altına bir dosya eklemektir. Menü, konu
+      sayfası, OG kartı ve arşiv sayaçları kendiliğinden oluşur.
+    </p>
+    <div class="y-ikili">
+      <div class="y-alan">
+        <label for="k-slug">Slug (adres)</label>
+        <input id="k-slug" type="text" spellcheck="false" placeholder="kubernetes" />
+      </div>
+      <div class="y-alan">
+        <label for="k-ad">Görünen ad</label>
+        <input id="k-ad" type="text" placeholder="Kubernetes" />
+      </div>
+      <div class="y-alan">
+        <label for="k-grup">Grup</label>
+        <input id="k-grup" type="text" placeholder="Bulut" />
+      </div>
+      <div class="y-alan">
+        <label for="k-ikon">İkon</label>
+        <select id="k-ikon">
+          {['sunucu', 'bulut', 'terminal', 'kalkan', 'dugum', 'kure', 'kutu', 'pencere', 'akis', 'geri'].map((i) => (
+            <option value={i}>{i}</option>
+          ))}
+        </select>
+      </div>
+    </div>
+    <div class="y-alan">
+      <label for="k-ozet">Özet</label>
+      <input id="k-ozet" type="text" placeholder="Konteyner orkestrasyonu, operasyon gözüyle" />
+    </div>
+    <div class="y-dugmeler">
+      <button type="button" class="y-dg ikincil" id="k-ekle">Konuyu oluştur</button>
+    </div>
+    <p class="y-durum" id="k-durum" style="margin-top:12px" role="status" aria-live="polite"></p>
+  </section>
+
+  <script define:vars={{ yol: dosya.yol, ad: dosya.ad }}>
+    (() => {
+      const el = (s) => document.querySelector(s);
+      const durum = el('#v-durum');
+      const alan = el('#v-icerik');
+
+      const dogrula = () => {
+        try {
+          JSON.parse(alan.value);
+          return null;
+        } catch (e) {
+          return e.message;
+        }
+      };
+
+      alan.addEventListener('input', () => {
+        const hata = dogrula();
+        durum.className = 'y-durum' + (hata ? ' hata' : '');
+        durum.textContent = hata ? 'JSON hatası: ' + hata : '';
+      });
+
+      el('#v-bicimle').addEventListener('click', () => {
+        const hata = dogrula();
+        if (hata) {
+          durum.className = 'y-durum hata';
+          durum.textContent = 'Önce JSON hatasını düzeltin: ' + hata;
+          return;
+        }
+        alan.value = JSON.stringify(JSON.parse(alan.value), null, 2) + '\n';
+        durum.className = 'y-durum ok';
+        durum.textContent = 'Biçimlendirildi.';
+      });
+
+      el('#v-kaydet').addEventListener('click', async (e) => {
+        const hata = dogrula();
+        if (hata) {
+          durum.className = 'y-durum hata';
+          durum.textContent = 'Bozuk JSON kaydedilmez: ' + hata;
+          return;
+        }
+        const dugme = e.currentTarget;
+        dugme.disabled = true;
+        durum.className = 'y-durum';
+        durum.textContent = 'Kaydediliyor…';
+        try {
+          const cevap = await fetch('/api/admin/dosya', {
+            method: 'PUT',
+            headers: { 'content-type': 'application/json' },
+            body: JSON.stringify({ yol, icerik: alan.value, mesaj: `${ad} güncellendi` }),
+          });
+          const sonuc = await cevap.json();
+          if (!cevap.ok) throw new Error(sonuc.hata ?? 'Kaydedilemedi.');
+          durum.className = 'y-durum ok';
+          durum.textContent =
+            (sonuc.commit ? `Kaydedildi (commit ${sonuc.commit}). ` : 'Kaydedildi. ') + (sonuc.not ?? '');
+        } catch (h) {
+          durum.className = 'y-durum hata';
+          durum.textContent = h.message;
+        } finally {
+          dugme.disabled = false;
+        }
+      });
+
+      /* --- yeni konu ------------------------------------------------------- */
+      el('#k-ekle').addEventListener('click', async (e) => {
+        const kDurum = el('#k-durum');
+        const slug = el('#k-slug').value.trim().toLowerCase().replace(/[^a-z0-9-]/g, '-');
+        const kAd = el('#k-ad').value.trim();
+        if (!slug || !kAd) {
+          kDurum.className = 'y-durum hata';
+          kDurum.textContent = 'Slug ve ad zorunlu.';
+          return;
+        }
+        const govde = {
+          ad: kAd,
+          ozet: el('#k-ozet').value.trim(),
+          grup: el('#k-grup').value.trim(),
+          ikon: el('#k-ikon').value,
+          sira: 99,
+          oneCikan: false,
+        };
+        e.currentTarget.disabled = true;
+        kDurum.className = 'y-durum';
+        kDurum.textContent = 'Oluşturuluyor…';
+        try {
+          const cevap = await fetch('/api/admin/dosya', {
+            method: 'PUT',
+            headers: { 'content-type': 'application/json' },
+            body: JSON.stringify({
+              yol: `src/data/konu/${slug}.json`,
+              icerik: JSON.stringify(govde, null, 2) + '\n',
+              mesaj: `Konu eklendi: ${kAd}`,
+            }),
+          });
+          const sonuc = await cevap.json();
+          if (!cevap.ok) throw new Error(sonuc.hata ?? 'Oluşturulamadı.');
+          kDurum.className = 'y-durum ok';
+          kDurum.textContent = 'Konu oluşturuldu. Sayfa yenileniyor…';
+          setTimeout(() => (location.href = `/admin/veri?dosya=src/data/konu/${slug}.json`), 900);
+        } catch (h) {
+          kDurum.className = 'y-durum hata';
+          kDurum.textContent = h.message;
+          e.currentTarget.disabled = false;
+        }
+      });
+    })();
+  </script>
+</Yonetim>

@@ -1,7 +1,7 @@
 import type { APIRoute } from 'astro';
 import { guvenliGetir, metniOku } from '../../guvenli-adres';
 
-// Keystatic gibi bu uç da sunucu tarafında çalışmalı: hedef siteyi tarayıcıdan
+// Bu uç sunucu tarafında çalışmalı: hedef siteyi tarayıcıdan
 // çekmek CORS'a takılır, ayrıca SSRF denetimini istemciye bırakamayız.
 // Adres doğrulama ve güvenli getirme src/guvenli-adres.ts içinde; site görüntüsü
 // ucu da aynı katmanı kullanıyor.

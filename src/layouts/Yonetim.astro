@@ -1,0 +1,301 @@
+---
+import '../styles/global.css';
+import { yerelMi } from '../admin/depo';
+
+interface Props {
+  baslik: string;
+  /** Giriş sayfasında üst çubuk gösterilmez */
+  cikis?: boolean;
+}
+
+const { baslik, cikis = true } = Astro.props;
+const oturum = Astro.locals.oturum;
+const yol = Astro.url.pathname;
+
+const menu = [
+  { adres: '/admin', ad: 'Gösterge' },
+  { adres: '/admin/icerik/rehberler', ad: 'Rehberler' },
+  { adres: '/admin/icerik/ipuclari', ad: 'İpuçları' },
+  { adres: '/admin/icerik/komutlar', ad: 'Komutlar' },
+  { adres: '/admin/icerik/cozumler', ad: 'Çözümler' },
+  { adres: '/admin/icerik/projeler', ad: 'Portfolyo' },
+  { adres: '/admin/veri', ad: 'Menü, konu, araç, ayarlar' },
+];
+---
+
+<!doctype html>
+<html lang="tr">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>{baslik} · bilgince yönetim</title>
+    <meta name="robots" content="noindex, nofollow" />
+    <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
+  </head>
+  <body class="y-govde">
+    {
+      cikis && (
+        <header class="y-bas">
+          <div class="y-kap">
+            <a class="y-logo" href="/admin">bilgince <span>yönetim</span></a>
+            <nav class="y-gez">
+              {menu.map((m) => (
+                <a href={m.adres} aria-current={yol === m.adres ? 'page' : undefined}>
+                  {m.ad}
+                </a>
+              ))}
+            </nav>
+            <span class="y-sag">
+              {yerelMi() && <span class="y-rozet">yerel kip</span>}
+              <span class="y-eposta">{oturum?.eposta}</span>
+              <a class="y-cikis" href="/api/admin/cikis">Çıkış</a>
+            </span>
+          </div>
+        </header>
+      )
+    }
+
+    <main class="y-kap y-icerik">
+      <slot />
+    </main>
+
+    <style is:global>
+      .y-govde {
+        background: var(--bg);
+        color: var(--ink);
+        margin: 0;
+        min-height: 100vh;
+      }
+      .y-kap {
+        max-width: 1120px;
+        margin: 0 auto;
+        padding: 0 20px;
+      }
+      .y-bas {
+        background: var(--navy);
+        color: #fff;
+        position: sticky;
+        top: 0;
+        z-index: 20;
+      }
+      .y-bas .y-kap {
+        display: flex;
+        align-items: center;
+        gap: 18px;
+        flex-wrap: wrap;
+        min-height: 56px;
+      }
+      .y-logo {
+        font-weight: 900;
+        font-size: 16px;
+        color: #fff;
+        text-decoration: none;
+        letter-spacing: -0.02em;
+      }
+      .y-logo span {
+        font-weight: 500;
+        opacity: 0.6;
+      }
+      .y-gez {
+        display: flex;
+        gap: 2px;
+        flex-wrap: wrap;
+        margin-right: auto;
+      }
+      .y-gez a {
+        color: rgba(255, 255, 255, 0.74);
+        text-decoration: none;
+        font-size: 13px;
+        font-weight: 700;
+        padding: 6px 10px;
+        border-radius: 7px;
+      }
+      .y-gez a:hover {
+        background: rgba(255, 255, 255, 0.1);
+        color: #fff;
+      }
+      .y-gez a[aria-current='page'] {
+        background: rgba(255, 255, 255, 0.16);
+        color: #fff;
+      }
+      .y-sag {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        font-size: 12.5px;
+      }
+      .y-eposta {
+        color: rgba(255, 255, 255, 0.66);
+      }
+      .y-rozet {
+        background: var(--amber);
+        color: #241a05;
+        font-weight: 800;
+        font-size: 11px;
+        padding: 2px 8px;
+        border-radius: 999px;
+      }
+      .y-cikis {
+        color: #fff;
+        text-decoration: none;
+        border: 1px solid rgba(255, 255, 255, 0.28);
+        border-radius: 7px;
+        padding: 4px 10px;
+        font-weight: 700;
+      }
+      .y-icerik {
+        padding: 26px 20px 70px;
+        display: grid;
+        gap: 22px;
+      }
+      .y-blok {
+        background: var(--paper);
+        border: 1px solid var(--line);
+        border-radius: var(--r-l);
+        padding: 22px;
+      }
+      .y-blok h2 {
+        font-size: 17px;
+        margin: 0 0 14px;
+      }
+      .y-alan {
+        display: grid;
+        gap: 6px;
+        margin-bottom: 14px;
+        font-size: 13px;
+        font-weight: 700;
+        color: var(--ink-soft);
+      }
+      .y-alan :is(input, textarea, select) {
+        font: inherit;
+        font-weight: 400;
+        padding: 9px 11px;
+        border: 1px solid var(--line);
+        border-radius: var(--r-s);
+        background: var(--bg);
+        width: 100%;
+      }
+      .y-alan textarea {
+        font-family: var(--mono);
+        font-size: 13px;
+        line-height: 1.6;
+        resize: vertical;
+      }
+      .y-alan small {
+        font-weight: 400;
+        color: var(--muted);
+      }
+      .y-ikili {
+        display: grid;
+        gap: 16px;
+        grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+      }
+      .y-dugmeler {
+        display: flex;
+        gap: 10px;
+        flex-wrap: wrap;
+        align-items: center;
+      }
+      .y-dg {
+        font: inherit;
+        font-weight: 800;
+        font-size: 14px;
+        padding: 10px 18px;
+        border-radius: var(--r-s);
+        border: 0;
+        background: var(--indigo);
+        color: #fff;
+        cursor: pointer;
+        text-decoration: none;
+        display: inline-block;
+      }
+      .y-dg[disabled] {
+        opacity: 0.55;
+        cursor: progress;
+      }
+      .y-dg.ikincil {
+        background: var(--paper);
+        color: var(--indigo-d);
+        border: 1px solid var(--indigo);
+      }
+      .y-dg.tehlike {
+        background: var(--paper);
+        color: var(--clay-ink);
+        border: 1px solid var(--clay);
+      }
+      .y-durum {
+        font-size: 13px;
+        color: var(--muted);
+        min-height: 1.2em;
+      }
+      .y-durum.ok {
+        color: var(--green-ink);
+      }
+      .y-durum.hata {
+        color: var(--clay-ink);
+      }
+      .y-liste {
+        display: grid;
+        gap: 1px;
+        background: var(--line);
+        border: 1px solid var(--line);
+        border-radius: var(--r-s);
+        overflow: hidden;
+      }
+      .y-satir {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        padding: 11px 14px;
+        background: var(--paper);
+        text-decoration: none;
+        color: inherit;
+      }
+      .y-satir:hover {
+        background: var(--tint);
+      }
+      .y-satir b {
+        font-size: 14.5px;
+        flex: 1;
+        min-width: 0;
+      }
+      .y-satir code {
+        font-size: 12px;
+        color: var(--muted);
+      }
+      .y-etiket {
+        font-size: 11px;
+        font-weight: 800;
+        padding: 2px 8px;
+        border-radius: 999px;
+        background: var(--tint);
+        color: var(--indigo-d);
+        white-space: nowrap;
+      }
+      .y-etiket.taslak {
+        background: color-mix(in srgb, var(--amber) 24%, var(--paper));
+        color: var(--amber-ink);
+      }
+      .y-kutu {
+        border: 1px solid var(--line);
+        border-radius: var(--r-m);
+        padding: 14px 16px;
+        font-size: 13.5px;
+        line-height: 1.6;
+        background: var(--bg);
+      }
+      .y-kutu.iyi {
+        border-color: color-mix(in srgb, var(--green) 40%, var(--line));
+        background: color-mix(in srgb, var(--green) 8%, var(--paper));
+      }
+      .y-kutu.uyari {
+        border-color: color-mix(in srgb, var(--amber) 50%, var(--line));
+        background: color-mix(in srgb, var(--amber) 10%, var(--paper));
+      }
+      .y-kutu.kotu {
+        border-color: color-mix(in srgb, var(--clay) 45%, var(--line));
+        background: color-mix(in srgb, var(--clay) 8%, var(--paper));
+      }
+    </style>
+  </body>
+</html>

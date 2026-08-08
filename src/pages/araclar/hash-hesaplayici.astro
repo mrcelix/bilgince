@@ -1,0 +1,278 @@
+---
+import Base from '../../layouts/Base.astro';
+---
+
+<Base
+  baslik="Özet (hash) hesaplayıcı ve doğrulayıcı"
+  aciklama="Metin ve dosyaların SHA-256, SHA-384, SHA-512 özetini hesaplar; beklenen özetle karşılaştırıp indirmenin bozulup bozulmadığını söyler. Dosya tarayıcıdan çıkmaz."
+  aramaya={true}
+  kategori="Araç"
+>
+  <div class="arama-bas">
+    <div class="kap">
+      <nav class="kirinti" aria-label="Kırıntı yolu" style="padding-top:0">
+        <a href="/">Ana sayfa</a><span class="ayrac">/</span><a href="/araclar">Araçlar</a><span
+          class="ayrac">/</span
+        ><span aria-current="page">Özet hesaplayıcı</span>
+      </nav>
+      <h1>Özet (hash) hesaplayıcı ve doğrulayıcı</h1>
+      <p style="color:var(--muted);font-size:14px;margin-top:8px;max-width:64ch">
+        İndirdiğiniz ISO ya da kurulum dosyasının bozulmadığını doğrulamanın tek yolu özetini
+        karşılaştırmaktır. Dosya buraya yüklenmez; okuma da hesap da tarayıcıda yapılır.
+      </p>
+    </div>
+  </div>
+
+  <div class="kap arac-sayfa">
+    <section class="arac-blok">
+      <h2 class="arac-h2"><span class="arac-no">1</span> Dosya</h2>
+      <div id="h-birak" class="h-birak">
+        <p><b>Dosyayı buraya sürükleyin</b> ya da seçin</p>
+        <label class="dg" style="cursor:pointer">
+          Dosya seç
+          <input type="file" id="h-dosya" hidden />
+        </label>
+        <p class="arac-not" style="margin-top:10px">
+          Büyük dosyalar parça parça okunur; 4 GB'lık bir ISO da hesaplanabilir, yalnızca sürer.
+        </p>
+      </div>
+      <div class="arac-olcer" id="h-olcer" hidden data-guc="cok-guclu"><i style="width:0%"></i></div>
+      <p class="arac-durum" id="h-durum" role="status" aria-live="polite"></p>
+    </section>
+
+    <section class="arac-blok">
+      <h2 class="arac-h2"><span class="arac-no">2</span> Metin</h2>
+      <div class="arac-alan">
+        <label for="h-metin">Özeti alınacak metin</label>
+        <textarea id="h-metin" rows="3" spellcheck="false" placeholder="metin girin…" style="font-family:var(--mono);font-size:13px"></textarea>
+      </div>
+    </section>
+
+    <section class="arac-blok" id="h-sonuc-blok" hidden>
+      <h2 class="arac-h2"><span class="arac-no">3</span> Özetler</h2>
+      <p class="arac-not" style="margin-top:0" id="h-kaynak"></p>
+      <table class="h-tablo" id="h-sonuc"></table>
+    </section>
+
+    <section class="arac-blok">
+      <h2 class="arac-h2"><span class="arac-no">4</span> Beklenen özetle karşılaştır</h2>
+      <div class="arac-alan">
+        <label for="h-beklenen">Yayıncının verdiği özet (SHA-256/384/512)</label>
+        <input id="h-beklenen" type="text" spellcheck="false" placeholder="a1b2c3… (boşluk ve büyük/küçük harf önemli değil)" style="font-family:var(--mono);font-size:13px" />
+      </div>
+      <div id="h-karsilastir" style="margin-top:14px"></div>
+    </section>
+
+    <section class="arac-blok">
+      <h2 class="arac-h2"><span class="arac-no">5</span> Ne işe yarar, ne işe yaramaz</h2>
+      <div class="arac-kutu">
+        <ul style="margin:0">
+          <li><b>Bozulmayı yakalar.</b> Yarım inen, aktarımda bozulan ya da diskte çürüyen dosya farklı özet verir.</li>
+          <li><b>Kaynağı doğrulamaz.</b> Özeti de saldırgan yayınladıysa eşleşme bir şey kanıtlamaz; özeti dosyayla <em>aynı yerden</em> almayın.</li>
+          <li><b>MD5 ve SHA-1 kullanmayın.</b> Çakışma üretilebiliyor; bütünlük için SHA-256 alt sınırdır.</li>
+          <li><b>Windows'ta yerel karşılığı:</b> <code>Get-FileHash .\dosya.iso -Algorithm SHA256</code></li>
+        </ul>
+      </div>
+    </section>
+  </div>
+
+  <script>
+    const el = (s) => document.querySelector(s);
+    const ALGORITMALAR = ['SHA-256', 'SHA-384', 'SHA-512'];
+    let sonOzetler = {};
+
+    const onaltilik = (tampon) =>
+      [...new Uint8Array(tampon)].map((b) => b.toString(16).padStart(2, '0')).join('');
+
+    async function metinOzeti(metin) {
+      const veri = new TextEncoder().encode(metin);
+      const sonuc = {};
+      for (const alg of ALGORITMALAR) {
+        sonuc[alg] = onaltilik(await crypto.subtle.digest(alg, veri));
+      }
+      return sonuc;
+    }
+
+    /**
+     * Büyük dosyalar için akışlı okuma. Web Crypto parça parça özet alamadığı
+     * için dosyayı tek seferde belleğe alıyoruz; ilerleme çubuğu okuma
+     * aşamasını gösteriyor, hesap sonunda tek adımda yapılıyor.
+     */
+    async function dosyaOzeti(dosya) {
+      const olcer = el('#h-olcer');
+      const cubuk = olcer.firstElementChild;
+      olcer.hidden = false;
+      cubuk.style.width = '0%';
+
+      const parcalar = [];
+      const okuyucu = dosya.stream().getReader();
+      let okunan = 0;
+      while (true) {
+        const { done, value } = await okuyucu.read();
+        if (done) break;
+        parcalar.push(value);
+        okunan += value.length;
+        cubuk.style.width = Math.round((okunan / dosya.size) * 100) + '%';
+        el('#h-durum').textContent = `Okunuyor: %${Math.round((okunan / dosya.size) * 100)}`;
+      }
+
+      const tampon = new Uint8Array(okunan);
+      let konum = 0;
+      for (const p of parcalar) {
+        tampon.set(p, konum);
+        konum += p.length;
+      }
+
+      el('#h-durum').textContent = 'Özet hesaplanıyor…';
+      const sonuc = {};
+      for (const alg of ALGORITMALAR) {
+        sonuc[alg] = onaltilik(await crypto.subtle.digest(alg, tampon));
+      }
+      olcer.hidden = true;
+      return sonuc;
+    }
+
+    function ciz(ozetler, kaynak) {
+      sonOzetler = ozetler;
+      el('#h-sonuc-blok').hidden = false;
+      el('#h-kaynak').textContent = kaynak;
+      el('#h-sonuc').innerHTML = ALGORITMALAR.map(
+        (alg) => `<tr>
+          <th>${alg}</th>
+          <td><code>${ozetler[alg]}</code></td>
+          <td><button type="button" class="h-kopya" data-alg="${alg}">Kopyala</button></td>
+        </tr>`
+      ).join('');
+
+      el('#h-sonuc')
+        .querySelectorAll('.h-kopya')
+        .forEach((b) =>
+          b.addEventListener('click', async () => {
+            await navigator.clipboard.writeText(ozetler[b.dataset.alg]);
+            b.textContent = 'Kopyalandı';
+            setTimeout(() => (b.textContent = 'Kopyala'), 1500);
+          })
+        );
+      karsilastir();
+    }
+
+    function karsilastir() {
+      const beklenen = el('#h-beklenen').value.replace(/\s/g, '').toLowerCase();
+      const kap = el('#h-karsilastir');
+      if (!beklenen) {
+        kap.innerHTML = '';
+        return;
+      }
+      if (!Object.keys(sonOzetler).length) {
+        kap.innerHTML = '<div class="arac-kutu uyari">Önce bir dosya seçin ya da metin girin.</div>';
+        return;
+      }
+      const eslesen = ALGORITMALAR.find((alg) => sonOzetler[alg] === beklenen);
+      kap.innerHTML = eslesen
+        ? `<div class="arac-kutu iyi"><h3>Eşleşti (${eslesen})</h3>
+           <p style="margin:0">Dosya, yayıncının verdiği özetle birebir aynı. Bozulma yok.</p></div>`
+        : `<div class="arac-kutu kotu"><h3>EŞLEŞMEDİ</h3>
+           <p style="margin:0">Girilen özet hesaplananların hiçbirine uymuyor. Dosya eksik inmiş, bozulmuş
+           ya da beklenen özet başka bir sürüme ait olabilir. Kullanmadan önce yeniden indirin.</p></div>`;
+    }
+
+    /* olaylar --------------------------------------------------------------- */
+    el('#h-dosya').addEventListener('change', async (e) => {
+      const dosya = e.target.files?.[0];
+      if (!dosya) return;
+      el('#h-durum').className = 'arac-durum';
+      const basla = performance.now();
+      const ozetler = await dosyaOzeti(dosya);
+      const sure = ((performance.now() - basla) / 1000).toFixed(1);
+      ciz(ozetler, `${dosya.name} · ${(dosya.size / 1048576).toFixed(1)} MB · ${sure} saniyede hesaplandı`);
+      el('#h-durum').className = 'arac-durum ok';
+      el('#h-durum').textContent = 'Hesaplandı.';
+    });
+
+    const birak = el('#h-birak');
+    ['dragenter', 'dragover'].forEach((olay) =>
+      birak.addEventListener(olay, (e) => {
+        e.preventDefault();
+        birak.classList.add('uzerinde');
+      })
+    );
+    ['dragleave', 'drop'].forEach((olay) =>
+      birak.addEventListener(olay, (e) => {
+        e.preventDefault();
+        birak.classList.remove('uzerinde');
+      })
+    );
+    birak.addEventListener('drop', async (e) => {
+      const dosya = e.dataTransfer.files?.[0];
+      if (!dosya) return;
+      const ozetler = await dosyaOzeti(dosya);
+      ciz(ozetler, `${dosya.name} · ${(dosya.size / 1048576).toFixed(1)} MB`);
+    });
+
+    let zamanlayici;
+    el('#h-metin').addEventListener('input', () => {
+      clearTimeout(zamanlayici);
+      zamanlayici = setTimeout(async () => {
+        const metin = el('#h-metin').value;
+        if (!metin) return;
+        ciz(await metinOzeti(metin), `${metin.length} karakterlik metin`);
+      }, 200);
+    });
+
+    el('#h-beklenen').addEventListener('input', karsilastir);
+  </script>
+
+  <style>
+    .h-birak {
+      border: 2px dashed var(--line);
+      border-radius: var(--r-m);
+      padding: 28px 20px;
+      text-align: center;
+      background: var(--bg);
+      transition: border-color 0.15s ease, background 0.15s ease;
+    }
+    .h-birak.uzerinde {
+      border-color: var(--indigo);
+      background: var(--tint);
+    }
+    .h-birak p {
+      margin: 0 0 12px;
+      font-size: 14px;
+      color: var(--ink-soft);
+    }
+    .h-tablo {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 13px;
+    }
+    .h-tablo :is(th, td) {
+      text-align: left;
+      padding: 10px;
+      border-bottom: 1px solid var(--line);
+      vertical-align: top;
+    }
+    .h-tablo th {
+      width: 90px;
+      font-family: var(--mono);
+      color: var(--indigo-d);
+      white-space: nowrap;
+    }
+    .h-tablo code {
+      word-break: break-all;
+      font-size: 12.5px;
+      line-height: 1.6;
+    }
+    .h-kopya {
+      font: inherit;
+      font-size: 12px;
+      font-weight: 700;
+      padding: 4px 11px;
+      border-radius: 999px;
+      border: 1px solid var(--indigo);
+      background: var(--paper);
+      color: var(--indigo-d);
+      cursor: pointer;
+      white-space: nowrap;
+    }
+  </style>
+</Base>

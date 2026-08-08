@@ -4,3 +4,8 @@ dist/
 .vercel/
 .DS_Store
 *.log
+
+# Ortam değişkenleri: Google istemci sırrı ve GitHub jetonu buraya yazılır
+.env
+.env.*
+!.env.example

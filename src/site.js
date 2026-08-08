@@ -1,4 +1,4 @@
-// Site verisi artık src/data/*.json içinde tutuluyor; admin paneli (Keystatic)
+// Site verisi src/data/*.json içinde tutuluyor; yönetim paneli (/admin)
 // bu dosyaları düzenliyor. Buradaki dışa aktarımlar sayfaların kullandığı
 // arayüzü koruyor, böylece panel eklendiğinde hiçbir sayfa değişmedi.
 import ayarlar from './data/ayarlar.json';

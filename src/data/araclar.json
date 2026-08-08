@@ -1,0 +1,114 @@
+[
+  {
+    "slug": "parola",
+    "ad": "Parola üreteci",
+    "ozet": "Kriptografik rastgelelikle parola ve Türkçe geçiş cümlesi; entropi ve kırılma süresi yanında.",
+    "ikon": "kalkan",
+    "etiket": "yeni",
+    "cevrimici": false
+  },
+  {
+    "slug": "sizinti-kontrol",
+    "ad": "Parola sızıntı kontrolü",
+    "ozet": "Parolanız sızıntı veri tabanında geçiyor mu? Yalnızca özetin ilk 5 hanesi sorulur.",
+    "ikon": "kalkan",
+    "etiket": "yeni",
+    "cevrimici": true
+  },
+  {
+    "slug": "wifi-qr",
+    "ad": "Wi-Fi QR kod üreteci",
+    "ozet": "Misafir ağı için taranabilir QR ve yazdırılabilir kart; QR tarayıcıda üretilir.",
+    "ikon": "kure",
+    "etiket": "yeni",
+    "cevrimici": false
+  },
+  {
+    "slug": "alt-ag-hesaplayici",
+    "ad": "Alt ağ hesaplayıcı",
+    "ozet": "CIDR'den ağ, yayın, aralık ve host sayısı; ağı eşit alt ağlara böler.",
+    "ikon": "dugum",
+    "etiket": "yeni",
+    "cevrimici": false
+  },
+  {
+    "slug": "eposta-guvenlik-kayitlari",
+    "ad": "SPF, DKIM, DMARC üreteci",
+    "ozet": "E-posta sahteciliğine karşı üç kaydı üretir; SPF sorgu sınırını sayar, politika sırasını önerir.",
+    "ikon": "kalkan",
+    "etiket": "yeni",
+    "cevrimici": false
+  },
+  {
+    "slug": "robocopy-uretec",
+    "ad": "Robocopy komut üreteci",
+    "ozet": "Senaryoya göre komutu kurar, her anahtarı açıklar ve /MIR'in neyi sildiğini söyler.",
+    "ikon": "terminal",
+    "etiket": "yeni",
+    "cevrimici": false
+  },
+  {
+    "slug": "cron-cozumleyici",
+    "ad": "Cron ifadesi çözümleyici",
+    "ozet": "İfadeyi Türkçeye çevirir, sonraki çalışma zamanlarını listeler, Zamanlanmış Görev karşılığını verir.",
+    "ikon": "pencere",
+    "etiket": "yeni",
+    "cevrimici": false
+  },
+  {
+    "slug": "sertifika-okuyucu",
+    "ad": "Sertifika okuyucu",
+    "ozet": "PEM içeriğini okur: süre, kapsanan adlar, anahtar boyu, imza algoritması ve zayıflık uyarıları.",
+    "ikon": "kalkan",
+    "etiket": "yeni",
+    "cevrimici": false
+  },
+  {
+    "slug": "base64-jwt",
+    "ad": "Base64 ve JWT çözücü",
+    "ozet": "Base64, URL kodu ve JWT belirteçlerini çözer; süre ve imza alanlarını ayrı gösterir.",
+    "ikon": "terminal",
+    "etiket": "yeni",
+    "cevrimici": false
+  },
+  {
+    "slug": "raid-hesaplayici",
+    "ad": "RAID kapasite hesaplayıcı",
+    "ozet": "Kullanılabilir kapasite, tolere edilen arıza, yazma cezası ve yeniden yapılandırma süresi.",
+    "ikon": "kutu",
+    "etiket": "yeni",
+    "cevrimici": false
+  },
+  {
+    "slug": "aktarim-suresi",
+    "ad": "Aktarım süresi hesaplayıcı",
+    "ozet": "Veri ve hat hızından gerçekçi süre; yedekleme penceresine sığıyor mu, sığmıyorsa hangi hat gerekir.",
+    "ikon": "akis",
+    "etiket": "yeni",
+    "cevrimici": false
+  },
+  {
+    "slug": "zaman-cevirici",
+    "ad": "Zaman damgası çevirici",
+    "ozet": "Unix, ISO 8601 ve yerel saat arasında çevirir; iki zaman arasındaki farkı hesaplar.",
+    "ikon": "pencere",
+    "etiket": "yeni",
+    "cevrimici": false
+  },
+  {
+    "slug": "hash-hesaplayici",
+    "ad": "Özet (hash) hesaplayıcı",
+    "ozet": "Dosya ve metnin SHA-256/384/512 özeti; yayıncının verdiği özetle karşılaştırır.",
+    "ikon": "kalkan",
+    "etiket": "yeni",
+    "cevrimici": false
+  },
+  {
+    "slug": "paylasim-karti",
+    "ad": "Paylaşım kartı üreteci",
+    "ozet": "Bir adresin temasını okuyup sosyal medya görselleri üretir; 14 stil, dört boyut.",
+    "ikon": "kutu",
+    "etiket": "",
+    "cevrimici": true
+  }
+]

@@ -1,0 +1,341 @@
+---
+import Yonetim from '../../layouts/Yonetim.astro';
+import { koleksiyonBul, frontmatterAyir } from '../../admin/icerik';
+import { dosyaOku } from '../../admin/depo';
+
+export const prerender = false;
+
+const url = Astro.url;
+const koleksiyonSlug = url.searchParams.get('koleksiyon') ?? '';
+const ad = url.searchParams.get('ad');
+const yeni = url.searchParams.get('yeni') === '1';
+
+const koleksiyon = koleksiyonBul(koleksiyonSlug);
+if (!koleksiyon) return Astro.redirect('/admin');
+
+let yaml = '';
+let govde = '';
+let hata: string | null = null;
+
+if (ad) {
+  try {
+    const { icerik } = await dosyaOku(`${koleksiyon.dizin}/${ad}`);
+    const parcali = frontmatterAyir(icerik);
+    yaml = parcali.yaml;
+    govde = parcali.govde;
+  } catch (e) {
+    hata = e instanceof Error ? e.message : 'Dosya okunamadı.';
+  }
+} else if (yeni) {
+  const bugun = new Date().toISOString().slice(0, 10);
+  yaml = koleksiyon.alanlar
+    .map((a) => {
+      if (a.tur === 'tarih') return `${a.anahtar}: ${bugun}`;
+      if (a.tur === 'onay') return `${a.anahtar}: false`;
+      if (a.tur === 'sayi') return `${a.anahtar}: 5`;
+      if (a.tur === 'liste') return `${a.anahtar}: []`;
+      if (a.tur === 'blok') return `${a.anahtar}: |\n  `;
+      if (a.tur === 'secim') return `${a.anahtar}: "${a.secenekler?.[0] ?? ''}"`;
+      return `${a.anahtar}: ""`;
+    })
+    .join('\n');
+  govde = '';
+}
+---
+
+<Yonetim baslik={ad ?? `Yeni ${koleksiyon.tekil}`}>
+  <section class="y-blok">
+    <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:16px">
+      <h2 style="margin:0;flex:1">
+        {ad ? `${koleksiyon.ad} · ${ad}` : `Yeni ${koleksiyon.tekil}`}
+      </h2>
+      <a class="y-dg ikincil" href={`/admin/icerik/${koleksiyon.slug}`}>← listeye dön</a>
+      {
+        ad && koleksiyon.adres && (
+          <a class="y-dg ikincil" target="_blank" href={koleksiyon.adres(ad.replace(koleksiyon.uzanti, ''))}>
+            Sitede aç
+          </a>
+        )
+      }
+    </div>
+
+    {hata && <div class="y-kutu kotu" style="margin-bottom:16px">{hata}</div>}
+
+    <div class="y-alan" id="d-dosyaAlani" hidden={!yeni}>
+      <label for="d-dosyaAdi">Dosya adı (adres bundan türer)</label>
+      <input id="d-dosyaAdi" type="text" spellcheck="false" placeholder="ornek-rehber-adi" />
+      <small>Yayımlandıktan sonra değiştirmeyin: kalıcı bağlantı kırılır.</small>
+    </div>
+
+    <div id="d-alanlar"></div>
+
+    <details style="margin:6px 0 16px">
+      <summary style="cursor:pointer;font-size:13px;font-weight:700;color:var(--ink-soft)">
+        Ham frontmatter (YAML) — iç içe alanlar burada düzenlenir
+      </summary>
+      <div class="y-alan" style="margin-top:10px">
+        <textarea id="d-yaml" rows="12" spellcheck="false">{yaml}</textarea>
+        <small>Hızlı alanlar bu metni düzenler; buraya yazdığınız her şey olduğu gibi kaydedilir.</small>
+      </div>
+    </details>
+
+    {
+      koleksiyon.govdeVar && (
+        <div class="y-alan">
+          <label for="d-govde">İçerik (Markdown / MDX)</label>
+          <textarea id="d-govde" rows="20" spellcheck="false">{govde}</textarea>
+        </div>
+      )
+    }
+
+    <div class="y-dugmeler" style="margin-top:8px">
+      <button type="button" class="y-dg" id="d-kaydet">Kaydet</button>
+      {ad && <button type="button" class="y-dg tehlike" id="d-sil">Sil</button>}
+    </div>
+    <p class="y-durum" id="d-durum" style="margin-top:12px" role="status" aria-live="polite"></p>
+  </section>
+
+  <script
+    define:vars={{
+      alanlar: koleksiyon.alanlar,
+      dizin: koleksiyon.dizin,
+      uzanti: koleksiyon.uzanti,
+      mevcutAd: ad,
+      koleksiyonAd: koleksiyon.ad,
+    }}
+  >
+    (() => {
+      const el = (s) => document.querySelector(s);
+      const yamlAlani = el('#d-yaml');
+
+      /* --- YAML satır işlemleri (sunucudakiyle aynı mantık) ---------------- */
+      const alanOku = (yaml, anahtar) => {
+        const e = yaml.match(new RegExp(`^${anahtar}:[ \\t]*(.*)$`, 'm'));
+        return e ? e[1] : null;
+      };
+      const alanYaz = (yaml, anahtar, deger) => {
+        const desen = new RegExp(`^${anahtar}:[ \\t]*.*$`, 'm');
+        if (deger === null || deger === '') {
+          return yaml.replace(new RegExp(`^${anahtar}:[ \\t]*.*\\r?\\n?`, 'm'), '');
+        }
+        const satir = `${anahtar}: ${deger}`;
+        return desen.test(yaml) ? yaml.replace(desen, satir) : `${yaml.replace(/\s+$/, '')}\n${satir}`;
+      };
+      const tirnakla = (m) => `"${String(m).replace(/\\/g, '\\\\').replace(/"/g, '\\"')}"`;
+
+      /* Çok satırlı alanlar (kod: |) satır bazlı yazılamaz; girintili gövde
+         ayrı okunup ayrı yazılıyor. */
+      const blokOku = (yaml, anahtar) => {
+        const satirlar = yaml.split('\n');
+        const bas = satirlar.findIndex((s) => new RegExp(`^${anahtar}:\\s*[|>]`).test(s));
+        if (bas === -1) return null;
+        const govde = [];
+        for (let i = bas + 1; i < satirlar.length; i++) {
+          const s = satirlar[i];
+          if (s.trim() === '') { govde.push(''); continue; }
+          if (/^ {2,}/.test(s)) govde.push(s.replace(/^ {2}/, ''));
+          else break;
+        }
+        while (govde.length && govde[govde.length - 1] === '') govde.pop();
+        return govde.join('\n');
+      };
+
+      const blokYaz = (yaml, anahtar, metin) => {
+        const satirlar = yaml.split('\n');
+        const yeni = [`${anahtar}: |`, ...String(metin).replace(/\s+$/, '').split('\n').map((s) => '  ' + s)];
+        const bas = satirlar.findIndex((s) => new RegExp(`^${anahtar}:`).test(s));
+        if (bas === -1) return [...satirlar, ...yeni].join('\n');
+        let son = bas + 1;
+        if (/^[^:]*:\s*[|>]/.test(satirlar[bas])) {
+          while (son < satirlar.length && (satirlar[son].trim() === '' || /^ {2,}/.test(satirlar[son]))) son++;
+        }
+        return [...satirlar.slice(0, bas), ...yeni, ...satirlar.slice(son)].join('\n');
+      };
+
+      const yamlDeger = (alan, girdi) => {
+        const temiz = String(girdi).trim();
+        if (alan.tur === 'onay') return temiz === 'true' ? 'true' : 'false';
+        if (temiz === '') return null;
+        if (alan.tur === 'sayi') return String(Number(temiz) || 0);
+        if (alan.tur === 'tarih') return temiz;
+        if (alan.tur === 'liste') {
+          const ogeler = temiz.split(',').map((s) => s.trim()).filter(Boolean).map(tirnakla);
+          return `[${ogeler.join(', ')}]`;
+        }
+        return tirnakla(temiz);
+      };
+
+      const paneleDeger = (alan, ham) => {
+        if (ham === null) return alan.tur === 'onay' ? 'false' : '';
+        const temiz = ham.trim();
+        if (alan.tur === 'liste') {
+          return temiz
+            .replace(/^\[|\]$/g, '')
+            .split(',')
+            .map((s) => s.trim().replace(/^["']|["']$/g, ''))
+            .filter(Boolean)
+            .join(', ');
+        }
+        return temiz.replace(/^["']|["']$/g, '');
+      };
+
+      /* --- hızlı alanları kur ---------------------------------------------- */
+      const kap = el('#d-alanlar');
+      const kutular = new Map();
+
+      for (const alan of alanlar) {
+        const sarmal = document.createElement('div');
+        sarmal.className = 'y-alan';
+        const kimlik = `alan-${alan.anahtar}`;
+
+        if (alan.tur === 'onay') {
+          sarmal.innerHTML = `<label style="display:flex;align-items:center;gap:8px;cursor:pointer">
+            <input type="checkbox" id="${kimlik}" style="width:16px;height:16px;accent-color:var(--indigo)" />
+            <span>${alan.etiket}</span></label>`;
+        } else if (alan.tur === 'blok') {
+          sarmal.innerHTML = `<label for="${kimlik}">${alan.etiket}</label>
+            <textarea id="${kimlik}" rows="4" spellcheck="false"></textarea>
+            ${alan.ipucu ? `<small>${alan.ipucu}</small>` : ''}`;
+        } else if (alan.tur === 'uzunMetin') {
+          sarmal.innerHTML = `<label for="${kimlik}">${alan.etiket}</label>
+            <textarea id="${kimlik}" rows="2" style="font-family:inherit;font-size:14px"></textarea>
+            ${alan.ipucu ? `<small>${alan.ipucu}</small>` : ''}`;
+        } else if (alan.tur === 'secim') {
+          sarmal.innerHTML = `<label for="${kimlik}">${alan.etiket}</label>
+            <select id="${kimlik}">${(alan.secenekler ?? []).map((s) => `<option value="${s}">${s}</option>`).join('')}</select>`;
+        } else {
+          const tur = alan.tur === 'tarih' ? 'date' : alan.tur === 'sayi' ? 'number' : 'text';
+          sarmal.innerHTML = `<label for="${kimlik}">${alan.etiket}</label>
+            <input id="${kimlik}" type="${tur}" spellcheck="false" />
+            ${alan.ipucu ? `<small>${alan.ipucu}</small>` : ''}`;
+        }
+
+        kap.appendChild(sarmal);
+        kutular.set(alan.anahtar, { alan, girdi: sarmal.querySelector(`#${kimlik}`) });
+      }
+
+      /* --- iki yönlü bağ ---------------------------------------------------- */
+      function yamldanAlanlara() {
+        for (const [, { alan, girdi }] of kutular) {
+          if (alan.tur === 'blok') {
+            girdi.value = blokOku(yamlAlani.value, alan.anahtar) ?? '';
+            continue;
+          }
+          const deger = paneleDeger(alan, alanOku(yamlAlani.value, alan.anahtar));
+          if (alan.tur === 'onay') girdi.checked = deger === 'true';
+          else girdi.value = deger;
+        }
+      }
+
+      function alanlardanYamla(anahtar) {
+        const { alan, girdi } = kutular.get(anahtar);
+        if (alan.tur === 'blok') {
+          yamlAlani.value = blokYaz(yamlAlani.value, anahtar, girdi.value);
+          return;
+        }
+        const ham = alan.tur === 'onay' ? String(girdi.checked) : girdi.value;
+        yamlAlani.value = alanYaz(yamlAlani.value, anahtar, yamlDeger(alan, ham));
+      }
+
+      for (const [anahtar, { girdi }] of kutular) {
+        girdi.addEventListener('input', () => alanlardanYamla(anahtar));
+        girdi.addEventListener('change', () => alanlardanYamla(anahtar));
+      }
+      yamlAlani.addEventListener('input', yamldanAlanlara);
+      yamldanAlanlara();
+
+      /* --- dosya adı --------------------------------------------------------- */
+      const slugla = (metin) => {
+        const harita = { ç:'c', Ç:'c', ğ:'g', Ğ:'g', ı:'i', I:'i', İ:'i', ö:'o', Ö:'o', ş:'s', Ş:'s', ü:'u', Ü:'u' };
+        return String(metin)
+          .replace(/[çÇğĞıIİöÖşŞüÜ]/g, (h) => harita[h] ?? h)
+          .toLowerCase()
+          .replace(/[^a-z0-9]+/g, '-')
+          .replace(/^-+|-+$/g, '')
+          .slice(0, 80);
+      };
+
+      const dosyaAdiGirdi = el('#d-dosyaAdi');
+      if (!mevcutAd && kutular.has('baslik')) {
+        kutular.get('baslik').girdi.addEventListener('input', (e) => {
+          if (!dosyaAdiGirdi.dataset.elle) dosyaAdiGirdi.value = slugla(e.target.value);
+        });
+        dosyaAdiGirdi.addEventListener('input', () => (dosyaAdiGirdi.dataset.elle = '1'));
+      }
+
+      /* --- kaydet ------------------------------------------------------------ */
+      const durum = el('#d-durum');
+
+      el('#d-kaydet').addEventListener('click', async (e) => {
+        const dugme = e.currentTarget;
+        const dosyaAdi = mevcutAd ?? (dosyaAdiGirdi.value.trim() ? slugla(dosyaAdiGirdi.value) + uzanti : '');
+        if (!dosyaAdi) {
+          durum.className = 'y-durum hata';
+          durum.textContent = 'Dosya adı gerekli.';
+          return;
+        }
+
+        const govdeAlani = el('#d-govde');
+        const icerik =
+          `---\n${yamlAlani.value.replace(/\s+$/, '')}\n---\n\n` +
+          (govdeAlani ? govdeAlani.value.replace(/^\s+/, '') : '');
+
+        dugme.disabled = true;
+        durum.className = 'y-durum';
+        durum.textContent = 'Kaydediliyor…';
+
+        try {
+          const cevap = await fetch('/api/admin/dosya', {
+            method: 'PUT',
+            headers: { 'content-type': 'application/json' },
+            body: JSON.stringify({
+              yol: `${dizin}/${dosyaAdi}`,
+              icerik,
+              mesaj: `${koleksiyonAd}: ${mevcutAd ? 'güncellendi' : 'eklendi'} — ${dosyaAdi}`,
+            }),
+          });
+          const sonuc = await cevap.json();
+          if (!cevap.ok) throw new Error(sonuc.hata ?? 'Kaydedilemedi.');
+
+          durum.className = 'y-durum ok';
+          durum.textContent =
+            (sonuc.commit ? `Kaydedildi (commit ${sonuc.commit}). ` : 'Kaydedildi. ') + (sonuc.not ?? '');
+
+          if (!mevcutAd) {
+            setTimeout(() => {
+              location.href = `/admin/duzenle?koleksiyon=${new URLSearchParams(location.search).get('koleksiyon')}&ad=${encodeURIComponent(dosyaAdi)}`;
+            }, 900);
+          }
+        } catch (hata) {
+          durum.className = 'y-durum hata';
+          durum.textContent = hata.message;
+        } finally {
+          dugme.disabled = false;
+        }
+      });
+
+      /* --- sil ---------------------------------------------------------------- */
+      const silDugme = el('#d-sil');
+      if (silDugme) {
+        silDugme.addEventListener('click', async () => {
+          if (!confirm(`"${mevcutAd}" silinsin mi? Bu işlem depoda bir commit oluşturur.`)) return;
+          silDugme.disabled = true;
+          durum.className = 'y-durum';
+          durum.textContent = 'Siliniyor…';
+          try {
+            const cevap = await fetch(`/api/admin/dosya?yol=${encodeURIComponent(`${dizin}/${mevcutAd}`)}`, {
+              method: 'DELETE',
+            });
+            const sonuc = await cevap.json();
+            if (!cevap.ok) throw new Error(sonuc.hata ?? 'Silinemedi.');
+            location.href = `/admin/icerik/${new URLSearchParams(location.search).get('koleksiyon')}`;
+          } catch (hata) {
+            durum.className = 'y-durum hata';
+            durum.textContent = hata.message;
+            silDugme.disabled = false;
+          }
+        });
+      }
+    })();
+  </script>
+</Yonetim>

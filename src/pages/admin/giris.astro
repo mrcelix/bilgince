@@ -1,0 +1,51 @@
+---
+import Yonetim from '../../layouts/Yonetim.astro';
+import { girisKurulu, oturumOku, yapilandirma } from '../../admin/oturum';
+
+export const prerender = false;
+
+// Zaten girmişse panele al
+const oturum = await oturumOku(Astro.request);
+if (oturum) return Astro.redirect('/admin');
+
+const kurulu = girisKurulu();
+const y = yapilandirma();
+---
+
+<Yonetim baslik="Giriş" cikis={false}>
+  <div style="max-width:36rem;margin:8vh auto 0">
+    <div class="y-blok">
+      <h1 style="font-size:22px;margin:0 0 6px">bilgince yönetim</h1>
+      <p style="color:var(--muted);font-size:14px;margin:0 0 22px">
+        İçerik, menü, konu ve araçlar bu panelden yönetilir. Giriş yalnızca yetkili Google
+        hesaplarına açıktır.
+      </p>
+
+      {
+        kurulu ? (
+          <>
+            <a class="y-dg" href="/api/admin/google-basla" style="width:100%;text-align:center">
+              Google ile giriş yap
+            </a>
+            <p class="y-durum" style="margin-top:14px">
+              Yetkili hesap: {y.epostalar.join(', ')}
+            </p>
+          </>
+        ) : (
+          <div class="y-kutu uyari">
+            <b>Google girişi henüz yapılandırılmamış.</b>
+            <p style="margin:8px 0 0">
+              Panelin canlıda açılması için üç ortam değişkeni gerekir:
+              <code>GOOGLE_ISTEMCI_ID</code>, <code>GOOGLE_ISTEMCI_SIR</code> ve
+              <code>OTURUM_ANAHTARI</code>. Kurulum adımları depodaki README dosyasında.
+            </p>
+          </div>
+        )
+      }
+    </div>
+
+    <p style="text-align:center;margin-top:18px;font-size:13px">
+      <a href="/" style="color:var(--muted)">← siteye dön</a>
+    </p>
+  </div>
+</Yonetim>

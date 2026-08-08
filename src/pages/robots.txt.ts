@@ -11,6 +11,9 @@ Allow: /
 # Site içi arama sonuçları indekslenmesin
 Disallow: /ara
 
+# Yönetim paneli
+Disallow: /admin
+
 Sitemap: ${SITE.url}/sitemap-index.xml
 `,
     { headers: { 'Content-Type': 'text/plain; charset=utf-8' } }

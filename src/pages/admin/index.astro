@@ -1,0 +1,104 @@
+---
+import Yonetim from '../../layouts/Yonetim.astro';
+import { getCollection } from 'astro:content';
+import { KOLEKSIYONLAR } from '../../admin/icerik';
+import { yerelMi, yazabilirMi } from '../../admin/depo';
+import { girisKurulu, yapilandirma } from '../../admin/oturum';
+import { DERLEME } from '../../derleme.js';
+
+export const prerender = false;
+
+const sayilar: Record<string, number> = {};
+for (const k of KOLEKSIYONLAR) {
+  try {
+    sayilar[k.slug] = (await getCollection(k.slug as any)).length;
+  } catch {
+    sayilar[k.slug] = 0;
+  }
+}
+
+const y = yapilandirma();
+const oturum = Astro.locals.oturum;
+
+const durumlar = [
+  {
+    ad: 'Google girişi',
+    tamam: girisKurulu(),
+    iyi: 'Yapılandırılmış — panele yalnızca yetkili hesaplar girebiliyor.',
+    kotu: 'Kurulu değil. GOOGLE_ISTEMCI_ID, GOOGLE_ISTEMCI_SIR ve OTURUM_ANAHTARI eksik; canlıda panel açılmaz.',
+  },
+  {
+    ad: 'Kayıt yolu',
+    tamam: yazabilirMi(),
+    iyi: yerelMi()
+      ? 'Yerel kip: değişiklikler doğrudan çalışma kopyanıza yazılıyor, commit sizde.'
+      : 'GitHub jetonu tanımlı — her kayıt depoya commit ediliyor.',
+    kotu: 'GITHUB_JETON tanımlı değil: canlıda düzenleme kaydedilemez.',
+  },
+  {
+    ad: 'Yetkili hesaplar',
+    tamam: y.epostalar.length > 0,
+    iyi: y.epostalar.join(', '),
+    kotu: 'ADMIN_EPOSTALAR boş.',
+  },
+];
+---
+
+<Yonetim baslik="Gösterge">
+  <section class="y-blok">
+    <h2>Merhaba{oturum?.ad ? `, ${oturum.ad.split(' ')[0]}` : ''}</h2>
+    <div class="y-ikili">
+      {
+        KOLEKSIYONLAR.map((k) => (
+          <a class="y-kutu" href={`/admin/icerik/${k.slug}`} style="text-decoration:none;color:inherit;display:block">
+            <b style="font-size:26px;display:block;line-height:1.2">{sayilar[k.slug]}</b>
+            <span style="color:var(--muted)">{k.ad}</span>
+          </a>
+        ))
+      }
+      <a class="y-kutu" href="/admin/veri" style="text-decoration:none;color:inherit;display:block">
+        <b style="font-size:26px;display:block;line-height:1.2">⚙</b>
+        <span style="color:var(--muted)">Menü, konu, araç, ayarlar</span>
+      </a>
+    </div>
+  </section>
+
+  <section class="y-blok">
+    <h2>Kurulum durumu</h2>
+    <div style="display:grid;gap:10px">
+      {
+        durumlar.map((d) => (
+          <div class={`y-kutu ${d.tamam ? 'iyi' : 'kotu'}`}>
+            <b>{d.ad}</b>
+            <p style="margin:4px 0 0">{d.tamam ? d.iyi : d.kotu}</p>
+          </div>
+        ))
+      }
+    </div>
+  </section>
+
+  <section class="y-blok">
+    <h2>Yayındaki derleme</h2>
+    <p style="font-size:14px;margin:0 0 6px">
+      Bu sayfayı üreten derleme: <code>{DERLEME.surum}</code> · {DERLEME.zamanMetin}
+    </p>
+    <p style="color:var(--muted);font-size:13px;margin:0">
+      {
+        yerelMi()
+          ? 'Yerel kipte kayıtlar diske yazılır; siteye yansıması için commit ve push gerekir.'
+          : 'Kaydettiğiniz her değişiklik depoya commit edilir ve Vercel birkaç dakika içinde yeniden yayınlar. Sitedeki derleme numarası değişince yayına çıkmış demektir.'
+      }
+    </p>
+  </section>
+
+  <section class="y-blok">
+    <h2>Hızlı işler</h2>
+    <div class="y-dugmeler">
+      <a class="y-dg" href="/admin/icerik/rehberler?yeni=1">Yeni rehber</a>
+      <a class="y-dg ikincil" href="/admin/icerik/ipuclari?yeni=1">Yeni ipucu</a>
+      <a class="y-dg ikincil" href="/admin/icerik/komutlar?yeni=1">Yeni komut</a>
+      <a class="y-dg ikincil" href="/admin/veri?dosya=src/data/menu.json">Menüyü düzenle</a>
+      <a class="y-dg ikincil" href="/" target="_blank">Siteyi aç</a>
+    </div>
+  </section>
+</Yonetim>

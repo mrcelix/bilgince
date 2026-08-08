@@ -50,37 +50,84 @@ Pagefind'e hem süzgeç hem meta olarak yazılır. Arşiv, konu, etiket ve sayfa
 | `/rss.xml` | `src/pages/rss.xml.ts` | RSS akışı |
 | `/og/<slug>.png` | `src/pages/og/[...slug].png.ts` | 1200×630 paylaşım kartı (derleme sırasında üretilir) |
 
-## Admin paneli
+## Yönetim paneli
 
-Keystatic ile `/keystatic` adresinde. Yazıları, kategorileri, menüyü ve site
-ayarlarını buradan yönetirsiniz; her kayıt depodaki bir dosyaya yazılır.
+`/admin` adresinde, **Google ile giriş**. İçerik koleksiyonları, menü/grup
+tanımları, konular, araç kütüğü ve site ayarları buradan yönetilir; her kayıt
+depodaki bir dosyaya yazılır.
 
-**Yerelde** (kimlik doğrulama yok, doğrudan diske yazar):
+| Ekran | Ne yönetir |
+| --- | --- |
+| `/admin` | Gösterge: sayaçlar, kurulum durumu, yayındaki derleme |
+| `/admin/icerik/<koleksiyon>` | Rehber, ipucu, komut, çözüm, proje listesi ve düzenleme |
+| `/admin/duzenle` | Tek kayıt: hızlı alanlar + ham frontmatter + gövde |
+| `/admin/veri` | `ayarlar.json`, `menu.json`, `araclar.json`, `konu/*.json` + yeni konu |
+
+**Yerelde** kimlik doğrulaması istemez ve doğrudan diske yazar:
 
 ```bash
 npm run dev
 ```
 
-Sonra `http://localhost:4321/keystatic`. Değişiklikler çalışma kopyanızda
-oluşur; commit ve push'u siz yaparsınız.
+Sonra `http://localhost:4321/admin`. Değişiklikler çalışma kopyanızda oluşur;
+commit ve push sizde.
 
-**Canlıda** GitHub moduna geçer ve değişiklikleri doğrudan depoya commit'ler.
-Çalışması için bir kerelik GitHub App kurulumu gerekir:
+**Canlıda** iki şey gerekir: Google girişi ve depoya yazma jetonu. İkisi de
+yoksa panel açılmaz — bu kasıtlı.
 
-1. `https://bilgince.com/keystatic` adresine gidin, "Set up Keystatic" akışını izleyin.
-   Keystatic sizin adınıza bir GitHub App oluşturur.
-2. Akışın sonunda verilen dört değeri Vercel'de **Settings → Environment
-   Variables** altına ekleyin:
-   `KEYSTATIC_GITHUB_CLIENT_ID`, `KEYSTATIC_GITHUB_CLIENT_SECRET`,
-   `KEYSTATIC_SECRET`, `PUBLIC_KEYSTATIC_GITHUB_APP_SLUG`.
-3. Yeniden dağıtın.
+### 1. Google OAuth istemcisi
 
-Depo adı `keystatic.config.ts` içinde sabit (`mrcelix/bilgince`); depoyu
-taşırsanız orayı güncelleyin.
+1. [console.cloud.google.com](https://console.cloud.google.com) → bir proje seçin ya da oluşturun.
+2. **APIs & Services → OAuth consent screen**: tür *External*, uygulama adı
+   `bilgince yönetim`, destek e-postası olarak kendi adresinizi girin. Uygulamayı
+   *Testing* durumunda bırakabilirsiniz; o hâlde kendinizi **Test users** listesine ekleyin.
+3. **Credentials → Create credentials → OAuth client ID → Web application**:
+   - *Authorized JavaScript origins*: `https://bilgince.com`
+   - *Authorized redirect URIs*: `https://bilgince.com/api/admin/google-donus`
+     (yerelde de denemek isterseniz `http://localhost:4321/api/admin/google-donus` ekleyin)
+4. Çıkan **Client ID** ve **Client secret** değerlerini saklayın.
 
-Panel yüzünden site tamamen statik olmaktan çıktı: içerik sayfaları hâlâ
-derleme sırasında üretiliyor, yalnızca `/keystatic` ve `/api/keystatic`
-sunucu tarafında çalışıyor. Vercel adaptörü bunun için eklendi.
+### 2. Depoya yazma jetonu
+
+GitHub → **Settings → Developer settings → Fine-grained tokens**: yalnızca
+`mrcelix/bilgince` deposuna, **Contents: Read and write** izniyle bir jeton üretin.
+Panel her kaydı bu jetonla commit'ler; commit mesajında düzenleyen e-posta yazar.
+
+### 3. Vercel ortam değişkenleri
+
+**Settings → Environment Variables** altına:
+
+| Değişken | Değer |
+| --- | --- |
+| `GOOGLE_ISTEMCI_ID` | Google'ın verdiği Client ID |
+| `GOOGLE_ISTEMCI_SIR` | Google'ın verdiği Client secret |
+| `OTURUM_ANAHTARI` | Rastgele uzun bir dize — çerez imzası bununla üretilir |
+| `ADMIN_EPOSTALAR` | `mcelik@gmail.com` (virgülle birden çok yazılabilir) |
+| `GITHUB_JETON` | 2. adımdaki jeton |
+| `GITHUB_DEPO` | İsteğe bağlı, varsayılan `mrcelix/bilgince` |
+| `GITHUB_DAL` | İsteğe bağlı, varsayılan `main` |
+
+Oturum anahtarını üretmek için:
+
+```bash
+node -e "console.log(require('crypto').randomBytes(48).toString('base64url'))"
+```
+
+Sonra yeniden dağıtın. `/admin` açıldığında gösterge panelindeki **Kurulum
+durumu** kutuları hangi parçanın eksik olduğunu söyler.
+
+### Güvenlik notları
+
+- Yetki tek yerde: `ADMIN_EPOSTALAR` listesinde olmayan Google hesabı, giriş yapsa
+  bile 403 alır. Liste boşken kimse giremez.
+- Oturum çerezi HMAC-SHA256 ile imzalı, `HttpOnly`, `Secure`, `SameSite=Lax` ve 12 saatlik.
+- Panel yalnızca `src/content/`, `src/data/` ve `public/araclar/` altına yazabilir;
+  yol denetimi `src/pages/api/admin/dosya.ts` içinde tek kapıdan geçer.
+- `robots.txt` `/admin` adresini dışlar, sayfalar `noindex` gönderir, site haritasına girmez.
+
+Panel yüzünden site tamamen statik olmaktan çıktı: içerik sayfaları hâlâ derleme
+sırasında üretiliyor, yalnızca `/admin`, `/api/admin` ve araç uçları sunucu
+tarafında çalışıyor. Vercel adaptörü bunun için duruyor.
 
 ## İçerik ekleme
 
@@ -88,9 +135,13 @@ Markdown dosyaları `src/content/` altında. Şema `src/content.config.ts` için
 zorunlu bir alanı unutursanız derleme hata verir — bu kasıtlı.
 
 Koleksiyonlar: `rehberler` (uzun rehberler), `ipuclari` (tek ekranlık notlar),
-`komutlar` (komut kütüphanesi), `projeler` (portfolyo). İçerik dosyaları `.mdx`
-biçiminde (Keystatic zengin metin alanı bunu gerektiriyor; render açısından
-markdown ile aynı davranır).
+`komutlar` (komut kütüphanesi), `cozumler` (hızlı çözümler), `projeler`
+(portfolyo). İçerik dosyaları `.mdx` biçiminde; render açısından markdown ile
+aynı davranır.
+
+Panelin gösterdiği hızlı alanlar `src/admin/icerik.ts` içinde tanımlı. Şemaya
+zorunlu bir alan eklerseniz oraya da ekleyin — yoksa panelden oluşturulan kayıt
+derlemeyi kırar.
 
 Yapılandırma verisi `src/data/` altında ve panelden yönetilir:
 

@@ -27,7 +27,7 @@ const varMi = (u) => {
 };
 
 // sunucu tarafında çalışan rotalar statik çıktıda bulunmaz
-const sunucuRotalari = /^\/(keystatic|api)(\/|$)/;
+const sunucuRotalari = /^\/(admin|api)(\/|$)/;
 
 const kirik = new Map();
 for (const f of html) {

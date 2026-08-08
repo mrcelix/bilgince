@@ -1,8 +1,6 @@
 import { defineConfig } from 'astro/config';
 import sitemap from '@astrojs/sitemap';
 import mdx from '@astrojs/mdx';
-import react from '@astrojs/react';
-import keystatic from '@keystatic/astro';
 import vercel from '@astrojs/vercel';
 import { readFileSync } from 'node:fs';
 
@@ -16,24 +14,17 @@ export default defineConfig({
   // tarayıcı botu her adreste 308 yönlendirmesine takılmasın
   trailingSlash: 'never',
 
-  // İçerik sayfaları statik üretilir; yalnızca /keystatic ve /api/keystatic
-  // sunucu tarafında çalışır. Adaptör bunun için gerekli.
+  // İçerik sayfaları statik üretilir; sunucu tarafında çalışanlar yalnızca
+  // yönetim paneli (/admin, /api/admin) ve araç uçları. Adaptör bunun için.
   output: 'static',
-  // AI görsel üretimi 10 sn'lik varsayılanı aşabiliyor
+  // AI görsel üretimi ve tarayıcı işleme 10 sn'lik varsayılanı aşabiliyor
   adapter: vercel({ maxDuration: 60 }),
-
-  // panel /keystatic altında; /admin alışkanlığı için kısayol
-  redirects: {
-    '/admin': '/keystatic',
-  },
 
   integrations: [
     mdx(),
-    react(),
-    keystatic(),
     sitemap({
       // noindex ve yönetim sayfaları site haritasına girmemeli
-      filter: (sayfa) => !/\/(ara|404|ozgecmis\/yazdir|keystatic|admin|api)(\/|$)/.test(sayfa),
+      filter: (sayfa) => !/\/(ara|404|ozgecmis\/yazdir|admin|api)(\/|$)/.test(sayfa),
     }),
   ],
 
