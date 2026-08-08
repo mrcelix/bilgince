@@ -1,0 +1,11 @@
+---
+baslik: "Koşullu erişim politikaları ve gerçekten açık olanlar"
+ozet: "Politikaların hangisi zorluyor, hangisi yalnızca rapor topluyor — Entra panelinde tek tek tıklamadan görün."
+konu: "azure"
+etiketler: ["entra", "kimlik", "denetim"]
+kod: |
+  Get-MgIdentityConditionalAccessPolicy |
+    Select-Object DisplayName, State, ModifiedDateTime |
+    Sort-Object State, DisplayName
+dikkat: "enabledForReportingButNotEnforced = rapor modu: oturumları sayar ama hiçbir şeyi engellemez. Denetimde 'MFA politikamız var' derken çoğu kurumun kastettiği budur."
+---

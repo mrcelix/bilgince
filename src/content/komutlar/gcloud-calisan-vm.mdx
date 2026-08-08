@@ -1,0 +1,10 @@
+---
+baslik: "Google Cloud'da o an çalışan sanal makineler"
+ozet: "Hangi projede ne çalışıyor sorusunun konsol açmadan cevabı."
+konu: "google-cloud"
+etiketler: ["envanter", "maliyet", "gce"]
+kod: |
+  gcloud compute instances list --filter="status=RUNNING" \
+    --format="table(name, zone.basename(), machineType.basename(), status)"
+dikkat: "Varsayılan olarak yalnızca etkin projeyi listeler. Tüm projeler için gcloud projects list çıktısında döngü kurun."
+---

@@ -1,0 +1,11 @@
+---
+baslik: "Hyper-V replikasyonu gerçekten çalışıyor mu?"
+ozet: "Durum 'Replicating' görünürken sağlık 'Warning' olabilir ve son kopya dünden kalma olabilir."
+konu: "sanallastirma"
+etiketler: ["hyper-v", "felaket-kurtarma", "replikasyon"]
+kod: |
+  Get-VMReplication |
+    Select-Object VMName, State, Health, LastReplicationTime |
+    Sort-Object Health, LastReplicationTime
+dikkat: "LastReplicationTime bugüne ait değilse hedefteki kopya sizi kurtarmaz. Sağlık 'Normal' olsa bile bu sütuna bakın."
+---

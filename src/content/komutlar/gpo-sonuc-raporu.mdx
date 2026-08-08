@@ -1,0 +1,10 @@
+---
+baslik: "Bu makinede hangi grup ilkeleri gerçekten uygulandı?"
+ozet: "'İlke uygulanmadı' şikâyetinin cevabı tahminle değil, sonuç raporuyla verilir."
+konu: "windows-server"
+etiketler: ["gpo", "active-directory", "tanilama"]
+kod: |
+  gpresult /h "$env:TEMP\gpo-rapor.html" /f
+  Invoke-Item "$env:TEMP\gpo-rapor.html"
+dikkat: "Kullanıcı ilkeleri için o kullanıcının oturumunda çalıştırın; yönetici olarak açılan konsolda kullanıcı bölümü sizin hesabınızı gösterir."
+---

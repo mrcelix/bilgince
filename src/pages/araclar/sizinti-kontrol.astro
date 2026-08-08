@@ -1,0 +1,245 @@
+---
+import Base from '../../layouts/Base.astro';
+---
+
+<Base
+  baslik="Parola sızıntı kontrolü"
+  aciklama="Parolanız bilinen veri sızıntılarında geçiyor mu? Kontrol k-anonimlik ile yapılır: parolanın SHA-1 özetinin yalnızca ilk 5 hanesi sorulur, parola cihazdan çıkmaz."
+  aramaya={false}
+>
+  <div class="arama-bas">
+    <div class="kap">
+      <nav class="kirinti" aria-label="Kırıntı yolu" style="padding-top:0">
+        <a href="/">Ana sayfa</a><span class="ayrac">/</span><a href="/araclar">Araçlar</a><span
+          class="ayrac">/</span
+        ><span aria-current="page">Sızıntı kontrolü</span>
+      </nav>
+      <h1>Parola sızıntı kontrolü</h1>
+      <p style="color:var(--muted);font-size:14px;margin-top:8px;max-width:64ch">
+        Bir parolanın <strong>bilinen sızıntılarda</strong> kaç kez göründüğünü söyler. Parolayı hiçbir
+        yere göndermez: özet tarayıcıda hesaplanır, dışarıya yalnızca özetin ilk beş hanesi çıkar.
+      </p>
+    </div>
+  </div>
+
+  <div class="kap arac-sayfa">
+    <section class="arac-blok">
+      <h2 class="arac-h2"><span class="arac-no">1</span> Parolayı girin</h2>
+      <form id="s-form" autocomplete="off">
+        <div class="arac-alanlar">
+          <label class="arac-alan"
+            >Parola
+            <input id="s-parola" type="password" autocomplete="new-password" spellcheck="false" placeholder="kontrol edilecek parola" />
+          </label>
+        </div>
+        <div class="arac-onaylar">
+          <label class="arac-onay"><input type="checkbox" id="s-goster" /> <span>Parolayı göster</span></label>
+        </div>
+        <div class="arac-dugmeler">
+          <button type="submit" class="dg" id="s-kontrol">Sızıntıda ara</button>
+          <a class="dg arac-ikincil" href="/araclar/parola">Yeni parola üret</a>
+        </div>
+      </form>
+      <p class="arac-durum" id="s-durum" role="status" aria-live="polite"></p>
+      <div id="s-sonuc" hidden style="margin-top:14px"></div>
+    </section>
+
+    <section class="arac-blok" id="s-analiz-blok" hidden>
+      <h2 class="arac-h2"><span class="arac-no">2</span> Çevrimdışı analiz</h2>
+      <p class="arac-not" style="margin-top:0">
+        Bu bölüm ağa hiçbir şey sormaz; parolanın biçimine bakar. Sızıntı listesinde olmamak "güçlü"
+        demek değildir — henüz sızmamış zayıf bir parola da zayıftır.
+      </p>
+      <div class="arac-olcer" id="s-olcer" data-guc="zayif"><i style="width:8%"></i></div>
+      <div class="arac-olcum">
+        <span>Uzunluk: <b id="s-uzunluk">—</b></span>
+        <span>Karakter havuzu: <b id="s-havuz">—</b></span>
+        <span>Üst sınır entropi: <b id="s-bit">—</b></span>
+        <span>Kaba kuvvetle: <b id="s-sure">—</b></span>
+      </div>
+      <div id="s-orunutu" style="margin-top:14px"></div>
+    </section>
+
+    <section class="arac-blok">
+      <h2 class="arac-h2"><span class="arac-no">3</span> Toplu kontrol</h2>
+      <p class="arac-not" style="margin-top:0">
+        Her satıra bir parola. Devralınan bir ortamda paylaşılan hesapları toplu taramak için; istekler
+        sırayla gider, hiçbir parola sunucuya çıkmaz.
+      </p>
+      <div class="arac-alan" style="margin-top:12px">
+        <label for="s-toplu">Parolalar (en fazla 25 satır)</label>
+        <textarea id="s-toplu" rows="5" spellcheck="false" style="font-family:var(--mono);font-size:13.5px"></textarea>
+      </div>
+      <div class="arac-dugmeler">
+        <button type="button" class="dg arac-ikincil" id="s-toplu-btn">Listeyi kontrol et</button>
+      </div>
+      <p class="arac-durum" id="s-toplu-durum" role="status" aria-live="polite"></p>
+      <div id="s-toplu-sonuc"></div>
+    </section>
+
+    <section class="arac-blok">
+      <h2 class="arac-h2"><span class="arac-no">4</span> Bu kontrol nasıl çalışıyor</h2>
+      <div class="arac-kutu">
+        <p style="margin:0 0 10px">
+          Parolanın <b>SHA-1</b> özeti tarayıcınızda hesaplanır. Dışarıya yalnızca özetin ilk
+          <b>5 hanesi</b> sorulur; karşı taraf o ön ekle başlayan yaklaşık 800 karmayı geri gönderir ve
+          eşleşmeyi sizin cihazınız yapar. Buna <b>k-anonimlik</b> denir: hangi parolayı sorduğunuz
+          servis tarafından bilinemez.
+        </p>
+        <p style="margin:0">
+          Veri kaynağı Have I Been Pwned'in Pwned Passwords listesidir — bilinen sızıntılardan derlenmiş
+          milyarlarca parola karması. Sonuç <b>"kaç sızıntıda geçtiği"</b> bilgisidir; hesabınızın
+          ele geçirildiği anlamına gelmez, ama o parolanın saldırganların sözlüğünde olduğu anlamına gelir.
+        </p>
+      </div>
+      <div class="arac-kutu uyari" style="margin-top:12px">
+        <h3>Parolanız listedeyse</h3>
+        <ul style="margin:0">
+          <li>Önce o parolayı <b>başka nerede kullandıysanız</b> orada değiştirin — saldırganın ilk denediği şey budur.</li>
+          <li>Yeni parolayı <a href="/araclar/parola">üreteçle</a> oluşturun; aynı kalıbın sayısını artırmak (2026 → 2027) işe yaramaz.</li>
+          <li>Hesapta çok faktörlü doğrulama varsa açın: sızmış parola tek başına yetmez hâle gelir.</li>
+        </ul>
+      </div>
+    </section>
+  </div>
+
+  <script>
+    import { sizintiSay, sayiBicim } from '../../scripts/sizinti.js';
+    import { kirilmaSuresi, guc, orunutuBul } from '../../scripts/parola.js';
+
+    const el = (s) => document.querySelector(s);
+
+    /* --- çevrimdışı analiz ------------------------------------------------- */
+    function havuzBoyu(parola) {
+      let havuz = 0;
+      if (/[a-zçğıöşü]/.test(parola)) havuz += 29;
+      if (/[A-ZÇĞİÖŞÜ]/.test(parola)) havuz += 29;
+      if (/\d/.test(parola)) havuz += 10;
+      if (/[^\p{L}\d]/u.test(parola)) havuz += 33;
+      return havuz || 1;
+    }
+
+    function analizEt(parola) {
+      const blok = el('#s-analiz-blok');
+      if (!parola) {
+        blok.hidden = true;
+        return;
+      }
+      blok.hidden = false;
+      const havuz = havuzBoyu(parola);
+      const bit = parola.length * Math.log2(havuz);
+      const g = guc(bit);
+      el('#s-olcer').dataset.guc = g.sinif;
+      el('#s-olcer').firstElementChild.style.width = g.oran + '%';
+      el('#s-uzunluk').textContent = parola.length + ' karakter';
+      el('#s-havuz').textContent = havuz + ' karakter';
+      el('#s-bit').textContent = Math.round(bit) + ' bit';
+      el('#s-sure').textContent = kirilmaSuresi(bit);
+
+      const bulgular = orunutuBul(parola);
+      el('#s-orunutu').innerHTML = bulgular.length
+        ? '<div class="arac-kutu kotu"><h3>Zayıflatan örüntüler</h3><ul>' +
+          bulgular.map((b) => `<li>${b}</li>`).join('') +
+          '</ul></div>'
+        : '<div class="arac-kutu iyi">Bilinen zayıf örüntülerden hiçbirine uymuyor.</div>';
+    }
+
+    el('#s-parola').addEventListener('input', (e) => {
+      analizEt(e.target.value);
+      el('#s-sonuc').hidden = true;
+      el('#s-durum').textContent = '';
+      el('#s-durum').className = 'arac-durum';
+    });
+
+    el('#s-goster').addEventListener('change', (e) => {
+      el('#s-parola').type = e.target.checked ? 'text' : 'password';
+    });
+
+    /* --- tekil kontrol ------------------------------------------------------ */
+    el('#s-form').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const parola = el('#s-parola').value;
+      const durum = el('#s-durum');
+      const sonuc = el('#s-sonuc');
+      if (!parola) {
+        durum.textContent = 'Önce bir parola girin.';
+        durum.className = 'arac-durum hata';
+        return;
+      }
+      el('#s-kontrol').disabled = true;
+      durum.className = 'arac-durum';
+      durum.textContent = 'Soruluyor…';
+      sonuc.hidden = true;
+
+      try {
+        const { adet, onEk, aday } = await sizintiSay(parola);
+        durum.textContent = '';
+        sonuc.hidden = false;
+        sonuc.innerHTML =
+          adet > 0
+            ? `<div class="arac-kutu kotu"><h3>Bu parola sızmış</h3>
+               <p style="margin:0">Bilinen sızıntılarda <b>${sayiBicim(adet)} kez</b> görüldü. Nerede
+               kullanıyorsanız değiştirin; saldırgan sözlüklerinde bu parola zaten var.</p></div>`
+            : `<div class="arac-kutu iyi"><h3>Listede bulunamadı</h3>
+               <p style="margin:0">Bu parola Pwned Passwords listesinde geçmiyor. Yine de çevrimdışı
+               analizdeki uyarılara bakın — sızmamış olmak güçlü olmak değildir.</p></div>`;
+        durum.textContent = `Sorulan ön ek: ${onEk} · dönen aday karma: ${aday} · parola gönderilmedi.`;
+      } catch (hata) {
+        durum.textContent = hata.message;
+        durum.className = 'arac-durum hata';
+      } finally {
+        el('#s-kontrol').disabled = false;
+      }
+    });
+
+    /* --- toplu kontrol ------------------------------------------------------ */
+    el('#s-toplu-btn').addEventListener('click', async (e) => {
+      const satirlar = el('#s-toplu')
+        .value.split('\n')
+        .map((s) => s.trim())
+        .filter(Boolean)
+        .slice(0, 25);
+      const durum = el('#s-toplu-durum');
+      const kap = el('#s-toplu-sonuc');
+      kap.innerHTML = '';
+      if (!satirlar.length) {
+        durum.className = 'arac-durum hata';
+        durum.textContent = 'Kontrol edilecek satır yok.';
+        return;
+      }
+      e.currentTarget.disabled = true;
+      durum.className = 'arac-durum';
+
+      const sonuclar = [];
+      for (let i = 0; i < satirlar.length; i++) {
+        durum.textContent = `${i + 1}/${satirlar.length} kontrol ediliyor…`;
+        try {
+          const { adet } = await sizintiSay(satirlar[i]);
+          sonuclar.push({ parola: satirlar[i], adet });
+        } catch (hata) {
+          sonuclar.push({ parola: satirlar[i], hata: hata.message });
+        }
+      }
+
+      const gizle = (p) => (p.length <= 3 ? '•'.repeat(p.length) : p.slice(0, 2) + '•'.repeat(Math.min(10, p.length - 2)));
+      const sizan = sonuclar.filter((s) => s.adet > 0).length;
+      durum.className = 'arac-durum' + (sizan ? ' hata' : ' ok');
+      durum.textContent = sizan
+        ? `${satirlar.length} parolanın ${sizan} tanesi sızıntı listesinde.`
+        : `${satirlar.length} parolanın hiçbiri listede yok.`;
+      kap.innerHTML =
+        '<div class="arac-kutu" style="margin-top:12px"><ul style="margin:0;padding-left:20px">' +
+        sonuclar
+          .map((s) =>
+            s.hata
+              ? `<li><code>${gizle(s.parola)}</code> — kontrol edilemedi: ${s.hata}</li>`
+              : s.adet > 0
+                ? `<li><code>${gizle(s.parola)}</code> — <b>${sayiBicim(s.adet)} kez</b> sızmış</li>`
+                : `<li><code>${gizle(s.parola)}</code> — listede yok</li>`
+          )
+          .join('') +
+        '</ul></div>';
+      e.currentTarget.disabled = false;
+    });
+  </script>
+</Base>

@@ -1,0 +1,315 @@
+---
+import Base from '../../layouts/Base.astro';
+---
+
+<Base
+  baslik="Wi-Fi QR kod üreteci"
+  aciklama="Misafir ağınız için taranabilir QR kod ve yazdırılabilir kart üretir. QR tamamen tarayıcıda çizilir; SSID ve parola hiçbir sunucuya gitmez."
+  aramaya={false}
+>
+  <div class="arama-bas">
+    <div class="kap">
+      <nav class="kirinti" aria-label="Kırıntı yolu" style="padding-top:0">
+        <a href="/">Ana sayfa</a><span class="ayrac">/</span><a href="/araclar">Araçlar</a><span
+          class="ayrac">/</span
+        ><span aria-current="page">Wi-Fi QR</span>
+      </nav>
+      <h1>Wi-Fi QR kod üreteci</h1>
+      <p style="color:var(--muted);font-size:14px;margin-top:8px;max-width:64ch">
+        Telefon kamerası QR'ı okuyunca ağa parola yazmadan bağlanır. Kod bu sayfada, kendi
+        kodumuzla çizilir — parolayı bir QR servisine yazmanız gerekmez.
+      </p>
+    </div>
+  </div>
+
+  <div class="kap arac-sayfa">
+    <section class="arac-blok">
+      <h2 class="arac-h2"><span class="arac-no">1</span> Ne kodlanacak</h2>
+      <div class="arac-onaylar" role="radiogroup" aria-label="Kod türü">
+        <label class="arac-onay"><input type="radio" name="q-kip" value="wifi" checked /> <span>Wi-Fi ağı</span></label>
+        <label class="arac-onay"><input type="radio" name="q-kip" value="metin" /> <span>Metin veya adres</span></label>
+      </div>
+
+      <div id="q-wifi" style="margin-top:18px">
+        <div class="arac-alanlar">
+          <label class="arac-alan"
+            >Ağ adı (SSID)
+            <input id="q-ssid" type="text" spellcheck="false" placeholder="Ofis-Misafir" value="Ofis-Misafir" />
+          </label>
+          <label class="arac-alan"
+            >Parola
+            <input id="q-parola" type="text" spellcheck="false" placeholder="ağ parolası" value="Kahve2026" />
+          </label>
+          <label class="arac-alan"
+            >Güvenlik
+            <select id="q-sifreleme">
+              <option value="WPA">WPA / WPA2 / WPA3</option>
+              <option value="WEP">WEP (eski)</option>
+              <option value="yok">Parolasız açık ağ</option>
+            </select>
+          </label>
+        </div>
+        <div class="arac-onaylar">
+          <label class="arac-onay"><input type="checkbox" id="q-gizli" /> <span>Ağ gizli (SSID yayınlanmıyor)</span></label>
+        </div>
+      </div>
+
+      <div id="q-metin" hidden style="margin-top:18px">
+        <div class="arac-alan">
+          <label for="q-icerik">Metin veya adres</label>
+          <textarea id="q-icerik" rows="3" spellcheck="false" placeholder="https://bilgince.com">https://bilgince.com</textarea>
+        </div>
+      </div>
+
+      <div class="arac-alanlar" style="margin-top:16px">
+        <label class="arac-alan"
+          >Hata düzeltme
+          <select id="q-seviye">
+            <option value="L">L — %7 (en küçük kod)</option>
+            <option value="M" selected>M — %15 (ekran için yeterli)</option>
+            <option value="Q">Q — %25 (baskı için önerilir)</option>
+            <option value="H">H — %30 (yıpranan yüzeyler)</option>
+          </select>
+        </label>
+        <label class="arac-alan"
+          >Modül boyu (piksel)
+          <span class="arac-kaydirac">
+            <input id="q-olcek" type="range" min="4" max="16" value="8" />
+            <output for="q-olcek" id="q-olcek-deger">8</output>
+          </span>
+        </label>
+      </div>
+    </section>
+
+    <section class="arac-blok">
+      <h2 class="arac-h2"><span class="arac-no">2</span> Kod</h2>
+      <div
+        style="display:grid;gap:20px;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));align-items:start"
+      >
+        <div style="display:grid;place-items:center;background:var(--bg);border:1px solid var(--line);border-radius:var(--r-m);padding:18px">
+          <canvas id="q-tuval" width="300" height="300" style="max-width:100%;height:auto;image-rendering:pixelated"></canvas>
+        </div>
+        <div>
+          <div class="arac-olcum" style="margin-top:0">
+            <span>Sürüm: <b id="q-surum">—</b></span>
+            <span>Modül: <b id="q-modul">—</b></span>
+            <span>Maske: <b id="q-maske">—</b></span>
+            <span>Kip: <b>bayt (UTF-8)</b></span>
+          </div>
+          <p class="arac-not">Kodlanan yük:</p>
+          <pre
+            id="q-yuk"
+            style="margin:0;font-size:13px;line-height:1.6;background:var(--bg);border:1px solid var(--line);border-radius:var(--r-s);padding:12px;white-space:pre-wrap;word-break:break-all"></pre>
+          <div class="arac-dugmeler">
+            <button type="button" class="dg" id="q-png">PNG indir</button>
+            <button type="button" class="dg arac-ikincil" id="q-svg">SVG indir</button>
+            <button type="button" class="dg arac-ikincil" id="q-kart">Misafir kartı (PNG)</button>
+          </div>
+          <p class="arac-durum" id="q-durum" role="status" aria-live="polite"></p>
+        </div>
+      </div>
+    </section>
+
+    <section class="arac-blok">
+      <h2 class="arac-h2"><span class="arac-no">3</span> Kullanmadan önce</h2>
+      <div class="arac-kutu uyari">
+        <h3>QR parolayı gizlemez</h3>
+        <p style="margin:0">
+          Kodun içinde parola <b>düz metin</b> olarak durur; kodu okuyan herkes parolayı da okur. Duvara
+          astığınız kart, parolayı duvara yazmakla aynı şeydir — bu yüzden misafir ağı için kullanın,
+          kurum ağı için değil.
+        </p>
+      </div>
+      <div class="arac-kutu" style="margin-top:12px">
+        <h3>Pratik notlar</h3>
+        <ul style="margin:0">
+          <li><b>WPA3-only</b> ağlarda bazı eski Android sürümleri QR ile bağlanamaz; misafir ağını WPA2/WPA3 karışık bırakın.</li>
+          <li>SSID'de Türkçe karakter varsa bazı cihazlar takılır; misafir ağı adını ASCII tutmak en güvenlisidir.</li>
+          <li>Baskıda <b>Q</b> seviyesi seçin: mürekkep akması ve yıpranma payı bırakır.</li>
+          <li>Kodun etrafındaki beyaz boşluk (sessiz alan) kırpılırsa okuma bozulur; indirilen dosyada bu boşluk zaten var.</li>
+        </ul>
+      </div>
+    </section>
+  </div>
+
+  <script>
+    import { qrUret, wifiYuku } from '../../scripts/qr.js';
+
+    const el = (s) => document.querySelector(s);
+    const tuval = el('#q-tuval');
+    const ctx = tuval.getContext('2d');
+    const SESSIZ = 4; // standart sessiz alan: 4 modül
+
+    let suanki = null;
+
+    const kipAl = () => document.querySelector('input[name="q-kip"]:checked').value;
+
+    function yukHazirla() {
+      if (kipAl() === 'metin') return el('#q-icerik').value || ' ';
+      return wifiYuku({
+        ssid: el('#q-ssid').value,
+        parola: el('#q-parola').value,
+        sifreleme: el('#q-sifreleme').value,
+        gizli: el('#q-gizli').checked,
+      });
+    }
+
+    function ciz() {
+      const durum = el('#q-durum');
+      durum.textContent = '';
+      durum.className = 'arac-durum';
+      const yuk = yukHazirla();
+      el('#q-yuk').textContent = yuk;
+
+      try {
+        suanki = qrUret(yuk, { seviye: el('#q-seviye').value });
+      } catch (hata) {
+        suanki = null;
+        durum.textContent = hata.message;
+        durum.classList.add('hata');
+        return;
+      }
+
+      const olcek = +el('#q-olcek').value;
+      const kenar = (suanki.boyut + SESSIZ * 2) * olcek;
+      tuval.width = kenar;
+      tuval.height = kenar;
+      ctx.fillStyle = '#ffffff';
+      ctx.fillRect(0, 0, kenar, kenar);
+      ctx.fillStyle = '#16203a';
+      for (let y = 0; y < suanki.boyut; y++) {
+        for (let x = 0; x < suanki.boyut; x++) {
+          if (suanki.modul[y][x]) {
+            ctx.fillRect((x + SESSIZ) * olcek, (y + SESSIZ) * olcek, olcek, olcek);
+          }
+        }
+      }
+
+      el('#q-surum').textContent = suanki.surum;
+      el('#q-modul').textContent = `${suanki.boyut}×${suanki.boyut}`;
+      el('#q-maske').textContent = suanki.maske;
+    }
+
+    function indir(veriAdres, ad) {
+      const a = document.createElement('a');
+      a.href = veriAdres;
+      a.download = ad;
+      a.click();
+    }
+
+    const dosyaAdi = () =>
+      (kipAl() === 'wifi' ? (el('#q-ssid').value || 'wifi').replace(/[^\w.-]+/g, '-') : 'qr').slice(0, 40);
+
+    el('#q-png').addEventListener('click', () => indir(tuval.toDataURL('image/png'), `${dosyaAdi()}-qr.png`));
+
+    el('#q-svg').addEventListener('click', () => {
+      if (!suanki) return;
+      const n = suanki.boyut + SESSIZ * 2;
+      let yol = '';
+      for (let y = 0; y < suanki.boyut; y++) {
+        for (let x = 0; x < suanki.boyut; x++) {
+          if (suanki.modul[y][x]) yol += `M${x + SESSIZ} ${y + SESSIZ}h1v1h-1z`;
+        }
+      }
+      const svg =
+        `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${n} ${n}" shape-rendering="crispEdges">` +
+        `<rect width="${n}" height="${n}" fill="#ffffff"/><path d="${yol}" fill="#16203a"/></svg>`;
+      indir('data:image/svg+xml;charset=utf-8,' + encodeURIComponent(svg), `${dosyaAdi()}-qr.svg`);
+    });
+
+    /* Misafir kartı: duvara asılacak tek sayfalık çıktı ------------------- */
+    el('#q-kart').addEventListener('click', () => {
+      if (!suanki) return;
+      const w = 1080;
+      const h = 1350;
+      const kart = document.createElement('canvas');
+      kart.width = w;
+      kart.height = h;
+      const k = kart.getContext('2d');
+      const yazi = 'Nunito, system-ui, sans-serif';
+
+      k.fillStyle = '#ffffff';
+      k.fillRect(0, 0, w, h);
+      k.fillStyle = '#3a45e0';
+      k.fillRect(0, 0, w, 16);
+
+      k.fillStyle = '#16203a';
+      k.textAlign = 'center';
+      k.font = `900 62px ${yazi}`;
+      k.fillText('Wi-Fi', w / 2, 150);
+      k.font = `500 30px ${yazi}`;
+      k.fillStyle = '#6b7488';
+      k.fillText('Kamerayı kodun üstüne tutun, bağlanır', w / 2, 200);
+
+      // QR: kartın ortasında, sessiz alanıyla birlikte
+      const alan = 620;
+      const olcek = Math.floor(alan / (suanki.boyut + SESSIZ * 2));
+      const kenar = (suanki.boyut + SESSIZ * 2) * olcek;
+      const qx = (w - kenar) / 2;
+      const qy = 250;
+      k.fillStyle = '#ffffff';
+      k.fillRect(qx, qy, kenar, kenar);
+      k.fillStyle = '#16203a';
+      for (let y = 0; y < suanki.boyut; y++) {
+        for (let x = 0; x < suanki.boyut; x++) {
+          if (suanki.modul[y][x]) k.fillRect(qx + (x + SESSIZ) * olcek, qy + (y + SESSIZ) * olcek, olcek, olcek);
+        }
+      }
+
+      const altY = qy + kenar + 90;
+      const satirlar =
+        kipAl() === 'wifi'
+          ? [
+              ['Ağ adı', el('#q-ssid').value],
+              el('#q-sifreleme').value === 'yok' ? ['Parola', 'yok — açık ağ'] : ['Parola', el('#q-parola').value],
+            ]
+          : [['İçerik', el('#q-icerik').value.slice(0, 60)]];
+
+      let y = altY;
+      for (const [etiket, deger] of satirlar) {
+        k.font = `700 26px ${yazi}`;
+        k.fillStyle = '#6b7488';
+        k.fillText(etiket.toLocaleUpperCase('tr'), w / 2, y);
+        k.font = `900 46px ${yazi}`;
+        k.fillStyle = '#16203a';
+        k.fillText(deger, w / 2, y + 58);
+        y += 130;
+      }
+
+      k.font = `500 24px ${yazi}`;
+      k.fillStyle = '#6b7488';
+      k.fillText('QR okunmazsa ağı listeden seçip parolayı elle girin', w / 2, h - 60);
+
+      indir(kart.toDataURL('image/png'), `${dosyaAdi()}-wifi-kart.png`);
+    });
+
+    /* olaylar --------------------------------------------------------------- */
+    document.querySelectorAll('input[name="q-kip"]').forEach((r) =>
+      r.addEventListener('change', () => {
+        const wifi = kipAl() === 'wifi';
+        el('#q-wifi').hidden = !wifi;
+        el('#q-metin').hidden = wifi;
+        el('#q-kart').textContent = wifi ? 'Misafir kartı (PNG)' : 'Kart olarak indir';
+        ciz();
+      })
+    );
+
+    el('#q-sifreleme').addEventListener('change', () => {
+      el('#q-parola').disabled = el('#q-sifreleme').value === 'yok';
+      ciz();
+    });
+
+    el('#q-olcek').addEventListener('input', () => {
+      el('#q-olcek-deger').textContent = el('#q-olcek').value;
+      ciz();
+    });
+
+    ['#q-ssid', '#q-parola', '#q-icerik', '#q-seviye'].forEach((s) =>
+      el(s).addEventListener('input', ciz)
+    );
+    el('#q-gizli').addEventListener('change', ciz);
+    el('#q-seviye').addEventListener('change', ciz);
+
+    ciz();
+  </script>
+</Base>

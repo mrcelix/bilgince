@@ -1,0 +1,11 @@
+---
+baslik: "Boşta duran Copilot lisansları"
+ozet: "Pahalı lisans kaleminde atanmamış koltuk aramanın en kısa yolu."
+konu: "copilot"
+etiketler: ["copilot", "lisans", "maliyet"]
+kod: |
+  Get-MgSubscribedSku | Where-Object SkuPartNumber -like '*COPILOT*' |
+    Select-Object SkuPartNumber, ConsumedUnits,
+      @{n='Bos'; e={$_.PrepaidUnits.Enabled - $_.ConsumedUnits}}
+dikkat: "Atanmış olması kullanıldığı anlamına gelmez. Gerçek kullanım için Microsoft 365 yönetim merkezindeki kullanım raporlarına bakın; lisans sayısı yalnızca üst sınırdır."
+---

@@ -1,0 +1,10 @@
+---
+baslik: "Yerel yöneticiler grubunda kimler var?"
+ozet: "Yıllar içinde eklenen kullanıcılar, eski servis hesapları ve unutulmuş etki alanı grupları burada birikir."
+konu: "guvenlik"
+etiketler: ["yetki", "denetim", "laps"]
+kod: |
+  Get-LocalGroupMember -Group 'Administrators' |
+    Select-Object Name, PrincipalSource, ObjectClass
+dikkat: "Yerel yönetici parolası her makinede aynıysa bir makinenin ele geçirilmesi hepsinin ele geçirilmesi demektir. Windows LAPS bunu çözer."
+---

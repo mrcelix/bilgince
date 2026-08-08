@@ -1,0 +1,9 @@
+---
+baslik: "Mac gerçekten MDM'e kayıtlı mı?"
+ozet: "Envanterde görünmesi kayıtlı olduğu anlamına gelmez; cihaza sorun."
+konu: "macos"
+etiketler: ["mdm", "intune", "envanter"]
+kod: |
+  sudo profiles status -type enrollment
+dikkat: "'Enrolled via DEP: No' çıkıyorsa cihaz elle kaydedilmiş demektir: silinip yeniden kurulduğunda yönetimden düşer. Otomatik cihaz kaydına almadan filoya saymayın."
+---

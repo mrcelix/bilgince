@@ -1,0 +1,18 @@
+---
+baslik: "NTLM ile açılan oturumları bul"
+ozet: "NTLM'i kapatmadan önce kimin kullandığını bilmek gerekir; kapatıp beklemek kesinti üretir."
+konu: "guvenlik"
+etiketler: ["ntlm", "kerberos", "sertlestirme"]
+kod: |
+  Get-WinEvent -LogName Security -MaxEvents 200 -FilterXPath @"
+  *[System[EventID=4624] and EventData[Data[@Name='AuthenticationPackageName']='NTLM']]
+  "@ | ForEach-Object {
+    $x = [xml]$_.ToXml()
+    [pscustomobject]@{
+      Zaman   = $_.TimeCreated
+      Hesap   = ($x.Event.EventData.Data | Where-Object Name -eq 'TargetUserName').'#text'
+      Kaynak  = ($x.Event.EventData.Data | Where-Object Name -eq 'WorkstationName').'#text'
+    }
+  } | Group-Object Hesap | Sort-Object Count -Descending
+dikkat: "Etki alanı denetleyicisinde çalıştırın. Tek makinede yalnızca o makineye gelen oturumları görürsünüz; asıl resim denetleyicilerdedir."
+---

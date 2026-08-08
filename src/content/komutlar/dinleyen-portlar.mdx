@@ -1,0 +1,12 @@
+---
+baslik: "Bu portu hangi süreç dinliyor?"
+ozet: "Yeni kurulan bir hizmet ayağa kalkmıyorsa portu tutan başka bir şey vardır."
+konu: "windows-server"
+etiketler: ["port", "tanilama", "hizmet"]
+kod: |
+  Get-NetTCPConnection -State Listen |
+    Select-Object LocalAddress, LocalPort,
+      @{n='Surec'; e={ (Get-Process -Id $_.OwningProcess -ErrorAction SilentlyContinue).ProcessName }},
+      OwningProcess | Sort-Object LocalPort
+dikkat: "0.0.0.0 tüm arayüzleri dinliyor demektir; yönetim arayüzlerinin yalnızca iç ağ adresine bağlanması gerekir."
+---

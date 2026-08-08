@@ -1,0 +1,9 @@
+---
+baslik: "Son yedek ne zaman ve başarılı mıydı?"
+ozet: "İki ayrı soru: en son ne zaman çalıştı ve en son ne zaman başarılı oldu."
+konu: "yedekleme"
+etiketler: ["yedekleme", "izleme", "windows-server-backup"]
+kod: |
+  Get-WBSummary | Select-Object LastSuccessfulBackupTime, LastBackupResultHR, NextBackupTime
+dikkat: "LastBackupResultHR 0 değilse son iş başarısızdır ve 'son başarılı' tarihi eskide kalır. İzlemeniz bu iki alanı ayrı ayrı kontrol etmiyorsa aylarca yedeksiz kalabilirsiniz."
+---

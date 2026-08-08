@@ -29,6 +29,12 @@ sayfası bunu belirten bir not gösterir.
 | `/etiket/<slug>` | `src/pages/etiket/[etiket].astro` | Etiketin geçtiği rehberler ve komutlar |
 | `/ipuclari` | `src/pages/ipuclari/index.astro` | Hızlı ipuçları |
 | `/komutlar` | `src/pages/komutlar.astro` | Komut kütüphanesi: konuya göre süzme, metin arama, kopyala düğmesi |
+| `/hizli-cozumler` | `src/pages/hizli-cozumler/index.astro` | Belirtiye göre arama; her kayıt indirilebilir bir araca çıkar |
+| `/araclar` | `src/pages/araclar/index.astro` | Üreteçler ve indirilebilir betiklerin dizini (`src/araclar.js`) |
+| `/araclar/parola` | `src/pages/araclar/parola.astro` | Parola ve geçiş cümlesi üreteci, entropi ölçümü |
+| `/araclar/sizinti-kontrol` | `src/pages/araclar/sizinti-kontrol.astro` | Pwned Passwords k-anonimlik sorgusu, çevrimdışı örüntü analizi |
+| `/araclar/wifi-qr` | `src/pages/araclar/wifi-qr.astro` | Wi-Fi QR kodu ve yazdırılabilir misafir kartı |
+| `/araclar/paylasim-karti` | `src/pages/araclar/paylasim-karti.astro` | Site temasından sosyal medya görseli üretir |
 | `/ozgecmis/yazdir` | `src/pages/ozgecmis/yazdir.astro` | Yazdırma düzeni — tarayıcıdan "PDF olarak kaydet" |
 | `/portfolyo` | `src/pages/portfolyo/index.astro` | Proje listesi |
 | `/portfolyo/<slug>` | `src/pages/portfolyo/[...slug].astro` | Sorun → Yaklaşım → Sonuç, aşamalar, metrikler |
@@ -127,7 +133,22 @@ RSS, site haritası ve `robots.txt` hepsi oradan türer. Değiştirmek için tek
 **Şu anki kişisel içeriğin tamamı uydurmadır** — iş yerleri, tarihler, sertifikalar ve proje
 sayıları gerçekçi görünsün diye yazıldı. Yayına almadan önce değiştirin.
 
-## Paylaşım kartı üreteci
+## Araçlar
+
+Üreteçlerin kütüğü `src/araclar.js` içinde: menüdeki Araçlar sütunu, `/araclar`
+dizini ve sayaçlar oradan türer. Yeni araç eklemek = sayfayı yazmak + listeye bir
+satır eklemek.
+
+Üçü tamamen tarayıcıda çalışır ve hiçbir veri dışarı çıkmaz:
+
+- **Parola üreteci** — `crypto.getRandomValues`, 256 sözcüklük Türkçe geçiş cümlesi
+  sözlüğü (`src/scripts/kelimeler.js`), entropi ve kırılma süresi hesabı.
+- **Sızıntı kontrolü** — Pwned Passwords aralık ucu. Parolanın SHA-1 özeti tarayıcıda
+  hesaplanır, dışarıya yalnızca ilk 5 hane çıkar (k-anonimlik); eşleşme cihazda yapılır.
+- **Wi-Fi QR** — QR kodlayıcı kendi kodumuz (`src/scripts/qr.js`): bayt kipi, sürüm 1–10,
+  dört hata düzeltme seviyesi. Parola bir QR servisine yazılmaz.
+
+### Paylaşım kartı üreteci
 
 `/araclar/paylasim-karti` bir adresi okuyup sosyal medya görselleri üretir. Kart
 tuvalde çizilir, iki yetenek dışarıdan servis ister:

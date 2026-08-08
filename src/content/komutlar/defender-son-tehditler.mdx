@@ -1,0 +1,11 @@
+---
+baslik: "Defender bu makinede en son ne yakaladı?"
+ozet: "Kullanıcı 'virüs uyarısı çıktı' diyor ama ne olduğunu hatırlamıyor. Kayıt makinenin kendisinde duruyor."
+konu: "guvenlik"
+etiketler: ["defender", "kotu-amacli-yazilim", "olay-mudahale"]
+kod: |
+  Get-MpThreatDetection |
+    Sort-Object InitialDetectionTime -Descending |
+    Select-Object -First 20 InitialDetectionTime, ThreatID, Resources
+dikkat: "Boş dönmesi 'temiz' demek değildir: geçmiş temizlenmiş ya da tarama hiç çalışmamış olabilir. Get-MpComputerStatus ile son tarama tarihine de bakın."
+---

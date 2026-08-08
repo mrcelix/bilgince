@@ -1,0 +1,11 @@
+---
+baslik: "DHCP kapsamları dolmak üzere mi?"
+ozet: "Misafir ağında 'IP alamıyorum' şikâyetleri başlamadan önce görülebilecek tek sayı."
+konu: "ag"
+etiketler: ["dhcp", "ip-plani", "izleme"]
+kod: |
+  Get-DhcpServerv4ScopeStatistics -ComputerName dhcp01 |
+    Select-Object ScopeId, AddressesFree, AddressesInUse, PercentageInUse |
+    Sort-Object PercentageInUse -Descending
+dikkat: "Kiralama süresi uzunsa doluluk gerçek cihaz sayısından yüksek görünür. Misafir ağında kirayı 2–4 saate indirmek çoğu zaman kapsamı büyütmekten iyidir."
+---

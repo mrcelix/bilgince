@@ -1,0 +1,12 @@
+---
+baslik: "Alan adının SPF, DKIM ve DMARC kayıtları"
+ozet: "E-posta sahteciliğine karşı üç kaydın da olması gerekir; biri eksikse diğer ikisi tek başına yetmez."
+konu: "guvenlik"
+etiketler: ["dns", "eposta", "kimlik-avi"]
+kod: |
+  $alan = 'ornek.com'
+  Resolve-DnsName $alan -Type TXT | Where-Object Strings -match 'v=spf1' | Select-Object -Expand Strings
+  Resolve-DnsName "_dmarc.$alan" -Type TXT | Select-Object -Expand Strings
+  Resolve-DnsName "selector1._domainkey.$alan" -Type CNAME, TXT -ErrorAction SilentlyContinue
+dikkat: "DMARC'ta p=none yalnızca rapor toplar, hiçbir mesajı durdurmaz. Kurumların çoğu yıllarca p=none'da kalır ve korunduğunu sanır."
+---

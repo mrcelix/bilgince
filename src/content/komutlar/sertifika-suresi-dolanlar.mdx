@@ -1,0 +1,11 @@
+---
+baslik: "45 gün içinde süresi dolacak sertifikalar"
+ozet: "Yenileme takvimi kimsenin ajandasında değilse makinenin kendisine sorun."
+konu: "windows-server"
+etiketler: ["sertifika", "pki", "izleme"]
+kod: |
+  Get-ChildItem Cert:\LocalMachine\My |
+    Where-Object { $_.NotAfter -lt (Get-Date).AddDays(45) } |
+    Select-Object Subject, NotAfter, Thumbprint | Sort-Object NotAfter
+dikkat: "Yalnızca makine deposuna bakar. IIS bağlamaları, uygulama havuzları ve hizmet hesaplarının kişisel depoları ayrı yerlerdedir."
+---

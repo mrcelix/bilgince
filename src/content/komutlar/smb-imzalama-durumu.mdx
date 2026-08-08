@@ -1,0 +1,9 @@
+---
+baslik: "SMB imzalama ve SMB1 durumu"
+ozet: "Dosya sunucusu sertleştirmesinde ilk bakılacak üç ayar tek satırda."
+konu: "guvenlik"
+etiketler: ["smb", "sertlestirme", "dosya-sunucusu"]
+kod: |
+  Get-SmbServerConfiguration | Select-Object RequireSecuritySignature, EnableSMB1Protocol, EncryptData
+dikkat: "EnableSMB1Protocol True ise diğer maddeleri tartışmayı bırakın, önce onu kapatın. İmzalama zorunlu değilse ortadaki adam saldırısı dosya trafiğini değiştirebilir."
+---

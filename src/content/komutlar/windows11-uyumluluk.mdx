@@ -1,0 +1,16 @@
+---
+baslik: "Bu makine Windows 11'e çıkabilir mi?"
+ozet: "TPM, Secure Boot ve bellek — üç engelin üçünü tek çıktıda gösterir."
+konu: "windows"
+etiketler: ["windows-11", "gocurme", "envanter"]
+kod: |
+  $tpm = Get-Tpm
+  [pscustomobject]@{
+    TPM_Var      = $tpm.TpmPresent
+    TPM_Etkin    = $tpm.TpmReady
+    TPM_Surum    = (Get-CimInstance -Namespace root\cimv2\security\microsofttpm -ClassName Win32_Tpm).SpecVersion
+    SecureBoot   = try { Confirm-SecureBootUEFI } catch { 'BIOS/Legacy' }
+    RAM_GB       = [math]::Round((Get-CimInstance Win32_ComputerSystem).TotalPhysicalMemory / 1GB)
+  }
+dikkat: "SpecVersion '1.2' ile başlıyorsa yükseltme desteklenmez. Confirm-SecureBootUEFI eski BIOS makinelerinde hata fırlatır; yukarıdaki try bunu yakalıyor."
+---

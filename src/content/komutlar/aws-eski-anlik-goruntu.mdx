@@ -1,0 +1,11 @@
+---
+baslik: "Bir yıldan eski EBS anlık görüntüleri"
+ozet: "Yedek politikası yazılırken kimse eski anlık görüntüleri silmeyi yazmaz; depolama faturası onları hatırlatır."
+konu: "aws"
+etiketler: ["maliyet", "yedekleme", "ebs"]
+kod: |
+  aws ec2 describe-snapshots --owner-ids self \
+    --query "Snapshots[?StartTime<='2025-08-01'].{Id:SnapshotId, GB:VolumeSize, Tarih:StartTime, Not:Description}" \
+    --output table
+dikkat: "AMI'lerin dayandığı anlık görüntüleri silmeyin; önce describe-images ile hangi görüntünün hangi anlık görüntüye bağlı olduğunu çıkarın."
+---

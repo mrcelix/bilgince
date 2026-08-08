@@ -2,6 +2,7 @@
 import { getCollection } from 'astro:content';
 import KonuIkon from './KonuIkon.astro';
 import { SITE, KONULAR, GRUPLAR, POPULER_ARAMALAR, slugla, sayi } from '../site.js';
+import { ARACLAR } from '../araclar.js';
 
 const rehberler = (await getCollection('rehberler')).filter((r) => !r.data.taslak);
 const ipuclari = await getCollection('ipuclari');
@@ -254,25 +255,27 @@ const etkin = (p: string) => (yol === p || yol.startsWith(p + '/') ? 'page' : un
       <div class="mega-sutun">
         <span class="mega-etiket">Üreteçler</span>
         <span class="mega-grup-ozet">Tarayıcıda çalışır, kurulum yok</span>
-        <a class="mega-bag" href="/araclar/paylasim-karti">
-          <span class="ikon" aria-hidden="true"><KonuIkon ad="kutu" /></span>
-          <span>
-            <span class="ad">Paylaşım kartı üreteci<span class="say">yeni</span></span>
-            <span class="ac">Adresi girin, temasına uygun post görseli çıksın</span>
-          </span>
-        </a>
+        {
+          ARACLAR.map((a) => (
+            <a class="mega-bag" href={`/araclar/${a.slug}`}>
+              <span class="ikon" aria-hidden="true">
+                <KonuIkon ad={a.ikon} />
+              </span>
+              <span>
+                <span class="ad">
+                  {a.ad}
+                  {a.etiket && <span class="say">{a.etiket}</span>}
+                </span>
+                <span class="ac">{a.ozet}</span>
+              </span>
+            </a>
+          ))
+        }
         <a class="mega-bag" href="/komutlar">
           <span class="ikon" aria-hidden="true"><KonuIkon ad="terminal" /></span>
           <span>
             <span class="ad">Komut kütüphanesi<span class="say">{komutlar.length}</span></span>
             <span class="ac">Konuya göre süz, tek tıkla kopyala</span>
-          </span>
-        </a>
-        <a class="mega-bag" href="/ozgecmis/yazdir">
-          <span class="ikon" aria-hidden="true"><KonuIkon ad="pencere" /></span>
-          <span>
-            <span class="ad">Özgeçmiş yazdırma düzeni</span>
-            <span class="ac">Tarayıcıdan PDF olarak kaydedilir</span>
           </span>
         </a>
       </div>
@@ -302,7 +305,7 @@ const etkin = (p: string) => (yol === p || yol.startsWith(p + '/') ? 'page' : un
           <h3>Belirtiyi yazın, aracıyla birlikte çözümü alın</h3>
           <span class="alt">{cozumler.length} kayıt · {betikler.length} indirilebilir betik</span>
         </a>
-        <a class="mega-tum" href="/ipuclari">Hızlı ipuçları · {ipuclari.length} not →</a>
+        <a class="mega-tum" href="/araclar">Tüm araçlar · {ARACLAR.length} üreteç →</a>
       </div>
     </div>
   </div>
@@ -344,7 +347,7 @@ const etkin = (p: string) => (yol === p || yol.startsWith(p + '/') ? 'page' : un
     <a href="/hizli-cozumler">Hızlı Çözümler <span class="say">{cozumler.length}</span></a>
     <a href="/komutlar">Komut kütüphanesi <span class="say">{komutlar.length}</span></a>
     <a href="/ipuclari">Hızlı ipuçları <span class="say">{ipuclari.length}</span></a>
-    <a href="/araclar/paylasim-karti">Paylaşım kartı üreteci</a>
+    <a href="/araclar">Araçlar <span class="say">{ARACLAR.length}</span></a>
     <a href="/portfolyo">Portfolyo</a>
     <a href="/ozgecmis">Özgeçmiş</a>
     <a href="/hakkimda">Hakkımda</a>

@@ -1,0 +1,9 @@
+---
+baslik: "Hiçbir sanal makineye bağlı olmayan Azure diskleri"
+ozet: "Silinen makinelerin diskleri arkada kalır ve her ay tam ücret öder. Fatura kaleminin adı yoktur, sahibi de."
+konu: "azure"
+etiketler: ["maliyet", "depolama", "temizlik"]
+kod: |
+  az disk list --query "[?diskState=='Unattached'].{Ad:name, Grup:resourceGroup, GB:diskSizeGb, Katman:sku.name}" -o table
+dikkat: "Silmeden önce anlık görüntü alın ve bir hafta bekleyin. 'Bağlı değil' bazen 'yarın taşınacak' demektir."
+---

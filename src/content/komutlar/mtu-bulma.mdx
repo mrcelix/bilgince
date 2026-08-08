@@ -1,0 +1,9 @@
+---
+baslik: "Yoldaki gerçek MTU değerini bul"
+ozet: "VPN üstünde bazı siteler açılıyor bazıları takılıyorsa, sorun çoğu zaman parçalanmayan büyük paketlerdir."
+konu: "ag"
+etiketler: ["mtu", "vpn", "tanilama"]
+kod: |
+  ping -f -l 1472 8.8.8.8
+dikkat: "'Paketin parçalanması gerekiyor' hatası alana kadar 1472'den aşağı inin. Geçen en büyük değere 28 ekleyin: yolun MTU'su odur. VPN'de 1500 beklemeyin, 1400 civarı normaldir."
+---

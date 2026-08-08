@@ -1,0 +1,10 @@
+---
+baslik: "BitLocker açık ama kurtarma anahtarı yedeklendi mi?"
+ozet: "Şifreleme durumu ile anahtarın yedeği ayrı sorulardır. İkincisi olmadan disk şifreli ve kurtarılamaz."
+konu: "windows"
+etiketler: ["bitlocker", "sifreleme", "kurtarma"]
+kod: |
+  Get-BitLockerVolume | Select-Object MountPoint, VolumeStatus, ProtectionStatus,
+    @{n='KurtarmaAnahtari'; e={ ($_.KeyProtector | Where-Object KeyProtectorType -eq 'RecoveryPassword').Count }}
+dikkat: "Sayı 0 ise anahtar yalnızca TPM'de: anakart değişiminde veya ürün yazılımı güncellemesinde veri gider. Anahtarı Entra ID'ye ya da AD'ye yedekleyin."
+---

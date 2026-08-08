@@ -1,0 +1,340 @@
+---
+import Base from '../../layouts/Base.astro';
+---
+
+<Base
+  baslik="Parola üreteci"
+  aciklama="Kriptografik rastgelelikle parola ve Türkçe geçiş cümlesi üretir; entropiyi, kırılma süresini ve zayıf örüntüleri aynı ekranda gösterir. Her şey tarayıcıda çalışır."
+  aramaya={false}
+>
+  <div class="arama-bas">
+    <div class="kap">
+      <nav class="kirinti" aria-label="Kırıntı yolu" style="padding-top:0">
+        <a href="/">Ana sayfa</a><span class="ayrac">/</span><a href="/araclar">Araçlar</a><span
+          class="ayrac">/</span
+        ><span aria-current="page">Parola üreteci</span>
+      </nav>
+      <h1>Parola üreteci</h1>
+      <p style="color:var(--muted);font-size:14px;margin-top:8px;max-width:64ch">
+        Rastgelelik <code>crypto.getRandomValues</code> ile üretilir, <code>Math.random</code> kullanılmaz.
+        Parola sayfadan çıkmaz: sunucuya gönderilmez, günlüğe yazılmaz, adres çubuğunda görünmez.
+      </p>
+    </div>
+  </div>
+
+  <div class="kap arac-sayfa">
+    <section class="arac-blok">
+      <h2 class="arac-h2"><span class="arac-no">1</span> Ne üretilsin</h2>
+      <div class="arac-onaylar" role="radiogroup" aria-label="Üretim kipi">
+        <label class="arac-onay"
+          ><input type="radio" name="kip" value="karakter" checked /> <span>Karakter parolası</span></label
+        >
+        <label class="arac-onay"
+          ><input type="radio" name="kip" value="cumle" /> <span>Geçiş cümlesi (Türkçe sözcükler)</span></label
+        >
+      </div>
+
+      <div id="p-karakter" style="margin-top:18px">
+        <div class="arac-alanlar">
+          <label class="arac-alan"
+            >Uzunluk
+            <span class="arac-kaydirac">
+              <input id="p-uzunluk" type="range" min="8" max="64" value="20" />
+              <output for="p-uzunluk" id="p-uzunluk-deger">20</output>
+            </span>
+          </label>
+        </div>
+        <div class="arac-onaylar">
+          <label class="arac-onay"><input type="checkbox" id="p-kucuk" checked /> <span>abc</span></label>
+          <label class="arac-onay"><input type="checkbox" id="p-buyuk" checked /> <span>ABC</span></label>
+          <label class="arac-onay"><input type="checkbox" id="p-rakam" checked /> <span>123</span></label>
+          <label class="arac-onay"><input type="checkbox" id="p-sembol" checked /> <span>!#$%</span></label>
+          <label class="arac-onay"
+            ><input type="checkbox" id="p-benzer" /> <span>Benzer karakterleri ele (I l 1 O 0 B 8 S 5)</span></label
+          >
+          <label class="arac-onay"
+            ><input type="checkbox" id="p-hepsi" checked /> <span>Her kümeden en az bir karakter</span></label
+          >
+        </div>
+      </div>
+
+      <div id="p-cumle" hidden style="margin-top:18px">
+        <div class="arac-alanlar">
+          <label class="arac-alan"
+            >Kelime sayısı
+            <span class="arac-kaydirac">
+              <input id="p-kelime" type="range" min="3" max="10" value="7" />
+              <output for="p-kelime" id="p-kelime-deger">7</output>
+            </span>
+          </label>
+          <label class="arac-alan"
+            >Ayırıcı
+            <select id="p-ayirici">
+              <option value="-">tire ( - )</option>
+              <option value=".">nokta ( . )</option>
+              <option value="_">alt çizgi ( _ )</option>
+              <option value=" ">boşluk</option>
+              <option value="">yok</option>
+            </select>
+          </label>
+        </div>
+        <div class="arac-onaylar">
+          <label class="arac-onay"
+            ><input type="checkbox" id="p-bashafr" checked /> <span>Baş harfleri büyüt</span></label
+          >
+          <label class="arac-onay"><input type="checkbox" id="p-sayi" /> <span>Sonuna iki hane sayı ekle</span></label>
+        </div>
+        <p class="arac-not">
+          Sözlük 256 sözcük; her kelime tam 8 bit entropi demek. Beş kelime 40 bit, yedi kelime 56 bit,
+          dokuz kelime 72 bit. Akılda kalması kolay olduğu için uzun tutun: kısa geçiş cümlesi, kısa
+          paroladan daha güvenli değildir.
+        </p>
+      </div>
+    </section>
+
+    <section class="arac-blok">
+      <h2 class="arac-h2"><span class="arac-no">2</span> Sonuç</h2>
+      <output class="arac-cikti" id="p-cikti" aria-live="polite">…</output>
+
+      <div class="arac-olcer" id="p-olcer" data-guc="zayif"><i style="width:8%"></i></div>
+      <div class="arac-olcum">
+        <span>Entropi: <b id="p-bit">—</b></span>
+        <span>Güç: <b id="p-guc">—</b></span>
+        <span>Kaba kuvvetle kırılma: <b id="p-sure">—</b></span>
+      </div>
+
+      <div class="arac-dugmeler">
+        <button type="button" class="dg" id="p-yeni">Yeni üret</button>
+        <button type="button" class="dg arac-ikincil" id="p-kopyala">Kopyala</button>
+        <button type="button" class="dg arac-ikincil" id="p-sizinti">Sızıntı listesinde ara</button>
+      </div>
+      <p class="arac-durum" id="p-durum" role="status" aria-live="polite"></p>
+
+      <div id="p-uyari" hidden style="margin-top:14px"></div>
+    </section>
+
+    <section class="arac-blok">
+      <h2 class="arac-h2"><span class="arac-no">3</span> Toplu üretim</h2>
+      <p class="arac-not" style="margin-top:0">
+        Yeni kurulan makinelere yerel yönetici parolası, servis hesabı ya da geçici kullanıcı parolası
+        dağıtırken listeyi buradan alın.
+      </p>
+      <div class="arac-alanlar" style="margin-top:14px">
+        <label class="arac-alan"
+          >Adet
+          <span class="arac-kaydirac">
+            <input id="p-adet" type="range" min="2" max="50" value="10" />
+            <output for="p-adet" id="p-adet-deger">10</output>
+          </span>
+        </label>
+      </div>
+      <div class="arac-dugmeler">
+        <button type="button" class="dg arac-ikincil" id="p-toplu">Listeyi üret</button>
+        <button type="button" class="dg arac-ikincil" id="p-indir" hidden>.txt indir</button>
+        <button type="button" class="dg arac-ikincil" id="p-toplu-kopya" hidden>Hepsini kopyala</button>
+      </div>
+      <pre
+        id="p-liste"
+        hidden
+        style="margin-top:14px;font-size:13.5px;line-height:1.7;background:var(--bg);border:1px solid var(--line);border-radius:var(--r-s);padding:14px;overflow:auto"></pre>
+    </section>
+
+    <section class="arac-blok">
+      <h2 class="arac-h2"><span class="arac-no">4</span> Bu sayılar ne anlama geliyor</h2>
+      <div class="arac-kutu">
+        <p style="margin:0 0 10px">
+          <b>Entropi</b>, parolanın kaç farklı olasılık arasından seçildiğinin bit cinsinden ölçüsüdür. Her
+          ek bit olasılığı ikiye katlar. Kırılma süresi, sızdırılmış bir karma dosyasına <b>saniyede 10¹¹
+          deneme</b> yapan bir saldırgan varsayımıyla hesaplanır — sunucuya tek tek deneme yapan bir
+          saldırgan çok daha yavaştır, ama parolanızı korumanız gereken senaryo bu değildir.
+        </p>
+        <ul style="margin:0">
+          <li><b>40 bitin altı:</b> zayıf. Bugünün donanımı için pratikte anlık.</li>
+          <li><b>60 bit:</b> sıradan hesaplar için makul alt sınır.</li>
+          <li><b>80 bit ve üstü:</b> yönetici hesabı, kasa parolası, şifreleme anahtarı için hedeflenecek yer.</li>
+        </ul>
+      </div>
+      <p class="arac-not">
+        Entropi yalnızca <em>rastgele üretilmiş</em> parolalar için anlamlıdır. Kendi seçtiğiniz "Ankara2026!"
+        matematiksel olarak 72 bit görünür, sözlük saldırısında saniyeler içinde düşer. Aşağıdaki
+        <a href="/araclar/sizinti-kontrol">sızıntı kontrolü</a> tam olarak bunu ölçer.
+      </p>
+    </section>
+  </div>
+
+  <script>
+    import { KUMELER, parolaUret, karakterEntropi, gecisCumlesi, kirilmaSuresi, guc, orunutuBul } from '../../scripts/parola.js';
+    import { KELIMELER } from '../../scripts/kelimeler.js';
+    import { sizintiSay, sayiBicim } from '../../scripts/sizinti.js';
+
+    const el = (s) => document.querySelector(s);
+    let suanki = '';
+    let sonBit = 0;
+
+    const kipAl = () => document.querySelector('input[name="kip"]:checked').value;
+
+    function ayarlar() {
+      return {
+        uzunluk: +el('#p-uzunluk').value,
+        kucuk: el('#p-kucuk').checked,
+        buyuk: el('#p-buyuk').checked,
+        rakam: el('#p-rakam').checked,
+        sembol: el('#p-sembol').checked,
+        benzerleriEle: el('#p-benzer').checked,
+        herKumedenEnAz: el('#p-hepsi').checked,
+      };
+    }
+
+    function uret() {
+      const durum = el('#p-durum');
+      durum.textContent = '';
+      durum.className = 'arac-durum';
+      el('#p-uyari').hidden = true;
+
+      try {
+        if (kipAl() === 'karakter') {
+          const sonuc = parolaUret(ayarlar());
+          suanki = sonuc.parola;
+          sonBit = karakterEntropi(sonuc.parola.length, sonuc.havuzBoyu);
+        } else {
+          const sonuc = gecisCumlesi(
+            {
+              kelimeSayisi: +el('#p-kelime').value,
+              ayirici: el('#p-ayirici').value,
+              basHarfBuyuk: el('#p-bashafr').checked,
+              sayiEkle: el('#p-sayi').checked,
+            },
+            KELIMELER
+          );
+          suanki = sonuc.parola;
+          sonBit = sonuc.bit;
+        }
+      } catch (hata) {
+        durum.textContent = hata.message;
+        durum.classList.add('hata');
+        return;
+      }
+
+      el('#p-cikti').textContent = suanki;
+      const g = guc(sonBit);
+      el('#p-olcer').dataset.guc = g.sinif;
+      el('#p-olcer').firstElementChild.style.width = g.oran + '%';
+      el('#p-bit').textContent = Math.round(sonBit) + ' bit';
+      el('#p-guc').textContent = g.ad;
+      el('#p-sure').textContent = kirilmaSuresi(sonBit);
+
+      const bulgular = orunutuBul(suanki);
+      if (bulgular.length) {
+        el('#p-uyari').hidden = false;
+        el('#p-uyari').innerHTML =
+          '<div class="arac-kutu uyari"><h3>Dikkat çeken örüntüler</h3><ul>' +
+          bulgular.map((b) => `<li>${b}</li>`).join('') +
+          '</ul></div>';
+      }
+    }
+
+    /* kip değişimi ---------------------------------------------------------- */
+    document.querySelectorAll('input[name="kip"]').forEach((r) =>
+      r.addEventListener('change', () => {
+        const karakter = kipAl() === 'karakter';
+        el('#p-karakter').hidden = !karakter;
+        el('#p-cumle').hidden = karakter;
+        uret();
+      })
+    );
+
+    /* kaydıraçlar ----------------------------------------------------------- */
+    for (const [kaydirac, gosterge] of [
+      ['#p-uzunluk', '#p-uzunluk-deger'],
+      ['#p-kelime', '#p-kelime-deger'],
+      ['#p-adet', '#p-adet-deger'],
+    ]) {
+      el(kaydirac).addEventListener('input', () => {
+        el(gosterge).textContent = el(kaydirac).value;
+        if (kaydirac !== '#p-adet') uret();
+      });
+    }
+
+    document
+      .querySelectorAll('#p-kucuk, #p-buyuk, #p-rakam, #p-sembol, #p-benzer, #p-hepsi, #p-ayirici, #p-bashafr, #p-sayi')
+      .forEach((d) => d.addEventListener('change', uret));
+
+    el('#p-yeni').addEventListener('click', uret);
+
+    async function panoyaYaz(metin, dugme, eskiMetin) {
+      try {
+        await navigator.clipboard.writeText(metin);
+        dugme.textContent = 'Kopyalandı';
+      } catch {
+        dugme.textContent = 'Kopyalanamadı';
+      }
+      setTimeout(() => (dugme.textContent = eskiMetin), 1600);
+    }
+
+    el('#p-kopyala').addEventListener('click', (e) => panoyaYaz(suanki, e.currentTarget, 'Kopyala'));
+
+    /* sızıntı kontrolü ------------------------------------------------------ */
+    el('#p-sizinti').addEventListener('click', async (e) => {
+      const dugme = e.currentTarget;
+      const durum = el('#p-durum');
+      dugme.disabled = true;
+      durum.className = 'arac-durum';
+      durum.textContent = 'Sızıntı listesi soruluyor (parola gönderilmiyor)…';
+      try {
+        const { adet, onEk, aday } = await sizintiSay(suanki);
+        durum.textContent =
+          adet > 0
+            ? `Bu parola sızıntı listesinde ${sayiBicim(adet)} kez geçiyor — kullanmayın.`
+            : `Listede yok. Sorulan ön ek "${onEk}", dönen aday karma sayısı ${aday}.`;
+        durum.classList.add(adet > 0 ? 'hata' : 'ok');
+      } catch (hata) {
+        durum.textContent = hata.message;
+        durum.classList.add('hata');
+      } finally {
+        dugme.disabled = false;
+      }
+    });
+
+    /* toplu üretim ---------------------------------------------------------- */
+    let toplu = [];
+    el('#p-toplu').addEventListener('click', () => {
+      const adet = +el('#p-adet').value;
+      toplu = [];
+      for (let i = 0; i < adet; i++) {
+        toplu.push(
+          kipAl() === 'karakter'
+            ? parolaUret(ayarlar()).parola
+            : gecisCumlesi(
+                {
+                  kelimeSayisi: +el('#p-kelime').value,
+                  ayirici: el('#p-ayirici').value,
+                  basHarfBuyuk: el('#p-bashafr').checked,
+                  sayiEkle: el('#p-sayi').checked,
+                },
+                KELIMELER
+              ).parola
+        );
+      }
+      const liste = el('#p-liste');
+      liste.hidden = false;
+      liste.textContent = toplu.join('\n');
+      el('#p-indir').hidden = false;
+      el('#p-toplu-kopya').hidden = false;
+    });
+
+    el('#p-toplu-kopya').addEventListener('click', (e) =>
+      panoyaYaz(toplu.join('\n'), e.currentTarget, 'Hepsini kopyala')
+    );
+
+    el('#p-indir').addEventListener('click', () => {
+      const blob = new Blob([toplu.join('\r\n')], { type: 'text/plain;charset=utf-8' });
+      const a = document.createElement('a');
+      a.href = URL.createObjectURL(blob);
+      a.download = 'parolalar.txt';
+      a.click();
+      setTimeout(() => URL.revokeObjectURL(a.href), 4000);
+    });
+
+    uret();
+  </script>
+</Base>

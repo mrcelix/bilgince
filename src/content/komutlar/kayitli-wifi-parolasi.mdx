@@ -1,0 +1,9 @@
+---
+baslik: "Makinede kayıtlı Wi-Fi parolasını göster"
+ozet: "Kullanıcı parolayı unuttu, ağ profili makinede duruyor. Parola orada, düz metin."
+konu: "ag"
+etiketler: ["wifi", "netsh", "kurtarma"]
+kod: |
+  netsh wlan show profile name="AgAdi" key=clear | Select-String 'Key Content|Anahtar İçeriği'
+dikkat: "Yönetici hakkı ister ve parolayı ekrana düz metin basar. Ekran paylaşımı ya da kayıt açıkken çalıştırmayın; sonrasında konsol geçmişini de temizleyin."
+---

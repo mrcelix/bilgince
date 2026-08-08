@@ -1,0 +1,16 @@
+---
+baslik: "Sunucu hangi TLS sürümlerini kabul ediyor?"
+ozet: "Tarayıcı açılıyor diye TLS 1.2 kapalı sanmayın; el sıkışmayı sürüm sürüm deneyin."
+konu: "guvenlik"
+etiketler: ["tls", "sertifika", "sertlestirme"]
+kod: |
+  $h = 'www.ornek.com'
+  foreach ($p in 'Tls12', 'Tls13') {
+    $c = [Net.Sockets.TcpClient]::new($h, 443)
+    $s = [Net.Security.SslStream]::new($c.GetStream())
+    try { $s.AuthenticateAsClient($h, $null, [Net.SecurityProtocolType]::$p, $false); "$p : kabul" }
+    catch { "$p : ret" }
+    finally { $s.Dispose(); $c.Dispose() }
+  }
+dikkat: "Windows Server 2019 ve öncesi Tls13'ü hiç bilmez; 'ret' cevabı sunucunun değil istemcinin sınırı olabilir."
+---

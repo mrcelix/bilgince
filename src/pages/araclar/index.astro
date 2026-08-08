@@ -1,0 +1,72 @@
+---
+import Base from '../../layouts/Base.astro';
+import KonuIkon from '../../components/KonuIkon.astro';
+import { getCollection } from 'astro:content';
+import { ARACLAR } from '../../araclar.js';
+
+const cozumler = await getCollection('cozumler');
+const betikler = cozumler.filter((c) => c.data.dosya).sort((a, b) => a.data.sira - b.data.sira);
+---
+
+<Base
+  baslik="Araçlar"
+  aciklama="Tarayıcıda çalışan üreteçler ve indirilebilir betikler: parola üreteci, sızıntı kontrolü, Wi-Fi QR, paylaşım kartı ve saha betikleri."
+  aramaya={false}
+>
+  <div class="arama-bas">
+    <div class="kap">
+      <nav class="kirinti" aria-label="Kırıntı yolu" style="padding-top:0">
+        <a href="/">Ana sayfa</a><span class="ayrac">/</span><span aria-current="page">Araçlar</span>
+      </nav>
+      <h1>Araçlar</h1>
+      <p style="color:var(--muted);font-size:14px;margin-top:8px;max-width:64ch">
+        {ARACLAR.length} üreteç ve {betikler.length} indirilebilir betik. Üreteçlerin tamamı tarayıcınızda
+        çalışır: girdiğiniz parola, SSID ya da adres sunucuya gönderilmez.
+      </p>
+    </div>
+  </div>
+
+  <div class="kap arac-sayfa">
+    <section class="arac-blok">
+      <h2 class="arac-h2">Üreteçler</h2>
+      <div class="arac-liste">
+        {
+          ARACLAR.map((a) => (
+            <a class="arac-kart" href={`/araclar/${a.slug}`}>
+              <span class="ust">
+                <KonuIkon ad={a.ikon} boyut={20} />
+                <b>{a.ad}</b>
+                {a.etiket && <span class="arac-rozet">{a.etiket}</span>}
+              </span>
+              <span>{a.ozet}</span>
+              <span style="font-size:12px;color:var(--muted)">
+                {a.cevrimici ? 'Ağ erişimi gerekir' : 'Tamamen çevrimdışı çalışır'}
+              </span>
+            </a>
+          ))
+        }
+      </div>
+    </section>
+
+    <section class="arac-blok">
+      <h2 class="arac-h2">İndirilebilir betikler</h2>
+      <p class="arac-not" style="margin-top:0">
+        Her betik, belirtiden çözüme giden bir kayda bağlıdır: ne yaptığını okumadan çalıştırmayın.
+      </p>
+      <div class="arac-liste" style="margin-top:14px">
+        {
+          betikler.map((b) => (
+            <a class="arac-kart" href={`/hizli-cozumler/${b.id}`}>
+              <span class="ust">
+                <KonuIkon ad="akis" boyut={20} />
+                <b>{b.data.dosyaAdi ?? b.data.dosya}</b>
+              </span>
+              <span>{b.data.baslik}</span>
+              <span style="font-size:12px;color:var(--muted)">{b.data.platform}</span>
+            </a>
+          ))
+        }
+      </div>
+    </section>
+  </div>
+</Base>

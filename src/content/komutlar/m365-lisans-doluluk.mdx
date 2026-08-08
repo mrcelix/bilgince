@@ -1,0 +1,11 @@
+---
+baslik: "Microsoft 365 lisanslarının kaçı kullanılıyor?"
+ozet: "Yenileme görüşmesine girmeden önce alınan ve tüketilen lisans sayısını yan yana koyun."
+konu: "azure"
+etiketler: ["m365", "lisans", "maliyet"]
+kod: |
+  Get-MgSubscribedSku | Select-Object SkuPartNumber,
+    @{n='Alinan'; e={$_.PrepaidUnits.Enabled}}, ConsumedUnits,
+    @{n='Bos'; e={$_.PrepaidUnits.Enabled - $_.ConsumedUnits}} | Sort-Object Bos -Descending
+dikkat: "Ayrılmış çalışanların lisansı hâlâ atanmış görünüyorsa 'tüketilen' sayısı gerçek kullanımı değil, temizlenmemiş hesapları gösterir."
+---

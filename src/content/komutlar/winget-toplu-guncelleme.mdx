@@ -1,0 +1,9 @@
+---
+baslik: "Üçüncü parti uygulamaları tek komutla güncelle"
+ozet: "Chrome, 7-Zip, Notepad++ ve benzerleri Windows Update'e uğramaz. winget uğrar."
+konu: "windows"
+etiketler: ["winget", "yama", "otomasyon"]
+kod: |
+  winget upgrade --all --include-unknown --accept-source-agreements --accept-package-agreements
+dikkat: "Önce --all olmadan çalıştırıp listeyi görün. --include-unknown sürümü okunamayan paketleri de günceller; sunucuda bu, çalışan bir uygulamayı yeniden başlatabilir."
+---
