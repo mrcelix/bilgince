@@ -1,0 +1,298 @@
+---
+import Base from '../../layouts/Base.astro';
+
+const ORNEKLER = [
+  { ifade: '*/15 9-17 * * 1-5', ne: 'Mesai saatlerinde çeyrek saatte bir' },
+  { ifade: '0 3 * * 1', ne: 'Pazartesi gecesi bakım' },
+  { ifade: '0 2 * * *', ne: 'Her gece yedekleme' },
+  { ifade: '0 0 1 * *', ne: 'Ayın ilk günü rapor' },
+  { ifade: '30 22 * * 5', ne: 'Cuma akşamı tam yedek' },
+  { ifade: '0 0 29 2 *', ne: 'Dört yılda bir çalışan tuzak' },
+];
+---
+
+<Base
+  baslik="Cron ifadesi çözümleyici"
+  aciklama="Cron ifadesini Türkçe cümleye çevirir, sonraki çalışma zamanlarını listeler ve Windows Zamanlanmış Görevler karşılığını verir."
+  aramaya={true}
+  kategori="Araç"
+>
+  <div class="arama-bas">
+    <div class="kap">
+      <nav class="kirinti" aria-label="Kırıntı yolu" style="padding-top:0">
+        <a href="/">Ana sayfa</a><span class="ayrac">/</span><a href="/araclar">Araçlar</a><span
+          class="ayrac">/</span
+        ><span aria-current="page">Cron çözümleyici</span>
+      </nav>
+      <h1>Cron ifadesi çözümleyici</h1>
+      <p style="color:var(--muted);font-size:14px;margin-top:8px;max-width:64ch">
+        <code>*/15 9-17 * * 1-5</code> ne demek ve ilk ne zaman çalışacak? İfadeyi yazın; cümleye
+        çevrilsin, sonraki çalışma zamanları listelensin.
+      </p>
+    </div>
+  </div>
+
+  <div class="kap arac-sayfa">
+    <section class="arac-blok">
+      <h2 class="arac-h2"><span class="arac-no">1</span> İfade</h2>
+      <div class="arac-alan">
+        <label for="c-ifade">Cron ifadesi (dakika · saat · ayın günü · ay · haftanın günü)</label>
+        <input
+          id="c-ifade"
+          type="text"
+          spellcheck="false"
+          value="*/15 9-17 * * 1-5"
+          style="font-family:var(--mono);font-size:16px"
+        />
+      </div>
+      <div class="c-ornekler">
+        {
+          ORNEKLER.map((o) => (
+            <button type="button" class="c-ornek" data-ifade={o.ifade}>
+              <code>{o.ifade}</code>
+              <span>{o.ne}</span>
+            </button>
+          ))
+        }
+      </div>
+      <p class="arac-durum" id="c-durum" role="status" aria-live="polite"></p>
+    </section>
+
+    <section class="arac-blok" id="c-sonuc-blok" hidden>
+      <h2 class="arac-h2"><span class="arac-no">2</span> Ne anlama geliyor</h2>
+      <output class="arac-cikti" id="c-cumle" style="font-family:inherit"></output>
+
+      <h3 style="font-size:15px;margin:22px 0 8px">Sonraki çalışmalar</h3>
+      <ol class="c-zamanlar" id="c-zamanlar"></ol>
+
+      <h3 style="font-size:15px;margin:22px 0 8px">Alan alan</h3>
+      <table class="c-tablo" id="c-alanlar"></table>
+
+      <h3 style="font-size:15px;margin:22px 0 8px">Windows Zamanlanmış Görevler karşılığı</h3>
+      <pre class="c-ps" id="c-ps"></pre>
+      <div class="arac-dugmeler">
+        <button type="button" class="dg arac-ikincil" id="c-kopya">PowerShell satırını kopyala</button>
+      </div>
+    </section>
+
+    <section class="arac-blok">
+      <h2 class="arac-h2"><span class="arac-no">3</span> En sık yapılan üç hata</h2>
+      <div class="arac-kutu">
+        <ul style="margin:0">
+          <li>
+            <b>Gün alanlarının ikisini birden doldurmak.</b> <code>0 0 1 * 1</code> "ayın 1'inde
+            <em>ve</em> pazartesi" değil, "ayın 1'inde <b>veya</b> pazartesi" demektir — beklenenden
+            çok daha sık çalışır. Aracın sonraki çalışma listesi bunu hemen gösterir.
+          </li>
+          <li>
+            <b>Saat diliminin varsayılması.</b> Cron çalıştığı makinenin saatini kullanır; sunucu UTC
+            ise "gece 2" sizin için 05:00'tir. Bu sayfa <b>tarayıcınızın saat dilimini</b> kullanır.
+          </li>
+          <li>
+            <b>Hiç çalışmayan ifade yazmak.</b> <code>0 0 31 2 *</code> geçerli bir ifadedir ve
+            hiçbir zaman çalışmaz. Sonraki çalışma listesi boşsa sebebi budur.
+          </li>
+        </ul>
+      </div>
+    </section>
+  </div>
+
+  <script>
+    import { cronAyristir, sonrakiCalismalar, cronAciklama, powershellKarsilik } from '../../scripts/cron.js';
+
+    const el = (s) => document.querySelector(s);
+    const ALAN_ADI = ['Dakika', 'Saat', 'Ayın günü', 'Ay', 'Haftanın günü'];
+
+    const bicim = new Intl.DateTimeFormat('tr-TR', {
+      weekday: 'long',
+      day: 'numeric',
+      month: 'long',
+      year: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit',
+    });
+
+    function coz() {
+      const ifade = el('#c-ifade').value.trim();
+      const durum = el('#c-durum');
+      const blok = el('#c-sonuc-blok');
+
+      if (!ifade) {
+        blok.hidden = true;
+        durum.textContent = '';
+        durum.className = 'arac-durum';
+        return;
+      }
+
+      let c;
+      try {
+        c = cronAyristir(ifade);
+      } catch (hata) {
+        blok.hidden = true;
+        durum.className = 'arac-durum hata';
+        durum.textContent = hata.message;
+        return;
+      }
+
+      blok.hidden = false;
+      el('#c-cumle').textContent = cronAciklama(c);
+
+      const zamanlar = sonrakiCalismalar(c, 6);
+      el('#c-zamanlar').innerHTML = zamanlar.length
+        ? zamanlar
+            .map((t, i) => {
+              const fark = t.getTime() - Date.now();
+              const saat = Math.round(fark / 3600000);
+              const uzaklik =
+                saat < 1 ? `${Math.max(1, Math.round(fark / 60000))} dakika sonra`
+                : saat < 48 ? `${saat} saat sonra`
+                : `${Math.round(saat / 24)} gün sonra`;
+              return `<li${i === 0 ? ' class="ilk"' : ''}><span>${bicim.format(t)}</span><em>${uzaklik}</em></li>`;
+            })
+            .join('')
+        : '<li class="yok">Bu ifade hiçbir zaman çalışmaz — ay ve gün birleşimi mümkün değil.</li>';
+
+      durum.className = 'arac-durum ok';
+      durum.textContent = zamanlar.length
+        ? `Geçerli ifade · saat dilimi: ${Intl.DateTimeFormat().resolvedOptions().timeZone}`
+        : 'İfade geçerli ama hiçbir zamana denk gelmiyor.';
+
+      const ham = c.ham.split(' ');
+      el('#c-alanlar').innerHTML = ALAN_ADI.map(
+        (ad, i) => `<tr><th>${ad}</th><td><code>${ham[i]}</code></td><td>${degerMetni(c, i)}</td></tr>`
+      ).join('');
+
+      el('#c-ps').textContent = powershellKarsilik(c);
+    }
+
+    function degerMetni(c, i) {
+      const kume = [c.dakika, c.saat, c.ayGunu, c.ay, c.haftaGunu][i];
+      const dizi = [...kume].sort((a, b) => a - b);
+      const tamKume = [60, 24, 31, 12, 8][i];
+      if (dizi.length >= tamKume - 1 && i !== 4) return 'her değer';
+      if (dizi.length > 12) return `${dizi.length} değer: ${dizi.slice(0, 8).join(', ')}…`;
+      if (i === 4) {
+        const gunler = ['Pazar', 'Pazartesi', 'Salı', 'Çarşamba', 'Perşembe', 'Cuma', 'Cumartesi'];
+        const temiz = dizi.filter((g) => g < 7);
+        return temiz.length === 7 ? 'her gün' : temiz.map((g) => gunler[g]).join(', ');
+      }
+      if (i === 3) {
+        const aylar = ['Ocak', 'Şubat', 'Mart', 'Nisan', 'Mayıs', 'Haziran', 'Temmuz', 'Ağustos', 'Eylül', 'Ekim', 'Kasım', 'Aralık'];
+        return dizi.map((a) => aylar[a - 1]).join(', ');
+      }
+      return dizi.join(', ');
+    }
+
+    el('#c-ifade').addEventListener('input', coz);
+    document.querySelectorAll('.c-ornek').forEach((b) =>
+      b.addEventListener('click', () => {
+        el('#c-ifade').value = b.dataset.ifade;
+        coz();
+      })
+    );
+    el('#c-kopya').addEventListener('click', async (e) => {
+      try {
+        await navigator.clipboard.writeText(el('#c-ps').textContent);
+        e.currentTarget.textContent = 'Kopyalandı';
+      } catch {
+        e.currentTarget.textContent = 'Kopyalanamadı';
+      }
+      setTimeout(() => (e.currentTarget.textContent = 'PowerShell satırını kopyala'), 1600);
+    });
+
+    coz();
+  </script>
+
+  <style>
+    .c-ornekler {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(230px, 1fr));
+      gap: 8px;
+      margin-top: 14px;
+    }
+    .c-ornek {
+      display: grid;
+      gap: 3px;
+      text-align: left;
+      font: inherit;
+      padding: 9px 12px;
+      border: 1px solid var(--line);
+      border-radius: var(--r-s);
+      background: var(--bg);
+      cursor: pointer;
+    }
+    .c-ornek:hover {
+      border-color: var(--indigo);
+    }
+    .c-ornek code {
+      font-size: 13px;
+      font-weight: 700;
+      color: var(--indigo-d);
+    }
+    .c-ornek span {
+      font-size: 12px;
+      color: var(--muted);
+    }
+    .c-zamanlar {
+      list-style: none;
+      margin: 0;
+      padding: 0;
+      display: grid;
+      gap: 2px;
+    }
+    .c-zamanlar li {
+      display: flex;
+      justify-content: space-between;
+      align-items: baseline;
+      gap: 12px;
+      flex-wrap: wrap;
+      padding: 9px 12px;
+      border-radius: var(--r-s);
+      background: var(--bg);
+      font-size: 14px;
+    }
+    .c-zamanlar li.ilk {
+      background: var(--tint);
+      font-weight: 700;
+    }
+    .c-zamanlar li.yok {
+      background: color-mix(in srgb, var(--clay) 10%, var(--paper));
+      color: var(--clay-ink);
+    }
+    .c-zamanlar em {
+      font-style: normal;
+      font-size: 12.5px;
+      color: var(--muted);
+      font-family: var(--mono);
+    }
+    .c-tablo {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 14px;
+    }
+    .c-tablo :is(th, td) {
+      text-align: left;
+      padding: 8px 10px;
+      border-bottom: 1px solid var(--line);
+    }
+    .c-tablo th {
+      color: var(--ink-soft);
+      white-space: nowrap;
+    }
+    .c-tablo code {
+      font-weight: 700;
+      color: var(--indigo-d);
+    }
+    .c-ps {
+      margin: 0;
+      padding: 13px;
+      background: var(--navy);
+      color: #f2f5ff;
+      border-radius: var(--r-s);
+      font-size: 13.5px;
+      overflow-x: auto;
+      white-space: pre-wrap;
+      word-break: break-word;
+    }
+  </style>
+</Base>

@@ -1,0 +1,66 @@
+---
+baslik: "İnternet yok — nereden başlamalı"
+ozet: "Aynı cümlenin altında yedi farklı arıza var. Katman katman ilerleyince hangisi olduğu üç dakikada çıkar."
+konu: "ag"
+etiketler: ["tanilama", "dns", "dhcp", "proxy"]
+belirtiler:
+  - "İnternet yok ama ağ simgesi normal görünüyor"
+  - "Bazı siteler açılıyor bazıları açılmıyor"
+  - "Ping çalışıyor ama tarayıcı açılmıyor"
+  - "Yerel paylaşımlar açılıyor, dışarı çıkılmıyor"
+yayin: 2026-08-08
+sure: 5
+dosya: "/araclar/ag-tanilama-paketi.ps1"
+dosyaAdi: "ag-tanilama-paketi.ps1"
+dosyaAciklama: "Fiziksel bağlantı, IP yapılandırması, ağ geçidi, DNS, dış erişim, proxy ve MTU katmanlarını sırayla test edip nerede koptuğunu söyler. -Dosya ile raporu destek talebine eklenecek biçimde kaydeder."
+komut: "Get-NetIPConfiguration | Where-Object { $_.NetAdapter.Status -eq 'Up' }"
+platform: "windows"
+ilgiliRehberler: []
+sira: 13
+---
+
+"İnternet yok" bir belirti değil, bir özettir. Altında birbirinden bağımsız yedi arıza vardır ve hangisi olduğunu anlamanın yolu, katmanları **sırayla** elemektir. Sırayı atlayan her deneme zaman kaybıdır.
+
+## Sıra
+
+| Katman | Nasıl anlaşılır | Kopmuşsa sebep |
+| --- | --- | --- |
+| 1. Fiziksel | Arayüz `Up` mı | Kablo, anahtar portu, Wi-Fi kapalı |
+| 2. IP | Adres `169.254.*` mi | DHCP sunucusu ya da kapsam doldu |
+| 3. Ağ geçidi | Ping yanıt veriyor mu | VLAN, anahtar, yönlendirici |
+| 4. DNS | İsim çözülüyor mu | DNS sunucusu ya da 53. port |
+| 5. Dış erişim | 443 açılıyor mu | Güvenlik duvarı, içerik süzme |
+| 6. Proxy | Tarayıcı boş ama ping var | Proxy erişilemez ya da yanlış |
+| 7. MTU | Bazı siteler takılıyor | VPN/tünel, parçalanma engelli |
+
+## En çok yanıltan iki belirti
+
+**Ping çalışıyor ama tarayıcı açılmıyor.** Neredeyse her zaman proxy'dir. `netsh winhttp show proxy` ile sistem proxy'sini, tarayıcı ayarlarından kullanıcı proxy'sini ayrı ayrı kontrol edin — ikisi farklı yerlerdir.
+
+**Bazı siteler açılıyor bazıları takılıyor.** Bu, DNS ya da erişim sorunu değil, **MTU** sorunudur. VPN, PPPoE ya da tünel üzerinden çıkan bağlantılarda 1500 bayt geçmez; büyük paket gerektiren siteler yarı yüklenip kalır.
+
+```powershell
+ping -f -l 1472 8.8.8.8
+```
+
+"Paketin parçalanması gerekiyor" cevabı geldiyse MTU 1500'ün altındadır.
+
+## 169.254 gördüğünüzde
+
+Bu adres DHCP'den cevap gelmediğinin işaretidir. Makinede yapılacak bir şey yoktur; sıradaki soru "başkalarında da var mı" sorusudur. Tek makinedeyse port/kablo, birden çok makinedeyse DHCP sunucusu ya da dolmuş kapsam.
+
+```powershell
+Get-DhcpServerv4ScopeStatistics -ComputerName dhcp01 | Select-Object ScopeId, AddressesFree, PercentageInUse
+```
+
+## Doğrulama
+
+Düzelttikten sonra betiği yeniden çalıştırın ve **kopma noktasının kapandığını** görün. Kullanıcıya "düzeldi mi" diye sormak doğrulama değildir: aynı belirtinin ikinci bir sebebi varsa o da ancak ölçümle görünür.
+
+Destek talebine raporu ekleyin:
+
+```powershell
+.\ag-tanilama-paketi.ps1 -Dosya "$env:USERPROFILE\Desktop\ag-raporu.txt"
+```
+
+Bir üst kademeye giden her talepte bu rapor varsa, aynı soruların ikinci kez sorulması biter.

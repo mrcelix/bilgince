@@ -1,0 +1,263 @@
+---
+import Base from '../../layouts/Base.astro';
+---
+
+<Base
+  baslik="Zaman damgası ve saat dilimi çevirici"
+  aciklama="Unix zaman damgası, ISO 8601 ve günlük biçimlerini birbirine çevirir; UTC ile yerel saat arasındaki farkı gösterir. Olay kaydı incelerken saat kaymasını buradan görürsünüz."
+  aramaya={true}
+  kategori="Araç"
+>
+  <div class="arama-bas">
+    <div class="kap">
+      <nav class="kirinti" aria-label="Kırıntı yolu" style="padding-top:0">
+        <a href="/">Ana sayfa</a><span class="ayrac">/</span><a href="/araclar">Araçlar</a><span
+          class="ayrac">/</span
+        ><span aria-current="page">Zaman çevirici</span>
+      </nav>
+      <h1>Zaman damgası ve saat dilimi çevirici</h1>
+      <p style="color:var(--muted);font-size:14px;margin-top:8px;max-width:64ch">
+        Sunucu UTC yazar, kullanıcı yerel saatle konuşur, günlükler epoch tutar. Olayları yan yana
+        koymak için üçünü aynı ekranda görmek gerekir.
+      </p>
+    </div>
+  </div>
+
+  <div class="kap arac-sayfa">
+    <section class="arac-blok">
+      <h2 class="arac-h2"><span class="arac-no">1</span> Girdi</h2>
+      <div class="arac-alan">
+        <label for="z-girdi">Zaman damgası veya tarih</label>
+        <input
+          id="z-girdi"
+          type="text"
+          spellcheck="false"
+          placeholder="1786000000 · 2026-08-08T14:30:00Z · 08.08.2026 17:30"
+          style="font-family:var(--mono);font-size:15px"
+        />
+      </div>
+      <div class="arac-dugmeler">
+        <button type="button" class="dg arac-ikincil" id="z-simdi">Şimdi</button>
+        <button type="button" class="dg arac-ikincil" id="z-temizle">Temizle</button>
+      </div>
+      <p class="arac-not">
+        Anlaşılan biçimler: Unix saniye ve milisaniye, ISO 8601, <code>gg.aa.yyyy ss:dd</code>,
+        <code>yyyy-aa-gg ss:dd:ss</code> ve Windows olay günlüğü çıktısı.
+      </p>
+      <p class="arac-durum" id="z-durum" role="status" aria-live="polite"></p>
+    </section>
+
+    <section class="arac-blok" id="z-sonuc-blok" hidden>
+      <h2 class="arac-h2"><span class="arac-no">2</span> Karşılıkları</h2>
+      <table class="z-tablo" id="z-sonuc"></table>
+      <div class="arac-dugmeler">
+        <button type="button" class="dg arac-ikincil" id="z-kopya">ISO 8601 kopyala</button>
+      </div>
+    </section>
+
+    <section class="arac-blok">
+      <h2 class="arac-h2"><span class="arac-no">3</span> İki zaman arasındaki fark</h2>
+      <div class="arac-alanlar">
+        <label class="arac-alan"
+          >Başlangıç
+          <input id="z-bas" type="text" spellcheck="false" placeholder="2026-08-08T02:00:00Z" style="font-family:var(--mono);font-size:14px" />
+        </label>
+        <label class="arac-alan"
+          >Bitiş
+          <input id="z-son" type="text" spellcheck="false" placeholder="2026-08-08T06:45:00Z" style="font-family:var(--mono);font-size:14px" />
+        </label>
+      </div>
+      <p class="arac-durum" id="z-fark" role="status" aria-live="polite"></p>
+    </section>
+
+    <section class="arac-blok">
+      <h2 class="arac-h2"><span class="arac-no">4</span> Günlük okurken saat tuzakları</h2>
+      <div class="arac-kutu">
+        <ul style="margin:0">
+          <li>
+            <b>Sunucu UTC, kullanıcı yerel.</b> Türkiye UTC+3'tür ve yaz saati uygulaması yoktur;
+            "saat 02:00'de oldu" diyen bir kullanıcı, sunucu günlüğünde <b>23:00</b> satırını arıyor demektir.
+          </li>
+          <li>
+            <b>Epoch saniye mi milisaniye mi?</b> 10 haneli sayı saniye, 13 haneli milisaniyedir.
+            Karıştırınca tarih 1970'e ya da 55.000 yılına düşer — araç bunu kendisi ayırt eder.
+          </li>
+          <li>
+            <b>Makineler arası kayma.</b> Kerberos beş dakikadan büyük farkı reddeder; "parola doğru
+            ama giriş olmuyor" belirtisinin bilinen sebeplerinden biri budur.
+          </li>
+        </ul>
+      </div>
+    </section>
+  </div>
+
+  <script>
+    const el = (s) => document.querySelector(s);
+    const YEREL = Intl.DateTimeFormat().resolvedOptions().timeZone;
+
+    /** Farklı biçimleri Date'e çevirir; anlaşılmazsa null. */
+    function zamanCoz(ham) {
+      const metin = ham.trim();
+      if (!metin) return null;
+
+      // saf sayı: epoch saniye (10 hane) ya da milisaniye (13 hane)
+      if (/^\d{9,14}$/.test(metin)) {
+        const n = Number(metin);
+        return new Date(metin.length <= 11 ? n * 1000 : n);
+      }
+      // gg.aa.yyyy ss:dd[:ss]
+      const tr = metin.match(/^(\d{1,2})[./](\d{1,2})[./](\d{4})(?:[ T](\d{1,2}):(\d{2})(?::(\d{2}))?)?$/);
+      if (tr) {
+        return new Date(+tr[3], +tr[2] - 1, +tr[1], +(tr[4] ?? 0), +(tr[5] ?? 0), +(tr[6] ?? 0));
+      }
+      // ISO ve Date'in anladığı diğer biçimler
+      const d = new Date(metin.replace(' ', 'T'));
+      return Number.isNaN(d.getTime()) ? null : d;
+    }
+
+    const bicimUTC = new Intl.DateTimeFormat('tr-TR', {
+      dateStyle: 'full',
+      timeStyle: 'medium',
+      timeZone: 'UTC',
+    });
+    const bicimYerel = new Intl.DateTimeFormat('tr-TR', { dateStyle: 'full', timeStyle: 'medium' });
+    const bicimIstanbul = new Intl.DateTimeFormat('tr-TR', {
+      dateStyle: 'full',
+      timeStyle: 'medium',
+      timeZone: 'Europe/Istanbul',
+    });
+
+    function goreli(d) {
+      const fark = d.getTime() - Date.now();
+      const mutlak = Math.abs(fark);
+      // Birim adları İngilizce olmak zorunda (Intl birim tanımlayıcıları);
+      // çıktı yine Türkçe üretilir: "3 gün sonra", "2 saat önce".
+      const birim =
+        mutlak < 60000 ? [Math.round(fark / 1000), 'second']
+        : mutlak < 3600000 ? [Math.round(fark / 60000), 'minute']
+        : mutlak < 86400000 ? [Math.round(fark / 3600000), 'hour']
+        : [Math.round(fark / 86400000), 'day'];
+      return new Intl.RelativeTimeFormat('tr-TR', { numeric: 'auto' }).format(birim[0], birim[1]);
+    }
+
+    let sonISO = '';
+
+    function cevir() {
+      const d = zamanCoz(el('#z-girdi').value);
+      const durum = el('#z-durum');
+      const blok = el('#z-sonuc-blok');
+
+      if (!el('#z-girdi').value.trim()) {
+        blok.hidden = true;
+        durum.textContent = '';
+        durum.className = 'arac-durum';
+        return;
+      }
+      if (!d || Number.isNaN(d.getTime())) {
+        blok.hidden = true;
+        durum.className = 'arac-durum hata';
+        durum.textContent = 'Bu girdi bir zamana çevrilemedi.';
+        return;
+      }
+
+      blok.hidden = false;
+      durum.className = 'arac-durum ok';
+      durum.textContent = goreli(d);
+      sonISO = d.toISOString();
+
+      const kayma = -d.getTimezoneOffset() / 60;
+      const satirlar = [
+        ['Unix (saniye)', Math.floor(d.getTime() / 1000)],
+        ['Unix (milisaniye)', d.getTime()],
+        ['ISO 8601 (UTC)', d.toISOString()],
+        ['UTC', bicimUTC.format(d)],
+        [`Yerel (${YEREL})`, bicimYerel.format(d)],
+        ['Türkiye (Europe/Istanbul)', bicimIstanbul.format(d)],
+        ['UTC farkı', `${kayma >= 0 ? '+' : ''}${kayma} saat`],
+        ['Haftanın günü', new Intl.DateTimeFormat('tr-TR', { weekday: 'long' }).format(d)],
+        ['Yılın haftası', haftaNo(d)],
+      ];
+      el('#z-sonuc').innerHTML = satirlar
+        .map(([k, v]) => `<tr><th>${k}</th><td>${v}</td></tr>`)
+        .join('');
+    }
+
+    /** ISO 8601 hafta numarası */
+    function haftaNo(d) {
+      const t = new Date(Date.UTC(d.getFullYear(), d.getMonth(), d.getDate()));
+      const gun = t.getUTCDay() || 7;
+      t.setUTCDate(t.getUTCDate() + 4 - gun);
+      const yilBasi = new Date(Date.UTC(t.getUTCFullYear(), 0, 1));
+      return Math.ceil(((t - yilBasi) / 86400000 + 1) / 7) + '. hafta';
+    }
+
+    function farkHesapla() {
+      const a = zamanCoz(el('#z-bas').value);
+      const b = zamanCoz(el('#z-son').value);
+      const cikti = el('#z-fark');
+      if (!a || !b) {
+        cikti.className = 'arac-durum';
+        cikti.textContent = el('#z-bas').value || el('#z-son').value ? 'İki geçerli zaman girin.' : '';
+        return;
+      }
+      const ms = Math.abs(b - a);
+      const gun = Math.floor(ms / 86400000);
+      const saat = Math.floor((ms % 86400000) / 3600000);
+      const dakika = Math.floor((ms % 3600000) / 60000);
+      const saniye = Math.floor((ms % 60000) / 1000);
+      cikti.className = 'arac-durum ok';
+      cikti.textContent =
+        `${gun ? gun + ' gün ' : ''}${saat} saat ${dakika} dakika ${saniye} saniye` +
+        ` · toplam ${Math.round(ms / 60000).toLocaleString('tr-TR')} dakika` +
+        ` · ${(ms / 1000).toLocaleString('tr-TR')} saniye`;
+    }
+
+    el('#z-girdi').addEventListener('input', cevir);
+    el('#z-bas').addEventListener('input', farkHesapla);
+    el('#z-son').addEventListener('input', farkHesapla);
+    el('#z-simdi').addEventListener('click', () => {
+      el('#z-girdi').value = String(Math.floor(Date.now() / 1000));
+      cevir();
+    });
+    el('#z-temizle').addEventListener('click', () => {
+      el('#z-girdi').value = '';
+      cevir();
+    });
+    el('#z-kopya').addEventListener('click', async (e) => {
+      try {
+        await navigator.clipboard.writeText(sonISO);
+        e.currentTarget.textContent = 'Kopyalandı';
+      } catch {
+        e.currentTarget.textContent = 'Kopyalanamadı';
+      }
+      setTimeout(() => (e.currentTarget.textContent = 'ISO 8601 kopyala'), 1600);
+    });
+
+    el('#z-girdi').value = String(Math.floor(Date.now() / 1000));
+    cevir();
+  </script>
+
+  <style>
+    .z-tablo {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 14.5px;
+    }
+    .z-tablo :is(th, td) {
+      text-align: left;
+      padding: 9px 10px;
+      border-bottom: 1px solid var(--line);
+    }
+    .z-tablo th {
+      color: var(--ink-soft);
+      font-weight: 700;
+      width: 38%;
+      white-space: nowrap;
+    }
+    .z-tablo td {
+      font-family: var(--mono);
+      font-size: 13.5px;
+      word-break: break-word;
+    }
+  </style>
+</Base>

@@ -1,0 +1,72 @@
+---
+baslik: "Gönderdiğimiz e-postalar spama düşüyor"
+ozet: "Sorun içerikte değil, kimlik doğrulamada. SPF, DKIM ve DMARC kayıtlarının hangisi eksikse alıcı sunucu ona göre karar veriyor."
+konu: "guvenlik"
+etiketler: ["eposta", "spf", "dkim", "dmarc"]
+belirtiler:
+  - "Müşterilere gönderdiğimiz postalar gereksize düşüyor"
+  - "Bazı alıcılara ulaşıyor bazılarına ulaşmıyor"
+  - "Adımıza sahte e-posta gönderilmiş"
+  - "Yeni pazarlama aracından gönderilenler engelleniyor"
+yayin: 2026-08-08
+sure: 6
+dosya: "/araclar/eposta-tanilama.ps1"
+dosyaAdi: "eposta-tanilama.ps1"
+dosyaAciklama: "Alan adının MX, SPF (sorgu sayısı dahil), DKIM seçicileri, DMARC politikası, MTA-STS ve TLS-RPT kayıtlarını DNS üzerinden denetler; eksik ve hatalı olanları sıralar. Yalnızca sorgu yapar."
+komut: "Resolve-DnsName _dmarc.ornek.com -Type TXT | Select-Object -Expand Strings"
+platform: "genel"
+ilgiliRehberler: ["guv-kimlik-avi-savunma-katmanlari"]
+sira: 16
+---
+
+Alıcı sunucu, gelen mesaja üç soru sorar: **gönderen sunucu yetkili mi** (SPF), **mesaj yolda değişmiş mi** (DKIM), **ikisi tutmazsa ne yapmalıyım** (DMARC). Üçünden biri eksikse cevap "gereksiz kutusuna at" olur.
+
+İçeriği değiştirmek, konu satırından ünlem işaretini çıkarmak bu kararı değiştirmez.
+
+## 1. Önce üç kaydı okuyun
+
+```powershell
+.\eposta-tanilama.ps1 -Alan ornek.com
+```
+
+Betik hepsini tek seferde sorar. Elle bakmak isterseniz:
+
+```powershell
+Resolve-DnsName ornek.com -Type TXT | Where-Object Strings -match 'v=spf1'
+Resolve-DnsName _dmarc.ornek.com -Type TXT | Select-Object -Expand Strings
+Resolve-DnsName selector1._domainkey.ornek.com -Type CNAME
+```
+
+## 2. En sık çıkan dört hata
+
+**Birden çok SPF kaydı.** Yeni bir pazarlama aracı eklerken ikinci bir `v=spf1` kaydı açmak, RFC'ye göre hatadır: alıcı sunucu ikisini de yok sayabilir. Doğrusu tek kayıtta `include:` eklemektir.
+
+**10 DNS sorgusu sınırının aşılması.** Her `include`, `a`, `mx` bir sorgu üretir ve include'ların içindekiler de sayılır. Sınır aşıldığında SPF `permerror` verir — yani **hiç yokmuş gibi** davranılır. Beş sağlayıcı eklendikten sonra çoğu kurum farkında olmadan bu durumdadır.
+
+**DKIM'in hiç kurulmamış olması.** SPF, mesaj yönlendirildiğinde kırılır; DKIM kırılmaz. Yalnızca SPF'e dayanan bir yapılandırma, posta listeleri ve yönlendirmelerde başarısız olur.
+
+**DMARC'ın `p=none`'da unutulması.** Rapor toplar, hiçbir şeyi engellemez. Kurumların çoğu yıllarca burada kalır ve korunduğunu sanır.
+
+## 3. Yeni bir gönderen eklerken
+
+Pazarlama aracı, fatura sistemi, CRM — her biri sizin adınıza gönderir. Eklemeden önce:
+
+1. Aracın `include:` kaydını SPF'e ekleyin (yeni bir kayıt **açmayın**)
+2. Aracın verdiği DKIM kayıtlarını yayınlayın
+3. İlk hafta DMARC raporlarını okuyun: aracın gerçekten hizalı gönderip göndermediği orada görünür
+
+Kayıtları üretmek için [SPF, DKIM ve DMARC üreteci](/araclar/eposta-guvenlik-kayitlari) aracını kullanabilirsiniz.
+
+## Doğrulama
+
+Değişiklik sonrası kendinize değil, **dış bir adrese** gönderin ve mesaj kaynağındaki `Authentication-Results` başlığına bakın:
+
+```
+spf=pass ... dkim=pass ... dmarc=pass
+```
+
+Üçü de `pass` değilse iş bitmemiştir. DNS değişikliklerinin yayılması için TTL kadar beklemeyi unutmayın — aynı gün içinde alınan sonuç yanıltıcı olabilir.
+
+## Kalıcı çözüm
+
+DMARC raporlarını toplayan bir adres tanımlayın ve **okuyun**. Kimin sizin adınıza gönderdiğini başka hiçbir kaynak bu kadar net söylemez; hem spam sorununu hem de sahtecilik girişimlerini aynı yerden görürsünüz.

@@ -1,0 +1,218 @@
+---
+import Base from '../../layouts/Base.astro';
+---
+
+<Base
+  baslik="Sertifika okuyucu"
+  aciklama="PEM sertifikayı yapıştırın: kime verilmiş, ne zaman doluyor, hangi adları kapsıyor, anahtarı kaç bit. Ayrıştırma tarayıcıda yapılır, sertifika hiçbir yere gönderilmez."
+  aramaya={true}
+  kategori="Araç"
+>
+  <div class="arama-bas">
+    <div class="kap">
+      <nav class="kirinti" aria-label="Kırıntı yolu" style="padding-top:0">
+        <a href="/">Ana sayfa</a><span class="ayrac">/</span><a href="/araclar">Araçlar</a><span
+          class="ayrac">/</span
+        ><span aria-current="page">Sertifika okuyucu</span>
+      </nav>
+      <h1>Sertifika okuyucu</h1>
+      <p style="color:var(--muted);font-size:14px;margin-top:8px;max-width:64ch">
+        Elinizdeki <code>.crt</code>/<code>.pem</code> dosyasının içinde ne yazdığını görmek için
+        sunucuya yüklemeniz gerekmez. Ayrıştırma bu sayfada yapılır.
+      </p>
+    </div>
+  </div>
+
+  <div class="kap arac-sayfa">
+    <section class="arac-blok">
+      <h2 class="arac-h2"><span class="arac-no">1</span> Sertifika</h2>
+      <div class="arac-alan">
+        <label for="s-pem">PEM içeriği (<code>-----BEGIN CERTIFICATE-----</code> ile başlar)</label>
+        <textarea
+          id="s-pem"
+          rows="7"
+          spellcheck="false"
+          placeholder="-----BEGIN CERTIFICATE-----&#10;MIIF...&#10;-----END CERTIFICATE-----"
+          style="font-family:var(--mono);font-size:12.5px"></textarea>
+      </div>
+      <div class="arac-dugmeler">
+        <label class="dg arac-ikincil" style="cursor:pointer">
+          Dosya seç
+          <input type="file" id="s-dosya" accept=".pem,.crt,.cer,.txt" hidden />
+        </label>
+        <button type="button" class="dg arac-ikincil" id="s-temizle">Temizle</button>
+      </div>
+      <p class="arac-not">
+        Zincir dosyası yapıştırırsanız (birden çok blok) hepsi ayrı ayrı okunur. Özel anahtar
+        yapıştırmayın — burada işi yok, zaten okunmaz.
+      </p>
+      <p class="arac-durum" id="s-durum" role="status" aria-live="polite"></p>
+    </section>
+
+    <div id="s-sonuc"></div>
+
+    <section class="arac-blok">
+      <h2 class="arac-h2"><span class="arac-no">2</span> Sunucudan sertifika almak</h2>
+      <div class="arac-kutu">
+        <p style="margin:0 0 8px">Uzak bir sunucunun sertifikasını PEM olarak almak için:</p>
+        <pre style="margin:0;font-size:13px;overflow-x:auto">openssl s_client -connect ornek.com:443 -servername ornek.com &lt; /dev/null | openssl x509 -out sertifika.pem</pre>
+        <p style="margin:10px 0 0">Windows'ta, PowerShell ile:</p>
+        <pre style="margin:6px 0 0;font-size:13px;overflow-x:auto">$c=[Net.Sockets.TcpClient]::new('ornek.com',443); $s=[Net.Security.SslStream]::new($c.GetStream()); $s.AuthenticateAsClient('ornek.com')
+"-----BEGIN CERTIFICATE-----`n" + [Convert]::ToBase64String($s.RemoteCertificate.Export('Cert'),'InsertLineBreaks') + "`n-----END CERTIFICATE-----"</pre>
+      </div>
+    </section>
+  </div>
+
+  <script>
+    import { pemAyikla, sertifikaOku, kalanGun } from '../../scripts/sertifika.js';
+
+    const el = (s) => document.querySelector(s);
+    const kacir = (m) =>
+      String(m).replace(/[<>&]/g, (c) => ({ '<': '&lt;', '>': '&gt;', '&': '&amp;' })[c]);
+
+    const tarihBicim = new Intl.DateTimeFormat('tr-TR', {
+      day: 'numeric',
+      month: 'long',
+      year: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit',
+      timeZone: 'UTC',
+    });
+
+    function durumKutusu(s) {
+      const gun = kalanGun(s.bitis);
+      if (gun < 0) return { sinif: 'kotu', metin: `Süresi ${Math.abs(gun)} gün önce doldu.` };
+      if (gun < 15) return { sinif: 'kotu', metin: `${gun} gün sonra doluyor — yenileme gecikti.` };
+      if (gun < 45) return { sinif: 'uyari', metin: `${gun} gün kaldı. Yenileme takvimine alın.` };
+      return { sinif: 'iyi', metin: `${gun} gün kaldı.` };
+    }
+
+    function ciz(sertifikalar) {
+      el('#s-sonuc').innerHTML = sertifikalar
+        .map((s, i) => {
+          const durum = durumKutusu(s);
+          const uyarilar = [];
+          if (s.imzaAlgoritmasi.startsWith('SHA-1')) {
+            uyarilar.push('SHA-1 imza: tarayıcılar bu sertifikayı reddeder.');
+          }
+          if (s.anahtar.tur === 'RSA' && s.anahtar.bit && s.anahtar.bit < 2048) {
+            uyarilar.push(`RSA-${s.anahtar.bit}: 2048 bitin altı kabul edilmiyor.`);
+          }
+          if (s.kendindenImzali && !s.caMi) {
+            uyarilar.push('Kendinden imzalı: istemciler güvenmez, elle güven eklemek gerekir.');
+          }
+          if (!s.caMi && !s.adlar.length) {
+            uyarilar.push('SAN listesi boş: modern tarayıcılar yalnızca CN alanına bakmaz, bu sertifika kabul edilmez.');
+          }
+          const gecerlilikGun = Math.round((s.bitis - s.baslangic) / 86400000);
+          if (!s.caMi && gecerlilikGun > 400) {
+            uyarilar.push(`Geçerlilik süresi ${gecerlilikGun} gün: 398 günü aşan sunucu sertifikaları reddedilir.`);
+          }
+
+          return `
+          <section class="arac-blok">
+            <h2 class="arac-h2">
+              <span class="arac-no">${i + 1}</span>
+              ${kacir(s.konu.CN ?? s.konu.metin ?? 'Sertifika')}
+              ${s.caMi ? '<span class="arac-rozet">CA</span>' : ''}
+            </h2>
+            <div class="arac-kutu ${durum.sinif}" style="margin-bottom:16px">${durum.metin}</div>
+            <table class="s-tablo">
+              <tr><th>Konu</th><td>${kacir(s.konu.metin)}</td></tr>
+              <tr><th>Veren</th><td>${kacir(s.veren.metin)}${s.kendindenImzali ? ' <b>(kendinden imzalı)</b>' : ''}</td></tr>
+              <tr><th>Geçerlilik</th><td>${tarihBicim.format(s.baslangic)} — ${tarihBicim.format(s.bitis)} <span style="color:var(--muted)">(UTC, ${gecerlilikGun} gün)</span></td></tr>
+              <tr><th>Anahtar</th><td>${s.anahtar.tur}${s.anahtar.bit ? ' · ' + s.anahtar.bit + ' bit' : ''}</td></tr>
+              <tr><th>İmza</th><td>${kacir(s.imzaAlgoritmasi)}</td></tr>
+              <tr><th>Kullanım</th><td>${s.kullanim.length ? kacir(s.kullanim.join(', ')) : '—'}</td></tr>
+              <tr><th>Seri no</th><td style="word-break:break-all">${kacir(s.seriNo)}</td></tr>
+              <tr><th>Kapsanan adlar</th><td>${
+                s.adlar.length
+                  ? `<span class="s-adlar">${s.adlar.map((a) => `<span>${kacir(a)}</span>`).join('')}</span>`
+                  : '—'
+              }</td></tr>
+            </table>
+            ${
+              uyarilar.length
+                ? `<div class="arac-kutu uyari" style="margin-top:14px"><h3>Dikkat</h3><ul style="margin:0">${uyarilar
+                    .map((u) => `<li>${u}</li>`)
+                    .join('')}</ul></div>`
+                : ''
+            }
+          </section>`;
+        })
+        .join('');
+    }
+
+    function oku() {
+      const metin = el('#s-pem').value.trim();
+      const durum = el('#s-durum');
+      if (!metin) {
+        el('#s-sonuc').innerHTML = '';
+        durum.textContent = '';
+        durum.className = 'arac-durum';
+        return;
+      }
+      try {
+        const sertifikalar = pemAyikla(metin).map(sertifikaOku);
+        ciz(sertifikalar);
+        durum.className = 'arac-durum ok';
+        durum.textContent =
+          sertifikalar.length === 1
+            ? 'Sertifika okundu.'
+            : `${sertifikalar.length} sertifika okundu (zincir).`;
+      } catch (hata) {
+        el('#s-sonuc').innerHTML = '';
+        durum.className = 'arac-durum hata';
+        durum.textContent = 'Okunamadı: ' + hata.message;
+      }
+    }
+
+    el('#s-pem').addEventListener('input', oku);
+    el('#s-temizle').addEventListener('click', () => {
+      el('#s-pem').value = '';
+      oku();
+    });
+    el('#s-dosya').addEventListener('change', async (e) => {
+      const dosya = e.target.files?.[0];
+      if (!dosya) return;
+      el('#s-pem').value = await dosya.text();
+      oku();
+    });
+  </script>
+
+  <style>
+    .s-tablo {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 14px;
+    }
+    .s-tablo :is(th, td) {
+      text-align: left;
+      padding: 9px 10px;
+      border-bottom: 1px solid var(--line);
+      vertical-align: top;
+    }
+    .s-tablo th {
+      width: 140px;
+      color: var(--ink-soft);
+      white-space: nowrap;
+    }
+    .s-tablo td {
+      font-family: var(--mono);
+      font-size: 13px;
+      line-height: 1.6;
+    }
+    .s-adlar {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+    }
+    .s-adlar span {
+      background: var(--bg);
+      border: 1px solid var(--line);
+      border-radius: 999px;
+      padding: 2px 9px;
+      font-size: 12px;
+    }
+  </style>
+</Base>

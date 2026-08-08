@@ -1,0 +1,62 @@
+---
+baslik: "Bu makinede ne kurulu — denetim öncesi envanter"
+ozet: "Devralınan bir ortamda ya da lisans denetiminden önce sorulan ilk soru. Cevabı üç ayrı kayıt defteri yolunda duruyor; yalnızca birine bakan envanterler eksik çıkar."
+konu: "windows"
+etiketler: ["envanter", "lisans", "denetim", "yama"]
+belirtiler:
+  - "Denetim geliyor, kurulu yazılım listesi isteniyor"
+  - "Kim ne kurmuş bilmiyoruz"
+  - "Programlar ve Özellikler'de görünmeyen uygulamalar var"
+  - "Lisans sayımı tutmuyor"
+yayin: 2026-08-08
+sure: 5
+dosya: "/araclar/yazilim-envanteri.ps1"
+dosyaAdi: "yazilim-envanteri.ps1"
+dosyaAciklama: "64-bit, 32-bit ve kullanıcı bazlı kurulumları birlikte listeler, Store uygulamalarını ayırır, güncelliği kritik yazılımları ve lisans açısından dikkat çekenleri işaretler. -Csv ile filo genelinde toplanır."
+komut: "Get-ItemProperty HKLM:\\SOFTWARE\\WOW6432Node\\Microsoft\\Windows\\CurrentVersion\\Uninstall\\* | Select-Object DisplayName, DisplayVersion"
+platform: "windows"
+ilgiliRehberler: ["win-yazilim-envanteri-lisans"]
+sira: 17
+---
+
+"Programlar ve Özellikler" listesi eksiktir ve bunu bilmeyen her envanter yanlış çıkar. Kurulu yazılım üç ayrı yerde durur:
+
+| Yol | Ne tutar |
+| --- | --- |
+| `HKLM\...\Uninstall` | 64-bit kurulumlar |
+| `HKLM\WOW6432Node\...\Uninstall` | 32-bit kurulumlar |
+| `HKCU\...\Uninstall` | Kullanıcı bazlı kurulumlar (yönetici hakkı istemeden kurulanlar) |
+
+Üçüncüsü özellikle önemlidir: kullanıcıların kendi başına kurduğu uzak erişim araçları, tarayıcı eklentileri ve taşınabilir uygulamalar orada birikir ve makine düzeyinde bakan hiçbir envanterde görünmez.
+
+## 1. Envanteri çıkarın
+
+```powershell
+.\yazilim-envanteri.ps1
+```
+
+Filo genelinde toplamak için oturum açma betiğine ekleyip CSV biriktirin:
+
+```powershell
+.\yazilim-envanteri.ps1 -Csv | Export-Csv \\sunucu\pay\envanter.csv -Append -NoTypeInformation -Encoding UTF8
+```
+
+## 2. Listeye bakarken sorulacak üç soru
+
+**Bu ne zaman kuruldu ve kim kurdu?** Son 30 günde çıkan yeni kalemler, ya bir projenin ya da bir sorunun işaretidir. Uzak erişim araçlarının (AnyDesk, TeamViewer) beklenmedik biçimde çıkması, fidye yazılımı vakalarında sık görülen bir bulgudur.
+
+**Hangi hakla kurulu?** Denetimde sorulan soru "ne kurulu" değil, "hangi lisansla kurulu"dur. Envanter tablonuza **lisans modeli** sütunu ekleyin: ücretsiz, kurumsal lisanslı, kişisel lisanslı, deneme süresi bitmiş. Bu tek sütun, denetim gününde yapılacak hesabı baştan doğru kurar.
+
+**Güncel mi?** Chrome, Java, Acrobat, 7-Zip ve benzerleri Windows Update kapsamında değildir. Yamalanmayan bir tarayıcı, yamalanmayan bir işletim sisteminden daha büyük risktir.
+
+```powershell
+winget upgrade --all --include-unknown
+```
+
+## 3. Store uygulamaları ayrı dünyadır
+
+`Get-AppxPackage` ile listelenirler ve kayıt defterindeki Uninstall yollarında görünmezler. Kurumsal ortamda çoğu gereksizdir; kaldırılmaları da ayrı bir yolla yapılır.
+
+## Doğrulama
+
+Envanterin doğru olduğunu anlamanın pratik yolu: rastgele üç makinede listeyi çıkarın ve **kullanıcıya sorun** — "şu programı kullanıyor musunuz?" Listede olmayan ama kullanılan bir şey çıkıyorsa, taşınabilir (kurulum gerektirmeyen) uygulamalar var demektir; onlar hiçbir kayıt defteri yolunda görünmez ve ancak dosya sistemi taramasıyla bulunur.

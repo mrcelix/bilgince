@@ -1,0 +1,214 @@
+---
+import Base from '../../layouts/Base.astro';
+---
+
+<Base
+  baslik="Aktarım süresi ve yedekleme penceresi hesaplayıcı"
+  aciklama="Veri boyutu ve hat hızından gerçekçi aktarım süresini hesaplar; yedekleme penceresine sığıp sığmadığını ve gereken hattı söyler."
+  aramaya={true}
+  kategori="Araç"
+>
+  <div class="arama-bas">
+    <div class="kap">
+      <nav class="kirinti" aria-label="Kırıntı yolu" style="padding-top:0">
+        <a href="/">Ana sayfa</a><span class="ayrac">/</span><a href="/araclar">Araçlar</a><span
+          class="ayrac">/</span
+        ><span aria-current="page">Aktarım süresi</span>
+      </nav>
+      <h1>Aktarım süresi ve yedekleme penceresi</h1>
+      <p style="color:var(--muted);font-size:14px;margin-top:8px;max-width:64ch">
+        "Gece yedeği sabaha biter mi?" sorusunun cevabı. Hat hızı megabit, veri gigabayt olduğu için
+        çoğu tahmin sekiz kat yanlış çıkar.
+      </p>
+    </div>
+  </div>
+
+  <div class="kap arac-sayfa">
+    <section class="arac-blok">
+      <h2 class="arac-h2"><span class="arac-no">1</span> Veri ve hat</h2>
+      <div class="arac-alanlar">
+        <label class="arac-alan"
+          >Aktarılacak veri
+          <input id="t-veri" type="number" min="0.1" step="10" value="500" />
+        </label>
+        <label class="arac-alan"
+          >Birim
+          <select id="t-birim">
+            <option value="1" selected>GB</option>
+            <option value="1000">TB</option>
+          </select>
+        </label>
+        <label class="arac-alan"
+          >Hat hızı
+          <input id="t-hiz" type="number" min="1" step="10" value="100" />
+        </label>
+        <label class="arac-alan"
+          >Hız birimi
+          <select id="t-hizBirim">
+            <option value="1" selected>Mbps</option>
+            <option value="1000">Gbps</option>
+          </select>
+        </label>
+      </div>
+
+      <div class="arac-alanlar" style="margin-top:14px">
+        <label class="arac-alan"
+          >Gerçekleşen verim
+          <span class="arac-kaydirac">
+            <input id="t-verim" type="range" min="20" max="95" value="70" />
+            <output for="t-verim" id="t-verim-deger">70</output>
+          </span>
+        </label>
+        <label class="arac-alan"
+          >Sıkıştırma / tekilleştirme kazancı
+          <span class="arac-kaydirac">
+            <input id="t-sikistir" type="range" min="0" max="80" step="5" value="0" />
+            <output for="t-sikistir" id="t-sikistir-deger">0</output>
+          </span>
+        </label>
+        <label class="arac-alan"
+          >Yedekleme penceresi (saat)
+          <input id="t-pencere" type="number" min="1" max="168" step="1" value="8" />
+        </label>
+      </div>
+      <p class="arac-not">
+        Gerçekleşen verim, hattın etiket hızının ne kadarını gerçekten alabildiğinizdir. WAN üzerinden
+        TCP ile %60–75 tipiktir; gecikmesi yüksek hatlarda tek akışta %30'a kadar düşer.
+      </p>
+    </section>
+
+    <section class="arac-blok">
+      <h2 class="arac-h2"><span class="arac-no">2</span> Sonuç</h2>
+      <output class="arac-cikti" id="t-cikti"></output>
+      <table class="t-tablo" id="t-detay" style="margin-top:16px"></table>
+      <div id="t-uyari" style="margin-top:16px"></div>
+    </section>
+
+    <section class="arac-blok">
+      <h2 class="arac-h2"><span class="arac-no">3</span> Pencereye sığmıyorsa</h2>
+      <div class="arac-kutu">
+        <ol style="margin:0;padding-left:20px">
+          <li><b>Tam yedek yerine artımlı.</b> Değişen veri toplamın %2–5'idir; pencere sorunu çoğu zaman burada biter.</li>
+          <li><b>Sıkıştırma ve tekilleştirme.</b> Sanal makine imajlarında %50'nin üstünde kazanç olağandır; veritabanı dökümlerinde daha da fazla.</li>
+          <li><b>Paralel akış.</b> Tek TCP akışı uzun mesafede hattı dolduramaz; yedekleme yazılımının çoklu akış ayarı çoğu zaman kapalıdır.</li>
+          <li><b>İlk kopyayı disk ile taşıyın.</b> 20 TB'ı hattan göndermek yerine diskle götürüp sonra artımlı devam etmek, uzak konumlarda hâlâ en hızlı yoldur.</li>
+        </ol>
+      </div>
+    </section>
+  </div>
+
+  <script>
+    const el = (s) => document.querySelector(s);
+    const sayi = (n, b = 1) => new Intl.NumberFormat('tr-TR', { maximumFractionDigits: b }).format(n);
+
+    function sureMetni(saniye) {
+      if (saniye < 60) return `${Math.round(saniye)} saniye`;
+      if (saniye < 3600) return `${sayi(saniye / 60, 0)} dakika`;
+      if (saniye < 86400) return `${sayi(saniye / 3600, 1)} saat`;
+      return `${sayi(saniye / 86400, 1)} gün`;
+    }
+
+    function hesapla() {
+      const veriGB = +el('#t-veri').value * +el('#t-birim').value;
+      const hizMbps = +el('#t-hiz').value * +el('#t-hizBirim').value;
+      const verim = +el('#t-verim').value / 100;
+      const sikistirma = +el('#t-sikistir').value / 100;
+      const pencereSaat = +el('#t-pencere').value;
+
+      el('#t-verim-deger').textContent = el('#t-verim').value;
+      el('#t-sikistir-deger').textContent = el('#t-sikistir').value;
+
+      if (!veriGB || !hizMbps) return;
+
+      const gonderilecekGB = veriGB * (1 - sikistirma);
+      const bayt = gonderilecekGB * 1e9;
+      const teorikBps = (hizMbps * 1e6) / 8;
+      const gercekBps = teorikBps * verim;
+
+      const teorikSaniye = bayt / teorikBps;
+      const gercekSaniye = bayt / gercekBps;
+      const pencereSaniye = pencereSaat * 3600;
+      const sigar = gercekSaniye <= pencereSaniye;
+
+      el('#t-cikti').textContent = `${sureMetni(gercekSaniye)} — ${sigar ? 'pencereye sığıyor' : 'pencereye SIĞMIYOR'}`;
+
+      // pencereye sığması için gereken hat
+      const gerekenBps = bayt / pencereSaniye / verim;
+      const gerekenMbps = (gerekenBps * 8) / 1e6;
+
+      const satirlar = [
+        ['Gönderilecek veri', `${sayi(gonderilecekGB)} GB${sikistirma ? ` (${sayi(veriGB)} GB'dan)` : ''}`],
+        ['Kuramsal en iyi süre', sureMetni(teorikSaniye)],
+        ['Gerçekçi süre (%' + el('#t-verim').value + ' verim)', `<b>${sureMetni(gercekSaniye)}</b>`],
+        ['Gerçekleşen aktarım hızı', `${sayi(gercekBps / 1e6)} MB/s`],
+        ['Yedekleme penceresi', `${pencereSaat} saat`],
+        [
+          sigar ? 'Pencerede kalan pay' : 'Pencereyi aşma',
+          sigar
+            ? `${sureMetni(pencereSaniye - gercekSaniye)} (%${sayi((1 - gercekSaniye / pencereSaniye) * 100, 0)})`
+            : `${sureMetni(gercekSaniye - pencereSaniye)} fazla`,
+        ],
+        ['Pencereye sığması için gereken hat', `${sayi(gerekenMbps, 0)} Mbps${gerekenMbps > 1000 ? ` (${sayi(gerekenMbps / 1000, 1)} Gbps)` : ''}`],
+      ];
+      el('#t-detay').innerHTML = satirlar.map(([k, v]) => `<tr><th>${k}</th><td>${v}</td></tr>`).join('');
+
+      const uyarilar = [];
+      if (!sigar) {
+        uyarilar.push({
+          sinif: 'kotu',
+          metin: `Bu iş penceresine sığmıyor: ${sureMetni(gercekSaniye - pencereSaniye)} taşıyor. Aşağıdaki dört seçenekten biri gerekiyor.`,
+        });
+      } else {
+        uyarilar.push({ sinif: 'iyi', metin: 'Pencereye sığıyor. Yine de veri büyümesi için pay bırakın: yılda %20 artış tipiktir.' });
+      }
+      if (verim > 0.85) {
+        uyarilar.push({
+          sinif: 'uyari',
+          metin: '%85 üstü verim yalnızca yerel ağda ve ayarlanmış sistemlerde görülür. WAN üzerinden bu değeri varsaymayın.',
+        });
+      }
+      if (sikistirma >= 0.5) {
+        uyarilar.push({
+          sinif: 'uyari',
+          metin: 'Yüksek sıkıştırma oranı zaten sıkıştırılmış verilerde (video, arşiv, şifreli disk) gerçekleşmez.',
+        });
+      }
+      if (gercekSaniye > 7 * 86400) {
+        uyarilar.push({
+          sinif: 'uyari',
+          metin: 'Bir haftadan uzun aktarımlarda kesinti neredeyse kesindir; kaldığı yerden devam edebilen bir araç kullanın.',
+        });
+      }
+      el('#t-uyari').innerHTML = uyarilar
+        .map((u) => `<div class="arac-kutu ${u.sinif}" style="margin-bottom:10px">${u.metin}</div>`)
+        .join('');
+    }
+
+    ['#t-veri', '#t-birim', '#t-hiz', '#t-hizBirim', '#t-verim', '#t-sikistir', '#t-pencere'].forEach((s) =>
+      el(s).addEventListener('input', hesapla)
+    );
+    hesapla();
+  </script>
+
+  <style>
+    .t-tablo {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 14.5px;
+    }
+    .t-tablo :is(th, td) {
+      text-align: left;
+      padding: 10px;
+      border-bottom: 1px solid var(--line);
+    }
+    .t-tablo th {
+      color: var(--ink-soft);
+      font-weight: 700;
+      width: 46%;
+    }
+    .t-tablo td {
+      font-family: var(--mono);
+      font-size: 14px;
+    }
+  </style>
+</Base>

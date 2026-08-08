@@ -1,0 +1,75 @@
+---
+baslik: "Sertifika süresi doldu, site açılmıyor"
+ozet: "Tarayıcı uyarı veriyor, uygulama bağlanmıyor. Yenilemek işin yarısı; asıl mesele bir daha aynı sürprizi yaşamamak."
+konu: "windows-server"
+etiketler: ["sertifika", "iis", "pki", "izleme"]
+belirtiler:
+  - "Tarayıcı güvenli değil uyarısı veriyor"
+  - "Uygulama sunucuya bağlanamıyor, hata TLS diyor"
+  - "Sertifikayı yeniledim ama site hâlâ eskisini gösteriyor"
+  - "Hangi sunucuda hangi sertifika var bilmiyoruz"
+yayin: 2026-08-08
+sure: 6
+dosya: "/araclar/sertifika-envanteri.ps1"
+dosyaAdi: "sertifika-envanteri.ps1"
+dosyaAciklama: "Makine ve kullanıcı depolarındaki sertifikaları listeler, süresi yaklaşanları ve dolmuşları işaretler, IIS bağlamalarını eşleştirir, SHA-1 ve kısa anahtar gibi zayıflıkları bulur, zinciri eksik olanları söyler."
+komut: "Get-ChildItem Cert:\\LocalMachine\\My | Where-Object NotAfter -lt (Get-Date).AddDays(45) | Select-Object Subject, NotAfter"
+platform: "windows"
+ilgiliRehberler: ["ws-sertifika-suresi-dolmadan"]
+sira: 14
+---
+
+Sertifikanın süresinin dolması, **önceden bilinebilecek tek arıza türüdür**. Yine de en sık yaşananlardandır, çünkü kimse envanteri tutmaz ve hatırlatma bir kişinin takviminde durur — o kişi de izinde olur.
+
+## 1. Hangi sertifika, nerede
+
+Sunucuda birden çok sertifika olur ve hepsi kullanılmaz. Önce süresi geçmiş olanı bulun:
+
+```powershell
+Get-ChildItem Cert:\LocalMachine\My |
+  Select-Object Subject, NotAfter, Thumbprint, HasPrivateKey |
+  Sort-Object NotAfter
+```
+
+**Özel anahtarı olmayan** sertifika sunucuda iş göremez; yeniledikten sonra en sık yapılan hata, anahtarsız kopyayı bağlamaktır.
+
+## 2. Yeniledim ama site hâlâ eskisini gösteriyor
+
+Üç sebepten biridir:
+
+1. **Bağlama güncellenmemiştir.** IIS'te sertifikayı depoya kurmak yetmez; site bağlamasında yeni parmak izini seçmek gerekir.
+2. **Birden çok bağlama vardır.** 443 dışında ayrı portlar ya da SNI ile ayrılmış birden çok site.
+3. **Uygulama sertifikayı kendi tutuyordur.** Java uygulamaları kendi anahtar deposunu (`keystore`) kullanır; Windows deposunu güncellemek onları etkilemez.
+
+```powershell
+Import-Module WebAdministration
+Get-ChildItem IIS:\SslBindings
+```
+
+## 3. Zincir eksikse yalnızca bazı istemciler patlar
+
+En kafa karıştırıcı belirti budur: tarayıcıda açılır, mobil uygulamada açılmaz. Sebep, sunucunun **ara sertifikayı göndermemesidir**. Masaüstü tarayıcılar eksik halkayı kendileri bulabilir, çoğu uygulama bulamaz.
+
+Betiğin zincir kontrolü bunu doğrudan söyler. Dışarıdan doğrulamak için:
+
+```powershell
+$c=[Net.Sockets.TcpClient]::new('site.ornek.com',443)
+$s=[Net.Security.SslStream]::new($c.GetStream())
+$s.AuthenticateAsClient('site.ornek.com')
+$s.RemoteCertificate | Format-List Subject, Issuer, NotAfter
+```
+
+Elinizdeki PEM dosyasının içinde ne yazdığını görmek için
+[sertifika okuyucu](/araclar/sertifika-okuyucu) aracını kullanabilirsiniz — dosyayı hiçbir yere yüklemeden okur.
+
+## 4. Bir daha yaşamamak için
+
+Tek kişilik hatırlatma bir süreç değildir. En az bunlar gerekir:
+
+- **Envanter**: hangi sunucuda hangi sertifika, ne zaman doluyor (betiğin `-Csv` çıktısı bunu verir)
+- **İzleme**: 45 ve 15 gün kala uyarı üreten bir kontrol
+- **Otomasyon**: iç sertifikalar için otomatik kayıt (autoenrollment), dış sertifikalar için ACME
+
+## Doğrulama
+
+Yeniledikten sonra üç şeyi kontrol edin: tarayıcıda geçerli görünüyor mu, zincir tam mı, **uygulama** bağlanıyor mu. İlk ikisi tamam olduğu hâlde üçüncüsü çalışmıyorsa sertifika değil, uygulamanın kendi güven deposu konuşuyordur.

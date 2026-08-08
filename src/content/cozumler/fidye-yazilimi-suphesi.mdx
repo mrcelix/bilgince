@@ -1,0 +1,70 @@
+---
+baslik: "Fidye yazılımı şüphesi: ilk yarım saatte ne kontrol edilir"
+ozet: "Dosya adları değişmiş, bir not bırakılmış ya da bir uyarı gelmiş. Panikle kapatmadan önce sırayla yapılacak işler ve makinenin sertleştirme durumu."
+konu: "guvenlik"
+etiketler: ["fidye-yazilimi", "olay-mudahale", "sertlestirme"]
+belirtiler:
+  - "Dosya uzantıları değişmiş"
+  - "Paylaşımda fidye notu var"
+  - "Antivirüs uyarı verdi ama ne olduğu belirsiz"
+  - "Devraldığım ortamın güvenlik durumunu bilmiyorum"
+yayin: 2026-08-08
+sure: 7
+dosya: "/araclar/guvenlik-hizli-denetim.ps1"
+dosyaAdi: "guvenlik-hizli-denetim.ps1"
+dosyaAciklama: "SMB1, SMB imzalama, Defender ve kurcalama koruması, güvenlik duvarı profilleri, RDP ve NLA, yerel yöneticiler, LAPS, otomatik oturum açma, BitLocker, PowerShell günlükleme ve son yama tarihini tek sayfada iyi/dikkat/kötü olarak raporlar."
+komut: "Get-MpComputerStatus | Select-Object RealTimeProtectionEnabled, IsTamperProtected, AntivirusSignatureLastUpdated"
+platform: "windows"
+ilgiliRehberler: []
+sira: 12
+---
+
+Şüphe anında yapılan ilk hareket, sonradan en pahalıya mal olan hareket olabilir. Sıra önemlidir.
+
+## 1. Önce izolasyon, sonra kapatma
+
+**Makineyi ağdan ayırın** (kablo çekin, Wi-Fi kapatın). Şifreleme sürüyorsa ağ paylaşımlarına yayılmasını bu durdurur.
+
+**Kapatmayın.** Bellekte duran şifreleme anahtarları, çalışan süreçler ve geçici dosyalar kapanışta kaybolur; bazı vakalarda kurtarma tam olarak buradan çıkar. Kapatma kararını olay müdahale tarafı verir.
+
+## 2. Yedeklere dokunmayın — önce erişimi kesin
+
+Fidye yazılımlarının ilk hedefi yedeklerdir. Yedek sunucusunun kimlik bilgisi bu makinede kayıtlıysa yedekler de risktedir.
+
+Sırayla: yedek deposunun ağ erişimini kesin, değişmez (immutable) kopya varsa onu doğrulayın, kaset/çevrimdışı kopya varsa takmayın.
+
+## 3. Kapsamı ölçün
+
+```powershell
+# Son bir saatte değişen dosyalar — şifrelemenin nereye ulaştığını gösterir
+Get-ChildItem \\dosya01\pay -Recurse -File -ErrorAction SilentlyContinue |
+  Where-Object LastWriteTime -gt (Get-Date).AddHours(-1) |
+  Select-Object FullName, LastWriteTime | Select-Object -First 50
+```
+
+Aynı anda kimin oturum açtığına bakın: paylaşımdaki değişikliklerin sahibi, ele geçirilmiş hesabı gösterir.
+
+## 4. Makinenin sertleştirme durumunu çıkarın
+
+Olay sırasında da, olaydan önce de aynı liste geçerlidir. Betik bunları tek seferde okur:
+
+- **SMB1 açık mı** — yayılmanın klasik yolu
+- **Defender gerçek zamanlı koruma ve kurcalama koruması** — kapatılmışsa bu, saldırganın ilk işidir
+- **Yerel yönetici sayısı ve LAPS** — ortak parola, tek makineden tüm filoya geçiş demektir
+- **RDP ve NLA** — internete açık RDP, fidye vakalarının en sık giriş kapısı
+- **PowerShell betik günlüğü** — kapalıysa olaydan sonra ne çalıştığını kimse bilemez
+- **Son yama tarihi**
+
+## 5. Kayıt tutun
+
+Ekran görüntüsü alın, fidye notunu saklayın (silmeyin), zaman çizelgesi yazın: ilk belirti ne zaman fark edildi, hangi makinede, kim ne yaptı. Sigorta ve adli inceleme bu kaydı ister; sonradan hatırlanarak yazılan kayıt işe yaramaz.
+
+## Doğrulama
+
+Temizlik sonrası "makine temiz" demek için üç şey gerekir: yeniden kurulmuş işletim sistemi, **doğrulanmış** yedekten dönmüş veri ve değiştirilmiş kimlik bilgileri. Üçü tamam değilse iş bitmemiştir.
+
+Aynı betiği temizlikten sonra tekrar çalıştırın: bu kez kırmızı satır kalmamalı.
+
+## Olaydan önce
+
+Bu sayfayı olay anında okuyorsanız geç kalınmıştır. Betiği bugün çalıştırıp çıkan kırmızı satırları kapatmak, olay olasılığını doğrudan düşürür — özellikle SMB1, LAPS ve internete açık RDP maddeleri.

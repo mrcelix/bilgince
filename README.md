@@ -144,14 +144,19 @@ sayıları gerçekçi görünsün diye yazıldı. Yayına almadan önce değişt
 dizini ve sayaçlar oradan türer. Yeni araç eklemek = sayfayı yazmak + listeye bir
 satır eklemek.
 
-Üçü tamamen tarayıcıda çalışır ve hiçbir veri dışarı çıkmaz:
+Paylaşım kartı dışındaki üreteçlerin tamamı **tarayıcıda** çalışır; girilen veri
+dışarı çıkmaz. Ortak mantık `src/scripts/` altında ve Node ile sınanabilir:
 
-- **Parola üreteci** — `crypto.getRandomValues`, 256 sözcüklük Türkçe geçiş cümlesi
-  sözlüğü (`src/scripts/kelimeler.js`), entropi ve kırılma süresi hesabı.
-- **Sızıntı kontrolü** — Pwned Passwords aralık ucu. Parolanın SHA-1 özeti tarayıcıda
-  hesaplanır, dışarıya yalnızca ilk 5 hane çıkar (k-anonimlik); eşleşme cihazda yapılır.
-- **Wi-Fi QR** — QR kodlayıcı kendi kodumuz (`src/scripts/qr.js`): bayt kipi, sürüm 1–10,
-  dört hata düzeltme seviyesi. Parola bir QR servisine yazılmaz.
+| Modül | Ne yapar | Nasıl doğrulandı |
+| --- | --- | --- |
+| `qr.js` | QR kodlayıcı: bayt kipi, sürüm 1–10, dört düzeltme seviyesi | Bağımsız bir kodlayıcının çıktısıyla modül modül karşılaştırma |
+| `sertifika.js` | DER/X.509 ayrıştırıcı: süre, SAN, anahtar, imza | Node'un TLS ayrıştırıcısıyla üç gerçek sitede karşılaştırma |
+| `cron.js` | Cron ayrıştırma, sonraki çalışmalar, Türkçe açıklama | Dönen zamanların ifadenin kısıtlarını sağladığı denetimi |
+| `parola.js` | Rastgelelik, entropi, kırılma süresi, örüntü uyarıları | — |
+| `sizinti.js` | Pwned Passwords k-anonimlik sorgusu (ilk 5 hane) | Bilinen sızıntı sayılarıyla karşılaştırma |
+
+Test betikleri depoda tutulmuyor; `src/scripts/*.js` dosyaları düz ES modülü olduğu
+için `node --input-type=module` ile doğrudan içe aktarılıp sınanabilir.
 
 ### Paylaşım kartı üreteci
 

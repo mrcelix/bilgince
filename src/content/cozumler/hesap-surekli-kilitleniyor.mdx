@@ -1,0 +1,71 @@
+---
+baslik: "Hesap sürekli kilitleniyor"
+ozet: "Parolayı sıfırlıyorsunuz, on dakika sonra yine kilitli. Kilit belirtidir; sebep, eski parolayı arka planda deneyen bir şeydir."
+konu: "windows-server"
+etiketler: ["active-directory", "kilitlenme", "4740", "kimlik"]
+belirtiler:
+  - "Sabah gelince hesap kilitli oluyor"
+  - "Parolayı değiştirdim, yine kilitleniyor"
+  - "Kullanıcı yanlış parola girmediğine yemin ediyor"
+  - "Belirli saatlerde tekrarlıyor"
+yayin: 2026-08-08
+sure: 6
+dosya: "/araclar/ad-hesap-kilit-teshis.ps1"
+dosyaAdi: "ad-hesap-kilit-teshis.ps1"
+dosyaAciklama: "Hesabın kilit durumunu, PDC öykünücüsündeki 4740 olaylarını ve kilidi tetikleyen makinedeki eski parola kaynaklarını (kimlik deposu, zamanlanmış görevler, servisler) sırayla raporlar. -KilidiAc olmadan hiçbir şey değiştirmez."
+komut: "Search-ADAccount -LockedOut | Select-Object Name, SamAccountName, LastLogonDate"
+platform: "windows"
+ilgiliRehberler: []
+sira: 11
+---
+
+Kullanıcı arıyor: "Yine giremiyorum." Kilidi açıyorsunuz, on dakika sonra aynı çağrı geliyor. Parola sıfırlanıyor, sorun devam ediyor — çünkü sorun parolada değil.
+
+Kilit, birinin **eski parolayı tekrar tekrar denemesinden** doğar. O "biri" neredeyse hiçbir zaman kullanıcı değildir.
+
+## 1. Kilit nereden geliyor: 4740
+
+Kilitlenme olayı yalnızca **PDC öykünücüsünde** toplanır. Rastgele bir denetleyicide arayıp bulamamak, olayın olmadığı anlamına gelmez.
+
+```powershell
+$pdc = (Get-ADDomain).PDCEmulator
+Get-WinEvent -ComputerName $pdc -FilterHashtable @{LogName='Security'; Id=4740} -MaxEvents 20 |
+  ForEach-Object { [pscustomobject]@{ Zaman=$_.TimeCreated; Hesap=$_.Properties[0].Value; Kaynak=$_.Properties[1].Value } }
+```
+
+`Kaynak` sütunu size makinenin adını verir. Bu tek sütun, aramanın %80'ini bitirir.
+
+Olay hiç yoksa denetim ilkesi kapalıdır: **Audit Account Management → Başarı** açık olmalı. Kapalıyken kilitlenmeleri sonsuza kadar tahminle kovalarsınız.
+
+## 2. Kaynak makinede eski parolayı kim tutuyor
+
+Sahada görülme sıklığına göre:
+
+1. **Telefondaki e-posta hesabı.** Kullanıcı parolayı bilgisayarda değiştirir, telefon eski parolayla denemeye devam eder. Kaynak makine olarak posta sunucusu görünür.
+2. **Açık kalmış ikinci oturum.** Toplantı odası bilgisayarı, ikinci masa, uzak masaüstü oturumu.
+3. **Zamanlanmış görev ya da servis.** Yıllar önce bir kullanıcı hesabıyla kurulmuş, parola değişince denemeye başlamıştır.
+4. **Eşlenmiş ağ sürücüsü / kimlik deposundaki kayıt.**
+
+```powershell
+cmdkey /list
+Get-ScheduledTask | Where-Object { $_.Principal.UserId -like '*kullanici*' }
+Get-CimInstance Win32_Service | Where-Object { $_.StartName -like '*kullanici*' }
+```
+
+## 3. Kilit ilkesini de okuyun
+
+```powershell
+Get-ADDefaultDomainPasswordPolicy | Select-Object LockoutThreshold, LockoutObservationWindow, LockoutDuration
+```
+
+Eşik 3 ve pencere 30 dakikaysa, arka planda saatte bir deneyen bir servis bile hesabı gün boyu kilitli tutar. Eşiği 10'a çıkarmak sorunu çözmez ama teşhis süresince kullanıcıyı çalışır tutar.
+
+## Doğrulama
+
+Kaynağı temizledikten sonra **kilidi açın ve iki saat bekleyin**. Yeni bir 4740 gelmiyorsa iş bitmiştir.
+
+Gelmeye devam ediyorsa kaynak makine listesine yeniden bakın: çoğu ortamda iki ayrı kaynak vardır ve ilki bulunduğunda ikincisi görünür hâle gelir.
+
+## Kalıcı çözüm
+
+Servis ve zamanlanmış görevleri kullanıcı hesabıyla çalıştırmayı bırakın: **grup yönetimli hizmet hesabı** (gMSA) parolayı kendisi döndürür, kimse kilitlenmez.

@@ -1,0 +1,240 @@
+---
+import Base from '../../layouts/Base.astro';
+---
+
+<Base
+  baslik="RAID kapasite ve risk hesaplayıcı"
+  aciklama="Disk sayısı, disk boyutu ve RAID seviyesinden kullanılabilir kapasiteyi, tolere edilen arıza sayısını, yazma cezasını ve yeniden yapılandırma süresini hesaplar."
+  aramaya={true}
+  kategori="Araç"
+>
+  <div class="arama-bas">
+    <div class="kap">
+      <nav class="kirinti" aria-label="Kırıntı yolu" style="padding-top:0">
+        <a href="/">Ana sayfa</a><span class="ayrac">/</span><a href="/araclar">Araçlar</a><span
+          class="ayrac">/</span
+        ><span aria-current="page">RAID hesaplayıcı</span>
+      </nav>
+      <h1>RAID kapasite ve risk hesaplayıcı</h1>
+      <p style="color:var(--muted);font-size:14px;margin-top:8px;max-width:64ch">
+        Kapasite kolay kısmı. Asıl soru şu: bir disk öldüğünde yeniden yapılandırma ne kadar sürer ve
+        o süre boyunca ne kadar açıktasınız?
+      </p>
+    </div>
+  </div>
+
+  <div class="kap arac-sayfa">
+    <section class="arac-blok">
+      <h2 class="arac-h2"><span class="arac-no">1</span> Dizi</h2>
+      <div class="arac-alanlar">
+        <label class="arac-alan"
+          >RAID seviyesi
+          <select id="d-seviye">
+            <option value="0">RAID 0 — şeritleme</option>
+            <option value="1">RAID 1 — aynalama</option>
+            <option value="5" selected>RAID 5 — tek eşlik</option>
+            <option value="6">RAID 6 — çift eşlik</option>
+            <option value="10">RAID 10 — aynalı şerit</option>
+          </select>
+        </label>
+        <label class="arac-alan"
+          >Disk sayısı
+          <span class="arac-kaydirac">
+            <input id="d-adet" type="range" min="2" max="24" value="6" />
+            <output for="d-adet" id="d-adet-deger">6</output>
+          </span>
+        </label>
+        <label class="arac-alan"
+          >Disk boyutu (TB)
+          <input id="d-boyut" type="number" min="0.24" max="32" step="0.5" value="8" />
+        </label>
+        <label class="arac-alan"
+          >Disk türü
+          <select id="d-tur">
+            <option value="150">7.200 rpm SATA (~150 MB/s)</option>
+            <option value="220" selected>7.200 rpm kurumsal (~220 MB/s)</option>
+            <option value="500">SAS 10K / hızlı dizi (~500 MB/s)</option>
+            <option value="2000">SSD (~2 GB/s)</option>
+          </select>
+        </label>
+      </div>
+      <div class="arac-onaylar">
+        <label class="arac-onay"><input type="checkbox" id="d-yedek" /> <span>Bir yedek disk (hot spare) ayır</span></label>
+      </div>
+      <p class="arac-durum" id="d-durum" role="status" aria-live="polite"></p>
+    </section>
+
+    <section class="arac-blok">
+      <h2 class="arac-h2"><span class="arac-no">2</span> Sonuç</h2>
+      <table class="d-tablo" id="d-sonuc"></table>
+      <div id="d-uyari" style="margin-top:16px"></div>
+    </section>
+
+    <section class="arac-blok">
+      <h2 class="arac-h2"><span class="arac-no">3</span> Hesabın arkasındaki varsayımlar</h2>
+      <div class="arac-kutu">
+        <ul style="margin:0">
+          <li>
+            <b>TB ve TiB farkı.</b> Üretici 1 TB derken 10¹² bayt kastediyor, işletim sistemi 2⁴⁰
+            bayta göre gösteriyor. 8 TB'lik disk sistemde 7,28 TiB görünür; tablo ikisini de veriyor.
+          </li>
+          <li>
+            <b>Yeniden yapılandırma süresi iyimserdir.</b> Hesap, diskin sıralı hızının
+            <b>%30'uyla</b> çalışıldığını varsayar; dizi üretimdeyken bu oran daha da düşer. Gerçek
+            süre çoğu zaman buradakinin iki katıdır.
+          </li>
+          <li>
+            <b>Yazma cezası</b> her yazma işleminin arka planda kaç disk işlemine dönüştüğüdür:
+            RAID 5'te 4, RAID 6'da 6, RAID 10'da 2. Veritabanı yükünde bu sayı doğrudan gecikmedir.
+          </li>
+          <li>
+            <b>RAID yedek değildir.</b> Silinen dosyayı, şifrelenen paylaşımı ve bozulan veritabanını
+            hiçbir RAID seviyesi geri getirmez.
+          </li>
+        </ul>
+      </div>
+    </section>
+  </div>
+
+  <script>
+    const el = (s) => document.querySelector(s);
+
+    const SEVIYE = {
+      0: { ad: 'RAID 0', enAz: 2, tolerans: 0, ceza: 1, kullanilabilir: (n) => n },
+      1: { ad: 'RAID 1', enAz: 2, tolerans: 1, ceza: 2, kullanilabilir: (n) => Math.floor(n / 2) },
+      5: { ad: 'RAID 5', enAz: 3, tolerans: 1, ceza: 4, kullanilabilir: (n) => n - 1 },
+      6: { ad: 'RAID 6', enAz: 4, tolerans: 2, ceza: 6, kullanilabilir: (n) => n - 2 },
+      10: { ad: 'RAID 10', enAz: 4, tolerans: 1, ceza: 2, kullanilabilir: (n) => Math.floor(n / 2) },
+    };
+
+    const sayi = (n, basamak = 2) =>
+      new Intl.NumberFormat('tr-TR', { maximumFractionDigits: basamak }).format(n);
+
+    function sure(saniye) {
+      if (saniye < 3600) return `${Math.round(saniye / 60)} dakika`;
+      if (saniye < 86400) return `${sayi(saniye / 3600, 1)} saat`;
+      return `${sayi(saniye / 86400, 1)} gün`;
+    }
+
+    function hesapla() {
+      const seviye = SEVIYE[el('#d-seviye').value];
+      let adet = +el('#d-adet').value;
+      const boyut = +el('#d-boyut').value;
+      const hiz = +el('#d-tur').value;
+      const yedek = el('#d-yedek').checked;
+      el('#d-adet-deger').textContent = adet;
+
+      const durum = el('#d-durum');
+      const veriDiski = yedek ? adet - 1 : adet;
+
+      if (veriDiski < seviye.enAz) {
+        durum.className = 'arac-durum hata';
+        durum.textContent = `${seviye.ad} en az ${seviye.enAz} disk ister${yedek ? ' (yedek disk hariç)' : ''}.`;
+        el('#d-sonuc').innerHTML = '';
+        el('#d-uyari').innerHTML = '';
+        return;
+      }
+      if ((el('#d-seviye').value === '10' || el('#d-seviye').value === '1') && veriDiski % 2) {
+        durum.className = 'arac-durum hata';
+        durum.textContent = `${seviye.ad} için disk sayısı çift olmalı.`;
+        el('#d-sonuc').innerHTML = '';
+        return;
+      }
+      durum.className = 'arac-durum ok';
+      durum.textContent = `${veriDiski} veri diski${yedek ? ' + 1 yedek' : ''}.`;
+
+      const ham = adet * boyut;
+      const kullanilabilirTB = seviye.kullanilabilir(veriDiski) * boyut;
+      const kullanilabilirTiB = (kullanilabilirTB * 1e12) / 2 ** 40;
+      const verim = (kullanilabilirTB / ham) * 100;
+
+      // yeniden yapılandırma: tek diskin tamamı, sıralı hızın %30'uyla
+      const yenidenSaniye = (boyut * 1e12) / (hiz * 1e6 * 0.3);
+      const okumaHizi = hiz * seviye.kullanilabilir(veriDiski);
+
+      const satirlar = [
+        ['Ham kapasite', `${sayi(ham)} TB`],
+        ['Kullanılabilir kapasite', `<b>${sayi(kullanilabilirTB)} TB</b> (${sayi(kullanilabilirTiB)} TiB)`],
+        ['Eşliğe/aynaya giden', `${sayi(ham - kullanilabilirTB)} TB — %${sayi(100 - verim, 0)}`],
+        ['Tolere edilen disk arızası', seviye.tolerans === 0 ? '0 — tek disk her şeyi götürür' : `${seviye.tolerans} disk${el('#d-seviye').value === '10' ? ' (şanslıysanız daha fazla)' : ''}`],
+        ['Yazma cezası', `${seviye.ceza}× disk işlemi`],
+        ['Kaba sıralı okuma', `${sayi(okumaHizi / 1000, 1)} GB/s'ye kadar`],
+        ['Bir disk yeniden yapılandırma', `${sure(yenidenSaniye)} <span style="color:var(--muted)">(iyimser)</span>`],
+      ];
+
+      el('#d-sonuc').innerHTML = satirlar.map(([k, v]) => `<tr><th>${k}</th><td>${v}</td></tr>`).join('');
+
+      /* --- uyarılar --------------------------------------------------------- */
+      const uyarilar = [];
+      if (seviye.tolerans === 0) {
+        uyarilar.push({
+          sinif: 'kotu',
+          metin:
+            'RAID 0 hiçbir arızaya dayanmaz ve disk sayısı arttıkça arıza olasılığı da artar. ' +
+            'Yalnızca kaybı önemsenmeyen geçici veride kullanılır.',
+        });
+      }
+      if (el('#d-seviye').value === '5' && boyut >= 4) {
+        uyarilar.push({
+          sinif: 'kotu',
+          metin:
+            `${sayi(boyut, 0)} TB disklerle RAID 5 önerilmez. Yeniden yapılandırma ${sure(yenidenSaniye)} sürer ve ` +
+            'bu sürenin tamamı boyunca dizi korumasızdır; ikinci bir okuma hatası tüm veriyi götürür. ' +
+            'Bu boyutta RAID 6 kullanın.',
+        });
+      }
+      if (yenidenSaniye > 86400) {
+        uyarilar.push({
+          sinif: 'uyari',
+          metin:
+            'Yeniden yapılandırma bir günden uzun. Bu süre boyunca performans düşer ve koruma azalır; ' +
+            'yedek disk (hot spare) ile sürecin hemen başlaması önemli.',
+        });
+      }
+      if (!yedek && veriDiski >= 6) {
+        uyarilar.push({
+          sinif: 'uyari',
+          metin: 'Altı ve üzeri diskli dizide yedek disk ayırmamak, arıza ile onarım arasına insan hızını sokar.',
+        });
+      }
+      if (el('#d-seviye').value === '1' && veriDiski > 2) {
+        uyarilar.push({ sinif: 'uyari', metin: 'İkiden fazla diskle RAID 1 yerine RAID 10 daha verimlidir.' });
+      }
+      uyarilar.push({
+        sinif: 'iyi',
+        metin: 'Hesaplanan kapasite dosya sistemi ek yükünü içermez; kullanılabilir alan %2–5 daha düşük olur.',
+      });
+
+      el('#d-uyari').innerHTML = uyarilar
+        .map((u) => `<div class="arac-kutu ${u.sinif}" style="margin-bottom:10px">${u.metin}</div>`)
+        .join('');
+    }
+
+    ['#d-seviye', '#d-adet', '#d-boyut', '#d-tur', '#d-yedek'].forEach((s) =>
+      el(s).addEventListener('input', hesapla)
+    );
+    hesapla();
+  </script>
+
+  <style>
+    .d-tablo {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 14.5px;
+    }
+    .d-tablo :is(th, td) {
+      text-align: left;
+      padding: 10px;
+      border-bottom: 1px solid var(--line);
+    }
+    .d-tablo th {
+      color: var(--ink-soft);
+      font-weight: 700;
+      width: 42%;
+    }
+    .d-tablo td {
+      font-family: var(--mono);
+      font-size: 14px;
+    }
+  </style>
+</Base>

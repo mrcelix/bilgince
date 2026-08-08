@@ -1,0 +1,70 @@
+---
+baslik: "Dosya paylaşımına erişemiyorum"
+ozet: "Klasör görünüyor ama açılmıyor, ya da açılıyor ama kaydedilemiyor. Cevap paylaşım izniyle NTFS izninin kesişiminde."
+konu: "windows-server"
+etiketler: ["smb", "ntfs", "yetki", "dosya-sunucusu"]
+belirtiler:
+  - "Klasör görünüyor ama açılmıyor"
+  - "Açıyorum, kaydedemiyorum"
+  - "Bazı kullanıcılar erişiyor bazıları erişemiyor"
+  - "Yetkiyi verdim ama değişmedi"
+yayin: 2026-08-08
+sure: 5
+dosya: "/araclar/paylasim-izin-raporu.ps1"
+dosyaAdi: "paylasim-izin-raporu.ps1"
+dosyaAciklama: "Paylaşım izinleriyle NTFS izinlerini yan yana çıkarır, kalıtımı kırılmış klasörleri bulur ve Everyone gibi geniş yetkileri işaretler. Hiçbir izni değiştirmez."
+komut: "Get-SmbShare | ForEach-Object { Get-SmbShareAccess -Name $_.Name }"
+platform: "windows"
+ilgiliRehberler: []
+sira: 15
+---
+
+Erişim sorunlarının neredeyse tamamı tek bir kuralı atlamaktan doğar: **etkin izin, paylaşım izniyle NTFS izninin kesişimidir**. Hangisi daha darsa o geçerlidir.
+
+Bir kullanıcıya NTFS'te tam denetim verdiniz ama paylaşımda yalnızca okuma varsa, kullanıcı yazamaz. Ve NTFS sekmesine bakarak bunu asla göremezsiniz.
+
+## 1. İki izni birlikte okuyun
+
+```powershell
+Get-SmbShareAccess -Name 'Ortak'
+Get-Acl D:\Ortak | Select-Object -ExpandProperty Access |
+  Select-Object IdentityReference, FileSystemRights, AccessControlType, IsInherited
+```
+
+Yaygın ve doğru desen şudur: **paylaşımda geniş** (Authenticated Users — Change), **NTFS'te gerçek yetkilendirme**. İzin yönetimini tek yerde toplamak, ikisini birden ayarlamaya çalışmaktan çok daha az hata üretir.
+
+## 2. "Yetkiyi verdim ama değişmedi"
+
+Üç sebepten biridir:
+
+1. **Kullanıcının belirteci eski.** Grup üyeliği değiştiğinde mevcut oturum bunu bilmez. Çıkış–giriş gerekir; `klist purge` bazen yeterlidir.
+2. **Kalıtım kırılmış.** Üst klasördeki değişiklik alta inmiyordur. Betik kalıtımı kırık klasörleri ayrıca işaretler.
+3. **Reddet kuralı var.** Reddet, izin verenin üstündedir ve genelde yıllar önce eklenmiş, unutulmuş bir kuraldır.
+
+## 3. Bazı kullanıcılar erişiyor bazıları erişemiyor
+
+Bu belirti sizi doğrudan **gruba** götürür. Erişebilen ve erişemeyen bir kullanıcının grup üyeliklerini karşılaştırın:
+
+```powershell
+$a = (Get-ADUser ahmet -Properties MemberOf).MemberOf
+$b = (Get-ADUser mehmet -Properties MemberOf).MemberOf
+Compare-Object $a $b
+```
+
+Fark listesi, aradığınız grubu genelde tek satırda verir.
+
+## 4. Geniş yetkiler: "Everyone — Full Control"
+
+Çalışıyor olması doğru olduğu anlamına gelmez. Fidye yazılımı bir kullanıcıyı ele geçirdiğinde, o kullanıcının yazabildiği her yeri şifreler. Everyone yazma yetkisi olan bir paylaşım, tüm kurumun tek noktadan şifrelenmesi demektir.
+
+Betik bu kuralları kırmızı işaretler. Daraltmadan önce kimin gerçekten yazdığını ölçün: dosya erişim denetimini açıp bir hafta izlemek, tahminle yetki kesmekten çok daha güvenlidir.
+
+## Doğrulama
+
+Değişiklikten sonra **kullanıcının kendisiyle** test edin, kendi yönetici hesabınızla değil. Yöneticiler çoğu izni fark etmeden aşar; "bende çalışıyor" bu işte hiçbir şey kanıtlamaz.
+
+Etkin izni tek komutla görmek için:
+
+```powershell
+Get-SmbShareAccess -Name 'Ortak' | Where-Object AccountName -like '*Domain Users*'
+```

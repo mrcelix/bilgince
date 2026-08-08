@@ -1,0 +1,234 @@
+---
+import Base from '../../layouts/Base.astro';
+---
+
+<Base
+  baslik="Base64 ve JWT çözücü"
+  aciklama="Base64, URL kodlaması ve JWT belirteçlerini çözer; JWT'nin başlık, gövde ve süre bilgisini okunur hâle getirir. Veri tarayıcıdan çıkmaz."
+  aramaya={true}
+  kategori="Araç"
+>
+  <div class="arama-bas">
+    <div class="kap">
+      <nav class="kirinti" aria-label="Kırıntı yolu" style="padding-top:0">
+        <a href="/">Ana sayfa</a><span class="ayrac">/</span><a href="/araclar">Araçlar</a><span
+          class="ayrac">/</span
+        ><span aria-current="page">Base64 / JWT</span>
+      </nav>
+      <h1>Base64 ve JWT çözücü</h1>
+      <p style="color:var(--muted);font-size:14px;margin-top:8px;max-width:64ch">
+        Günlükte gördüğünüz uzun dizeyi çözmek için çevrimiçi bir siteye yapıştırmayın: belirteçler
+        çoğu zaman kimlik bilgisi taşır. Bu sayfa çözümü tarayıcıda yapar.
+      </p>
+    </div>
+  </div>
+
+  <div class="kap arac-sayfa">
+    <section class="arac-blok">
+      <h2 class="arac-h2"><span class="arac-no">1</span> Girdi</h2>
+      <div class="arac-alan">
+        <label for="b-girdi">Metin, Base64 dizesi ya da JWT</label>
+        <textarea id="b-girdi" rows="5" spellcheck="false" placeholder="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9…" style="font-family:var(--mono);font-size:13px"></textarea>
+      </div>
+      <div class="arac-onaylar" role="radiogroup" aria-label="İşlem">
+        <label class="arac-onay"><input type="radio" name="b-mod" value="oto" checked /> <span>Otomatik algıla</span></label>
+        <label class="arac-onay"><input type="radio" name="b-mod" value="coz" /> <span>Base64 çöz</span></label>
+        <label class="arac-onay"><input type="radio" name="b-mod" value="kodla" /> <span>Base64 kodla</span></label>
+        <label class="arac-onay"><input type="radio" name="b-mod" value="url" /> <span>URL çöz/kodla</span></label>
+      </div>
+      <p class="arac-durum" id="b-durum" role="status" aria-live="polite"></p>
+    </section>
+
+    <section class="arac-blok" id="b-cikti-blok" hidden>
+      <h2 class="arac-h2"><span class="arac-no">2</span> Sonuç</h2>
+      <div id="b-cikti"></div>
+      <div class="arac-dugmeler">
+        <button type="button" class="dg arac-ikincil" id="b-kopya">Sonucu kopyala</button>
+      </div>
+    </section>
+
+    <section class="arac-blok">
+      <h2 class="arac-h2"><span class="arac-no">3</span> JWT hakkında bilinmesi gereken</h2>
+      <div class="arac-kutu uyari">
+        <h3>Çözmek doğrulamak değildir</h3>
+        <p style="margin:0">
+          JWT'nin gövdesi <b>şifreli değil, yalnızca kodlanmıştır</b>; herkes okuyabilir. İmzayı
+          doğrulamak için gizli anahtar gerekir ve bu sayfa imza doğrulaması yapmaz. Bir belirtecin
+          "geçerli" olduğuna içeriğine bakarak karar vermeyin.
+        </p>
+      </div>
+      <div class="arac-kutu" style="margin-top:12px">
+        <ul style="margin:0">
+          <li><code>exp</code> ve <code>nbf</code> Unix zaman damgasıdır; araç bunları yerel saate çevirir.</li>
+          <li><code>alg: none</code> gördüğünüzde durun: imzasız belirteç kabul eden bir sistem, kimlik doğrulamasını kaybetmiş demektir.</li>
+          <li>Belirteci hata kaydına, ekran görüntüsüne ya da destek talebine yapıştırmayın — parolaya eşdeğerdir.</li>
+        </ul>
+      </div>
+    </section>
+  </div>
+
+  <script>
+    const el = (s) => document.querySelector(s);
+    const kacir = (m) => String(m).replace(/[<>&]/g, (c) => ({ '<': '&lt;', '>': '&gt;', '&': '&amp;' })[c]);
+    let sonSonuc = '';
+
+    const b64Coz = (m) => {
+      const temiz = m.replace(/-/g, '+').replace(/_/g, '/').replace(/\s/g, '');
+      const dolgulu = temiz + '='.repeat((4 - (temiz.length % 4)) % 4);
+      const ikili = atob(dolgulu);
+      return new TextDecoder().decode(Uint8Array.from(ikili, (c) => c.charCodeAt(0)));
+    };
+    const b64Kodla = (m) => btoa(String.fromCharCode(...new TextEncoder().encode(m)));
+
+    const jwtMi = (m) => /^[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]*$/.test(m.trim());
+
+    const zamanAlanlari = { exp: 'süre bitişi', iat: 'veriliş', nbf: 'geçerlilik başlangıcı', auth_time: 'kimlik doğrulama' };
+
+    function jwtCiz(metin) {
+      const [basHam, govdeHam, imza] = metin.trim().split('.');
+      const bas = JSON.parse(b64Coz(basHam));
+      const govde = JSON.parse(b64Coz(govdeHam));
+
+      const notlar = [];
+      const simdi = Math.floor(Date.now() / 1000);
+      if (govde.exp) {
+        const kalan = govde.exp - simdi;
+        notlar.push(
+          kalan < 0
+            ? { sinif: 'kotu', metin: `Belirtecin süresi ${Math.abs(Math.round(kalan / 60))} dakika önce doldu.` }
+            : { sinif: 'iyi', metin: `Süresine ${Math.round(kalan / 60)} dakika kaldı.` }
+        );
+      }
+      if (govde.nbf && govde.nbf > simdi) {
+        notlar.push({ sinif: 'uyari', metin: 'Belirteç henüz geçerli değil (nbf ileri bir tarih).' });
+      }
+      if (String(bas.alg).toLowerCase() === 'none') {
+        notlar.push({ sinif: 'kotu', metin: 'alg: none — bu belirteç imzasız. Kabul eden sistem kimlik doğrulamasız çalışıyor demektir.' });
+      }
+      if (!imza) notlar.push({ sinif: 'kotu', metin: 'İmza bölümü boş.' });
+
+      const zamanSatir = Object.entries(zamanAlanlari)
+        .filter(([k]) => govde[k])
+        .map(
+          ([k, ad]) =>
+            `<tr><th>${k}</th><td>${new Date(govde[k] * 1000).toLocaleString('tr-TR')} <span style="color:var(--muted)">(${ad})</span></td></tr>`
+        )
+        .join('');
+
+      sonSonuc = JSON.stringify({ header: bas, payload: govde }, null, 2);
+
+      return `
+        ${notlar.map((n) => `<div class="arac-kutu ${n.sinif}" style="margin-bottom:10px">${kacir(n.metin)}</div>`).join('')}
+        <h3 class="b-h3">Başlık (header)</h3>
+        <pre class="b-kod">${kacir(JSON.stringify(bas, null, 2))}</pre>
+        <h3 class="b-h3">Gövde (payload)</h3>
+        <pre class="b-kod">${kacir(JSON.stringify(govde, null, 2))}</pre>
+        ${zamanSatir ? `<h3 class="b-h3">Zaman alanları</h3><table class="b-tablo">${zamanSatir}</table>` : ''}
+        <h3 class="b-h3">İmza</h3>
+        <pre class="b-kod">${kacir(imza || '(yok)')}</pre>`;
+    }
+
+    function isle() {
+      const girdi = el('#b-girdi').value;
+      const mod = document.querySelector('input[name="b-mod"]:checked').value;
+      const durum = el('#b-durum');
+      const blok = el('#b-cikti-blok');
+
+      if (!girdi.trim()) {
+        blok.hidden = true;
+        durum.textContent = '';
+        durum.className = 'arac-durum';
+        return;
+      }
+
+      durum.className = 'arac-durum';
+      blok.hidden = false;
+
+      try {
+        if ((mod === 'oto' && jwtMi(girdi)) || (mod === 'coz' && jwtMi(girdi))) {
+          el('#b-cikti').innerHTML = jwtCiz(girdi);
+          durum.textContent = 'JWT olarak çözüldü — imza doğrulanmadı.';
+          durum.classList.add('ok');
+          return;
+        }
+
+        let sonuc;
+        let ne;
+        if (mod === 'kodla') {
+          sonuc = b64Kodla(girdi);
+          ne = 'Base64 kodlandı.';
+        } else if (mod === 'url') {
+          sonuc = /%[0-9a-f]{2}/i.test(girdi) ? decodeURIComponent(girdi) : encodeURIComponent(girdi);
+          ne = /%[0-9a-f]{2}/i.test(girdi) ? 'URL kodu çözüldü.' : 'URL için kodlandı.';
+        } else {
+          sonuc = b64Coz(girdi);
+          ne = 'Base64 çözüldü.';
+        }
+
+        sonSonuc = sonuc;
+        let govde = `<pre class="b-kod">${kacir(sonuc)}</pre>`;
+        // Çıktı JSON ise biçimlendirilmiş hâlini de göster
+        try {
+          const j = JSON.parse(sonuc);
+          govde += `<h3 class="b-h3">JSON olarak</h3><pre class="b-kod">${kacir(JSON.stringify(j, null, 2))}</pre>`;
+        } catch {
+          /* düz metin */
+        }
+        el('#b-cikti').innerHTML = govde;
+        durum.textContent = ne;
+        durum.classList.add('ok');
+      } catch (hata) {
+        el('#b-cikti').innerHTML = '';
+        durum.className = 'arac-durum hata';
+        durum.textContent = 'Çözülemedi: geçerli bir Base64 ya da JWT değil.';
+      }
+    }
+
+    el('#b-girdi').addEventListener('input', isle);
+    document.querySelectorAll('input[name="b-mod"]').forEach((r) => r.addEventListener('change', isle));
+    el('#b-kopya').addEventListener('click', async (e) => {
+      try {
+        await navigator.clipboard.writeText(sonSonuc);
+        e.currentTarget.textContent = 'Kopyalandı';
+      } catch {
+        e.currentTarget.textContent = 'Kopyalanamadı';
+      }
+      setTimeout(() => (e.currentTarget.textContent = 'Sonucu kopyala'), 1600);
+    });
+  </script>
+
+  <style>
+    .b-h3 {
+      font-size: 14px;
+      margin: 16px 0 6px;
+      color: var(--ink-soft);
+    }
+    .b-kod {
+      margin: 0;
+      padding: 12px 14px;
+      background: var(--bg);
+      border: 1px solid var(--line);
+      border-radius: var(--r-s);
+      font-size: 13px;
+      line-height: 1.6;
+      overflow-x: auto;
+      white-space: pre-wrap;
+      word-break: break-word;
+    }
+    .b-tablo {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 13.5px;
+    }
+    .b-tablo :is(th, td) {
+      text-align: left;
+      padding: 7px 10px;
+      border-bottom: 1px solid var(--line);
+    }
+    .b-tablo th {
+      font-family: var(--mono);
+      color: var(--indigo-d);
+      width: 90px;
+    }
+  </style>
+</Base>
