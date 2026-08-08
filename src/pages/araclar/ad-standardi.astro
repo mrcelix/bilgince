@@ -1,0 +1,252 @@
+---
+import Base from '../../layouts/Base.astro';
+---
+
+<Base
+  baslik="Makine adlandırma standardı üreteci"
+  aciklama="Şemayı kurun, örnek adları görün, NetBIOS 15 karakter sınırını ve geçersiz karakterleri denetleyin. Elinizdeki adları şemaya göre doğrulayın."
+  aramaya={true}
+  kategori="Araç"
+>
+  <div class="arama-bas">
+    <div class="kap">
+      <nav class="kirinti" aria-label="Kırıntı yolu" style="padding-top:0">
+        <a href="/">Ana sayfa</a><span class="ayrac">/</span><a href="/araclar">Araçlar</a><span
+          class="ayrac">/</span
+        ><span aria-current="page">Adlandırma standardı</span>
+      </nav>
+      <h1>Makine adlandırma standardı</h1>
+      <p style="color:var(--muted);font-size:14px;margin-top:8px;max-width:64ch">
+        Adlandırma standardı, envanterin yarısıdır: adına bakınca nerede olduğunu ve ne iş yaptığını
+        anlayamıyorsanız her soru bir aramaya dönüşür. Şemayı burada kurun, sınırlara takılmadan.
+      </p>
+    </div>
+  </div>
+
+  <div class="kap arac-sayfa">
+    <section class="arac-blok">
+      <h2 class="arac-h2"><span class="arac-no">1</span> Şema</h2>
+      <div class="arac-alanlar">
+        <label class="arac-alan"
+          >Kurum ön eki
+          <input id="n-onek" type="text" value="ANL" maxlength="6" />
+        </label>
+        <label class="arac-alan"
+          >Lokasyon kodu
+          <input id="n-yer" type="text" value="IST" maxlength="6" />
+        </label>
+        <label class="arac-alan"
+          >Rol kodu
+          <select id="n-rol">
+            <option value="SRV">SRV — sunucu</option>
+            <option value="DC">DC — etki alanı denetleyicisi</option>
+            <option value="SQL">SQL — veritabanı</option>
+            <option value="WEB">WEB — web sunucusu</option>
+            <option value="FS">FS — dosya sunucusu</option>
+            <option value="PC" selected>PC — masaüstü</option>
+            <option value="NB">NB — dizüstü</option>
+            <option value="VDI">VDI — sanal masaüstü</option>
+            <option value="PRN">PRN — yazıcı sunucusu</option>
+          </select>
+        </label>
+        <label class="arac-alan"
+          >Ayırıcı
+          <select id="n-ayirici">
+            <option value="-" selected>tire ( - )</option>
+            <option value="">yok</option>
+          </select>
+        </label>
+        <label class="arac-alan"
+          >Sayaç hane sayısı
+          <span class="arac-kaydirac">
+            <input id="n-hane" type="range" min="2" max="5" value="3" />
+            <output for="n-hane" id="n-hane-deger">3</output>
+          </span>
+        </label>
+        <label class="arac-alan"
+          >Başlangıç numarası
+          <input id="n-baslangic" type="number" min="1" value="1" />
+        </label>
+      </div>
+      <div class="arac-onaylar">
+        <label class="arac-onay"><input type="checkbox" id="n-buyuk" checked /> <span>Büyük harf</span></label>
+      </div>
+    </section>
+
+    <section class="arac-blok">
+      <h2 class="arac-h2"><span class="arac-no">2</span> Sonuç</h2>
+      <output class="arac-cikti" id="n-desen"></output>
+      <div class="arac-olcum" id="n-olcum" style="margin-top:12px"></div>
+      <div id="n-uyari" style="margin-top:14px"></div>
+
+      <h3 style="font-size:15px;margin:20px 0 8px">Örnek adlar</h3>
+      <div class="n-ornekler" id="n-ornekler"></div>
+      <div class="arac-dugmeler">
+        <button type="button" class="dg arac-ikincil" id="n-kopya">Örnekleri kopyala</button>
+      </div>
+    </section>
+
+    <section class="arac-blok">
+      <h2 class="arac-h2"><span class="arac-no">3</span> Elinizdeki adları denetleyin</h2>
+      <div class="arac-alan">
+        <label for="n-denetle">Her satıra bir makine adı</label>
+        <textarea id="n-denetle" rows="6" spellcheck="false" style="font-family:var(--mono);font-size:13px"
+          placeholder="ANL-IST-PC-001&#10;muhasebe_pc&#10;ANL-IST-SRV-0000001"></textarea>
+      </div>
+      <div class="arac-dugmeler">
+        <button type="button" class="dg arac-ikincil" id="n-denetle-btn">Denetle</button>
+      </div>
+      <div id="n-denetim" style="margin-top:14px"></div>
+    </section>
+
+    <section class="arac-blok">
+      <h2 class="arac-h2"><span class="arac-no">4</span> Kurallar ve tuzaklar</h2>
+      <div class="arac-kutu">
+        <ul style="margin:0">
+          <li><b>15 karakter sınırı gerçektir.</b> Bilgisayar adının NetBIOS karşılığı 15 karakterle sınırlıdır; daha uzun ad verirseniz kısaltılır ve iki makine aynı NetBIOS adına düşebilir.</li>
+          <li><b>İzin verilen karakterler:</b> A–Z, 0–9 ve tire. Alt çizgi teknik olarak kabul edilir ama DNS'te sorun çıkarır; kullanmayın.</li>
+          <li><b>Kullanıcı adını makineye yazmayın.</b> "ahmet-pc" bir yıl sonra yanlış bilgi olur; kişi değişir, makine kalır.</li>
+          <li><b>Rol kodunu adın içine koyun</b> ama rolü değişebilecek makinelerde dikkatli olun: yeniden adlandırmak etki alanı üyeliğini ve sertifikaları etkiler.</li>
+          <li><b>Sayaç hanesini baştan geniş tutun.</b> İki haneyle başlayıp 100. makinede şema değiştirmek, envanteri ikiye böler.</li>
+        </ul>
+      </div>
+    </section>
+  </div>
+
+  <script>
+    const el = (s) => document.querySelector(s);
+    const GECERSIZ = /[^A-Za-z0-9-]/;
+
+    function parcalar() {
+      const ayirici = el('#n-ayirici').value;
+      const buyuk = el('#n-buyuk').checked;
+      const d = (m) => (buyuk ? m.toLocaleUpperCase('tr') : m.toLocaleLowerCase('tr'));
+      return {
+        onek: d(el('#n-onek').value.trim()),
+        yer: d(el('#n-yer').value.trim()),
+        rol: d(el('#n-rol').value),
+        ayirici,
+        hane: +el('#n-hane').value,
+        baslangic: +el('#n-baslangic').value || 1,
+      };
+    }
+
+    function adUret(p, sira) {
+      const sayac = String(sira).padStart(p.hane, '0');
+      return [p.onek, p.yer, p.rol, sayac].filter(Boolean).join(p.ayirici);
+    }
+
+    function hesapla() {
+      const p = parcalar();
+      el('#n-hane-deger').textContent = p.hane;
+
+      const ornek = adUret(p, p.baslangic);
+      const uzunluk = ornek.length;
+      const kalanHane = 15 - (uzunluk - p.hane);
+
+      el('#n-desen').textContent =
+        [p.onek || '—', p.yer || '—', p.rol, '#'.repeat(p.hane)].join(p.ayirici || ' ') + `  →  ${ornek}`;
+
+      el('#n-olcum').innerHTML = `
+        <span>Uzunluk: <b>${uzunluk} karakter</b></span>
+        <span>NetBIOS sınırı: <b>15</b></span>
+        <span>Sayaç kapasitesi: <b>${Math.pow(10, p.hane) - 1}</b> makine</span>`;
+
+      const uyarilar = [];
+      if (uzunluk > 15) {
+        uyarilar.push({
+          sinif: 'kotu',
+          metin: `Ad ${uzunluk} karakter — <b>NetBIOS 15 karakter sınırını aşıyor</b>. Windows adı kısaltır ve
+                  farklı makineler aynı NetBIOS adına düşebilir. Ön ek, lokasyon ya da sayaç hanesini kısaltın.`,
+        });
+      } else if (uzunluk === 15) {
+        uyarilar.push({ sinif: 'uyari', metin: 'Ad tam sınırda. Yeni bir alan eklemek için yeriniz kalmadı.' });
+      } else {
+        uyarilar.push({ sinif: 'iyi', metin: `Sınırın ${15 - uzunluk} karakter altında; büyümeye yeriniz var.` });
+      }
+
+      if (GECERSIZ.test(p.onek + p.yer)) {
+        uyarilar.push({ sinif: 'kotu', metin: 'Ön ek ya da lokasyon kodunda geçersiz karakter var. Yalnızca A–Z, 0–9 ve tire kullanın.' });
+      }
+      if (p.hane <= 2) {
+        uyarilar.push({ sinif: 'uyari', metin: 'İki haneli sayaç 99 makinede dolar. Filo büyürse şema değiştirmek zorunda kalırsınız.' });
+      }
+      if (!p.ayirici) {
+        uyarilar.push({ sinif: 'uyari', metin: 'Ayırıcı yok: "ANLISTPC001" okunabilir değil ve komut çıktılarında ayrıştırılamaz.' });
+      }
+
+      el('#n-uyari').innerHTML = uyarilar
+        .map((u) => `<div class="arac-kutu ${u.sinif}" style="margin-bottom:8px">${u.metin}</div>`)
+        .join('');
+
+      const ornekler = Array.from({ length: 8 }, (_, i) => adUret(p, p.baslangic + i));
+      el('#n-ornekler').innerHTML = ornekler.map((o) => `<code>${o}</code>`).join('');
+      el('#n-ornekler').dataset.liste = ornekler.join('\n');
+    }
+
+    el('#n-kopya').addEventListener('click', async (e) => {
+      await navigator.clipboard.writeText(el('#n-ornekler').dataset.liste ?? '');
+      e.currentTarget.textContent = 'Kopyalandı';
+      setTimeout(() => (e.currentTarget.textContent = 'Örnekleri kopyala'), 1600);
+    });
+
+    /* --- denetim ----------------------------------------------------------- */
+    el('#n-denetle-btn').addEventListener('click', () => {
+      const p = parcalar();
+      const satirlar = el('#n-denetle').value.split('\n').map((s) => s.trim()).filter(Boolean);
+      if (!satirlar.length) {
+        el('#n-denetim').innerHTML = '<div class="arac-kutu">Denetlenecek ad yok.</div>';
+        return;
+      }
+
+      const desen = new RegExp(
+        `^${p.onek}${p.ayirici}${p.yer}${p.ayirici}[A-Za-z]{2,4}${p.ayirici}\\d{${p.hane}}$`,
+        'i'
+      );
+
+      const sonuclar = satirlar.map((ad) => {
+        const sorunlar = [];
+        if (ad.length > 15) sorunlar.push(`${ad.length} karakter — 15 sınırını aşıyor`);
+        if (GECERSIZ.test(ad)) sorunlar.push('geçersiz karakter içeriyor (yalnızca A–Z, 0–9, tire)');
+        if (/^\d/.test(ad)) sorunlar.push('rakamla başlıyor');
+        if (!desen.test(ad)) sorunlar.push('şemaya uymuyor');
+        return { ad, sorunlar };
+      });
+
+      const uyan = sonuclar.filter((s) => !s.sorunlar.length).length;
+      el('#n-denetim').innerHTML =
+        `<div class="arac-kutu ${uyan === sonuclar.length ? 'iyi' : 'uyari'}" style="margin-bottom:10px">
+           ${sonuclar.length} addan ${uyan} tanesi şemaya uyuyor.
+         </div>` +
+        '<div class="arac-kutu"><ul style="margin:0">' +
+        sonuclar
+          .map((s) =>
+            s.sorunlar.length
+              ? `<li><code>${s.ad}</code> — ${s.sorunlar.join('; ')}</li>`
+              : `<li><code>${s.ad}</code> — uygun</li>`
+          )
+          .join('') +
+        '</ul></div>';
+    });
+
+    document
+      .querySelectorAll('#n-onek, #n-yer, #n-rol, #n-ayirici, #n-hane, #n-baslangic, #n-buyuk')
+      .forEach((d) => d.addEventListener('input', hesapla));
+    hesapla();
+  </script>
+
+  <style>
+    .n-ornekler {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+    }
+    .n-ornekler code {
+      background: var(--bg);
+      border: 1px solid var(--line);
+      border-radius: var(--r-s);
+      padding: 5px 11px;
+      font-size: 13.5px;
+    }
+  </style>
+</Base>

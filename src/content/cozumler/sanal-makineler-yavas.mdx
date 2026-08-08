@@ -1,0 +1,76 @@
+---
+baslik: "Sanal makineler yavaşladı"
+ozet: "Konuk içinde her şey normal görünüyor ama makine yavaş. Sebep genelde ana makinededir: aşırı taahhüt, yaşlanmış denetim noktası ya da depolama gecikmesi."
+konu: "sanallastirma"
+etiketler: ["hyper-v", "denetim-noktasi", "performans", "depolama"]
+belirtiler:
+  - "Sanal makineler yavaşladı ama içeride yük yok"
+  - "Disk hızla doluyor"
+  - "Yedek aldıktan sonra yavaşladı"
+  - "Bir sanal makine diğerlerini etkiliyor"
+yayin: 2026-08-09
+sure: 6
+dosya: "/araclar/hyper-v-saglik.ps1"
+dosyaAdi: "hyper-v-saglik.ps1"
+dosyaAciklama: "Ana makine kaynakları ve vCPU aşırı taahhüt oranı, dinamik bellek baskısı, denetim noktası yaşı, sanal disk türleri, replikasyon sağlığı, depolama gecikmesi ve Hyper-V olaylarını tek raporda toplar."
+komut: "Get-VMSnapshot -VMName * | Select-Object VMName, Name, CreationTime"
+platform: "windows"
+ilgiliRehberler: []
+sira: 21
+---
+
+Sanal makinede ölçüm yaparsınız: CPU boş, bellek yeterli, disk boş. Yine de yavaş. Çünkü baktığınız yer, darboğazın olduğu yer değil.
+
+Konuk işletim sistemi, ana makinede beklediği süreyi göremez.
+
+## 1. Aşırı taahhüt oranı
+
+Çalışan sanal makinelerin toplam vCPU sayısını fiziksel mantıksal çekirdeğe bölün:
+
+- **2:1'e kadar** — çoğu iş yükünde sorunsuz
+- **4:1'e kadar** — yoğun anlarda hissedilir
+- **4:1 üstü** — belirgin gecikme
+
+Bellekte aşırı taahhüt daha tehlikelidir: dinamik bellek açıkken **bellek baskısı %90 üstü** olan bir makine, istediği belleği alamıyordur ve konuk içinde bunu "biraz yavaş" diye görürsünüz.
+
+## 2. Denetim noktaları — en sık sebep
+
+Denetim noktası (checkpoint) **yedek değildir**. Alındığı andan itibaren tüm yazmalar bir fark diskine gider; o disk büyüdükçe:
+
+- Her okuma zincirde bir adım daha gezinir → gecikme artar
+- Disk beklenmedik biçimde dolar
+- Birleştirme (merge) işlemi gittikçe uzar ve daha çok yer ister
+
+"Yedek aldıktan sonra yavaşladı" şikâyetinin sebebi neredeyse her zaman budur: yedek yazılımı denetim noktası bırakmıştır.
+
+```powershell
+Get-VMSnapshot -VMName * | Select-Object VMName, Name, CreationTime
+```
+
+Bir haftadan eski bir denetim noktası, kapatılması gereken bir açık iştir.
+
+## 3. Depolama gecikmesi
+
+Bir sanal makine diğerlerini etkiliyorsa bakılacak yer depolamadır. Ortak diskte tek bir makinenin yoğun yazması, hepsinin gecikmesini yükseltir.
+
+Ana makinede ölçün: **25 ms üstü ortalama aktarım gecikmesi**, tüm konuklarda yavaşlık demektir. Bu noktadan sonra konuk içinde yapılacak hiçbir ayar sonucu değiştirmez.
+
+## 4. Fark diski görünüyorsa
+
+Rapor `Differencing` türünde disk gösteriyorsa ya açık bir denetim noktası vardır ya da bağlantılı klon. İkisi de üretimde uzun süre kalmamalıdır.
+
+## Doğrulama
+
+Denetim noktalarını birleştirdikten sonra:
+
+- Disk alanı geri geldi mi (fark diskleri kayboldu mu)
+- Depolama gecikmesi düştü mü
+- Şikâyet eden makinede aynı iş ne kadar sürüyor
+
+Üçünü de ölçmeden "düzeldi" demeyin: denetim noktası silmek anında etki etmez, birleştirme bitene kadar performans **daha da** düşer.
+
+## Tekrar yaşamamak için
+
+- Yedek işlerinin bıraktığı denetim noktalarını izleyin: haftalık bir kontrol yeterli.
+- Üretim makinelerinde dinamik belleği dikkatli kullanın; veritabanı sunucularında genelde sabit bellek daha öngörülebilir.
+- Ana makinede en az bir makinelik boş bellek payı bırakın: pay yoksa arıza anında hiçbir şeyi başka yere taşıyamazsınız.

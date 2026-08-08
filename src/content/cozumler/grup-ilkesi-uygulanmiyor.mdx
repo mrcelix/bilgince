@@ -1,0 +1,82 @@
+---
+baslik: "Grup ilkesi uygulanmıyor"
+ozet: "Ayarı yaptınız, makinede karşılığı yok. İlkenin makineye ulaşmasını engelleyen sekiz sebep var ve hangisi olduğu üç komutta çıkar."
+konu: "windows-server"
+etiketler: ["gpo", "active-directory", "sysvol", "tanilama"]
+belirtiler:
+  - "İlkeyi yaptım ama makinede uygulanmıyor"
+  - "Bazı makinelerde çalışıyor bazılarında çalışmıyor"
+  - "gpupdate hata veriyor"
+  - "İlke listede görünüyor ama etkisi yok"
+yayin: 2026-08-09
+sure: 6
+dosya: "/araclar/gpo-uygulanmiyor-teshis.ps1"
+dosyaAdi: "gpo-uygulanmiyor-teshis.ps1"
+dosyaAciklama: "Etki alanı bağlantısı, güvenli kanal, DNS, SYSVOL erişimi, son işleme zamanı, 1058/1030/1129 olayları, WMI süzgeçleri ve güvenlik süzmesini sırayla denetler; isteğe bağlı HTML sonuç raporu üretir."
+komut: "gpresult /r /scope:computer"
+platform: "windows"
+ilgiliRehberler: []
+sira: 18
+---
+
+"İlke uygulanmıyor" cümlesinin altında iki farklı durum vardır ve karıştırılınca saatler kaybedilir:
+
+- **İlke makineye hiç ulaşmıyor** → bağlantı, DNS, SYSVOL, güvenli kanal
+- **Ulaşıyor ama uygulanmıyor** → güvenlik süzmesi, WMI süzgeci, kapsam, öncelik
+
+Ayırt etmenin yolu tek komut:
+
+```powershell
+gpresult /r /scope:computer
+```
+
+İlke **"Applied"** listesindeyse ulaşmıştır; **"not applied"** listesindeyse sebebi hemen yanında yazar.
+
+## 1. Ulaşmıyorsa
+
+**Güvenli kanal.** Anlık görüntüden döndürülen ya da uzun süre kapalı kalmış makinelerde makine hesabı parolası uyuşmaz. Belirti çok geniştir: ilke gelmez, paylaşım açılmaz, bazen oturum bile açılmaz.
+
+```powershell
+Test-ComputerSecureChannel
+Test-ComputerSecureChannel -Repair -Credential (Get-Credential)
+```
+
+**DNS.** Etki alanı üyesi bir makinede DNS **yalnızca iç sunucuları** göstermelidir. Listeye 8.8.8.8 eklendiğinde belirti "bazen çalışıyor" olur — çünkü sıra bazen iç sunucuya düşer.
+
+**SYSVOL.** İlke dosyaları `\\<alan>\SYSVOL\<alan>\Policies` altındadır. Erişilemiyorsa olay günlüğünde **1058** görürsünüz. Sebep genelde DFS istemcisi, SMB imzalama uyuşmazlığı ya da ağ.
+
+## 2. Ulaşıyor ama uygulanmıyorsa
+
+Üç süzgeçten biri devrededir:
+
+| Süzgeç | Nasıl anlaşılır | Nasıl düzeltilir |
+| --- | --- | --- |
+| Güvenlik süzmesi | gpresult "Filtering: Denied (Security)" der | İlkenin Delegation sekmesinde hesaba **Apply** izni verin |
+| WMI süzgeci | "Filtering: Denied (WMI Filter)" | Sorguyu makinede çalıştırın; `false` dönüyorsa süzgeç doğru çalışıyor demektir |
+| Kapsam | İlke hiç listelenmez | Makine/kullanıcı, ilkenin bağlı olduğu OU altında değil |
+
+WMI süzgecini yerinde sınamak:
+
+```powershell
+Get-CimInstance -Query 'SELECT * FROM Win32_OperatingSystem WHERE ProductType = 1'
+```
+
+Boş dönerse ilke uygulanmaz — ve bu çoğu zaman istenen davranıştır, arıza değil.
+
+## 3. Açılışta uygulanmıyorsa
+
+Olay **1129**: ağ hazır olmadan ilke işlenmeye çalışılmış. Kablosuz istemcilerde ve hızlı SSD'li makinelerde yaygındır. Çözüm, "Bilgisayar açılışında ve oturum açmada her zaman ağı bekle" ilkesini açmaktır.
+
+## Doğrulama
+
+Düzelttikten sonra tam sonuç raporunu alın ve **ilkenin uygulanan listede** olduğunu görün:
+
+```powershell
+gpresult /h "$env:USERPROFILE\Desktop\gpo.html" /f
+```
+
+"gpupdate hata vermedi" yeterli değildir: hata vermeden de hiçbir şey uygulanmamış olabilir.
+
+## Kullanıcı ilkeleri için
+
+Kullanıcı tarafını **o kullanıcının oturumunda** çalıştırın. Yönetici olarak açılan konsolda `gpresult` kullanıcı bölümünde sizin hesabınızı gösterir; bakılan şey yanlış olur.

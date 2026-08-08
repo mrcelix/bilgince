@@ -1,0 +1,84 @@
+---
+baslik: "Kullanıcı giriş yapamıyor"
+ozet: "Parola doğru ama giriş olmuyor. Sebep hesapta da olabilir makinede de; başarısız oturum açma olayının alt kodu ikisini birbirinden ayırır."
+konu: "windows-server"
+etiketler: ["kimlik", "kerberos", "active-directory", "4625"]
+belirtiler:
+  - "Parola doğru ama giriş olmuyor"
+  - "Sadece bu makinede giremiyor"
+  - "Sadece bu kullanıcı giremiyor"
+  - "Belirli saatlerde giremiyor"
+yayin: 2026-08-09
+sure: 6
+dosya: "/araclar/kullanici-oturum-teshis.ps1"
+dosyaAdi: "kullanici-oturum-teshis.ps1"
+dosyaAciklama: "Hesap durumu (kilit, parola süresi, saat ve iş istasyonu kısıtı), makine tarafı (güvenli kanal, saat kayması, DC erişimi), son 4625 olayları alt koduyla çözülmüş hâlde ve kullanıcı profili."
+komut: "Get-ADUser ahmet -Properties LockedOut, Enabled, PasswordExpired, AccountExpirationDate"
+platform: "windows"
+ilgiliRehberler: []
+sira: 23
+---
+
+"Giriş yapamıyorum" belirtisinde ilk soru şu olmalı: **sadece bu kullanıcı mı, sadece bu makine mi?** Cevap, aramayı ikiye böler.
+
+| Durum | Nerede aranır |
+| --- | --- |
+| Tek kullanıcı, her makinede | Hesap tarafı |
+| Tek makine, her kullanıcıda | Makine tarafı |
+| Tek kullanıcı, tek makine | Profil ya da iş istasyonu kısıtı |
+| Belirli saatlerde | Oturum açma saati kısıtı |
+
+## 1. Alt kod sebebi doğrudan söyler
+
+Başarısız her deneme güvenlik günlüğüne **4625** olarak düşer ve içinde bir **Sub Status** kodu vardır:
+
+| Kod | Anlamı |
+| --- | --- |
+| `0xC000006A` | Parola yanlış |
+| `0xC0000064` | Kullanıcı adı yok |
+| `0xC0000234` | Hesap kilitli |
+| `0xC0000072` | Hesap devre dışı |
+| `0xC000006F` | İzin verilen saat dışında |
+| `0xC0000070` | İzin verilmeyen iş istasyonu |
+| `0xC0000071` | Parolanın süresi dolmuş |
+| `0xC0000133` | Saat kayması çok büyük |
+
+Bu tablo, tahmin etmeyi bitirir. `0xC0000070` gördüğünüzde parolayı sıfırlamanın hiçbir faydası yoktur.
+
+## 2. Makine tarafı: güvenli kanal ve saat
+
+**Güvenli kanal bozuksa** o makineden hiç kimse giremez. Anlık görüntüden döndürülen sanal makinelerde ve uzun süre kapalı kalan dizüstülerde tipiktir.
+
+```powershell
+Test-ComputerSecureChannel
+Test-ComputerSecureChannel -Repair -Credential (Get-Credential)
+```
+
+**Saat kayması** en az bilinen sebeptir: Kerberos, beş dakikadan büyük farkı reddeder. Parola doğru olsa bile bilet alınamaz.
+
+```powershell
+w32tm /query /status
+w32tm /resync
+```
+
+Sanal makinelerde ana makineyle zaman eşitlemesi ile etki alanı zaman kaynağı çakışabilir; ikisinden biri kapatılmalıdır.
+
+## 3. Hesap tarafı: görünmeyen kısıtlar
+
+Hesap etkin, kilitli değil, parola geçerli — ama yine de giremiyor. Sıradaki iki alan çoğu zaman unutulur:
+
+- **userWorkstations**: hesap yalnızca belirli makinelerden girebilir. Listede olmayan makinede belirti "parola yanlış" gibi görünür.
+- **LogonHours**: oturum açma saati kısıtı. "Sabah 8'den önce giremiyorum" şikâyetinin karşılığı.
+
+## 4. Sürekli kilitleniyorsa
+
+Bu ayrı bir sorundur ve ayrı bir yolu vardır:
+[hesap sürekli kilitleniyor](/hizli-cozumler/hesap-surekli-kilitleniyor) — kilidi açmak çözüm değil, belirtiyi bastırmaktır.
+
+## Doğrulama
+
+Düzelttikten sonra **kullanıcının kendisi** giriş yapsın ve 4625 olayının tekrarlamadığını görün. Kendi hesabınızla test etmek yanıltıcıdır: yöneticiler çoğu kısıttan muaf tutulur.
+
+## Kayıt tutun
+
+Aynı kullanıcı ayda birden fazla kez bu sorunu yaşıyorsa sebep kalıcıdır: eski parola tutan bir cihaz, bozuk bir profil ya da hatalı bir ilke. Her seferinde kilidi açıp geçmek, aynı çağrıyı her ay yeniden almak demektir.

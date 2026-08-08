@@ -1,0 +1,237 @@
+---
+import Base from '../../layouts/Base.astro';
+---
+
+<Base
+  baslik="Güvenlik duvarı kuralı üreteci"
+  aciklama="Windows Defender Güvenlik Duvarı kuralını form doldurarak üretir: PowerShell ve netsh karşılığı, her parametrenin açıklaması ve kuralı geniş bırakan seçimlerde uyarı."
+  aramaya={true}
+  kategori="Araç"
+>
+  <div class="arama-bas">
+    <div class="kap">
+      <nav class="kirinti" aria-label="Kırıntı yolu" style="padding-top:0">
+        <a href="/">Ana sayfa</a><span class="ayrac">/</span><a href="/araclar">Araçlar</a><span
+          class="ayrac">/</span
+        ><span aria-current="page">Güvenlik duvarı kuralı</span>
+      </nav>
+      <h1>Güvenlik duvarı kuralı üreteci</h1>
+      <p style="color:var(--muted);font-size:14px;margin-top:8px;max-width:64ch">
+        Arayüzden tıklayarak açılan kurallar belgelenmez ve geri alınamaz. Komut olarak üretin:
+        değişiklik kaydına yapıştırılır, betiğe konur, geri alması tek satırdır.
+      </p>
+    </div>
+  </div>
+
+  <div class="kap arac-sayfa">
+    <section class="arac-blok">
+      <h2 class="arac-h2"><span class="arac-no">1</span> Kural</h2>
+      <div class="arac-alanlar">
+        <label class="arac-alan"
+          >Kural adı
+          <input id="g-ad" type="text" value="SQL Server - uygulama sunucularindan" />
+        </label>
+        <label class="arac-alan"
+          >Yön
+          <select id="g-yon">
+            <option value="Inbound" selected>Gelen</option>
+            <option value="Outbound">Giden</option>
+          </select>
+        </label>
+        <label class="arac-alan"
+          >Eylem
+          <select id="g-eylem">
+            <option value="Allow" selected>İzin ver</option>
+            <option value="Block">Engelle</option>
+          </select>
+        </label>
+        <label class="arac-alan"
+          >Protokol
+          <select id="g-protokol">
+            <option value="TCP" selected>TCP</option>
+            <option value="UDP">UDP</option>
+            <option value="ICMPv4">ICMPv4 (ping)</option>
+            <option value="Any">Tümü</option>
+          </select>
+        </label>
+        <label class="arac-alan"
+          >Port(lar)
+          <input id="g-port" type="text" value="1433" placeholder="443 · 80,443 · 5000-5010" />
+        </label>
+        <label class="arac-alan"
+          >Uzak adres
+          <input id="g-uzak" type="text" value="10.10.20.0/24" placeholder="Any · 10.0.0.5 · 10.10.0.0/16" />
+        </label>
+      </div>
+
+      <div class="arac-alanlar" style="margin-top:14px">
+        <label class="arac-alan"
+          >Program yolu (isteğe bağlı)
+          <input id="g-program" type="text" placeholder="C:\\Program Files\\Uygulama\\app.exe" />
+        </label>
+        <label class="arac-alan"
+          >Açıklama
+          <input id="g-aciklama" type="text" value="Degisiklik kaydi: DEG-2026-114" />
+        </label>
+      </div>
+
+      <div class="arac-onaylar">
+        <span style="font-size:13px;font-weight:700;color:var(--ink-soft);align-self:center">Profiller:</span>
+        <label class="arac-onay"><input type="checkbox" id="g-domain" checked /> <span>Etki alanı</span></label>
+        <label class="arac-onay"><input type="checkbox" id="g-private" /> <span>Özel</span></label>
+        <label class="arac-onay"><input type="checkbox" id="g-public" /> <span>Genel</span></label>
+      </div>
+    </section>
+
+    <section class="arac-blok">
+      <h2 class="arac-h2"><span class="arac-no">2</span> Komutlar</h2>
+      <h3 style="font-size:14px;margin:0 0 6px;color:var(--ink-soft)">PowerShell</h3>
+      <pre class="g-kod" id="g-ps"></pre>
+      <h3 style="font-size:14px;margin:16px 0 6px;color:var(--ink-soft)">netsh (eski sistemler)</h3>
+      <pre class="g-kod" id="g-netsh"></pre>
+      <h3 style="font-size:14px;margin:16px 0 6px;color:var(--ink-soft)">Geri alma</h3>
+      <pre class="g-kod" id="g-geri"></pre>
+      <div class="arac-dugmeler">
+        <button type="button" class="dg" id="g-kopya">PowerShell'i kopyala</button>
+      </div>
+      <div id="g-uyari" style="margin-top:16px"></div>
+    </section>
+
+    <section class="arac-blok">
+      <h2 class="arac-h2"><span class="arac-no">3</span> Kural yazarken</h2>
+      <div class="arac-kutu">
+        <ul style="margin:0">
+          <li><b>Uzak adresi daraltın.</b> "Any" ile açılan bir yönetim portu, iç ağdaki her makineye açık demektir. Kaynağı belli olan her kuralda ağ ya da IP yazın.</li>
+          <li><b>Profil seçimi önemlidir.</b> Genel profilde açılan kural, kullanıcı kafede Wi-Fi'ye bağlandığında da geçerlidir.</li>
+          <li><b>Açıklama alanını boş bırakmayın.</b> Bir yıl sonra "bu kural neden var" sorusunu cevaplayan tek şey odur; değişiklik kaydı numarası yazın.</li>
+          <li><b>Filoya dağıtacaksanız</b> makinede tek tek değil grup ilkesi ya da Intune ile uygulayın; yerel kurallar bir sonraki kurulumda kaybolur.</li>
+        </ul>
+      </div>
+    </section>
+  </div>
+
+  <script>
+    const el = (s) => document.querySelector(s);
+
+    function profiller() {
+      const p = [];
+      if (el('#g-domain').checked) p.push('Domain');
+      if (el('#g-private').checked) p.push('Private');
+      if (el('#g-public').checked) p.push('Public');
+      return p.length === 3 ? ['Any'] : p;
+    }
+
+    function uret() {
+      const ad = el('#g-ad').value.trim() || 'Yeni kural';
+      const yon = el('#g-yon').value;
+      const eylem = el('#g-eylem').value;
+      const protokol = el('#g-protokol').value;
+      const port = el('#g-port').value.trim();
+      const uzak = el('#g-uzak').value.trim() || 'Any';
+      const program = el('#g-program').value.trim();
+      const aciklama = el('#g-aciklama').value.trim();
+      const prof = profiller();
+
+      /* --- PowerShell ------------------------------------------------------ */
+      const ps = [`New-NetFirewallRule \``, `  -DisplayName "${ad}" \``, `  -Direction ${yon} \``, `  -Action ${eylem} \``];
+      if (protokol !== 'Any') ps.push(`  -Protocol ${protokol} \``);
+      if (port && (protokol === 'TCP' || protokol === 'UDP')) {
+        ps.push(`  -${yon === 'Inbound' ? 'LocalPort' : 'RemotePort'} ${port} \``);
+      }
+      if (uzak && uzak.toLowerCase() !== 'any') ps.push(`  -RemoteAddress ${uzak} \``);
+      if (program) ps.push(`  -Program "${program}" \``);
+      if (prof.length) ps.push(`  -Profile ${prof.join(',')} \``);
+      if (aciklama) ps.push(`  -Description "${aciklama}" \``);
+      ps.push('  -Enabled True');
+      el('#g-ps').textContent = ps.join('\n');
+
+      /* --- netsh ------------------------------------------------------------ */
+      const n = [
+        'netsh advfirewall firewall add rule',
+        `name="${ad}"`,
+        `dir=${yon === 'Inbound' ? 'in' : 'out'}`,
+        `action=${eylem.toLowerCase()}`,
+      ];
+      if (protokol !== 'Any') n.push(`protocol=${protokol}`);
+      if (port && (protokol === 'TCP' || protokol === 'UDP')) {
+        n.push(`${yon === 'Inbound' ? 'localport' : 'remoteport'}=${port}`);
+      }
+      if (uzak && uzak.toLowerCase() !== 'any') n.push(`remoteip=${uzak}`);
+      if (program) n.push(`program="${program}"`);
+      n.push(`profile=${prof.map((p) => p.toLowerCase()).join(',')}`);
+      el('#g-netsh').textContent = n.join(' ');
+
+      el('#g-geri').textContent = `Remove-NetFirewallRule -DisplayName "${ad}"`;
+
+      /* --- uyarılar --------------------------------------------------------- */
+      const uyarilar = [];
+      const yonetimPortlari = ['3389', '5985', '5986', '22', '445', '135', '1433', '3306'];
+      const portListesi = port.split(/[,\s-]+/).filter(Boolean);
+
+      if (uzak.toLowerCase() === 'any' && eylem === 'Allow' && yon === 'Inbound') {
+        const yonetim = portListesi.find((p) => yonetimPortlari.includes(p));
+        uyarilar.push({
+          sinif: yonetim ? 'kotu' : 'uyari',
+          metin: yonetim
+            ? `<b>${yonetim}</b> portunu her adrese açıyorsunuz. Bu bir yönetim/veritabanı portu; kaynağı daraltmadan uygulamayın.`
+            : 'Uzak adres "Any": bu kural ağdaki her makineye açık. Kaynağı belliyse yazın.',
+        });
+      }
+      if (prof.includes('Any') || el('#g-public').checked) {
+        uyarilar.push({
+          sinif: 'uyari',
+          metin:
+            'Genel profil seçili. Dizüstü kullanıcıları ev ve kafe ağlarında da bu kuralı taşır; ' +
+            'sunucu kuralları genelde yalnızca etki alanı profilinde olmalıdır.',
+        });
+      }
+      if (eylem === 'Block' && yon === 'Outbound') {
+        uyarilar.push({
+          sinif: 'uyari',
+          metin: 'Giden engelleme kuralları, sebebi anlaşılması en zor arızaları üretir. Açıklamaya neyi neden engellediğinizi yazın.',
+        });
+      }
+      if (!aciklama) {
+        uyarilar.push({ sinif: 'uyari', metin: 'Açıklama boş: bir yıl sonra bu kuralın neden var olduğunu kimse bilemeyecek.' });
+      }
+      if (!uyarilar.length) {
+        uyarilar.push({ sinif: 'iyi', metin: 'Kural kaynağı ve profili sınırlı, açıklaması var. Uygulanabilir.' });
+      }
+
+      el('#g-uyari').innerHTML = uyarilar
+        .map((u) => `<div class="arac-kutu ${u.sinif}" style="margin-bottom:10px">${u.metin}</div>`)
+        .join('');
+    }
+
+    document
+      .querySelectorAll('#g-ad, #g-yon, #g-eylem, #g-protokol, #g-port, #g-uzak, #g-program, #g-aciklama, #g-domain, #g-private, #g-public')
+      .forEach((d) => d.addEventListener('input', uret));
+
+    el('#g-kopya').addEventListener('click', async (e) => {
+      try {
+        await navigator.clipboard.writeText(el('#g-ps').textContent);
+        e.currentTarget.textContent = 'Kopyalandı';
+      } catch {
+        e.currentTarget.textContent = 'Kopyalanamadı';
+      }
+      setTimeout(() => (e.currentTarget.textContent = "PowerShell'i kopyala"), 1600);
+    });
+
+    uret();
+  </script>
+
+  <style>
+    .g-kod {
+      margin: 0;
+      padding: 13px 15px;
+      background: var(--navy);
+      color: #f2f5ff;
+      border-radius: var(--r-s);
+      font-size: 13.5px;
+      line-height: 1.6;
+      overflow-x: auto;
+      white-space: pre-wrap;
+      word-break: break-word;
+    }
+  </style>
+</Base>

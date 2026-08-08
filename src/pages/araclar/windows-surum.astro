@@ -1,0 +1,231 @@
+---
+import Base from '../../layouts/Base.astro';
+
+/**
+ * Derleme numarası → sürüm ve destek bitişi. Tarihler Microsoft yaşam döngüsü
+ * takvimine dayanır; kritik kararlardan önce doğrulanmalı diye sayfada da
+ * yazıyor. Kurumsal (Enterprise/Education) sürümler tüketici sürümlerinden
+ * bir yıl daha uzun destek alır, o yüzden iki sütun var.
+ */
+const SURUMLER = [
+  { derleme: '26200', ad: 'Windows 11 25H2', aile: 'Windows 11', tuketici: '2027-10-12', kurumsal: '2028-10-10', not: 'Yaklaşık tarih' },
+  { derleme: '26100', ad: 'Windows 11 24H2', aile: 'Windows 11', tuketici: '2026-10-13', kurumsal: '2027-10-12' },
+  { derleme: '22631', ad: 'Windows 11 23H2', aile: 'Windows 11', tuketici: '2025-11-11', kurumsal: '2026-11-10' },
+  { derleme: '22621', ad: 'Windows 11 22H2', aile: 'Windows 11', tuketici: '2024-10-08', kurumsal: '2025-10-14' },
+  { derleme: '22000', ad: 'Windows 11 21H2', aile: 'Windows 11', tuketici: '2023-10-10', kurumsal: '2024-10-08' },
+  { derleme: '19045', ad: 'Windows 10 22H2', aile: 'Windows 10', tuketici: '2025-10-14', kurumsal: '2025-10-14', not: 'Windows 10 desteğinin bittiği sürüm' },
+  { derleme: '19044', ad: 'Windows 10 21H2', aile: 'Windows 10', tuketici: '2023-06-13', kurumsal: '2024-06-11' },
+  { derleme: '19043', ad: 'Windows 10 21H1', aile: 'Windows 10', tuketici: '2022-12-13', kurumsal: '2022-12-13' },
+  { derleme: '19042', ad: 'Windows 10 20H2', aile: 'Windows 10', tuketici: '2022-05-10', kurumsal: '2023-05-09' },
+  { derleme: '19041', ad: 'Windows 10 2004', aile: 'Windows 10', tuketici: '2021-12-14', kurumsal: '2021-12-14' },
+  { derleme: '18363', ad: 'Windows 10 1909', aile: 'Windows 10', tuketici: '2021-05-11', kurumsal: '2022-05-10' },
+  { derleme: '18362', ad: 'Windows 10 1903', aile: 'Windows 10', tuketici: '2020-12-08', kurumsal: '2020-12-08' },
+  { derleme: '17763', ad: 'Windows 10 1809', aile: 'Windows 10', tuketici: '2020-11-10', kurumsal: '2021-05-11' },
+  { derleme: '17134', ad: 'Windows 10 1803', aile: 'Windows 10', tuketici: '2019-11-12', kurumsal: '2021-05-11' },
+  { derleme: '16299', ad: 'Windows 10 1709', aile: 'Windows 10', tuketici: '2019-04-09', kurumsal: '2020-10-13' },
+  { derleme: '15063', ad: 'Windows 10 1703', aile: 'Windows 10', tuketici: '2018-10-09', kurumsal: '2019-10-08' },
+  { derleme: '14393', ad: 'Windows 10 1607', aile: 'Windows 10', tuketici: '2018-04-10', kurumsal: '2019-04-09' },
+  { derleme: '10240', ad: 'Windows 10 1507', aile: 'Windows 10', tuketici: '2017-05-09', kurumsal: '2017-05-09' },
+  { derleme: '26100', ad: 'Windows Server 2025', aile: 'Windows Server', tuketici: '2029-10-09', kurumsal: '2034-10-10', not: 'Ana destek / genişletilmiş destek' },
+  { derleme: '25398', ad: 'Windows Server 23H2', aile: 'Windows Server', tuketici: '2025-10-24', kurumsal: '2025-10-24', not: 'Yıllık kanal — kısa ömürlü' },
+  { derleme: '20348', ad: 'Windows Server 2022', aile: 'Windows Server', tuketici: '2026-10-13', kurumsal: '2031-10-14', not: 'Ana destek / genişletilmiş destek' },
+  { derleme: '17763', ad: 'Windows Server 2019', aile: 'Windows Server', tuketici: '2024-01-09', kurumsal: '2029-01-09', not: 'Ana destek / genişletilmiş destek' },
+  { derleme: '14393', ad: 'Windows Server 2016', aile: 'Windows Server', tuketici: '2022-01-11', kurumsal: '2027-01-12', not: 'Ana destek / genişletilmiş destek' },
+  { derleme: '9600', ad: 'Windows Server 2012 R2', aile: 'Windows Server', tuketici: '2018-10-09', kurumsal: '2023-10-10' },
+];
+---
+
+<Base
+  baslik="Windows sürüm ve destek sözlüğü"
+  aciklama="Derleme numarasından sürüm adını ve destek bitiş tarihini bulur: 19045 hangi Windows 10, ne zamana kadar yama alıyor? İstemci ve sunucu sürümleri bir arada."
+  aramaya={true}
+  kategori="Araç"
+>
+  <div class="arama-bas">
+    <div class="kap">
+      <nav class="kirinti" aria-label="Kırıntı yolu" style="padding-top:0">
+        <a href="/">Ana sayfa</a><span class="ayrac">/</span><a href="/araclar">Araçlar</a><span
+          class="ayrac">/</span
+        ><span aria-current="page">Windows sürümleri</span>
+      </nav>
+      <h1>Windows sürüm ve destek sözlüğü</h1>
+      <p style="color:var(--muted);font-size:14px;margin-top:8px;max-width:64ch">
+        Envanterde <code>10.0.19045</code> yazıyor. Bu hangi sürüm ve yama almaya devam ediyor mu?
+        Numarayı yazın, tablo süzülsün.
+      </p>
+    </div>
+  </div>
+
+  <div class="kap arac-sayfa">
+    <section class="arac-blok">
+      <h2 class="arac-h2"><span class="arac-no">1</span> Ara</h2>
+      <div class="arac-alan">
+        <label for="w-ara">Derleme numarası ya da sürüm adı</label>
+        <input id="w-ara" type="search" spellcheck="false" placeholder="19045 · 22H2 · Server 2019" style="font-family:var(--mono);font-size:15px" />
+      </div>
+      <p class="arac-not">
+        Makinenizin derleme numarası: <code>winver</code> ya da
+        <code>(Get-CimInstance Win32_OperatingSystem).BuildNumber</code>
+      </p>
+      <p class="arac-durum" id="w-durum" role="status" aria-live="polite"></p>
+    </section>
+
+    <section class="arac-blok">
+      <h2 class="arac-h2"><span class="arac-no">2</span> Sürümler</h2>
+      <div style="overflow-x:auto">
+        <table class="w-tablo">
+          <thead>
+            <tr>
+              <th>Derleme</th>
+              <th>Sürüm</th>
+              <th>Tüketici / ana destek</th>
+              <th>Kurumsal / genişletilmiş</th>
+              <th>Durum</th>
+            </tr>
+          </thead>
+          <tbody id="w-govde">
+            {
+              SURUMLER.map((s) => (
+                <tr data-ara={`${s.derleme} ${s.ad} ${s.aile}`.toLocaleLowerCase('tr')} data-tuketici={s.tuketici} data-kurumsal={s.kurumsal}>
+                  <td><code>{s.derleme}</code></td>
+                  <td>
+                    <b>{s.ad}</b>
+                    {s.not && <span class="w-not">{s.not}</span>}
+                  </td>
+                  <td>{s.tuketici}</td>
+                  <td>{s.kurumsal}</td>
+                  <td class="w-durum" />
+                </tr>
+              ))
+            }
+          </tbody>
+        </table>
+      </div>
+      <p class="arac-not">
+        Aynı derleme numarası hem istemci hem sunucuda görünebilir (örn. 26100 = Windows 11 24H2 ve
+        Windows Server 2025). Ayırt etmek için ürün adına bakın.
+      </p>
+    </section>
+
+    <section class="arac-blok">
+      <h2 class="arac-h2"><span class="arac-no">3</span> Bu tabloyu nasıl kullanmalı</h2>
+      <div class="arac-kutu uyari">
+        <b>Tarihleri kritik kararlardan önce doğrulayın.</b>
+        <p style="margin:6px 0 0">
+          Microsoft yaşam döngüsü takvimini güncelleyebiliyor; bu tablo derleme anındaki bilgiye
+          dayanıyor. Bütçe ve göç planı yaparken üreticinin yaşam döngüsü sayfasıyla karşılaştırın.
+        </p>
+      </div>
+      <div class="arac-kutu" style="margin-top:12px">
+        <ul style="margin:0">
+          <li><b>Desteği biten sürüm çalışmaya devam eder</b> ama güvenlik yaması almaz. Denetimde bulgu, olayda sorumluluk üretir.</li>
+          <li><b>Kurumsal sürümler bir yıl fazla destek alır.</b> Aynı derlemedeki iki makine farklı tarihlerde düşer; envanterde sürüm türünü de tutun.</li>
+          <li><b>Sunucularda iki tarih vardır:</b> ana destek biterse yeni özellik ve ücretsiz destek biter, güvenlik yaması genişletilmiş destek boyunca sürer.</li>
+          <li>Filo genelinde derleme dağılımını çıkarmak için <a href="/hizli-cozumler/windows-11-yukseltemiyorum">win11-uyumluluk.ps1</a> betiğinin CSV çıktısını kullanabilirsiniz.</li>
+        </ul>
+      </div>
+    </section>
+  </div>
+
+  <script>
+    const el = (s) => document.querySelector(s);
+    const bugun = new Date();
+
+    const gunFark = (tarih) => Math.round((new Date(tarih) - bugun) / 86400000);
+
+    function durumlariYaz() {
+      let bitmis = 0;
+      for (const satir of document.querySelectorAll('#w-govde tr')) {
+        const kurumsal = gunFark(satir.dataset.kurumsal);
+        const hucre = satir.querySelector('.w-durum');
+
+        if (kurumsal < 0) {
+          hucre.innerHTML = `<span class="w-rozet bitti">desteği bitti</span>`;
+          satir.classList.add('gecmis');
+          bitmis++;
+        } else if (kurumsal < 365) {
+          hucre.innerHTML = `<span class="w-rozet yakin">${kurumsal} gün kaldı</span>`;
+        } else {
+          hucre.innerHTML = `<span class="w-rozet acik">${Math.round(kurumsal / 365)} yıldan fazla</span>`;
+        }
+      }
+      return bitmis;
+    }
+
+    const bitmisSayisi = durumlariYaz();
+    el('#w-durum').textContent = `${document.querySelectorAll('#w-govde tr').length} sürüm listeleniyor · ${bitmisSayisi} tanesinin desteği bitmiş.`;
+
+    el('#w-ara').addEventListener('input', (e) => {
+      const q = e.target.value.trim().toLocaleLowerCase('tr');
+      let gorunen = 0;
+      for (const satir of document.querySelectorAll('#w-govde tr')) {
+        const uyar = !q || satir.dataset.ara.includes(q);
+        satir.hidden = !uyar;
+        if (uyar) gorunen++;
+      }
+      const durum = el('#w-durum');
+      durum.className = 'arac-durum' + (gorunen ? ' ok' : ' hata');
+      durum.textContent = q
+        ? gorunen
+          ? `${gorunen} eşleşme.`
+          : 'Eşleşme yok. Derleme numarasının tamamını değil ilk beş hanesini yazın (örn. 19045).'
+        : `${document.querySelectorAll('#w-govde tr').length} sürüm listeleniyor · ${bitmisSayisi} tanesinin desteği bitmiş.`;
+    });
+  </script>
+
+  <style>
+    .w-tablo {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 14px;
+      min-width: 640px;
+    }
+    .w-tablo :is(th, td) {
+      text-align: left;
+      padding: 9px 10px;
+      border-bottom: 1px solid var(--line);
+      vertical-align: top;
+    }
+    .w-tablo thead th {
+      font-size: 12px;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+      color: var(--muted);
+    }
+    .w-tablo td:nth-child(3),
+    .w-tablo td:nth-child(4) {
+      font-family: var(--mono);
+      font-size: 13px;
+      white-space: nowrap;
+    }
+    .w-tablo tr.gecmis {
+      opacity: 0.62;
+    }
+    .w-not {
+      display: block;
+      font-size: 12px;
+      color: var(--muted);
+      font-weight: 400;
+    }
+    .w-rozet {
+      display: inline-block;
+      font-size: 11.5px;
+      font-weight: 800;
+      padding: 3px 9px;
+      border-radius: 999px;
+      white-space: nowrap;
+    }
+    .w-rozet.bitti {
+      background: color-mix(in srgb, var(--clay) 20%, var(--paper));
+      color: var(--clay-ink);
+    }
+    .w-rozet.yakin {
+      background: color-mix(in srgb, var(--amber) 26%, var(--paper));
+      color: var(--amber-ink);
+    }
+    .w-rozet.acik {
+      background: color-mix(in srgb, var(--green) 16%, var(--paper));
+      color: var(--green-ink);
+    }
+  </style>
+</Base>

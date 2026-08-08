@@ -1,0 +1,63 @@
+---
+baslik: "Sunucu yavaş — hangi katman?"
+ozet: "İşlemci mi, bellek mi, disk mi, ağ mı? Dördünü aynı anda ölçmeden yapılan her müdahale tahmindir; sayaçlar cevabı otuz saniyede verir."
+konu: "windows-server"
+etiketler: ["performans", "sayac", "disk", "bellek"]
+belirtiler:
+  - "Sunucu yavaşladı ama CPU normal görünüyor"
+  - "Uygulama takılıyor, sebebi belli değil"
+  - "Belirli saatlerde yavaşlıyor"
+  - "Yeniden başlatınca düzeliyor, sonra tekrar yavaşlıyor"
+yayin: 2026-08-09
+sure: 6
+dosya: "/araclar/yavas-sunucu-teshis.ps1"
+dosyaAdi: "yavas-sunucu-teshis.ps1"
+dosyaAciklama: "İşlemci kuyruğu, bellek baskısı ve sayfalama, disk gecikmesi ve kuyruk uzunluğu ile ağ hatalarını belirli bir süre örnekler; en olası darboğazı ve o katmanda bakılacak sonraki şeyi söyler."
+komut: "Get-Counter '\\PhysicalDisk(_Total)\\Avg. Disk sec/Read' -SampleInterval 2 -MaxSamples 5"
+platform: "windows"
+ilgiliRehberler: []
+sira: 20
+---
+
+Görev Yöneticisi'nde CPU %30 görünüyor ve sunucu yavaş. Buradan çıkarılacak sonuç "sorun CPU'da değil" değil, **"tek sayıya bakmak yetmiyor"**dur.
+
+Yavaşlığın dört katmanı vardır ve her birinin kendi sayacı vardır.
+
+## Bakılacak dört sayı
+
+| Katman | Sayaç | Eşik |
+| --- | --- | --- |
+| İşlemci | `\System\Processor Queue Length` | Çekirdek başına 2'nin üstü |
+| Bellek | `\Memory\Pages/sec` | Sürekli 1000 üstü |
+| Disk | `\PhysicalDisk(_Total)\Avg. Disk sec/Read` | 25 ms üstü |
+| Ağ | Kart hata sayaçları | Artıyorsa |
+
+**Disk gecikmesi en çok yanıltan sayıdır**: disk %5 meşgul görünürken gecikme 40 ms olabilir. Kullanıcı bunu "her şey takılıyor" diye tarif eder ve hiçbir yüzde göstergesi bunu göstermez.
+
+## Ölçüm ne zaman yapılır
+
+**Şikâyet sürerken.** Sorun geçtikten sonra alınan ölçüm hiçbir şey söylemez. Belirli saatlerde oluyorsa betiği o saatte zamanlanmış görev olarak çalıştırıp dosyaya yazdırın.
+
+```powershell
+.\yavas-sunucu-teshis.ps1 -Saniye 120
+```
+
+## Katmanı bulduktan sonra
+
+**İşlemci doygunsa:** en çok tüketen sürece bakın. Sanal makinede ayrıca ana makinenin vCPU aşırı taahhüdünü kontrol edin — konuk içindeki sayaçlar, ana makinedeki beklemeyi göstermez.
+
+**Bellek yetmiyorsa:** sayfalama varsa RAM ekleyin. Ama önce sızıntı olup olmadığına bakın: olay **2019** (sayfalanmayan havuz tükendi) görüyorsanız sebep bir sürücü ya da antivirüstür, RAM eklemek sorunu erteler.
+
+**Disk yavaşsa:** sorun neredeyse hiçbir zaman işletim sisteminde değildir. RAID yeniden yapılandırması, SAN yolu, komşu sanal makinelerin gürültüsü ya da ölmekte olan bir disk. Olay günlüğünde 51/129/153 varsa kesindir.
+
+**Ağ hatalıysa:** kablo, port, çift yönlü uyuşmazlık ya da sürücü.
+
+## Sık yapılan üç hata
+
+1. **Yeniden başlatıp geçmesini beklemek.** Geçer, sonra döner ve ölçüm şansını kaybedersiniz.
+2. **Tek bir yüzdeye bakmak.** %30 CPU, kuyruğu 40 olan bir sunucuda da görülür.
+3. **Antivirüsü şüpheli görüp devre dışı bırakmak.** Ölçmeden yapılan bu değişiklik hem riskli hem de sonucu belirsizdir; gerçek tarama etkisini disk gecikmesi sayacı gösterir.
+
+## Doğrulama
+
+Değişiklikten sonra **aynı sayacı aynı sürede** yeniden ölçün. "Kullanıcı daha iyi olduğunu söyledi" doğrulama değildir; bir hafta sonra aynı şikâyet döner ve elinizde karşılaştırma verisi olmaz.

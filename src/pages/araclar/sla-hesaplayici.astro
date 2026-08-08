@@ -1,0 +1,342 @@
+---
+import Base from '../../layouts/Base.astro';
+---
+
+<Base
+  baslik="Kullanılabilirlik ve kesinti bütçesi hesaplayıcı"
+  aciklama="Yüzdeyi dakikaya çevirir: %99,9 yılda ne kadar kesinti demek? Seri ve yedekli bileşenlerden toplam kullanılabilirliği, MTBF/MTTR'den beklenen değeri hesaplar."
+  aramaya={true}
+  kategori="Araç"
+>
+  <div class="arama-bas">
+    <div class="kap">
+      <nav class="kirinti" aria-label="Kırıntı yolu" style="padding-top:0">
+        <a href="/">Ana sayfa</a><span class="ayrac">/</span><a href="/araclar">Araçlar</a><span
+          class="ayrac">/</span
+        ><span aria-current="page">Kullanılabilirlik</span>
+      </nav>
+      <h1>Kullanılabilirlik ve kesinti bütçesi</h1>
+      <p style="color:var(--muted);font-size:14px;margin-top:8px;max-width:64ch">
+        "%99,9 veriyoruz" cümlesi ayda <strong>43 dakika</strong> kesinti demektir. Sözleşmeye
+        yazmadan önce dakikaya çevirin; zincirdeki her bileşen bu sayıyı küçültür.
+      </p>
+    </div>
+  </div>
+
+  <div class="kap arac-sayfa">
+    <section class="arac-blok">
+      <h2 class="arac-h2"><span class="arac-no">1</span> Hedef kullanılabilirlik</h2>
+      <div class="arac-alanlar">
+        <label class="arac-alan"
+          >Yüzde
+          <input id="s-yuzde" type="number" min="50" max="99.9999" step="0.001" value="99.9" />
+        </label>
+        <label class="arac-alan"
+          >Hazır değerler
+          <select id="s-hazir">
+            <option value="">seçin</option>
+            <option value="99">99 — iki dokuz</option>
+            <option value="99.5">99,5</option>
+            <option value="99.9" selected>99,9 — üç dokuz</option>
+            <option value="99.95">99,95</option>
+            <option value="99.99">99,99 — dört dokuz</option>
+            <option value="99.999">99,999 — beş dokuz</option>
+          </select>
+        </label>
+      </div>
+      <table class="s-tablo" id="s-kesinti" style="margin-top:14px"></table>
+      <div id="s-yorum" style="margin-top:14px"></div>
+    </section>
+
+    <section class="arac-blok">
+      <h2 class="arac-h2"><span class="arac-no">2</span> Bileşen zinciri</h2>
+      <p class="arac-not" style="margin-top:0">
+        Bir hizmet, bağlı olduğu her bileşen kadar kullanılabilirdir. <b>Seri</b> bağlı bileşenler
+        çarpılır (biri düşerse hizmet düşer); <b>yedekli</b> bileşenlerde ikisi birden düşmezse hizmet ayakta kalır.
+      </p>
+      <table class="s-tablo" id="s-bilesenler" style="margin-top:14px"></table>
+      <div class="arac-dugmeler">
+        <button type="button" class="dg arac-ikincil" id="s-ekle">Bileşen ekle</button>
+      </div>
+      <div id="s-zincir" style="margin-top:16px"></div>
+    </section>
+
+    <section class="arac-blok">
+      <h2 class="arac-h2"><span class="arac-no">3</span> MTBF ve MTTR'den kullanılabilirlik</h2>
+      <p class="arac-not" style="margin-top:0">
+        Arızalar arası ortalama süre (MTBF) ve onarım süresi (MTTR) elinizdeyse kullanılabilirlik
+        bunlardan çıkar: <code>MTBF / (MTBF + MTTR)</code>.
+      </p>
+      <div class="arac-alanlar">
+        <label class="arac-alan"
+          >MTBF (saat)
+          <input id="s-mtbf" type="number" min="1" step="100" value="8760" />
+        </label>
+        <label class="arac-alan"
+          >MTTR (saat)
+          <input id="s-mttr" type="number" min="0.1" step="0.5" value="4" />
+        </label>
+      </div>
+      <output class="arac-cikti" id="s-mt" style="margin-top:6px"></output>
+    </section>
+
+    <section class="arac-blok">
+      <h2 class="arac-h2"><span class="arac-no">4</span> Bu ayın kesinti bütçesi</h2>
+      <div class="arac-alanlar">
+        <label class="arac-alan"
+          >Bu ay yaşanan kesinti (dakika)
+          <input id="s-yasanan" type="number" min="0" step="1" value="12" />
+        </label>
+      </div>
+      <div class="arac-olcer" id="s-olcer" data-guc="cok-guclu"><i style="width:0%"></i></div>
+      <div class="arac-olcum" id="s-butce"></div>
+      <div id="s-butceYorum" style="margin-top:14px"></div>
+    </section>
+
+    <section class="arac-blok">
+      <h2 class="arac-h2"><span class="arac-no">5</span> Sözleşmeye yazmadan önce</h2>
+      <div class="arac-kutu">
+        <ul style="margin:0">
+          <li><b>Ölçüm penceresi neresi?</b> Aylık %99,9 ile yıllık %99,9 aynı şey değildir: yıllıkta tek bir 8 saatlik kesinti hedefi tutturabilir, aylıkta o ayı batırır.</li>
+          <li><b>Planlı bakım sayılıyor mu?</b> Çoğu sözleşme hariç tutar. Hariç tutuluyorsa taahhüt ettiğiniz sayı, kullanıcının yaşadığı kesintiyi ölçmez.</li>
+          <li><b>Kim ölçüyor?</b> Sizin izlemeniz "ayakta" derken kullanıcı giremiyor olabilir. Ölçüm noktası kullanıcıya en yakın yer olmalı.</li>
+          <li><b>Zincirin tamamına bakın.</b> Uygulamanız %99,99 olsa bile tek hatlı internet %99,5'se hizmetiniz %99,5'tir.</li>
+        </ul>
+      </div>
+    </section>
+  </div>
+
+  <script>
+    const el = (s) => document.querySelector(s);
+    const sayi = (n, b = 2) => new Intl.NumberFormat('tr-TR', { maximumFractionDigits: b }).format(n);
+
+    function sureMetni(dakika) {
+      if (dakika < 1) return `${sayi(dakika * 60, 0)} saniye`;
+      if (dakika < 60) return `${sayi(dakika, 1)} dakika`;
+      if (dakika < 1440) return `${sayi(dakika / 60, 1)} saat`;
+      return `${sayi(dakika / 1440, 1)} gün`;
+    }
+
+    /* --- 1. hedef ---------------------------------------------------------- */
+    function hedefHesapla() {
+      const yuzde = Math.min(99.9999, Math.max(0, +el('#s-yuzde').value));
+      const kesintiOran = 1 - yuzde / 100;
+
+      const pencereler = [
+        ['Yılda', 365.25 * 24 * 60],
+        ['Ayda', 30.44 * 24 * 60],
+        ['Haftada', 7 * 24 * 60],
+        ['Günde', 24 * 60],
+      ];
+
+      el('#s-kesinti').innerHTML =
+        '<tr><th>Pencere</th><th>İzin verilen kesinti</th></tr>' +
+        pencereler
+          .map(([ad, dk]) => `<tr><th>${ad}</th><td>${sureMetni(kesintiOran * dk)}</td></tr>`)
+          .join('');
+
+      const yorumlar = [];
+      if (yuzde >= 99.99) {
+        yorumlar.push({
+          sinif: 'uyari',
+          metin:
+            'Dört dokuz ve üstü, tek bir sunucu yeniden başlatmasının bile bütçeyi bitirdiği yerdir: ' +
+            'yılda 53 dakika. Yedeklilik olmadan taahhüt edilemez.',
+        });
+      }
+      if (yuzde <= 99) {
+        yorumlar.push({
+          sinif: 'uyari',
+          metin: 'İki dokuz ayda 7 saatten fazla kesintiye izin verir. Kullanıcı bunu "sık sık düşüyor" diye tarif eder.',
+        });
+      }
+      yorumlar.push({
+        sinif: 'iyi',
+        metin:
+          'Bu rakam <b>tek bir kesintiyi</b> değil, tüm kesintilerin toplamını sınırlar. ' +
+          'Ayda 43 dakika, "43 dakikalık tek arıza" değil, "toplam 43 dakika" demektir.',
+      });
+
+      el('#s-yorum').innerHTML = yorumlar
+        .map((y) => `<div class="arac-kutu ${y.sinif}" style="margin-bottom:8px">${y.metin}</div>`)
+        .join('');
+
+      butceHesapla();
+    }
+
+    /* --- 2. bileşen zinciri ------------------------------------------------ */
+    const bilesenler = [
+      { ad: 'Uygulama sunucusu', yuzde: 99.9, yedek: false },
+      { ad: 'Veritabanı', yuzde: 99.95, yedek: false },
+      { ad: 'İnternet hattı', yuzde: 99.5, yedek: false },
+    ];
+
+    function bilesenCiz() {
+      el('#s-bilesenler').innerHTML =
+        '<tr><th>Bileşen</th><th>Kullanılabilirlik</th><th>Yedekli</th><th></th></tr>' +
+        bilesenler
+          .map(
+            (b, i) => `<tr>
+              <td><input type="text" value="${b.ad}" data-i="${i}" data-alan="ad" /></td>
+              <td><input type="number" value="${b.yuzde}" min="50" max="99.9999" step="0.01" data-i="${i}" data-alan="yuzde" /></td>
+              <td style="text-align:center"><input type="checkbox" ${b.yedek ? 'checked' : ''} data-i="${i}" data-alan="yedek" /></td>
+              <td><button type="button" class="s-sil" data-i="${i}">×</button></td>
+            </tr>`
+          )
+          .join('');
+
+      el('#s-bilesenler')
+        .querySelectorAll('input')
+        .forEach((g) =>
+          g.addEventListener('input', () => {
+            const i = +g.dataset.i;
+            const alan = g.dataset.alan;
+            bilesenler[i][alan] = alan === 'yedek' ? g.checked : alan === 'yuzde' ? +g.value : g.value;
+            zincirHesapla();
+          })
+        );
+      el('#s-bilesenler')
+        .querySelectorAll('.s-sil')
+        .forEach((b) =>
+          b.addEventListener('click', () => {
+            bilesenler.splice(+b.dataset.i, 1);
+            bilesenCiz();
+            zincirHesapla();
+          })
+        );
+      zincirHesapla();
+    }
+
+    function zincirHesapla() {
+      if (!bilesenler.length) {
+        el('#s-zincir').innerHTML = '<div class="arac-kutu">Bileşen ekleyin.</div>';
+        return;
+      }
+      // Yedekli bileşen: ikisi birden düşerse hizmet düşer → 1-(1-a)²
+      const toplam = bilesenler.reduce((t, b) => {
+        const a = b.yuzde / 100;
+        const etkin = b.yedek ? 1 - (1 - a) ** 2 : a;
+        return t * etkin;
+      }, 1);
+
+      const yuzde = toplam * 100;
+      const yillikDk = (1 - toplam) * 365.25 * 24 * 60;
+      const enZayif = [...bilesenler].sort((a, b) => a.yuzde - b.yuzde)[0];
+
+      el('#s-zincir').innerHTML = `
+        <output class="arac-cikti">%${sayi(yuzde, 4)} — yılda ${sureMetni(yillikDk)} kesinti</output>
+        <div class="arac-kutu ${yuzde >= 99.9 ? 'iyi' : 'uyari'}" style="margin-top:12px">
+          Zincirdeki en zayıf halka: <b>${enZayif.ad}</b> (%${enZayif.yuzde}).
+          ${
+            enZayif.yedek
+              ? 'Yedekli olduğu için etkisi azalıyor.'
+              : 'Yedeklemeden toplam kullanılabilirlik bunun üstüne çıkamaz.'
+          }
+        </div>`;
+    }
+
+    el('#s-ekle').addEventListener('click', () => {
+      bilesenler.push({ ad: 'Yeni bileşen', yuzde: 99.9, yedek: false });
+      bilesenCiz();
+    });
+
+    /* --- 3. MTBF / MTTR ---------------------------------------------------- */
+    function mtHesapla() {
+      const mtbf = +el('#s-mtbf').value;
+      const mttr = +el('#s-mttr').value;
+      if (!mtbf || !mttr) return;
+      const a = mtbf / (mtbf + mttr);
+      el('#s-mt').textContent = `%${sayi(a * 100, 4)} — yılda ${sureMetni((1 - a) * 365.25 * 24 * 60)} kesinti`;
+    }
+
+    /* --- 4. bütçe ---------------------------------------------------------- */
+    function butceHesapla() {
+      const yuzde = +el('#s-yuzde').value;
+      const aylikIzin = (1 - yuzde / 100) * 30.44 * 24 * 60;
+      const yasanan = +el('#s-yasanan').value;
+      const oran = aylikIzin ? Math.min(100, (yasanan / aylikIzin) * 100) : 100;
+
+      const olcer = el('#s-olcer');
+      olcer.dataset.guc = oran < 50 ? 'cok-guclu' : oran < 80 ? 'guclu' : oran < 100 ? 'orta' : 'zayif';
+      olcer.firstElementChild.style.width = oran + '%';
+
+      el('#s-butce').innerHTML = `
+        <span>Aylık bütçe: <b>${sureMetni(aylikIzin)}</b></span>
+        <span>Harcanan: <b>${sureMetni(yasanan)}</b></span>
+        <span>Kalan: <b>${yasanan >= aylikIzin ? '0' : sureMetni(aylikIzin - yasanan)}</b></span>
+        <span>Kullanım: <b>%${sayi(oran, 0)}</b></span>`;
+
+      el('#s-butceYorum').innerHTML =
+        yasanan >= aylikIzin
+          ? `<div class="arac-kutu kotu">Bütçe aşıldı: bu ay taahhüt tutmadı. Sözleşmede ceza maddesi varsa
+             tetiklenmiş demektir; yeni risk alan değişiklikleri ay sonuna kadar ertelenir.</div>`
+          : oran > 75
+            ? `<div class="arac-kutu uyari">Bütçenin dörtte üçü harcandı. Bu noktadan sonra planlı bakım da
+               riskli: kalan pay tek bir aksaklığı bile karşılamayabilir.</div>`
+            : `<div class="arac-kutu iyi">Bütçe içindesiniz. Kalan pay, planlı değişiklikler için kullanılabilir alandır.</div>`;
+    }
+
+    /* --- olaylar ----------------------------------------------------------- */
+    el('#s-hazir').addEventListener('change', (e) => {
+      if (e.target.value) {
+        el('#s-yuzde').value = e.target.value;
+        hedefHesapla();
+      }
+    });
+    el('#s-yuzde').addEventListener('input', hedefHesapla);
+    el('#s-yasanan').addEventListener('input', butceHesapla);
+    el('#s-mtbf').addEventListener('input', mtHesapla);
+    el('#s-mttr').addEventListener('input', mtHesapla);
+
+    hedefHesapla();
+    bilesenCiz();
+    mtHesapla();
+  </script>
+
+  <style>
+    .s-tablo {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 14.5px;
+    }
+    .s-tablo :is(th, td) {
+      text-align: left;
+      padding: 9px 10px;
+      border-bottom: 1px solid var(--line);
+    }
+    .s-tablo th {
+      color: var(--ink-soft);
+      font-weight: 700;
+    }
+    .s-tablo td {
+      font-family: var(--mono);
+      font-size: 14px;
+    }
+    .s-tablo input[type='text'],
+    .s-tablo input[type='number'] {
+      font: inherit;
+      font-size: 13.5px;
+      padding: 6px 8px;
+      border: 1px solid var(--line);
+      border-radius: var(--r-s);
+      background: var(--bg);
+      width: 100%;
+    }
+    .s-tablo input[type='checkbox'] {
+      width: 16px;
+      height: 16px;
+      accent-color: var(--indigo);
+    }
+    .s-sil {
+      font: inherit;
+      font-size: 16px;
+      line-height: 1;
+      padding: 4px 9px;
+      border-radius: var(--r-s);
+      border: 1px solid var(--line);
+      background: var(--paper);
+      color: var(--clay-ink);
+      cursor: pointer;
+    }
+  </style>
+</Base>

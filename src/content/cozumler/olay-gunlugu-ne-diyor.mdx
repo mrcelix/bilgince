@@ -1,0 +1,80 @@
+---
+baslik: "Olay günlüğü ne diyor?"
+ozet: "Binlerce satır arasında kaybolmadan: hangi olay kaç kez tekrarladı, ne zaman başladı, ne anlama geliyor. Gürültüyü ayıklayıp bakılacak beş satırı çıkarmak."
+konu: "windows"
+etiketler: ["olay-gunlugu", "tanilama", "izleme"]
+belirtiler:
+  - "Sunucu yeniden başladı, sebebini bulamıyorum"
+  - "Olay görüntüleyicide binlerce hata var"
+  - "Hangi hatanın önemli olduğunu bilmiyorum"
+  - "Sorun belirli saatlerde tekrarlıyor"
+yayin: 2026-08-09
+sure: 5
+dosya: "/araclar/olay-gunlugu-ozet.ps1"
+dosyaAdi: "olay-gunlugu-ozet.ps1"
+dosyaAciklama: "Sistem ve Uygulama günlüklerinin son N saatini gruplar: hangi kimlik kaç kez, ilk ve son ne zaman, örnek mesaj. Bilinen kritik kimlikler için Türkçe açıklama ve saat dağılımı grafiği verir."
+komut: "Get-WinEvent -FilterHashtable @{LogName='System'; Level=1,2; StartTime=(Get-Date).AddDays(-1)} | Group-Object Id | Sort-Object Count -Descending"
+platform: "windows"
+ilgiliRehberler: []
+sira: 22
+---
+
+Olay görüntüleyici açıldığında kırmızı simgeler görürsünüz ve hepsi acil görünür. Oysa çoğu gürültüdür: DCOM izin uyarıları, her açılışta tekrarlayan bilinen kayıtlar, uygulamanın normal davranışı.
+
+İşe yarayan yaklaşım tek tek okumak değil, **gruplamaktır**.
+
+## 1. Önce grupla
+
+```powershell
+Get-WinEvent -FilterHashtable @{LogName='System'; Level=1,2; StartTime=(Get-Date).AddDays(-1)} |
+  Group-Object Id | Sort-Object Count -Descending |
+  Select-Object Count, Name
+```
+
+Bu çıktı iki soruyu birden cevaplar: **ne sık tekrarlıyor** ve **ne nadir**. İkisi de bilgidir; nadir olan bir 1001 (mavi ekran), binlerce 10016'dan daha önemlidir.
+
+## 2. Zaman dağılımına bakın
+
+Betiğin saat grafiği, sebebi çoğu zaman doğrudan gösterir:
+
+- **Belirli bir saatte yığılma** → zamanlanmış bir iş, yedekleme, ilke yenilemesi
+- **Sürekli akış** → donanım ya da sürücü
+- **Yeniden başlatmayla başlayıp biten** → açılış sırası sorunu
+
+"Her gece 02:15'te" cümlesi, hangi işin o saatte çalıştığını sormanızı sağlar; hiçbir hata mesajı bunu söylemez.
+
+## 3. Önce bu kimliklere bakın
+
+| Kimlik | Anlamı |
+| --- | --- |
+| `1102` | Güvenlik günlüğü temizlendi — meşru sebebi neredeyse yoktur |
+| `6008` / `41` | Beklenmedik kapanma / temiz kapanmama |
+| `1001` | Mavi ekran; durdurma kodu olayın içinde |
+| `51` / `55` / `129` / `153` | Disk ve dosya sistemi hataları |
+| `2019` | Sayfalanmayan havuz tükendi — sürücü sızıntısı |
+| `7045` | Yeni hizmet kuruldu — beklenmedikse incelenmeli |
+| `5722` | Makine hesabı kimlik doğrulaması başarısız |
+
+Kimliklerin ayrıntılı açıklaması ve sonraki adımlar için
+[olay kimliği sözlüğü](/araclar/olay-kimligi) aracını kullanabilirsiniz.
+
+## 4. "Sunucu kendi kendine yeniden başladı"
+
+Sıra şudur:
+
+1. **1074** — kim, hangi süreçle ve hangi gerekçeyle yeniden başlattı. Varsa cevap burada biter.
+2. **6008** — düzgün kapanmamış demektir; 1074 yoksa bunu arayın.
+3. **41** — güç kesildi ya da sistem kilitlendi.
+4. **1001** — mavi ekran; durdurma kodu sürücüyü gösterir.
+
+Bu dördü yoksa kapanma işletim sistemi seviyesinde kayıt bırakmamıştır: donanım, hipervizör ya da güç tarafına bakın.
+
+## Doğrulama
+
+Bir sorunu kapattıktan sonra betiği aynı aralıkla yeniden çalıştırın ve **ilgili kimliğin sayısının düştüğünü** görün. Olay sayısı azalmıyorsa düzelttiğiniz şey sebep değildi.
+
+## Kalıcı çözüm
+
+Günlükler yerelde kalıyorsa, olay yaşandığında çoğu zaten dönmüş olur. Güvenlik günlüğü 20 MB'lık varsayılan boyutta yoğun bir sunucuda **birkaç saatte** başa sarar.
+
+En az iki şey yapın: günlük boyutlarını büyütün ve kritik günlükleri merkezî bir yere aktarın. Olaydan sonra "kayıt yok" demek, olayın kendisinden daha pahalıya mal olur.

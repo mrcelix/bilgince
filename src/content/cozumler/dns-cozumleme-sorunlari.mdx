@@ -1,0 +1,76 @@
+---
+baslik: "İç isimler çözülmüyor, DNS'ten şüpheleniyorum"
+ozet: "Belirtiler DNS'e benzemez: oturum açılmıyor, paylaşım gelmiyor, ilke uygulanmıyor. Üçünün de altında aynı kayıt eksikliği olabilir."
+konu: "ag"
+etiketler: ["dns", "active-directory", "srv", "tanilama"]
+belirtiler:
+  - "Sunucu adıyla erişemiyorum, IP ile erişiyorum"
+  - "Bazı makineler etki alanına giremiyor"
+  - "Eski IP'ye gitmeye çalışıyor"
+  - "Bazen çalışıyor bazen çalışmıyor"
+yayin: 2026-08-09
+sure: 6
+dosya: "/araclar/dns-saglik-kontrol.ps1"
+dosyaAdi: "dns-saglik-kontrol.ps1"
+dosyaAciklama: "İstemci DNS ayarlarını, bölgeleri, dinamik güncelleme kipini, ileticileri, kayıt temizlemeyi, AD'nin SRV kayıtlarını ve çözümleme sınamalarını tek raporda toplar."
+komut: "Resolve-DnsName _ldap._tcp.dc._msdcs.$env:USERDNSDOMAIN -Type SRV"
+platform: "windows"
+ilgiliRehberler: []
+sira: 19
+---
+
+DNS, Active Directory'nin görünmez bel kemiğidir. Bozulduğunda kimse "DNS bozuk" demez; "giriş yapamıyorum", "paylaşım açılmıyor", "ilke gelmiyor" der.
+
+Bu üç belirtinin ortak kontrolü tek satırdır:
+
+```powershell
+Resolve-DnsName _ldap._tcp.dc._msdcs.$env:USERDNSDOMAIN -Type SRV
+```
+
+Bu kayıt yoksa istemci etki alanı denetleyicisini **bulamaz**. Sonrasında ne yaparsanız yapın oturum açılmaz.
+
+## 1. En sık hata: istemcide dış DNS
+
+Etki alanı üyesi bir makinede DNS listesi **yalnızca iç sunucuları** içermelidir. "İnternet çalışsın diye" eklenen 8.8.8.8, AD kayıtlarını çözemez.
+
+Belirtinin en sinir bozucu tarafı burada: sıra bazen iç sunucuya düştüğü için **bazen çalışır**. "Ara sıra oluyor" cümlesi neredeyse her zaman bunu gösterir.
+
+```powershell
+Get-DnsClientServerAddress -AddressFamily IPv4 | Where-Object ServerAddresses
+```
+
+Dış çözümleme için doğru yer istemci değil, **DNS sunucusunun ileticileridir**.
+
+## 2. Eski IP'ye gidiyorsa: kayıt temizleme
+
+Sunucu taşındı, IP değişti, ama istemciler hâlâ eski adrese gidiyor. İki sebebi vardır:
+
+- **Önbellek**: `ipconfig /flushdns` ile geçer, kalıcı değilse sorun bu değildir
+- **Eski kayıt**: DNS'te iki A kaydı vardır ve sıra bazen eskisine düşer
+
+Kalıcı çözüm kayıt temizlemedir (scavenging). Kapalıysa eski kayıtlar yıllarca birikir. Açarken dikkatli olun: yenileme aralıklarını planlamadan açmak canlı kayıtları silebilir.
+
+## 3. Dinamik güncelleme güvenli mi?
+
+Bölge ayarında **Secure only** olmalıdır. "Nonsecure and secure" seçiliyken kimliği doğrulanmamış herhangi bir makine kayıt yazabilir — hem güvenlik hem kararlılık sorunudur.
+
+## 4. Ters bölge yoksa
+
+Zorunlu değildir ama yokluğu teşhisi zorlaştırır: günlüklerde IP görürsünüz, hangi makine olduğunu bulamazsınız. Her ağ için bir ters arama bölgesi oluşturmak beş dakikalık iştir.
+
+## Doğrulama
+
+Betiği çalıştırıp üç şeyi görün: **SRV kayıtları var**, **istemcide dış DNS yok**, **ileticiler erişilebilir**.
+
+Sonrasında istemcide:
+
+```powershell
+ipconfig /flushdns
+nltest /dsgetdc:$env:USERDNSDOMAIN
+```
+
+İkinci komut bir denetleyici adı döndürüyorsa iş bitmiştir.
+
+## Sunucu taşırken
+
+IP değiştiren her sunucuda sıra şudur: eski A kaydını **silin**, yeni kaydı oluşturun, TTL süresi kadar bekleyin, sonra eski sunucuyu kapatın. Bu sıra atlandığında ortaya çıkan arıza, günler sonra ve rastgele görünür.

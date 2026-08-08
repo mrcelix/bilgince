@@ -1,0 +1,205 @@
+---
+import Base from '../../layouts/Base.astro';
+
+/**
+ * Sahada en sık karşılaşılan Windows olay kimlikleri. Amaç eksiksiz bir liste
+ * değil, "bu numara ne demek ve şimdi nereye bakayım" sorusunu cevaplamak.
+ */
+const OLAYLAR = [
+  // --- kimlik doğrulama
+  { id: '4624', gunluk: 'Security', kume: 'Kimlik', ad: 'Oturum açma başarılı', ne: 'Bir hesap makinede oturum açtı. Asıl bilgi LogonType alanında: 2 konsol, 3 ağ (paylaşım), 10 uzak masaüstü, 5 hizmet.', yap: 'Şüpheli erişimde LogonType ve kaynak IP alanına bakın; 3 ve 10 uzaktan erişimi gösterir.' },
+  { id: '4625', gunluk: 'Security', kume: 'Kimlik', ad: 'Oturum açma başarısız', ne: 'Kimlik doğrulama reddedildi. Status/SubStatus alt kodu sebebi söyler: 0xC000006A yanlış parola, 0xC0000064 olmayan kullanıcı, 0xC0000234 kilitli hesap.', yap: 'Aynı hesapta çok sayıda 4625 → kaba kuvvet ya da eski parolayla çalışan bir servis.' },
+  { id: '4740', gunluk: 'Security', kume: 'Kimlik', ad: 'Hesap kilitlendi', ne: 'Hatalı deneme eşiği aşıldı. Yalnızca PDC öykünücüsünde toplanır; kilidi tetikleyen makine adı olayın içindedir.', yap: 'Kaynak makineye gidip kimlik deposu, zamanlanmış görev ve servisleri kontrol edin.' },
+  { id: '4767', gunluk: 'Security', kume: 'Kimlik', ad: 'Hesap kilidi açıldı', ne: 'Bir yönetici kilidi kaldırdı.', yap: 'Sık tekrarlıyorsa sebep bulunmamış demektir; kilidi açmak çözüm değildir.' },
+  { id: '4771', gunluk: 'Security', kume: 'Kimlik', ad: 'Kerberos ön kimlik doğrulama başarısız', ne: 'Genelde yanlış parola. 4625’in Kerberos karşılığıdır ve etki alanı denetleyicisinde görünür.', yap: 'Hesap kilitlenme teşhisinde 4740 ile birlikte okuyun.' },
+  { id: '4776', gunluk: 'Security', kume: 'Kimlik', ad: 'NTLM kimlik doğrulama', ne: 'Hesap NTLM ile doğrulandı. Kerberos varken NTLM kullanılması eski bir istemci ya da IP ile bağlanma göstergesidir.', yap: 'NTLM’i kapatmadan önce bu olayla kimlerin kullandığını çıkarın.' },
+  { id: '4648', gunluk: 'Security', kume: 'Kimlik', ad: 'Açık kimlik bilgisiyle oturum açma', ne: 'runas ya da farklı bir hesapla bağlanma. Normalde nadirdir.', yap: 'Sunucularda beklenmedik 4648, yanal hareket göstergesi olabilir.' },
+
+  // --- yetki ve hesap yönetimi
+  { id: '4720', gunluk: 'Security', kume: 'Yetki', ad: 'Kullanıcı hesabı oluşturuldu', ne: 'Yeni bir hesap açıldı.', yap: 'Değişiklik kaydında karşılığı yoksa sorun budur.' },
+  { id: '4724', gunluk: 'Security', kume: 'Yetki', ad: 'Parola sıfırlama girişimi', ne: 'Bir yönetici başka bir hesabın parolasını sıfırladı.', yap: 'Ayrıcalıklı hesaplarda beklenmedik sıfırlama, ele geçirme belirtisidir.' },
+  { id: '4728', gunluk: 'Security', kume: 'Yetki', ad: 'Genel gruba üye eklendi', ne: 'Etki alanı genel grubuna kullanıcı eklendi (örn. Domain Admins).', yap: '4732 ve 4756 ile birlikte izleyin: yetki yükseltmenin en görünür izi budur.' },
+  { id: '4732', gunluk: 'Security', kume: 'Yetki', ad: 'Yerel gruba üye eklendi', ne: 'Yerel Administrators grubuna ekleme dahil.', yap: 'Sunucularda uyarı üretecek şekilde izlenmeli.' },
+  { id: '4798', gunluk: 'Security', kume: 'Yetki', ad: 'Kullanıcının grup üyeliği listelendi', ne: 'Bir süreç hesabın gruplarını sorguladı. Keşif araçlarının klasik izidir.', yap: 'Tek başına zararsız; başka belirtilerle birlikte anlam kazanır.' },
+  { id: '1102', gunluk: 'Security', kume: 'Yetki', ad: 'Güvenlik günlüğü temizlendi', ne: 'Birisi güvenlik günlüğünü sildi. Meşru sebebi neredeyse yoktur.', yap: 'Olay müdahalesinde ilk bakılacak kayıtlardan biri. Günlükleri merkezî toplamıyorsanız kanıt yok demektir.' },
+  { id: '4688', gunluk: 'Security', kume: 'Yetki', ad: 'Yeni süreç oluşturuldu', ne: 'Çalıştırılan her süreç. Komut satırı denetimi açıksa parametreler de kaydedilir.', yap: 'Denetimde açılması gereken en değerli kalem; olay sonrası "ne çalıştı" sorusunun tek cevabı.' },
+
+  // --- sistem
+  { id: '6008', gunluk: 'System', kume: 'Sistem', ad: 'Beklenmedik kapanma', ne: 'Sistem düzgün kapatılmadan durdu.', yap: '41 ve 1001 ile birlikte okuyun: elektrik, donanım ya da mavi ekran ayrımı oradan çıkar.' },
+  { id: '41', gunluk: 'System', kume: 'Sistem', ad: 'Kernel-Power: temiz kapanmadı', ne: 'Makine kapanış sürecini tamamlamadan güç kesildi ya da donanım kilitlendi.', yap: 'Sunucuda güç kaynağı ve UPS; dizüstüde pil ve aşırı ısınma.' },
+  { id: '1074', gunluk: 'System', kume: 'Sistem', ad: 'Kapatma/yeniden başlatma başlatıldı', ne: 'Kim, hangi süreçle ve hangi gerekçeyle yeniden başlattı — hepsi olayın içinde.', yap: '"Sunucu kendi kendine yeniden başladı" iddiasının ilk kontrolü.' },
+  { id: '1001', gunluk: 'System', kume: 'Sistem', ad: 'BugCheck (mavi ekran)', ne: 'Çekirdek hatası. Durdurma kodu ve döküm dosyası yolu olayın içindedir.', yap: 'Aynı kod tekrarlıyorsa sürücü; rastgele kodlar bellek donanımını işaret eder.' },
+  { id: '7045', gunluk: 'System', kume: 'Sistem', ad: 'Yeni hizmet kuruldu', ne: 'Sisteme bir hizmet eklendi.', yap: 'Beklenmedik hizmet kurulumu, kalıcılık sağlamanın en yaygın yoludur; adı ve yolu incelenmeli.' },
+  { id: '7034', gunluk: 'System', kume: 'Sistem', ad: 'Hizmet beklenmedik biçimde sonlandı', ne: 'Bir hizmet çöktü ve kaç kez çöktüğü yazıyor.', yap: 'Uygulama günlüğündeki 1000 ile eşleştirin.' },
+  { id: '7031', gunluk: 'System', kume: 'Sistem', ad: 'Hizmet sonlandı, kurtarma işlemi uygulanıyor', ne: 'Hizmet çöktü ve otomatik yeniden başlatma devreye girdi.', yap: 'Kurtarma maskeliyorsa sorun görünmez olur; sayıya bakın.' },
+
+  // --- disk ve depolama
+  { id: '55', gunluk: 'System', kume: 'Disk', ad: 'NTFS yapısı bozuk', ne: 'Dosya sisteminde tutarsızlık bulundu.', yap: 'chkdsk planlayın; tekrar ediyorsa disk değişmeli. Önce yedeği doğrulayın.' },
+  { id: '153', gunluk: 'System', kume: 'Disk', ad: 'Disk G/Ç isteği yeniden denendi', ne: 'Depolama katmanı isteği yeniden denemek zorunda kaldı.', yap: 'SAN/yol sorunu ya da ölmekte olan disk. Çoklu yol yapılandırmasını kontrol edin.' },
+  { id: '51', gunluk: 'System', kume: 'Disk', ad: 'Sayfalama işleminde disk hatası', ne: 'Sayfa dosyasına erişimde hata.', yap: 'Kalıcı veri kaybı riski; diski hemen inceleyin.' },
+  { id: '129', gunluk: 'System', kume: 'Disk', ad: 'Denetleyici sıfırlandı', ne: 'Depolama denetleyicisi yanıt vermedi ve sıfırlandı.', yap: 'Ürün yazılımı ve sürücü sürümlerini üreticinin uyumluluk listesiyle karşılaştırın.' },
+
+  // --- ağ ve dizin
+  { id: '5719', gunluk: 'System', kume: 'Ağ/AD', ad: 'Netlogon: etki alanı denetleyicisi bulunamadı', ne: 'Makine açılışta DC ile konuşamadı.', yap: 'DNS ayarı, VPN gecikmesi ya da açılışta ağın geç gelmesi. Sıra: DNS → ağ → DC sağlığı.' },
+  { id: '5722', gunluk: 'System', kume: 'Ağ/AD', ad: 'Makine hesabı kimlik doğrulaması başarısız', ne: 'Makinenin güvenli kanalı bozuldu.', yap: 'Test-ComputerSecureChannel -Repair ile onarın; anlık görüntüden dönen sanal makinelerde tipiktir.' },
+  { id: '1058', gunluk: 'System', kume: 'Ağ/AD', ad: 'Grup ilkesi dosyası okunamadı', ne: 'İstemci SYSVOL üzerindeki gpt.ini dosyasına ulaşamadı.', yap: 'SYSVOL erişimi, DFS ve DNS. 1030 ile birlikte gelir.' },
+  { id: '1129', gunluk: 'System', kume: 'Ağ/AD', ad: 'Ağ olmadığı için ilke uygulanmadı', ne: 'Açılışta ağ hazır değilken ilke işlenmeye çalışıldı.', yap: '"Her zaman ağı bekle" ilkesini açın; kablosuz istemcilerde yaygındır.' },
+  { id: '4013', gunluk: 'DNS Server', kume: 'Ağ/AD', ad: 'DNS, dizin hizmetlerini bekliyor', ne: 'DNS sunucusu AD hazır olmadan başladı.', yap: 'Tek DC’li ortamlarda açılışta normal; kalıcıysa AD veri tabanı sorunu.' },
+
+  // --- güvenlik / şifreleme
+  { id: '36871', gunluk: 'System', kume: 'Güvenlik', ad: 'Schannel: TLS kimlik bilgisi oluşturulamadı', ne: 'TLS el sıkışması başarısız; genelde sertifika ya da protokol uyuşmazlığı.', yap: 'Sunucu ve istemcinin ortak bir TLS sürümü ve şifre paketi olduğunu doğrulayın.' },
+  { id: '36888', gunluk: 'System', kume: 'Güvenlik', ad: 'Schannel önemli hata', ne: 'Uyarı kodu şifre paketi ya da sertifika zinciri sorununu gösterir.', yap: 'Sertifika zincirinin tam gönderildiğini kontrol edin.' },
+  { id: '1116', gunluk: 'Defender', kume: 'Güvenlik', ad: 'Defender tehdit algıladı', ne: 'Kötü amaçlı yazılım bulundu; ad, yol ve önem derecesi olayın içinde.', yap: '1117 (işlem yapıldı) ile eşleştirin; işlem yapılmadıysa el ile müdahale gerekir.' },
+  { id: '1118', gunluk: 'Defender', kume: 'Güvenlik', ad: 'Defender işlemi başarısız', ne: 'Tehdit bulundu ama temizlenemedi.', yap: 'Makineyi ağdan ayırıp elle inceleyin; en yüksek öncelikli Defender olayı budur.' },
+
+  // --- uygulama
+  { id: '1000', gunluk: 'Application', kume: 'Uygulama', ad: 'Uygulama hatası (çökme)', ne: 'Bir uygulama çöktü; hatalı modül adı ve sürümü olayın içinde.', yap: 'Hatalı modül üçüncü parti bir DLL ise güncelleme ya da kaldırma; sistem DLL’iyse sürücü.' },
+  { id: '1026', gunluk: 'Application', kume: 'Uygulama', ad: '.NET çalışma zamanı hatası', ne: 'Yönetilen kodda yakalanmamış özel durum. Yığın izi olayın içindedir.', yap: 'Uygulama sahibine yığın iziyle birlikte iletin; sunucuda çözülecek bir şey yoktur.' },
+  { id: '10016', gunluk: 'System', kume: 'Uygulama', ad: 'DCOM izin hatası', ne: 'Bir bileşen DCOM izni olmadan çağrıldı.', yap: 'Neredeyse her zaman gürültüdür; Microsoft da çoğu durumda göz ardı edilmesini söyler.' },
+  { id: '2019', gunluk: 'System', kume: 'Sistem', ad: 'Sunucu havuz belleği tükendi', ne: 'Sayfalanmayan havuz doldu; sunucu yanıt vermemeye başlar.', yap: 'poolmon ile etiketi bulun: genelde bir sürücü ya da antivirüs sızdırıyordur.' },
+];
+
+const KUMELER = [...new Set(OLAYLAR.map((o) => o.kume))];
+
+// Süslü parantezli PowerShell örneği şablonda ifade sanılıyor; değişkende tutup
+// tek parça olarak basıyoruz.
+const TOPLU_KOMUT = `Get-WinEvent -FilterHashtable @{LogName='System'; Level=1,2; StartTime=(Get-Date).AddDays(-1)} |
+  Group-Object Id | Sort-Object Count -Descending |
+  Select-Object Count, Name`;
+---
+
+<Base
+  baslik="Windows olay kimliği sözlüğü"
+  aciklama="4740, 7045, 6008 ne demek? Sahada en sık karşılaşılan Windows olay kimlikleri, anlamları ve sonraki adım. Arayın ya da kümeye göre süzün."
+  aramaya={true}
+  kategori="Araç"
+>
+  <div class="arama-bas">
+    <div class="kap">
+      <nav class="kirinti" aria-label="Kırıntı yolu" style="padding-top:0">
+        <a href="/">Ana sayfa</a><span class="ayrac">/</span><a href="/araclar">Araçlar</a><span
+          class="ayrac">/</span
+        ><span aria-current="page">Olay kimlikleri</span>
+      </nav>
+      <h1>Windows olay kimliği sözlüğü</h1>
+      <p style="color:var(--muted);font-size:14px;margin-top:8px;max-width:64ch">
+        Olay görüntüleyicide bir numara var ve arama sonuçları forum tartışmalarına çıkıyor.
+        Numarayı yazın: ne anlama geldiği ve sonraki adım burada.
+      </p>
+    </div>
+  </div>
+
+  <div class="kap arac-sayfa">
+    <section class="arac-blok">
+      <div class="arac-alan">
+        <label for="o-ara">Olay kimliği ya da anahtar sözcük</label>
+        <input id="o-ara" type="search" spellcheck="false" placeholder="4740 · kilit · hizmet · disk" style="font-size:15px" />
+      </div>
+      <div class="o-cipler" role="group" aria-label="Küme süzgeci">
+        <button type="button" class="o-cip" data-kume="hepsi" aria-pressed="true">Tümü</button>
+        {KUMELER.map((k) => <button type="button" class="o-cip" data-kume={k} aria-pressed="false">{k}</button>)}
+      </div>
+      <p class="arac-durum" id="o-durum" role="status" aria-live="polite"></p>
+    </section>
+
+    <div id="o-liste" style="display:grid;gap:12px">
+      {
+        OLAYLAR.map((o) => (
+          <section
+            class="arac-blok o-kayit"
+            data-kume={o.kume}
+            data-ara={`${o.id} ${o.ad} ${o.ne} ${o.gunluk} ${o.kume}`.toLocaleLowerCase('tr')}
+            style="padding:16px 18px"
+          >
+            <div style="display:flex;align-items:baseline;gap:10px;flex-wrap:wrap">
+              <b class="o-id">{o.id}</b>
+              <b style="font-size:15.5px">{o.ad}</b>
+              <span class="arac-rozet">{o.kume}</span>
+              <code style="font-size:12px;color:var(--muted);margin-left:auto">{o.gunluk}</code>
+            </div>
+            <p style="font-size:14px;line-height:1.6;margin:8px 0 0">{o.ne}</p>
+            <p style="font-size:13.5px;line-height:1.6;margin:6px 0 0;color:var(--ink-soft)">
+              <b>Sonraki adım:</b> {o.yap}
+            </p>
+          </section>
+        ))
+      }
+    </div>
+
+    <section class="arac-blok">
+      <h2 class="arac-h2">Bu olayları toplu okumak</h2>
+      <div class="arac-kutu">
+        <p style="margin:0 0 8px">Son 24 saatin kritik ve hata olaylarını gruplayarak çıkarmak için:</p>
+        <pre style="margin:0;font-size:13px;overflow-x:auto">{TOPLU_KOMUT}</pre>
+        <p style="margin:10px 0 0">
+          Aynı işi açıklamalarıyla birlikte yapan bir betik de var:
+          <a href="/hizli-cozumler/olay-gunlugu-ne-diyor">olay-gunlugu-ozet.ps1</a>
+        </p>
+      </div>
+    </section>
+  </div>
+
+  <script>
+    const el = (s) => document.querySelector(s);
+    const kayitlar = [...document.querySelectorAll('.o-kayit')];
+    let kume = 'hepsi';
+
+    function suz() {
+      const q = el('#o-ara').value.trim().toLocaleLowerCase('tr');
+      let gorunen = 0;
+      for (const k of kayitlar) {
+        const uyar = (kume === 'hepsi' || k.dataset.kume === kume) && (!q || k.dataset.ara.includes(q));
+        k.hidden = !uyar;
+        if (uyar) gorunen++;
+      }
+      const durum = el('#o-durum');
+      durum.className = 'arac-durum' + (gorunen ? '' : ' hata');
+      durum.textContent = gorunen
+        ? `${gorunen} olay gösteriliyor.`
+        : 'Eşleşme yok. Numaranın tamamını değil kendisini yazın (örn. 4740).';
+    }
+
+    el('#o-ara').addEventListener('input', suz);
+    document.querySelectorAll('.o-cip').forEach((b) =>
+      b.addEventListener('click', () => {
+        kume = b.dataset.kume;
+        document.querySelectorAll('.o-cip').forEach((x) => x.setAttribute('aria-pressed', String(x === b)));
+        suz();
+      })
+    );
+    suz();
+  </script>
+
+  <style>
+    .o-cipler {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      margin-top: 12px;
+    }
+    .o-cip {
+      font: inherit;
+      font-size: 13px;
+      font-weight: 700;
+      padding: 6px 13px;
+      border-radius: 999px;
+      border: 1px solid var(--line);
+      background: var(--paper);
+      color: var(--ink-soft);
+      cursor: pointer;
+    }
+    .o-cip[aria-pressed='true'] {
+      border-color: var(--indigo);
+      background: var(--tint);
+      color: var(--indigo-d);
+    }
+    .o-id {
+      font-family: var(--mono);
+      font-size: 15px;
+      color: var(--indigo-d);
+      background: var(--tint);
+      border-radius: var(--r-s);
+      padding: 2px 9px;
+    }
+  </style>
+</Base>
