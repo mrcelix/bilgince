@@ -37,6 +37,10 @@ const betikler = cozumler
   .filter((c) => c.data.dosya)
   .sort((a, b) => a.data.sira - b.data.sira);
 
+// Menü listeleri kısa tutulur: araç sayısı arttıkça panel ekranı aşıyordu.
+// Tamamı /araclar dizininde; panelin altındaki bağlantı oraya götürüyor.
+const MENUDE = 5;
+
 const yol = Astro.url.pathname.replace(/\/$/, '') || '/';
 const etkin = (p: string) => (yol === p || yol.startsWith(p + '/') ? 'page' : undefined);
 ---
@@ -256,7 +260,7 @@ const etkin = (p: string) => (yol === p || yol.startsWith(p + '/') ? 'page' : un
         <span class="mega-etiket">Üreteçler</span>
         <span class="mega-grup-ozet">Tarayıcıda çalışır, kurulum yok</span>
         {
-          ARACLAR.map((a) => (
+          ARACLAR.slice(0, MENUDE).map((a) => (
             <a class="mega-bag" href={`/araclar/${a.slug}`}>
               <span class="ikon" aria-hidden="true">
                 <KonuIkon ad={a.ikon} />
@@ -284,7 +288,7 @@ const etkin = (p: string) => (yol === p || yol.startsWith(p + '/') ? 'page' : un
         <span class="mega-etiket">İndirilebilir betikler</span>
         <span class="mega-grup-ozet">PowerShell · değişiklik yapmadan önce okuyun</span>
         {
-          betikler.map((b) => (
+          betikler.slice(0, MENUDE).map((b) => (
             <a class="mega-bag" href={`/hizli-cozumler/${b.id}`}>
               <span class="ikon" aria-hidden="true">
                 <KonuIkon ad="akis" />
@@ -305,7 +309,9 @@ const etkin = (p: string) => (yol === p || yol.startsWith(p + '/') ? 'page' : un
           <h3>Belirtiyi yazın, aracıyla birlikte çözümü alın</h3>
           <span class="alt">{cozumler.length} kayıt · {betikler.length} indirilebilir betik</span>
         </a>
-        <a class="mega-tum" href="/araclar">Tüm araçlar · {ARACLAR.length} üreteç →</a>
+        <a class="mega-tum" href="/araclar">
+          Tüm araçlar · {ARACLAR.length} üreteç, {betikler.length} betik →
+        </a>
       </div>
     </div>
   </div>

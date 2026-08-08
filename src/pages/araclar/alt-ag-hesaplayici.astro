@@ -1,0 +1,252 @@
+---
+import Base from '../../layouts/Base.astro';
+---
+
+<Base
+  baslik="Alt ağ hesaplayıcı"
+  aciklama="IPv4 adres ve önek uzunluğundan ağ adresi, yayın adresi, kullanılabilir aralık ve host sayısını hesaplar; ağı eşit alt ağlara böler."
+  aramaya={false}
+>
+  <div class="arama-bas">
+    <div class="kap">
+      <nav class="kirinti" aria-label="Kırıntı yolu" style="padding-top:0">
+        <a href="/">Ana sayfa</a><span class="ayrac">/</span><a href="/araclar">Araçlar</a><span
+          class="ayrac">/</span
+        ><span aria-current="page">Alt ağ hesaplayıcı</span>
+      </nav>
+      <h1>Alt ağ hesaplayıcı</h1>
+      <p style="color:var(--muted);font-size:14px;margin-top:8px;max-width:64ch">
+        IP planı çizerken, güvenlik duvarı kuralı yazarken ve VLAN bölerken gereken sayılar. Hesap
+        tarayıcıda yapılır.
+      </p>
+    </div>
+  </div>
+
+  <div class="kap arac-sayfa">
+    <section class="arac-blok">
+      <h2 class="arac-h2"><span class="arac-no">1</span> Adres</h2>
+      <div class="arac-alanlar">
+        <label class="arac-alan"
+          >IPv4 adresi
+          <input id="a-ip" type="text" spellcheck="false" value="10.10.4.37" placeholder="10.10.4.37" />
+        </label>
+        <label class="arac-alan"
+          >Önek (CIDR)
+          <span class="arac-kaydirac">
+            <input id="a-onek" type="range" min="8" max="32" value="22" />
+            <output for="a-onek" id="a-onek-deger">/22</output>
+          </span>
+        </label>
+      </div>
+      <p class="arac-not">
+        Adresi <code>10.10.4.37/22</code> biçiminde de yazabilirsiniz; önek kaydıracı kendini ayarlar.
+      </p>
+      <p class="arac-durum" id="a-durum" role="status" aria-live="polite"></p>
+    </section>
+
+    <section class="arac-blok">
+      <h2 class="arac-h2"><span class="arac-no">2</span> Sonuç</h2>
+      <table class="a-tablo" id="a-sonuc"></table>
+      <div class="arac-dugmeler">
+        <button type="button" class="dg arac-ikincil" id="a-kopya">Özeti kopyala</button>
+      </div>
+    </section>
+
+    <section class="arac-blok">
+      <h2 class="arac-h2"><span class="arac-no">3</span> Alt ağlara böl</h2>
+      <div class="arac-alanlar">
+        <label class="arac-alan"
+          >Yeni önek
+          <span class="arac-kaydirac">
+            <input id="a-bol" type="range" min="8" max="32" value="24" />
+            <output for="a-bol" id="a-bol-deger">/24</output>
+          </span>
+        </label>
+      </div>
+      <p class="arac-durum" id="a-bol-durum"></p>
+      <div style="overflow-x:auto"><table class="a-tablo" id="a-bol-sonuc"></table></div>
+    </section>
+
+    <section class="arac-blok">
+      <h2 class="arac-h2"><span class="arac-no">4</span> Sık karıştırılanlar</h2>
+      <div class="arac-kutu">
+        <ul style="margin:0">
+          <li><b>/31 ve /32:</b> /31 noktadan noktaya bağlantılar için iki adres verir (RFC 3021), /32 tek adrestir. İkisinde de yayın adresi ayrılmaz.</li>
+          <li><b>Kullanılabilir host sayısı:</b> /24'te 256 adres vardır ama 254 host: ilk adres ağ, son adres yayın adresidir.</li>
+          <li><b>Ters maske (wildcard):</b> ACL yazarken maskenin biti tersine döner; 255.255.255.0 yerine 0.0.0.255 yazılır.</li>
+          <li><b>Özel aralıklar:</b> 10/8, 172.16/12 ve 192.168/16 dışına çıkan planlar, ileride kuracağınız VPN'lerde çakışma üretir.</li>
+        </ul>
+      </div>
+    </section>
+  </div>
+
+  <script>
+    const el = (s) => document.querySelector(s);
+
+    /* --- IPv4 yardımcıları ------------------------------------------------- */
+    const sayiyaCevir = (ip) =>
+      ip.split('.').reduce((t, p) => (t << 8) + (parseInt(p, 10) & 255), 0) >>> 0;
+    const metneCevir = (n) =>
+      [24, 16, 8, 0].map((k) => (n >>> k) & 255).join('.');
+    const maskeUret = (onek) => (onek === 0 ? 0 : (0xffffffff << (32 - onek)) >>> 0);
+    const ikilik = (n) =>
+      [24, 16, 8, 0].map((k) => ((n >>> k) & 255).toString(2).padStart(8, '0')).join('.');
+
+    function gecerliMi(ip) {
+      const p = ip.trim().split('.');
+      return p.length === 4 && p.every((x) => /^\d{1,3}$/.test(x) && +x <= 255);
+    }
+
+    function ozelMi(n) {
+      const [a, b] = [(n >>> 24) & 255, (n >>> 16) & 255];
+      if (a === 10) return '10.0.0.0/8 — özel';
+      if (a === 172 && b >= 16 && b <= 31) return '172.16.0.0/12 — özel';
+      if (a === 192 && b === 168) return '192.168.0.0/16 — özel';
+      if (a === 169 && b === 254) return '169.254.0.0/16 — APIPA (DHCP alınamamış)';
+      if (a === 127) return '127.0.0.0/8 — geri döngü';
+      if (a === 100 && b >= 64 && b <= 127) return '100.64.0.0/10 — operatör NAT';
+      if (a >= 224 && a <= 239) return 'çoklu gönderim (multicast)';
+      return 'genel (public) adres';
+    }
+
+    function hesapla() {
+      const durum = el('#a-durum');
+      let ham = el('#a-ip').value.trim();
+      let onek = +el('#a-onek').value;
+
+      // "10.0.0.1/24" yazıldıysa öneki oradan al
+      const bolu = ham.indexOf('/');
+      if (bolu > -1) {
+        const p = parseInt(ham.slice(bolu + 1), 10);
+        ham = ham.slice(0, bolu);
+        if (p >= 0 && p <= 32) {
+          onek = p;
+          el('#a-onek').value = p;
+          el('#a-ip').value = ham;
+        }
+      }
+      el('#a-onek-deger').textContent = '/' + onek;
+
+      if (!gecerliMi(ham)) {
+        durum.textContent = 'Geçerli bir IPv4 adresi girin (örn. 192.168.1.10).';
+        durum.className = 'arac-durum hata';
+        el('#a-sonuc').innerHTML = '';
+        return;
+      }
+      durum.textContent = '';
+      durum.className = 'arac-durum';
+
+      const ip = sayiyaCevir(ham);
+      const maske = maskeUret(onek);
+      const ag = (ip & maske) >>> 0;
+      const yayin = (ag | (~maske >>> 0)) >>> 0;
+      const toplam = onek === 32 ? 1 : 2 ** (32 - onek);
+      const host = onek >= 31 ? toplam : toplam - 2;
+      const ilk = onek >= 31 ? ag : ag + 1;
+      const son = onek >= 31 ? yayin : yayin - 1;
+
+      const satirlar = [
+        ['Ağ adresi', `${metneCevir(ag)}/${onek}`],
+        ['Alt ağ maskesi', metneCevir(maske)],
+        ['Ters maske (wildcard)', metneCevir(~maske >>> 0)],
+        ['Yayın adresi', onek >= 31 ? '—' : metneCevir(yayin)],
+        ['Kullanılabilir aralık', `${metneCevir(ilk)} – ${metneCevir(son)}`],
+        ['Toplam adres', toplam.toLocaleString('tr-TR')],
+        ['Kullanılabilir host', host.toLocaleString('tr-TR')],
+        ['Girilen adres', ip === ag ? `${ham} (ağ adresi)` : ip === yayin ? `${ham} (yayın adresi)` : ham],
+        ['Adres türü', ozelMi(ag)],
+        ['İkilik (ağ)', ikilik(ag)],
+        ['İkilik (maske)', ikilik(maske)],
+      ];
+
+      el('#a-sonuc').innerHTML = satirlar
+        .map(([k, v]) => `<tr><th>${k}</th><td>${v}</td></tr>`)
+        .join('');
+
+      bol();
+    }
+
+    function bol() {
+      const onek = +el('#a-onek').value;
+      const yeni = +el('#a-bol').value;
+      el('#a-bol-deger').textContent = '/' + yeni;
+      const durum = el('#a-bol-durum');
+      const tablo = el('#a-bol-sonuc');
+
+      if (!gecerliMi(el('#a-ip').value.trim())) return;
+      if (yeni < onek) {
+        durum.className = 'arac-durum hata';
+        durum.textContent = `Yeni önek /${onek} değerinden küçük olamaz — bölmek için daha uzun önek seçin.`;
+        tablo.innerHTML = '';
+        return;
+      }
+
+      const adet = 2 ** (yeni - onek);
+      const ag = (sayiyaCevir(el('#a-ip').value.trim()) & maskeUret(onek)) >>> 0;
+      const adim = yeni === 32 ? 1 : 2 ** (32 - yeni);
+      const gosterilecek = Math.min(adet, 64);
+
+      durum.className = 'arac-durum';
+      durum.textContent =
+        `/${onek} ağı ${adet.toLocaleString('tr-TR')} adet /${yeni} alt ağa bölünür` +
+        (adet > gosterilecek ? ` — ilk ${gosterilecek} tanesi listeleniyor.` : '.');
+
+      let govde = '<tr><th>#</th><th>Ağ</th><th>Aralık</th><th>Yayın</th></tr>';
+      for (let i = 0; i < gosterilecek; i++) {
+        const alt = (ag + i * adim) >>> 0;
+        const sonAdres = (alt + adim - 1) >>> 0;
+        const ilkHost = yeni >= 31 ? alt : alt + 1;
+        const sonHost = yeni >= 31 ? sonAdres : sonAdres - 1;
+        govde += `<tr><td>${i + 1}</td><td>${metneCevir(alt)}/${yeni}</td>
+          <td>${metneCevir(ilkHost)} – ${metneCevir(sonHost)}</td>
+          <td>${yeni >= 31 ? '—' : metneCevir(sonAdres)}</td></tr>`;
+      }
+      tablo.innerHTML = govde;
+    }
+
+    el('#a-ip').addEventListener('input', hesapla);
+    el('#a-onek').addEventListener('input', hesapla);
+    el('#a-bol').addEventListener('input', bol);
+
+    el('#a-kopya').addEventListener('click', async (e) => {
+      const metin = [...el('#a-sonuc').querySelectorAll('tr')]
+        .map((tr) => tr.children[0].textContent.padEnd(24) + tr.children[1].textContent)
+        .join('\n');
+      try {
+        await navigator.clipboard.writeText(metin);
+        e.currentTarget.textContent = 'Kopyalandı';
+      } catch {
+        e.currentTarget.textContent = 'Kopyalanamadı';
+      }
+      setTimeout(() => (e.currentTarget.textContent = 'Özeti kopyala'), 1600);
+    });
+
+    hesapla();
+  </script>
+
+  <style>
+    .a-tablo {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 14px;
+    }
+    .a-tablo :is(th, td) {
+      text-align: left;
+      padding: 8px 10px;
+      border-bottom: 1px solid var(--line);
+      vertical-align: top;
+    }
+    .a-tablo th {
+      color: var(--ink-soft);
+      font-weight: 700;
+      white-space: nowrap;
+    }
+    .a-tablo td {
+      font-family: var(--mono);
+      font-size: 13.5px;
+    }
+    .a-tablo tr:first-child td {
+      font-weight: 700;
+    }
+  </style>
+</Base>

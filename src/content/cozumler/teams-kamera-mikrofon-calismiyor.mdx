@@ -10,6 +10,9 @@ belirtiler:
   - "Cihaz listede yok"
 yayin: 2026-08-02
 sure: 4
+dosya: "/araclar/teams-onbellek-sifirla.ps1"
+dosyaAdi: "teams-onbellek-sifirla.ps1"
+dosyaAciklama: "Kurulu Teams istemcilerini, önbellek klasörlerinin boyutunu ve kamera/mikrofon izinlerini raporlar. -Sifirla ile önbelleği siler değil, yeniden adlandırır; sohbet geçmişi sunucuda kalır."
 komut: "Get-PnpDevice -Class Camera,AudioEndpoint | Where-Object Status -ne 'OK' | Select-Object FriendlyName, Status, Class"
 platform: "windows"
 ilgiliRehberler: []

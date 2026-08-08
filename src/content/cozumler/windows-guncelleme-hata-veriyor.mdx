@@ -1,0 +1,85 @@
+---
+baslik: "Windows güncellemesi hata kodu veriyor"
+ozet: "Aynı güncelleme her denemede aynı yerde düşüyor. Hata kodu neyin bozuk olduğunu söyler; bileşen sıfırlama çoğu durumu kapatır."
+konu: "windows"
+etiketler: ["windows-update", "yama", "tanilama"]
+belirtiler:
+  - "Güncelleme %0'da ya da %98'de takılıyor"
+  - "Bir hata oluştu diyor, kod veriyor"
+  - "Aynı güncelleme her ay yeniden geliyor"
+  - "Güncelleştirmeleri denetle düğmesi hiç bitmiyor"
+yayin: 2026-08-08
+sure: 6
+dosya: "/araclar/windows-update-tamir.ps1"
+dosyaAdi: "windows-update-tamir.ps1"
+dosyaAciklama: "Servisleri, güncelleme geçmişini, hata kodlarını, WSUS yönlendirmesini ve disk alanını raporlar. -Onar ile bileşenleri sıfırlar: önbellekler silinmez, yeniden adlandırılır."
+komut: "Get-WindowsUpdateLog"
+platform: "windows"
+ilgiliRehberler: []
+sira: 7
+---
+
+Kullanıcı "güncelleme yüklenmiyor" diyor. Denetim panelinde kırmızı bir satır ve sekiz haneli bir kod var. Kod kopyalanıp aranıyor, çıkan forum başlığında yedi farklı öneri var ve hiçbiri sırayla denenmiyor.
+
+Doğru sıra kısa: **önce kodu okuyun**, sonra alan ve yönlendirmeye bakın, en son bileşeni sıfırlayın.
+
+## 1. Kod ne diyor
+
+Kodların çoğu üç kümede toplanır ve küme, hangi tarafa bakacağınızı söyler:
+
+| Kod | Anlamı | Nereye bakılır |
+| --- | --- | --- |
+| `0x8024xxxx` | İletişim | Ağ, proxy, WSUS erişimi |
+| `0x8007xxxx` | Windows API | İzin, kilitli dosya, disk alanı |
+| `0x800Fxxxx` | Bileşen deposu | DISM ile onarım |
+
+`0x80070020` gördüğünüzde antivirüsün dosyayı kilitlemesi neredeyse kesindir; `0x800F0922` çoğunlukla sistem ayrılmış bölümünün küçüklüğüdür.
+
+## 2. Alan ve yönlendirme
+
+Özellik güncellemeleri **20 GB civarı** boş alan ister. Alan yoksa hata kodu bunu doğrudan söylemez, indirme ya da hazırlık aşamasında düşer.
+
+Kurumsal makinelerde ikinci soru şudur: bu makine güncellemeyi nereden alıyor?
+
+```powershell
+Get-ItemProperty 'HKLM:\SOFTWARE\Policies\Microsoft\Windows\WindowsUpdate' |
+  Select-Object WUServer, WUStatusServer
+```
+
+Bir sunucu adresi çıkıyorsa ve o sunucu erişilemez durumdaysa istemci **hiçbir yerden** güncelleme alamaz — internete çıkabiliyor olması bir şey değiştirmez.
+
+## 3. Bileşen sıfırlama
+
+İlk ikisi temizse sıra indirme önbelleğine gelir. Servisler durdurulur, `SoftwareDistribution` ve `catroot2` klasörleri yeniden adlandırılır, servisler başlatılır. Windows bu klasörleri kendisi yeniden kurar; **veri kaybı yoktur**, yalnızca bekleyen indirmeler baştan iner.
+
+Betik bunu yaparken klasörleri silmez, tarih damgasıyla yeniden adlandırır. Bir şey ters giderse geri dönebilirsiniz.
+
+```powershell
+.\windows-update-tamir.ps1          # yalnızca rapor
+.\windows-update-tamir.ps1 -Onar    # bileşen sıfırlama
+```
+
+## 4. Bileşen deposu bozuksa
+
+`0x80073712` veya `0x800F081F` görüyorsanız sorun önbellekte değil, bileşen deposundadır. Sıfırlama işe yaramaz; onarım gerekir:
+
+```powershell
+DISM /Online /Cleanup-Image /RestoreHealth
+sfc /scannow
+```
+
+İkisi bu sırayla çalıştırılır. `sfc`'yi önce çalıştırmak yaygın bir alışkanlıktır ve depo bozukken düzeltebileceği bir şey yoktur.
+
+## Doğrulama
+
+Sıfırlamadan sonra taramayı yeniden başlatın:
+
+```powershell
+UsoClient StartScan
+```
+
+Üç şeyi kontrol edin: güncelleme listesi geliyor mu, indirme ilerliyor mu, kurulum sonrası geçmişte **Başarılı** satırı var mı. Üçüncüsü olmadan iş bitmemiştir — "hata vermedi" ile "yüklendi" aynı şey değildir.
+
+## Aynı güncelleme her ay geri geliyorsa
+
+Kurulum başarılı görünüp bir sonraki ay yeniden geliyorsa kurulum aslında tamamlanmıyordur. Bu genelde yeniden başlatmanın hiç yapılmamasından ya da bir görüntü dağıtım aracının makineyi eski duruma döndürmesinden kaynaklanır. Makineye değil, dağıtım sürecine bakın.

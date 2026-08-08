@@ -1,0 +1,295 @@
+---
+import Base from '../../layouts/Base.astro';
+---
+
+<Base
+  baslik="SPF, DKIM ve DMARC kaydı üreteci"
+  aciklama="Alan adınız için SPF, DKIM ve DMARC TXT kayıtlarını üretir; SPF'te 10 DNS sorgusu sınırını sayar ve DMARC politikasını kademeli geçiş sırasına göre önerir."
+  aramaya={false}
+>
+  <div class="arama-bas">
+    <div class="kap">
+      <nav class="kirinti" aria-label="Kırıntı yolu" style="padding-top:0">
+        <a href="/">Ana sayfa</a><span class="ayrac">/</span><a href="/araclar">Araçlar</a><span
+          class="ayrac">/</span
+        ><span aria-current="page">E-posta güvenlik kayıtları</span>
+      </nav>
+      <h1>SPF, DKIM ve DMARC kaydı üreteci</h1>
+      <p style="color:var(--muted);font-size:14px;margin-top:8px;max-width:64ch">
+        Üç kaydın üçü de olmadan alan adınız adına sahte e-posta gönderilmesini engelleyemezsiniz.
+        Formu doldurun, DNS'e yapıştırılacak kayıtlar aşağıda çıksın.
+      </p>
+    </div>
+  </div>
+
+  <div class="kap arac-sayfa">
+    <section class="arac-blok">
+      <h2 class="arac-h2"><span class="arac-no">1</span> Alan adı ve gönderenler</h2>
+      <div class="arac-alanlar">
+        <label class="arac-alan"
+          >Alan adı
+          <input id="e-alan" type="text" spellcheck="false" value="ornek.com" placeholder="ornek.com" />
+        </label>
+        <label class="arac-alan"
+          >E-posta sağlayıcısı
+          <select id="e-saglayici">
+            <option value="">seçin — kendi sunucum</option>
+            <option value="spf.protection.outlook.com" selected>Microsoft 365</option>
+            <option value="_spf.google.com">Google Workspace</option>
+            <option value="spf.mandrillapp.com">Mailchimp / Mandrill</option>
+            <option value="_spf.salesforce.com">Salesforce</option>
+            <option value="sendgrid.net">SendGrid</option>
+            <option value="mail.zendesk.com">Zendesk</option>
+          </select>
+        </label>
+      </div>
+      <div class="arac-alanlar" style="margin-top:14px">
+        <label class="arac-alan"
+          >Ek include kayıtları (virgülle)
+          <input id="e-include" type="text" spellcheck="false" placeholder="sendgrid.net, _spf.baskasaglayici.com" />
+        </label>
+        <label class="arac-alan"
+          >Kendi sunucu IP'leri (virgülle)
+          <input id="e-ip" type="text" spellcheck="false" placeholder="203.0.113.10, 198.51.100.0/24" />
+        </label>
+      </div>
+      <div class="arac-onaylar">
+        <label class="arac-onay"><input type="checkbox" id="e-sert" checked /> <span>SPF'i sert bitir (-all)</span></label>
+      </div>
+      <p class="arac-not">
+        <code>-all</code> "listede yoksa reddet", <code>~all</code> "şüpheli işaretle" demektir. Geçiş
+        döneminde <code>~all</code>, kaynak listeniz kesinleşince <code>-all</code>.
+      </p>
+    </section>
+
+    <section class="arac-blok">
+      <h2 class="arac-h2"><span class="arac-no">2</span> DMARC politikası</h2>
+      <div class="arac-alanlar">
+        <label class="arac-alan"
+          >Politika
+          <select id="e-politika">
+            <option value="none" selected>none — yalnızca rapor topla (başlangıç)</option>
+            <option value="quarantine">quarantine — gereksize düşür</option>
+            <option value="reject">reject — tamamen reddet</option>
+          </select>
+        </label>
+        <label class="arac-alan"
+          >Rapor adresi (rua)
+          <input id="e-rua" type="text" spellcheck="false" value="dmarc@ornek.com" />
+        </label>
+        <label class="arac-alan"
+          >Uygulama yüzdesi
+          <span class="arac-kaydirac">
+            <input id="e-pct" type="range" min="10" max="100" step="10" value="100" />
+            <output for="e-pct" id="e-pct-deger">100</output>
+          </span>
+        </label>
+      </div>
+      <div class="arac-onaylar">
+        <label class="arac-onay"><input type="checkbox" id="e-siki" /> <span>Sıkı hizalama (adkim=s, aspf=s)</span></label>
+      </div>
+    </section>
+
+    <section class="arac-blok">
+      <h2 class="arac-h2"><span class="arac-no">3</span> DNS'e girilecek kayıtlar</h2>
+      <div id="e-kayitlar"></div>
+      <div id="e-uyari"></div>
+    </section>
+
+    <section class="arac-blok">
+      <h2 class="arac-h2"><span class="arac-no">4</span> Sıra önemli</h2>
+      <div class="arac-kutu">
+        <ol style="margin:0;padding-left:20px">
+          <li><b>SPF ve DKIM önce.</b> DMARC ikisinin sonucuna bakar; onlar yokken DMARC yayınlamak her şeyi başarısız yapar.</li>
+          <li><b>DMARC'ı p=none ile başlatın</b> ve raporları en az iki hafta okuyun. Hangi meşru sistemin sizin adınıza gönderdiğini ancak burada görürsünüz.</li>
+          <li><b>Sonra quarantine, sonra reject.</b> Yüzdeyi kademeli artırın (pct=25 → 50 → 100).</li>
+          <li><b>p=none'da kalmayın.</b> Rapor toplayan ama hiçbir şeyi engellemeyen bir DMARC kaydı, koruma değil belgelendirmedir.</li>
+        </ol>
+      </div>
+    </section>
+  </div>
+
+  <script>
+    const el = (s) => document.querySelector(s);
+
+    /** SPF'te 10 DNS sorgusu sınırına giren mekanizmalar */
+    const SORGULU = ['include', 'a', 'mx', 'ptr', 'exists', 'redirect'];
+
+    function parcala(metin) {
+      return metin
+        .split(',')
+        .map((s) => s.trim())
+        .filter(Boolean);
+    }
+
+    function uret() {
+      const alan = el('#e-alan').value.trim() || 'ornek.com';
+      const saglayici = el('#e-saglayici').value;
+      const ekler = parcala(el('#e-include').value);
+      const ipler = parcala(el('#e-ip').value);
+
+      /* --- SPF ------------------------------------------------------------- */
+      const includeler = [saglayici, ...ekler].filter(Boolean);
+      const spfParcalar = ['v=spf1'];
+      for (const ip of ipler) {
+        spfParcalar.push((ip.includes(':') ? 'ip6:' : 'ip4:') + ip);
+      }
+      for (const i of includeler) spfParcalar.push('include:' + i);
+      spfParcalar.push(el('#e-sert').checked ? '-all' : '~all');
+      const spf = spfParcalar.join(' ');
+      const sorguSayisi = includeler.length; // include başına en az 1 sorgu
+
+      /* --- DMARC ----------------------------------------------------------- */
+      const politika = el('#e-politika').value;
+      const pct = +el('#e-pct').value;
+      const rua = el('#e-rua').value.trim();
+      const dmarcParcalar = [`v=DMARC1`, `p=${politika}`];
+      if (rua) dmarcParcalar.push(`rua=mailto:${rua}`);
+      if (pct !== 100) dmarcParcalar.push(`pct=${pct}`);
+      if (el('#e-siki').checked) dmarcParcalar.push('adkim=s', 'aspf=s');
+      dmarcParcalar.push('fo=1');
+      const dmarc = dmarcParcalar.join('; ');
+
+      /* --- DKIM ------------------------------------------------------------ */
+      const dkim =
+        saglayici === 'spf.protection.outlook.com'
+          ? [
+              { ad: `selector1._domainkey.${alan}`, tur: 'CNAME', deger: `selector1-${alan.replace(/\./g, '-')}._domainkey.<kiracı>.onmicrosoft.com` },
+              { ad: `selector2._domainkey.${alan}`, tur: 'CNAME', deger: `selector2-${alan.replace(/\./g, '-')}._domainkey.<kiracı>.onmicrosoft.com` },
+            ]
+          : saglayici === '_spf.google.com'
+            ? [{ ad: `google._domainkey.${alan}`, tur: 'TXT', deger: 'v=DKIM1; k=rsa; p=<yönetim panelinden alınan genel anahtar>' }]
+            : [{ ad: `varsayilan._domainkey.${alan}`, tur: 'TXT', deger: 'v=DKIM1; k=rsa; p=<sağlayıcınızın verdiği genel anahtar>' }];
+
+      const kayitlar = [
+        { ad: alan, tur: 'TXT', deger: spf, baslik: 'SPF — kimler sizin adınıza gönderebilir' },
+        ...dkim.map((d) => ({ ...d, baslik: 'DKIM — mesajın imzası' })),
+        { ad: `_dmarc.${alan}`, tur: 'TXT', deger: dmarc, baslik: 'DMARC — uyuşmayan mesajlara ne yapılsın' },
+      ];
+
+      el('#e-kayitlar').innerHTML = kayitlar
+        .map(
+          (k, i) => `
+        <div class="e-kayit">
+          <div class="e-bas"><strong>${k.baslik}</strong>
+            <button type="button" class="e-kopya" data-i="${i}">Kopyala</button></div>
+          <table class="e-tablo">
+            <tr><th>Ad</th><td>${k.ad}</td></tr>
+            <tr><th>Tür</th><td>${k.tur}</td></tr>
+            <tr><th>Değer</th><td>${k.deger.replace(/[<>&]/g, (c) => ({ '<': '&lt;', '>': '&gt;', '&': '&amp;' })[c])}</td></tr>
+          </table>
+        </div>`
+        )
+        .join('');
+
+      el('#e-kayitlar')
+        .querySelectorAll('.e-kopya')
+        .forEach((b) =>
+          b.addEventListener('click', async () => {
+            await navigator.clipboard.writeText(kayitlar[+b.dataset.i].deger);
+            b.textContent = 'Kopyalandı';
+            setTimeout(() => (b.textContent = 'Kopyala'), 1600);
+          })
+        );
+
+      /* --- uyarılar --------------------------------------------------------- */
+      const uyarilar = [];
+      if (sorguSayisi > 10) {
+        uyarilar.push(
+          `SPF kaydınız <b>${sorguSayisi} include</b> içeriyor. Sınır 10 DNS sorgusudur ve aşıldığında ` +
+            'kayıt <code>permerror</code> verir — yani hiç yokmuş gibi davranılır. Kullanılmayan sağlayıcıları çıkarın.'
+        );
+      } else if (sorguSayisi >= 8) {
+        uyarilar.push(
+          `SPF kaydı ${sorguSayisi} include ile 10 sorgu sınırına yaklaşıyor. Her include kendi içinde ` +
+            'yeni sorgular açabilir; sınırı gerçek değerle ölçmeden yeni sağlayıcı eklemeyin.'
+        );
+      }
+      if (!includeler.length && !ipler.length) {
+        uyarilar.push('Hiç gönderen tanımlamadınız: bu SPF kaydı kendi e-postalarınızı da reddettirir.');
+      }
+      if (politika === 'none') {
+        uyarilar.push(
+          '<b>p=none</b> hiçbir mesajı engellemez, yalnızca rapor toplar. Başlangıç için doğrudur; ' +
+            'iki hafta sonra <code>quarantine</code> aşamasına geçmeyi planlayın.'
+        );
+      }
+      if (politika === 'reject' && pct === 100 && el('#e-siki').checked) {
+        uyarilar.push(
+          'Sıkı hizalama + reject + %100 en katı birleşimdir. Alt alan adlarından ya da pazarlama ' +
+            'araçlarından gönderilen meşru postalar da düşebilir; önce raporlarla doğrulayın.'
+        );
+      }
+
+      el('#e-uyari').innerHTML = uyarilar.length
+        ? `<div class="arac-kutu uyari" style="margin-top:16px"><h3>Dikkat</h3><ul style="margin:0">${uyarilar
+            .map((u) => `<li>${u}</li>`)
+            .join('')}</ul></div>`
+        : '<div class="arac-kutu iyi" style="margin-top:16px">Kayıtlar tutarlı görünüyor.</div>';
+    }
+
+    document
+      .querySelectorAll('#e-alan, #e-saglayici, #e-include, #e-ip, #e-sert, #e-politika, #e-rua, #e-siki')
+      .forEach((d) => d.addEventListener('input', uret));
+    el('#e-pct').addEventListener('input', () => {
+      el('#e-pct-deger').textContent = el('#e-pct').value;
+      uret();
+    });
+
+    uret();
+  </script>
+
+  <style>
+    .e-kayit {
+      border: 1px solid var(--line);
+      border-radius: var(--r-s);
+      overflow: hidden;
+      margin-bottom: 14px;
+    }
+    .e-bas {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 10px;
+      padding: 9px 13px;
+      background: var(--bg);
+      border-bottom: 1px solid var(--line);
+      font-size: 13px;
+    }
+    .e-kopya {
+      font: inherit;
+      font-size: 12px;
+      font-weight: 700;
+      padding: 4px 11px;
+      border-radius: 999px;
+      border: 1px solid var(--indigo);
+      background: var(--paper);
+      color: var(--indigo-d);
+      cursor: pointer;
+      flex: none;
+    }
+    .e-tablo {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 13.5px;
+    }
+    .e-tablo :is(th, td) {
+      text-align: left;
+      padding: 8px 13px;
+      vertical-align: top;
+      border-bottom: 1px solid var(--line);
+    }
+    .e-tablo tr:last-child :is(th, td) {
+      border-bottom: 0;
+    }
+    .e-tablo th {
+      width: 70px;
+      color: var(--muted);
+      font-weight: 700;
+    }
+    .e-tablo td {
+      font-family: var(--mono);
+      word-break: break-all;
+    }
+  </style>
+</Base>

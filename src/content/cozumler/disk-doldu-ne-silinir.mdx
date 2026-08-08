@@ -1,0 +1,84 @@
+---
+baslik: "C: doldu, güvenle ne silebilirim?"
+ozet: "Disk kırmızı. Silmeye başlamadan önce yeri kimin kapladığını ölçün: kolay kazancın çoğu kullanıcı dosyalarında değil, sistemin kendi klasörlerinde durur."
+konu: "windows"
+etiketler: ["disk", "temizlik", "winsxs"]
+belirtiler:
+  - "C: sürücüsü kırmızı, birkaç yüz MB kaldı"
+  - "Güncelleme yer olmadığı için kurulmuyor"
+  - "Temizledim ama alan geri gelmedi"
+  - "Kullanıcı dosyaları küçük, disk yine de dolu"
+yayin: 2026-08-08
+sure: 5
+dosya: "/araclar/disk-temizlik-analiz.ps1"
+dosyaAdi: "disk-temizlik-analiz.ps1"
+dosyaAciklama: "En büyük klasörleri, güncelleme önbelleğini, Windows.old'u, hazırda bekletme dosyasını, gölge kopyaları ve kullanıcı profillerini ölçer. Hiçbir şey silmez; her kalem için nasıl silineceğini yazar."
+komut: "Get-PSDrive C | Select-Object Used, Free"
+platform: "windows"
+ilgiliRehberler: []
+sira: 8
+---
+
+Disk doldu. İlk refleks İndirilenler klasörünü boşaltmak olur, 2 GB kazanılır, ertesi hafta aynı yere gelinir. Kalıcı çözüm ölçmekle başlar: **yeri kim kaplıyor?**
+
+Aşağıdaki sıra, kazanç/risk oranına göre dizilmiştir. Baştan başlayın.
+
+## 1. Geri dönüşüm kutusu ve geçici dosyalar
+
+En hızlı ve en risksiz kazanç. Geri dönüşüm kutusu, "silindi" sanılan dosyaları hâlâ diskte tutar:
+
+```powershell
+Clear-RecycleBin -Force
+```
+
+Geçici dosyalar için Ayarlar → Sistem → Depolama → Geçici dosyalar. Buradaki listede **"Windows Update temizleme"** ve **"Teslim İyileştirme dosyaları"** kalemleri çoğu makinede birkaç GB tutar.
+
+## 2. Güncelleme önbelleği
+
+`C:\Windows\SoftwareDistribution\Download` klasörü indirilmiş güncelleme paketlerini tutar ve kendiliğinden temizlenmez. Kurulum bittiyse içeriği gereksizdir.
+
+Servisi durdurmadan silmeye çalışmayın; dosyalar kilitlidir.
+
+## 3. Windows.old
+
+Sürüm yükseltmesinden sonra eski kurulum 10 gün boyunca `C:\Windows.old` altında bekler ve **20–30 GB** tutabilir. Geri dönmeyi düşünmüyorsanız temizleyin — ama elle silmeyin, Depolama ayarlarındaki "Önceki Windows kurulumları" seçeneğini kullanın.
+
+## 4. Bileşen deposu (WinSxS)
+
+Explorer'da `C:\Windows\WinSxS` klasörüne bakıp "10 GB, silelim" demek en pahalı hatadır: içindeki dosyaların çoğu Windows'un başka yerlerine **sabit bağ**dır, gerçek boyut görünenden küçüktür ve klasör silinirse sistem açılmaz.
+
+Doğru yol ölçmek:
+
+```powershell
+DISM /Online /Cleanup-Image /AnalyzeComponentStore
+```
+
+Çıktı "Bileşen deposu temizleme önerilir: Evet" diyorsa:
+
+```powershell
+DISM /Online /Cleanup-Image /StartComponentCleanup
+```
+
+## 5. Hazırda bekletme dosyası
+
+`hiberfil.sys` belleğin boyutu kadar yer kaplar. Sunucularda ve hazırda bekletmeyi kullanmayan masaüstlerinde gereksizdir:
+
+```powershell
+powercfg /hibernate off
+```
+
+Dizüstülerde kapatmayın — hızlı başlatma ve pil davranışı buna bağlıdır.
+
+## 6. Kullanıcı profilleri ve OneDrive önbelleği
+
+Ortak kullanılan makinelerde ayrılmış çalışanların profilleri yıllarca durur. OneDrive "Bu cihazda her zaman tut" işaretli klasörler de bulut dosyalarını yerelde tutar; "Yer açın" seçeneği bunları isteğe bağlı hâle getirir ve tek tıkla onlarca GB kazandırır.
+
+## Doğrulama
+
+Temizlikten sonra tek soru: **bir hafta sonra hâlâ boş mu?**
+
+Alan hızla geri doluyorsa sorun temizlik değil, kapasite ya da bir günlük dosyasının büyümesidir. O durumda betiği yeniden çalıştırıp "en büyük klasörler" listesini karşılaştırın: iki ölçüm arasındaki fark, sizi doğrudan kaynağa götürür.
+
+## Silmeden önce
+
+Sunucularda gölge kopya alanını küçültmek, geçmişe dönük geri yükleme noktalarını da siler. Kullanıcıların "önceki sürümler" ile kendi kurtardığı dosyalar buradan gelir; alanı daraltmadan önce bunu bilerek karar verin.

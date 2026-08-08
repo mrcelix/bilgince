@@ -1,0 +1,79 @@
+---
+baslik: "Bu bilgisayar Windows 11'e yükseltilemiyor diyor"
+ozet: "Uyumsuz görünen makinelerin büyük kısmı aslında uyumludur: TPM ve Secure Boot BIOS'ta kapalıdır. Donanım almadan önce hangisi olduğunu ölçün."
+konu: "windows"
+etiketler: ["windows-11", "tpm", "secure-boot", "gocurme"]
+belirtiler:
+  - "PC Sağlık Denetimi uyumsuz diyor"
+  - "TPM 2.0 gerekiyor uyarısı"
+  - "Bu bilgisayar Windows 11 çalıştıramaz"
+  - "Aynı model bazı makinelerde yükseltiliyor bazılarında yükseltilmiyor"
+yayin: 2026-08-08
+sure: 5
+dosya: "/araclar/win11-uyumluluk.ps1"
+dosyaAdi: "win11-uyumluluk.ps1"
+dosyaAciklama: "TPM, Secure Boot, UEFI, işlemci, bellek ve disk maddelerini tek tek raporlar; her engelin donanım kaynaklı mı yoksa BIOS'ta kapalı mı olduğunu ayırır. -Csv ile filo genelinde toplanabilir."
+komut: "Get-Tpm | Select-Object TpmPresent, TpmReady"
+platform: "windows"
+ilgiliRehberler: []
+sira: 9
+---
+
+"Uyumsuz" cevabı tek bir cümledir ve altında yedi ayrı madde vardır. Hangisinde takıldığınızı bilmeden verilecek her karar — makine değiştirmek dahil — tahmindir.
+
+Sahada en sık çıkan iki madde donanım eksikliği değil, **kapalı ayardır**.
+
+## 1. TPM: yok mu, kapalı mı?
+
+Çoğu 2016 sonrası anakartta TPM işlemcinin içindedir ve varsayılan olarak kapalı gelir. BIOS'taki adı üreticiye göre değişir; aradığınız şey şudur:
+
+- Intel: **PTT** (Platform Trust Technology)
+- AMD: **fTPM** (firmware TPM)
+
+```powershell
+Get-Tpm | Select-Object TpmPresent, TpmReady, TpmEnabled
+```
+
+`TpmPresent: False` çıkması "yonga yok" demek değildir; BIOS'ta kapalıysa işletim sistemi de göremez. Ayrı bir yonga arayıp anakarta takmadan önce BIOS'a bakın.
+
+`SpecVersion` değeri `1.2` ile başlıyorsa iş farklıdır: bu gerçekten yetersizdir ve yükseltilemez.
+
+## 2. Secure Boot ve UEFI
+
+İki ayrı sorudur ve karıştırılır:
+
+- **Secure Boot kapalı** → BIOS'tan açılır, disk düzeni değişmez.
+- **Makine Legacy/BIOS modunda kurulu** → disk MBR'dir, önce GPT'ye dönüştürülmesi gerekir.
+
+İkincisi için Windows'un kendi aracı iş görür ve veriyi korur:
+
+```powershell
+mbr2gpt /validate /allowFullOS
+mbr2gpt /convert /allowFullOS
+```
+
+Dönüştürmeden **sonra** BIOS'ta önyükleme modunu UEFI yapın. Sıra ters olursa makine açılmaz. Bu işlemi yedek almadan yapmayın.
+
+## 3. İşlemci listesi
+
+Microsoft'un desteklenen işlemci listesi Intel'de 8. nesilde başlar. 7. nesil bir makine tüm diğer maddeleri geçse bile listede olmadığı için "uyumsuz" der.
+
+Bu maddede yapılacak bir ayar yoktur; karar filo planlaması kararıdır.
+
+## 4. Bellek ve disk
+
+4 GB bellek ve 64 GB sistem diski alt sınırdır. Alt sınırı geçen ama 25 GB boş alanı olmayan makinelerde yükseltme indirme aşamasında düşer ve verdiği hata uyumlulukla ilgisiz görünür.
+
+## Filo genelinde ölçmek
+
+Tek makinede karar vermek kolaydır; asıl soru "kaç makine gerçekten değişmeli" sorusudur. Betiği oturum açma betiği ya da uzaktan çalıştırmayla dağıtıp CSV toplayın:
+
+```powershell
+.\win11-uyumluluk.ps1 -Csv | Export-Csv \\sunucu\pay\uyumluluk.csv -Append -NoTypeInformation -Encoding UTF8
+```
+
+Sonuç üç kümeye ayrılır: **uygun**, **ayar gerekiyor**, **uygun değil**. Bütçe konuşması yalnızca üçüncü kümeyle yapılır — ikinci küme bir BIOS ayarı ve bir öğleden sonra demektir.
+
+## Doğrulama
+
+BIOS ayarını yaptıktan sonra betiği yeniden çalıştırın. `TPM 2.0 hazır` ve `Secure Boot: Açık` satırlarını görmeden yükseltmeyi denemeyin: Windows Update'in uyumluluk denetimi kendi önbelleğini tutar ve bazen bir gün gecikmeyle güncellenir.

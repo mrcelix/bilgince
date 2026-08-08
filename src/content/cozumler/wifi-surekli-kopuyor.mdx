@@ -1,0 +1,67 @@
+---
+baslik: "Wi-Fi bağlanıyor ama sürekli kopuyor"
+ozet: "Bağlantı kuruluyor, birkaç dakika sonra düşüyor. Dört sebepten biridir ve hangisi olduğunu sinyal örneklemesi ile olay günlüğü birlikte söyler."
+konu: "ag"
+etiketler: ["wifi", "roaming", "surucu", "tanilama"]
+belirtiler:
+  - "Bağlanıyor, bir süre sonra kopuyor"
+  - "Toplantı sırasında ses kesiliyor"
+  - "Dizüstü uykudan kalkınca bağlantı yok"
+  - "Aynı ofiste bazı masalarda oluyor"
+yayin: 2026-08-08
+sure: 6
+dosya: "/araclar/wifi-kalite-teshis.ps1"
+dosyaAdi: "wifi-kalite-teshis.ps1"
+dosyaAciklama: "Sinyali belirli bir süre örnekler, ortamdaki kanal kalabalığını çıkarır, sürücü ve güç yönetimi ayarını okur, WLAN olay günlüğünden son kopmaları saat dağılımıyla listeler."
+komut: "netsh wlan show interfaces"
+platform: "windows"
+ilgiliRehberler: []
+sira: 10
+---
+
+"Wi-Fi kopuyor" tek bir belirtidir, dört ayrı sebebi olabilir. Sürücü güncellemek bunlardan yalnızca birini çözer; diğer üçünde zaman kaybettirir.
+
+Ayırt etmenin yolu tek bir anlık ölçüm değil, **süre içinde örneklemek** ve olay günlüğüne bakmaktır.
+
+## 1. Zayıf sinyal mi, oynak sinyal mi?
+
+Tek bir `netsh wlan show interfaces` çıktısı yanıltır: kopmanın olduğu an ile ölçtüğünüz an aynı değildir.
+
+- **Sürekli %50 altı** → kapsama sorunu. Ayarla çözülmez; erişim noktası konumu ya da sayısı konuşulur.
+- **%75 ile %45 arasında gidip gelen** → cihaz erişim noktaları arasında geziniyor (roaming). Ofiste "bazı masalarda oluyor" cümlesinin karşılığı budur.
+
+Betik varsayılan olarak 20 saniye örnekler; şüpheliyseniz `-Sure 60` verin.
+
+## 2. Kanal kalabalığı
+
+2.4 GHz bandında yalnızca **1, 6 ve 11** kanalları birbiriyle çakışmaz. Komşu ofislerin ağları araya girdiğinde bağlantı "kopuyor" gibi görünür; aslında paketler çarpışır ve gecikme yükselir.
+
+Ortam taramasında aynı kanalda üç ve üzeri ağ görüyorsanız kanal planı konuşulmalıdır. 5 GHz'e geçebilen cihazlar için en kalıcı çözüm 2.4 GHz'i tamamen bırakmaktır.
+
+## 3. Güç yönetimi — dizüstülerde en sık sebep
+
+Windows, pil tasarrufu için kablosuz kartı uyutabilir. Uyanma gecikince uygulama bağlantıyı kopmuş sayar. Belirtinin "uykudan kalkınca" ve "toplantı ortasında" görünmesi bundandır.
+
+Aygıt Yöneticisi → ağ kartı → Güç Yönetimi sekmesindeki onay kutusu kapatılır. Betik bunu raporlar, `-GucAyari` ile kapatabilir.
+
+Kurumsal filoda bunu tek tek yapmayın: grup ilkesi ya da Intune yapılandırma profili ile dağıtın.
+
+## 4. Sürücü ve kimlik doğrulama
+
+Sürücü tarihi üç yıldan eskiyse üretici sitesinden güncelleyin — Windows Update'in verdiği sürücü çoğu zaman en güncel olan değildir.
+
+Olay günlüğünde **11004 (kimlik doğrulama başarısız)** yoğunsa sorun kablosuz katmanda değildir: 802.1X, sertifika süresi ya da RADIUS tarafındadır. O durumda kanal ve sinyalle uğraşmak sonuç vermez.
+
+## Kopma saatleri neyi söyler
+
+Betik kopmaları saat dağılımına göre gruplar. Belirli bir saatte yoğunlaşma varsa sebep ortam değildir:
+
+- Her gün aynı saatte → zamanlanmış bir iş, yedekleme ya da ilke yenilemesi
+- Mesai başlangıcı ve öğle arası → aynı anda bağlanan cihaz sayısı; erişim noktası kapasitesi
+- Dağınık → sürücü ya da güç yönetimi
+
+## Doğrulama
+
+Değişikliği yaptıktan sonra aynı betiği **aynı masada** ve aynı uzunlukta tekrar çalıştırın. Bakılacak iki sayı var: sinyal oynamasının puan farkı ve son üç gündeki 8003 olay sayısı.
+
+İkisi de düşmediyse doğru sebebi bulmamışsınızdır — ayarı geri alın ve sıradaki maddeye geçin. Üst üste yapılan ve etkisi ölçülmeyen değişiklikler, sonraki teşhisi imkânsız hâle getirir.

@@ -1,0 +1,254 @@
+---
+import Base from '../../layouts/Base.astro';
+
+// Şablondaki öznitelik değerleri JS dizesi olarak derleniyor: "D:\Veri" içindeki
+// \V bir kaçış dizisi sanılıp yutuluyor. Yolları burada tanımlayıp bağlıyoruz.
+const ornekKaynak = 'D:\\Veri';
+const ornekHedef = '\\\\yedek01\\arsiv$\\Veri';
+const ipucuHedef = '\\\\sunucu\\pay\\Veri';
+---
+
+<Base
+  baslik="Robocopy komut üreteci"
+  aciklama="Kaynak, hedef ve senaryoyu seçin; robocopy komutunu güvenli varsayılanlarla üretsin. Her anahtarın ne yaptığı ve /MIR'in ne sildiği açıkça yazılır."
+  aramaya={false}
+>
+  <div class="arama-bas">
+    <div class="kap">
+      <nav class="kirinti" aria-label="Kırıntı yolu" style="padding-top:0">
+        <a href="/">Ana sayfa</a><span class="ayrac">/</span><a href="/araclar">Araçlar</a><span
+          class="ayrac">/</span
+        ><span aria-current="page">Robocopy üreteci</span>
+      </nav>
+      <h1>Robocopy komut üreteci</h1>
+      <p style="color:var(--muted);font-size:14px;margin-top:8px;max-width:64ch">
+        Robocopy'nin gücü anahtarlarında, riski de. Bu araç komutu kurar ve her anahtarın ne yaptığını
+        yanına yazar — kopyalayıp çalıştırmadan önce okuyun.
+      </p>
+    </div>
+  </div>
+
+  <div class="kap arac-sayfa">
+    <section class="arac-blok">
+      <h2 class="arac-h2"><span class="arac-no">1</span> Kaynak ve hedef</h2>
+      <div class="arac-alanlar">
+        <label class="arac-alan"
+          >Kaynak
+          <input id="r-kaynak" type="text" spellcheck="false" value={ornekKaynak} placeholder={ornekKaynak} />
+        </label>
+        <label class="arac-alan"
+          >Hedef
+          <input id="r-hedef" type="text" spellcheck="false" value={ornekHedef} placeholder={ipucuHedef} />
+        </label>
+      </div>
+    </section>
+
+    <section class="arac-blok">
+      <h2 class="arac-h2"><span class="arac-no">2</span> Senaryo</h2>
+      <div class="arac-onaylar" role="radiogroup" aria-label="Senaryo">
+        <label class="arac-onay"
+          ><input type="radio" name="r-mod" value="kopyala" checked /> <span>Kopyala (hedefte silme yapma)</span></label
+        >
+        <label class="arac-onay"
+          ><input type="radio" name="r-mod" value="ayna" /> <span>Ayna / <code>/MIR</code></span></label
+        >
+        <label class="arac-onay"
+          ><input type="radio" name="r-mod" value="tasima" /> <span>Taşı (kaynaktan sil)</span></label
+        >
+      </div>
+
+      <div class="arac-onaylar" style="margin-top:16px">
+        <label class="arac-onay"><input type="checkbox" id="r-deneme" checked /> <span>Önce deneme çalıştırması (/L)</span></label>
+        <label class="arac-onay"><input type="checkbox" id="r-izin" /> <span>NTFS izinlerini de taşı (/COPYALL)</span></label>
+        <label class="arac-onay"><input type="checkbox" id="r-yeniden" checked /> <span>Kesintiye dayanıklı (/Z)</span></label>
+        <label class="arac-onay"><input type="checkbox" id="r-fft" /> <span>Farklı dosya sistemi (/FFT)</span></label>
+        <label class="arac-onay"><input type="checkbox" id="r-gunluk" checked /> <span>Günlük dosyası yaz</span></label>
+        <label class="arac-onay"><input type="checkbox" id="r-eskiKoru" /> <span>Hedefteki daha yeni dosyayı ezme (/XO)</span></label>
+      </div>
+
+      <div class="arac-alanlar" style="margin-top:16px">
+        <label class="arac-alan"
+          >Eş zamanlı iş parçacığı (/MT)
+          <span class="arac-kaydirac">
+            <input id="r-mt" type="range" min="1" max="64" value="16" />
+            <output for="r-mt" id="r-mt-deger">16</output>
+          </span>
+        </label>
+        <label class="arac-alan"
+          >Yeniden deneme (/R)
+          <span class="arac-kaydirac">
+            <input id="r-r" type="range" min="0" max="10" value="2" />
+            <output for="r-r" id="r-r-deger">2</output>
+          </span>
+        </label>
+        <label class="arac-alan"
+          >Hariç tutulacak klasörler (virgülle)
+          <input id="r-xd" type="text" spellcheck="false" placeholder="Temp, Onbellek" />
+        </label>
+        <label class="arac-alan"
+          >Hariç tutulacak dosyalar (virgülle)
+          <input id="r-xf" type="text" spellcheck="false" placeholder="*.tmp, thumbs.db" />
+        </label>
+      </div>
+    </section>
+
+    <section class="arac-blok">
+      <h2 class="arac-h2"><span class="arac-no">3</span> Komut</h2>
+      <output class="arac-cikti" id="r-cikti" style="font-size:15px;line-height:1.7"></output>
+      <div class="arac-dugmeler">
+        <button type="button" class="dg" id="r-kopya">Kopyala</button>
+      </div>
+      <div id="r-uyari" style="margin-top:14px"></div>
+      <h3 style="font-size:15px;margin:20px 0 8px">Anahtarlar ne yapıyor</h3>
+      <table class="r-tablo" id="r-aciklama"></table>
+    </section>
+
+    <section class="arac-blok">
+      <h2 class="arac-h2"><span class="arac-no">4</span> Çıkış kodunu okumak</h2>
+      <div class="arac-kutu">
+        <p style="margin:0 0 10px">
+          Robocopy başarıda <b>0 değil</b> döndürür ve bu, zamanlanmış görevlerde "başarısız" sanılır.
+          Kodlar bit alanıdır:
+        </p>
+        <ul style="margin:0">
+          <li><code>0</code> — kopyalanacak bir şey yoktu, hedef zaten güncel</li>
+          <li><code>1</code> — dosya kopyalandı (başarı)</li>
+          <li><code>2</code> — hedefte fazladan dosya/klasör vardı</li>
+          <li><code>4</code> — uyumsuzluk var, incelemek gerekir</li>
+          <li><code>8 ve üstü</code> — <b>gerçek hata</b>; kopyalanamayan dosya var</li>
+        </ul>
+        <p style="margin:10px 0 0">
+          Zamanlanmış görevde başarı ölçütünüz <code>&lt; 8</code> olmalıdır. <code>0</code> bekleyen her
+          otomasyon, çalışan bir yedeği başarısız raporlar.
+        </p>
+      </div>
+    </section>
+  </div>
+
+  <script>
+    const el = (s) => document.querySelector(s);
+    const parcala = (m) => m.split(',').map((s) => s.trim()).filter(Boolean);
+    const tirnak = (y) => (y.includes(' ') ? `"${y}"` : y);
+
+    function uret() {
+      const mod = document.querySelector('input[name="r-mod"]:checked').value;
+      const kaynak = el('#r-kaynak').value.trim() || 'KAYNAK';
+      const hedef = el('#r-hedef').value.trim() || 'HEDEF';
+      const mt = +el('#r-mt').value;
+      const r = +el('#r-r').value;
+
+      const anahtarlar = [];
+      const aciklama = [];
+
+      const ekle = (anahtar, ne) => {
+        anahtarlar.push(anahtar);
+        aciklama.push([anahtar, ne]);
+      };
+
+      if (mod === 'ayna') ekle('/MIR', 'Hedefi kaynağın aynası yapar — kaynakta olmayan dosyaları HEDEFTEN SİLER');
+      else if (mod === 'tasima') ekle('/MOVE', 'Kopyalama başarılıysa dosyaları kaynaktan siler');
+      else ekle('/E', 'Alt klasörleri, boş olanlar dahil kopyalar; hedefte silme yapmaz');
+
+      if (el('#r-izin').checked) ekle('/COPYALL', 'Veri, öznitelik, zaman damgası, NTFS izinleri, sahiplik ve denetim bilgisini kopyalar');
+      else ekle('/DCOPY:DAT', 'Klasörlerin de zaman damgalarını korur');
+
+      if (el('#r-yeniden').checked) ekle('/Z', 'Yeniden başlatılabilir kip: kesilen büyük dosya baştan değil kaldığı yerden devam eder');
+      if (el('#r-fft').checked) ekle('/FFT', 'İki saniyelik zaman toleransı — NAS ve Linux paylaşımlarında gereksiz kopyalamayı önler');
+      if (el('#r-eskiKoru').checked) ekle('/XO', 'Hedefteki dosya daha yeniyse üzerine yazmaz');
+
+      ekle(`/MT:${mt}`, `${mt} iş parçacığıyla paralel kopyalar; çok sayıda küçük dosyada belirgin hızlanma sağlar`);
+      ekle(`/R:${r}`, `Hatalı dosyada ${r} kez yeniden dener (varsayılan 1.000.000 — kilitli tek dosya işi günlerce asar)`);
+      ekle('/W:5', 'Denemeler arasında 5 saniye bekler');
+
+      for (const d of parcala(el('#r-xd').value)) ekle(`/XD ${tirnak(d)}`, `"${d}" klasörünü hariç tutar`);
+      for (const f of parcala(el('#r-xf').value)) ekle(`/XF ${tirnak(f)}`, `"${f}" dosyalarını hariç tutar`);
+
+      if (el('#r-gunluk').checked) {
+        ekle('/LOG+:C:\\Temp\\robocopy.log', 'Çıktıyı günlük dosyasına ekler (üzerine yazmaz)');
+        ekle('/NP', 'Yüzde ilerlemesini yazmaz — günlük dosyasını okunur tutar');
+        ekle('/TEE', 'Hem ekrana hem günlüğe yazar');
+      }
+
+      if (el('#r-deneme').checked) {
+        ekle('/L', 'DENEME: hiçbir şey kopyalamaz, yalnızca ne yapacağını listeler');
+      }
+
+      const komut = `robocopy ${tirnak(kaynak)} ${tirnak(hedef)} ${anahtarlar.join(' ')}`;
+      el('#r-cikti').textContent = komut;
+
+      el('#r-aciklama').innerHTML = aciklama
+        .map(([a, n]) => `<tr><th>${a}</th><td>${n}</td></tr>`)
+        .join('');
+
+      /* uyarılar */
+      const uyarilar = [];
+      if (mod === 'ayna') {
+        uyarilar.push(
+          '<b>/MIR hedefte silme yapar.</b> Kaynak yanlış yazılmış ya da bağlanamamış bir yol ise ' +
+            'hedefteki her şey silinir. İlk çalıştırmayı mutlaka <code>/L</code> ile yapın.'
+        );
+      }
+      if (mod === 'tasima') {
+        uyarilar.push('<b>/MOVE kaynaktan siler.</b> Hedefin doğruluğunu doğrulamadan çalıştırmayın; geri alma yoktur.');
+      }
+      if (!el('#r-deneme').checked && (mod === 'ayna' || mod === 'tasima')) {
+        uyarilar.push('Deneme kipi kapalı ve silme yapan bir kip seçili — bu komut ilk çalıştırmada veri siler.');
+      }
+      if (el('#r-izin').checked && el('#r-hedef').value.startsWith('\\\\')) {
+        uyarilar.push('/COPYALL için hedefte sahiplik ve denetim yazma yetkisi gerekir; ağ paylaşımlarında çoğu hesapta bu yetki yoktur.');
+      }
+      if (mt > 32) {
+        uyarilar.push(`/MT:${mt} çoğu ortamda faydadan çok yük üretir; ağ ya da disk doyduğunda hız düşer.`);
+      }
+
+      el('#r-uyari').innerHTML = uyarilar.length
+        ? `<div class="arac-kutu ${mod === 'kopyala' ? 'uyari' : 'kotu'}"><h3>Çalıştırmadan önce</h3><ul style="margin:0">${uyarilar
+            .map((u) => `<li>${u}</li>`)
+            .join('')}</ul></div>`
+        : '<div class="arac-kutu iyi">Bu komut hedefte silme yapmaz.</div>';
+    }
+
+    document
+      .querySelectorAll('#r-kaynak, #r-hedef, #r-deneme, #r-izin, #r-yeniden, #r-fft, #r-gunluk, #r-eskiKoru, #r-xd, #r-xf')
+      .forEach((d) => d.addEventListener('input', uret));
+    document.querySelectorAll('input[name="r-mod"]').forEach((d) => d.addEventListener('change', uret));
+    for (const [k, g] of [['#r-mt', '#r-mt-deger'], ['#r-r', '#r-r-deger']]) {
+      el(k).addEventListener('input', () => {
+        el(g).textContent = el(k).value;
+        uret();
+      });
+    }
+
+    el('#r-kopya').addEventListener('click', async (e) => {
+      try {
+        await navigator.clipboard.writeText(el('#r-cikti').textContent);
+        e.currentTarget.textContent = 'Kopyalandı';
+      } catch {
+        e.currentTarget.textContent = 'Kopyalanamadı';
+      }
+      setTimeout(() => (e.currentTarget.textContent = 'Kopyala'), 1600);
+    });
+
+    uret();
+  </script>
+
+  <style>
+    .r-tablo {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 13.5px;
+    }
+    .r-tablo :is(th, td) {
+      text-align: left;
+      padding: 8px 10px;
+      border-bottom: 1px solid var(--line);
+      vertical-align: top;
+    }
+    .r-tablo th {
+      font-family: var(--mono);
+      font-weight: 700;
+      white-space: nowrap;
+      color: var(--indigo-d);
+    }
+  </style>
+</Base>
