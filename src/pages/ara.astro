@@ -1,16 +1,18 @@
 ---
 import Base from '../layouts/Base.astro';
 import { POPULER_ARAMALAR } from '../site.js';
+
+// Sonuçların gruplanma sırası: önce uzun içerik, sonra tek satırlık kayıtlar,
+// en sonda araçlar ve site sayfaları.
+const KATEGORILER = ['Rehber', 'Hızlı Çözüm', 'İpucu', 'Komut', 'Araç', 'Portfolyo', 'Sayfa'];
 ---
 
 <Base
   baslik="Ara"
-  aciklama="Rehberler, hızlı ipuçları ve projeler içinde arama yapın."
+  aciklama="Rehberler, hızlı çözümler, ipuçları, komutlar, araçlar ve proje sayfaları içinde arama yapın. Sonuçlar kategorilere ayrılarak gösterilir."
   noindex={true}
   aramaya={false}
 >
-  <link rel="stylesheet" href="/pagefind/pagefind-ui.css" />
-
   <div class="arama-bas">
     <div class="kap">
       <nav class="kirinti" aria-label="Kırıntı yolu" style="padding-top:0">
@@ -18,13 +20,31 @@ import { POPULER_ARAMALAR } from '../site.js';
       </nav>
       <h1>Arama</h1>
       <p style="color:var(--muted);font-size:14px;margin-top:8px">
-        Rehberler, hızlı ipuçları ve proje sayfaları taranır.
+        Sitedeki tüm içerik taranır: rehberler, hızlı çözümler, ipuçları, komut kütüphanesi, araçlar,
+        portfolyo ve site sayfaları. Sonuçlar kategorisine göre ayrılır.
       </p>
     </div>
   </div>
 
   <div class="kap">
-    <div id="arama" style="padding-top:24px"></div>
+    <form class="ara-form" id="ara-form" role="search">
+      <input
+        id="ara-girdi"
+        type="search"
+        name="q"
+        autocomplete="off"
+        spellcheck="false"
+        placeholder="Sitede ara: robocopy, hesap kilitleniyor, DMARC…"
+        aria-label="Sitede ara"
+      />
+      <button type="submit" class="dg">Ara</button>
+    </form>
+
+    <p class="ara-durum" id="ara-durum" role="status" aria-live="polite"></p>
+
+    <div class="ara-cipler" id="ara-cipler" hidden></div>
+
+    <div id="ara-sonuc"></div>
 
     <div class="bulunamadi">
       <div>
@@ -42,42 +62,382 @@ import { POPULER_ARAMALAR } from '../site.js';
     </section>
   </div>
 
-  <script is:inline src="/pagefind/pagefind-ui.js"></script>
-  <script is:inline>
-    window.addEventListener('DOMContentLoaded', () => {
-      if (typeof PagefindUI === 'undefined') {
-        document.getElementById('arama').innerHTML =
-          '<p style="color:var(--muted);font-size:14px">Arama dizini yalnızca üretim derlemesinde oluşur. ' +
-          '<code>npm run build &amp;&amp; npm run preview</code> ile deneyin.</p>';
-        return;
+  <script define:vars={{ KATEGORILER }}>
+    (() => {
+      const el = (s) => document.querySelector(s);
+      const girdi = el('#ara-girdi');
+      const durum = el('#ara-durum');
+      const cipKap = el('#ara-cipler');
+      const kap = el('#ara-sonuc');
+
+      const EN_COK = 100; // veri yüklenecek sonuç sayısı
+      const ILK_GOSTERIM = 5; // kategori başına ilk açılışta görünen sonuç
+
+      let pagefind = null;
+      let seciliKategori = 'hepsi';
+      let sonGruplar = new Map();
+
+      const kacir = (m) =>
+        String(m).replace(/[<>&"]/g, (c) => ({ '<': '&lt;', '>': '&gt;', '&': '&amp;', '"': '&quot;' })[c]);
+
+      /**
+       * Pagefind adresleri dosya yolundan üretiyor ve sonuna eğik çizgi koyuyor;
+       * site ise eğik çizgisiz çalışıyor. Düzeltmezsek her sonuç tıklaması bir
+       * yönlendirmeye takılır.
+       */
+      const adresDuzelt = (u) => (u === '/' ? '/' : u.replace(/\/(?=#|$)/, ''));
+
+      /** /rehberler/win-bitlocker → "rehberler / win-bitlocker" */
+      const yolMetni = (adres) =>
+        decodeURIComponent(adres)
+          .replace(/^\/|\/$/g, '')
+          .replace(/\/index\.html$/, '')
+          .split('/')
+          .filter(Boolean)
+          .join(' / ') || 'ana sayfa';
+
+      async function pagefindYukle() {
+        if (pagefind) return pagefind;
+        // Vite'ın derleme sırasında çözmeye çalışmaması için değişken üzerinden:
+        // dosya yalnızca üretim derlemesinde, pagefind çalıştıktan sonra var olur.
+        const yol = '/pagefind/pagefind.js';
+        pagefind = await import(/* @vite-ignore */ yol);
+        await pagefind.options({ excerptLength: 24 });
+        return pagefind;
       }
-      new PagefindUI({
-        element: '#arama',
-        showSubResults: true,
-        showImages: false,
-        translations: {
-          placeholder: 'Rehberlerde ara…',
-          clear_search: 'Temizle',
-          load_more: 'Daha fazla sonuç',
-          search_label: 'Bu sitede ara',
-          filters_label: 'Süzgeçler',
-          zero_results: '[SEARCH_TERM] için sonuç bulunamadı',
-          many_results: '[SEARCH_TERM] için [COUNT] sonuç',
-          one_result: '[SEARCH_TERM] için [COUNT] sonuç',
-          alt_search: '[SEARCH_TERM] için sonuç yok. Bunun yerine [DIFFERENT_TERM] gösteriliyor',
-          search_suggestion: '[SEARCH_TERM] için sonuç yok. Şunları deneyin:',
-          searching: '[SEARCH_TERM] aranıyor…',
-        },
+
+      function bosluk(mesaj, sinif = '') {
+        kap.innerHTML = '';
+        cipKap.hidden = true;
+        durum.className = 'ara-durum ' + sinif;
+        durum.textContent = mesaj;
+      }
+
+      function ciz() {
+        const toplam = [...sonGruplar.values()].reduce((t, d) => t + d.length, 0);
+
+        /* kategori çipleri */
+        cipKap.hidden = false;
+        cipKap.innerHTML =
+          `<button type="button" class="ara-cip" data-k="hepsi" aria-pressed="${seciliKategori === 'hepsi'}">
+             Tümü <span>${toplam}</span></button>` +
+          KATEGORILER.filter((k) => sonGruplar.has(k))
+            .map(
+              (k) =>
+                `<button type="button" class="ara-cip" data-k="${kacir(k)}" aria-pressed="${seciliKategori === k}">
+                   ${kacir(k)} <span>${sonGruplar.get(k).length}</span></button>`
+            )
+            .join('');
+
+        cipKap.querySelectorAll('.ara-cip').forEach((b) =>
+          b.addEventListener('click', () => {
+            seciliKategori = b.dataset.k;
+            ciz();
+          })
+        );
+
+        /* kategori bölümleri */
+        const gosterilecek = KATEGORILER.filter(
+          (k) => sonGruplar.has(k) && (seciliKategori === 'hepsi' || seciliKategori === k)
+        );
+
+        kap.innerHTML = gosterilecek
+          .map((k) => {
+            const kayitlar = sonGruplar.get(k);
+            const acik = seciliKategori === k ? kayitlar.length : ILK_GOSTERIM;
+            return `
+              <section class="ara-grup" data-kategori="${kacir(k)}">
+                <h2>${kacir(k)} <span class="ara-sayi">${kayitlar.length}</span></h2>
+                <ol class="ara-liste">
+                  ${kayitlar
+                    .map(
+                      (s, i) => `
+                    <li class="ara-kayit"${i >= acik ? ' hidden data-fazla' : ''}>
+                      <a class="ara-baslik" href="${s.url}">${kacir(s.baslik)}</a>
+                      <span class="ara-yol">${kacir(yolMetni(s.url))}</span>
+                      <p class="ara-ozet">${s.ozet}</p>
+                      ${
+                        s.altlar.length
+                          ? `<ul class="ara-alt">${s.altlar
+                              .map(
+                                (a) =>
+                                  `<li><a href="${a.url}">${kacir(a.baslik)}</a><span>${a.ozet}</span></li>`
+                              )
+                              .join('')}</ul>`
+                          : ''
+                      }
+                    </li>`
+                    )
+                    .join('')}
+                </ol>
+                ${
+                  kayitlar.length > acik
+                    ? `<button type="button" class="ara-daha" data-k="${kacir(k)}">
+                         ${kayitlar.length - acik} sonuç daha göster</button>`
+                    : ''
+                }
+              </section>`;
+          })
+          .join('');
+
+        kap.querySelectorAll('.ara-daha').forEach((b) =>
+          b.addEventListener('click', () => {
+            const bolum = b.closest('.ara-grup');
+            bolum.querySelectorAll('[data-fazla]').forEach((li) => {
+              li.hidden = false;
+              li.removeAttribute('data-fazla');
+            });
+            b.remove();
+          })
+        );
+      }
+
+      let sonIstek = 0;
+      async function ara(sorgu) {
+        const istek = ++sonIstek;
+        if (!sorgu.trim()) {
+          bosluk('');
+          return;
+        }
+
+        durum.className = 'ara-durum';
+        durum.textContent = `"${sorgu}" aranıyor…`;
+
+        let pf;
+        try {
+          pf = await pagefindYukle();
+        } catch {
+          bosluk(
+            'Arama dizini yalnızca üretim derlemesinde oluşur. Yerelde denemek için: npm run build',
+            'hata'
+          );
+          return;
+        }
+
+        const cevap = await pf.search(sorgu);
+        if (istek !== sonIstek) return; // daha yeni bir arama başladı
+
+        const veriler = await Promise.all(cevap.results.slice(0, EN_COK).map((r) => r.data()));
+        if (istek !== sonIstek) return;
+
+        const gruplar = new Map();
+        for (const v of veriler) {
+          const kategori = v.meta?.kategori ?? 'Sayfa';
+          if (!gruplar.has(kategori)) gruplar.set(kategori, []);
+          gruplar.get(kategori).push({
+            url: adresDuzelt(v.url),
+            baslik: v.meta?.title ?? yolMetni(v.url),
+            ozet: v.excerpt,
+            // Alt sonuçlar tek sayfada çok kayıt tutan bölümlerde işe yarıyor:
+            // ipucu ve komut listesinde doğrudan ilgili kayda götürür.
+            altlar: (v.sub_results ?? [])
+              .filter((a) => a.url !== v.url)
+              .slice(0, 3)
+              .map((a) => ({ url: adresDuzelt(a.url), baslik: a.title, ozet: a.excerpt })),
+          });
+        }
+
+        sonGruplar = gruplar;
+        seciliKategori = 'hepsi';
+
+        if (!veriler.length) {
+          bosluk(`"${sorgu}" için sonuç bulunamadı. Daha kısa bir sözcük deneyin.`, 'hata');
+          return;
+        }
+
+        const toplam = cevap.results.length;
+        durum.className = 'ara-durum ok';
+        durum.textContent =
+          `"${sorgu}" için ${toplam} sonuç · ${gruplar.size} kategori` +
+          (toplam > EN_COK ? ` (ilk ${EN_COK} tanesi gösteriliyor)` : '');
+        ciz();
+      }
+
+      /* --- olaylar ---------------------------------------------------------- */
+      let zamanlayici;
+      girdi.addEventListener('input', () => {
+        clearTimeout(zamanlayici);
+        zamanlayici = setTimeout(() => {
+          const q = girdi.value.trim();
+          const adres = new URL(location.href);
+          if (q) adres.searchParams.set('q', q);
+          else adres.searchParams.delete('q');
+          history.replaceState(null, '', adres);
+          ara(q);
+        }, 220);
       });
 
-      const q = new URLSearchParams(location.search).get('q');
-      if (q) {
-        const girdi = document.querySelector('#arama input');
-        if (girdi) {
-          girdi.value = q;
-          girdi.dispatchEvent(new Event('input', { bubbles: true }));
-        }
+      el('#ara-form').addEventListener('submit', (e) => {
+        e.preventDefault();
+        clearTimeout(zamanlayici);
+        ara(girdi.value.trim());
+      });
+
+      const baslangic = new URLSearchParams(location.search).get('q');
+      if (baslangic) {
+        girdi.value = baslangic;
+        ara(baslangic);
       }
-    });
+      girdi.focus();
+    })();
   </script>
+
+  <style>
+    .ara-form {
+      display: flex;
+      gap: 10px;
+      flex-wrap: wrap;
+      padding-top: 24px;
+    }
+    .ara-form input {
+      flex: 1 1 280px;
+      min-width: 0;
+      padding: 13px 15px;
+      font: inherit;
+      font-size: 16px;
+      border: 1px solid var(--line);
+      border-radius: var(--r-s);
+      background: var(--paper);
+    }
+    .ara-form input:focus-visible {
+      outline: 2px solid var(--indigo);
+      outline-offset: 1px;
+    }
+    .ara-durum {
+      font-size: 13.5px;
+      color: var(--muted);
+      margin: 14px 0 0;
+      min-height: 1.2em;
+    }
+    .ara-durum.ok {
+      color: var(--ink-soft);
+    }
+    .ara-durum.hata {
+      color: var(--clay-ink);
+    }
+
+    .ara-cipler {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      margin-top: 14px;
+    }
+    .ara-cip {
+      display: inline-flex;
+      align-items: center;
+      gap: 7px;
+      font: inherit;
+      font-size: 13px;
+      font-weight: 700;
+      padding: 6px 13px;
+      border-radius: 999px;
+      border: 1px solid var(--line);
+      background: var(--paper);
+      color: var(--ink-soft);
+      cursor: pointer;
+    }
+    .ara-cip span {
+      font-family: var(--mono);
+      font-size: 11.5px;
+      color: var(--muted);
+    }
+    .ara-cip[aria-pressed='true'] {
+      border-color: var(--indigo);
+      background: var(--tint);
+      color: var(--indigo-d);
+    }
+    .ara-cip[aria-pressed='true'] span {
+      color: var(--indigo-d);
+    }
+
+    .ara-grup {
+      margin-top: 30px;
+    }
+    .ara-grup h2 {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      font-size: 17px;
+      padding-bottom: 10px;
+      border-bottom: 2px solid var(--line);
+    }
+    .ara-sayi {
+      font-family: var(--mono);
+      font-size: 12px;
+      font-weight: 700;
+      color: var(--indigo-d);
+      background: var(--tint);
+      border-radius: 999px;
+      padding: 2px 9px;
+    }
+    .ara-liste {
+      list-style: none;
+      margin: 0;
+      padding: 0;
+    }
+    .ara-kayit {
+      padding: 16px 0;
+      border-bottom: 1px solid var(--line);
+    }
+    .ara-baslik {
+      font-size: 16.5px;
+      font-weight: 800;
+      color: var(--indigo-d);
+      text-decoration: none;
+    }
+    .ara-baslik:hover {
+      text-decoration: underline;
+    }
+    .ara-yol {
+      display: block;
+      font-family: var(--mono);
+      font-size: 11.5px;
+      color: var(--muted);
+      margin-top: 3px;
+    }
+    .ara-ozet {
+      font-size: 14px;
+      line-height: 1.6;
+      color: var(--ink-soft);
+      margin: 8px 0 0;
+    }
+    .ara-ozet mark,
+    .ara-alt mark {
+      background: color-mix(in srgb, var(--amber) 34%, transparent);
+      color: inherit;
+      border-radius: 3px;
+      padding: 0 2px;
+    }
+    .ara-alt {
+      list-style: none;
+      margin: 10px 0 0;
+      padding: 0 0 0 14px;
+      border-left: 2px solid var(--line);
+      display: grid;
+      gap: 6px;
+    }
+    .ara-alt a {
+      font-size: 14px;
+      font-weight: 700;
+      color: var(--ink);
+    }
+    .ara-alt span {
+      display: block;
+      font-size: 13px;
+      color: var(--muted);
+      line-height: 1.5;
+    }
+    .ara-daha {
+      font: inherit;
+      font-size: 13px;
+      font-weight: 700;
+      margin-top: 14px;
+      padding: 8px 14px;
+      border-radius: var(--r-s);
+      border: 1px solid var(--indigo);
+      background: var(--paper);
+      color: var(--indigo-d);
+      cursor: pointer;
+    }
+  </style>
 </Base>

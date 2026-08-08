@@ -30,6 +30,7 @@ const { hepsi, dilim, simdiki, toplamSayfa } = Astro.props;
 ---
 
 <Base
+  aramaya={false}
   baslik={`Tüm rehberler — sayfa ${simdiki}`}
   aciklama={`Rehber arşivinin ${simdiki}. sayfası. Toplam ${hepsi.length} rehber.`}
   ogGorsel="/og/sayfa-rehberler.png"

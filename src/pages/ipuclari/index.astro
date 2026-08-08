@@ -12,6 +12,7 @@ const kullanilan = KONULAR.filter((k) => ipuclari.some((i) => i.data.konu === k.
 ---
 
 <Base
+  kategori="İpucu"
   baslik="Hızlı ipuçları"
   aciklama={`İlgi düzeyine göre sıralanmış ${ipuclari.length} teknik ipucu. Tek ekranda biten, kopyala-çalıştır notlar.`}
   ogGorsel="/og/sayfa-ipuclari.png"
@@ -79,7 +80,7 @@ const kullanilan = KONULAR.filter((k) => ipuclari.some((i) => i.data.konu === k.
         icerikler.map(({ girdi, Content }, n) => (
           <article
             class="ipucu-kart"
-            id={girdi.id}
+            data-ipucu={girdi.id}
             data-konu={girdi.data.konu}
             data-ara={`${girdi.data.baslik} ${girdi.data.ozet} ${girdi.data.etiketler.join(' ')}`.toLocaleLowerCase('tr')}
           >
@@ -93,7 +94,9 @@ const kullanilan = KONULAR.filter((k) => ipuclari.some((i) => i.data.konu === k.
                 </a>
                 <span class="ipucu-tarih">{trTarih(girdi.data.yayin)}</span>
               </span>
-              <h2>
+              {/* Bağlantı hedefi başlıkta: /ipuclari#<id> adresleri çalışmaya devam
+                  ediyor, ayrıca site içi arama bu başlığı alt sonuç olarak veriyor. */}
+              <h2 id={girdi.id}>
                 <a href={`#${girdi.id}`}>{girdi.data.baslik}</a>
               </h2>
               <p class="ipucu-ozet">{girdi.data.ozet}</p>

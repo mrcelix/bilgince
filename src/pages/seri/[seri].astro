@@ -28,6 +28,7 @@ const planlanan = Math.max(...bolumler.map((b) => b.data.seriSira ?? 0), bolumle
 ---
 
 <Base
+  aramaya={false}
   baslik={ad}
   aciklama={`${ad} serisi: ${bolumler.length} bölüm yayında. Sırayla okunmak üzere yazıldı.`}
   ogGorsel={`/og/seri-${slug}.png`}

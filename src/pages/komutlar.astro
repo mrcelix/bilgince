@@ -11,6 +11,7 @@ const kullanilan = KONULAR.filter((k) => komutlar.some((c) => c.data.konu === k.
 ---
 
 <Base
+  kategori="Komut"
   baslik="Komut kütüphanesi"
   aciklama={`${komutlar.length} denenmiş PowerShell ve komut satırı tek satırı. Her birinin ne yaptığı ve nerede patlayabileceği yazıyor.`}
   ogGorsel="/og/sayfa-komutlar.png"
@@ -84,7 +85,9 @@ const kullanilan = KONULAR.filter((k) => komutlar.some((c) => c.data.konu === k.
               </span>
             </span>
 
-            <h2 style="font-size:19px;font-weight:900;letter-spacing:-.03em;line-height:1.22">
+            {/* id başlıkta: site içi arama komutu doğrudan alt sonuç olarak
+                gösterip /komutlar#<id> adresine bağlayabiliyor. */}
+            <h2 id={c.id} style="font-size:19px;font-weight:900;letter-spacing:-.03em;line-height:1.22">
               {c.data.baslik}
             </h2>
             <p style="font-size:14px;color:var(--muted);line-height:1.6">{c.data.ozet}</p>

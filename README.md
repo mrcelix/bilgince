@@ -16,6 +16,11 @@ npm run baglanti-kontrol   # dist/ içindeki kırık iç bağlantıları listele
 Arama (Pagefind) yalnızca `npm run build` sonrası çalışır; `npm run dev` sırasında `/ara`
 sayfası bunu belirten bir not gösterir.
 
+`/ara` sonuçları **kategoriye göre gruplar**: Rehber, Hızlı Çözüm, İpucu, Komut, Araç,
+Portfolyo, Sayfa. Kategori `Base.astro`'ya geçilen `kategori` özelliğinden gelir ve
+Pagefind'e hem süzgeç hem meta olarak yazılır. Arşiv, konu, etiket ve sayfalama sayfaları
+`aramaya={false}` ile dizinin dışında tutulur — içerikleri zaten kaynak sayfalarda geçiyor.
+
 ## Sayfa haritası
 
 | Adres | Dosya | Ne yapar |

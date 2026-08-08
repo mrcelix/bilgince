@@ -14,6 +14,11 @@ interface Props {
   noindex?: boolean;
   /** false ise sayfa site içi aramaya (Pagefind) girmez */
   aramaya?: boolean;
+  /**
+   * Arama sonuçlarının gruplandığı başlık: Rehber, Hızlı Çözüm, İpucu, Komut,
+   * Araç, Portfolyo, Sayfa. Hem süzgeç hem de sonuç etiketi olarak kullanılır.
+   */
+  kategori?: string;
 }
 
 const {
@@ -24,6 +29,7 @@ const {
   jsonLd,
   noindex = false,
   aramaya = true,
+  kategori = 'Sayfa',
 } = Astro.props;
 
 const kanonik = new URL(Astro.url.pathname.replace(/\/$/, '') || '/', Astro.site).href;
@@ -81,7 +87,12 @@ const semalar = [temelSema, ...(Array.isArray(jsonLd) ? jsonLd : jsonLd ? [jsonL
   <body>
     <a class="atla" href="#icerik">İçeriğe geç</a>
     <Header />
-    <main id="icerik" data-pagefind-body={aramaya ? '' : undefined}>
+    <main
+      id="icerik"
+      data-pagefind-body={aramaya ? '' : undefined}
+      data-pagefind-filter={aramaya ? `kategori:${kategori}` : undefined}
+      data-pagefind-meta={aramaya ? `kategori:${kategori}` : undefined}
+    >
       <slot />
     </main>
     <Footer />
