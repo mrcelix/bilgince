@@ -1,0 +1,325 @@
+---
+/**
+ * Yorum bölümü. Sayfalar statik üretildiği için yorumlar istemci tarafında
+ * /api/yorum ucundan yükleniyor; gönderim önce onaya düşüyor.
+ *
+ * Depo (KV) yapılandırılmamışsa bölüm hiç görünmez — yarım çalışan bir form
+ * göstermektense hiç göstermemek doğru.
+ */
+import { kvKurulu } from '../admin/kv';
+
+interface Props {
+  /** Yorumların bağlanacağı sayfa yolu; verilmezse geçerli adres kullanılır. */
+  yol?: string;
+}
+
+const { yol = Astro.url.pathname.replace(/\/$/, '') || '/' } = Astro.props;
+const acik = kvKurulu();
+---
+
+{
+  acik && (
+    <section class="yorumlar" id="yorumlar" data-yol={yol}>
+      <div class="yorum-bas">
+        <h2>Yorumlar</h2>
+        <span id="y-sayac" />
+      </div>
+
+      <div id="y-liste" class="y-liste">
+        <p class="y-bos">Yorumlar yükleniyor…</p>
+      </div>
+
+      <form id="y-form" class="y-form">
+        <h3>Yorum yazın</h3>
+        <p class="y-not">
+          Yorumlar yayımlanmadan önce okunur. Soru sorduysanız yanıtı yorumunuzun altında
+          görürsünüz.
+        </p>
+
+        <div class="y-ikili">
+          <label>
+            Adınız
+            <input type="text" id="y-ad" name="ad" maxlength="40" required autocomplete="name" />
+          </label>
+          <label>
+            E-posta <span>(isteğe bağlı, yayımlanmaz)</span>
+            <input type="email" id="y-eposta" name="eposta" maxlength="80" autocomplete="email" />
+          </label>
+        </div>
+
+        <label>
+          Yorumunuz
+          <textarea id="y-metin" name="metin" rows="5" maxlength="2000" required />
+        </label>
+
+        {/* Tuzak alan: insanlar görmez, botlar doldurur */}
+        <div class="y-tuzak" aria-hidden="true">
+          <label>
+            Bu alanı boş bırakın
+            <input type="text" id="y-tuzak" name="website" tabindex="-1" autocomplete="off" />
+          </label>
+        </div>
+
+        <div class="y-alt">
+          <button type="submit" class="dg" id="y-gonder">Gönder</button>
+          <span class="y-durum" id="y-durum" role="status" aria-live="polite" />
+        </div>
+
+        <p class="y-gizlilik">
+          Adınız ve yorumunuz yayımlanır. E-posta adresiniz yalnızca size dönüş yapmak için
+          saklanır, sitede gösterilmez ve kimseyle paylaşılmaz. Spam denetimi için IP adresinizin
+          tuzlanmış özeti tutulur; IP'nin kendisi saklanmaz.
+        </p>
+      </form>
+    </section>
+  )
+}
+
+<script>
+  (() => {
+    const bolum = document.getElementById('yorumlar');
+    if (!bolum) return;
+
+    const el = (s) => document.querySelector(s);
+    const yol = bolum.dataset.yol;
+    const acilis = Date.now();
+
+    const kacir = (m) =>
+      String(m).replace(/[<>&"]/g, (c) => ({ '<': '&lt;', '>': '&gt;', '&': '&amp;', '"': '&quot;' })[c]);
+
+    const tarihBicim = new Intl.DateTimeFormat('tr-TR', { day: 'numeric', month: 'long', year: 'numeric' });
+
+    function ciz(yorumlar) {
+      const liste = el('#y-liste');
+      el('#y-sayac').textContent = yorumlar.length ? `${yorumlar.length} yorum` : '';
+
+      if (!yorumlar.length) {
+        liste.innerHTML = '<p class="y-bos">Henüz yorum yok. İlk yorumu siz yazın.</p>';
+        return;
+      }
+
+      liste.innerHTML = yorumlar
+        .map(
+          (y) => `
+        <article class="y-kayit">
+          <div class="y-ust">
+            <b>${kacir(y.ad)}</b>
+            <time datetime="${kacir(y.tarih)}">${tarihBicim.format(new Date(y.tarih))}</time>
+          </div>
+          <p>${kacir(y.metin).replace(/\n/g, '<br>')}</p>
+          ${
+            y.yanit
+              ? `<div class="y-yanit">
+                   <div class="y-ust"><b>Yazarın yanıtı</b>
+                   <time datetime="${kacir(y.yanit.tarih)}">${tarihBicim.format(new Date(y.yanit.tarih))}</time></div>
+                   <p>${kacir(y.yanit.metin).replace(/\n/g, '<br>')}</p>
+                 </div>`
+              : ''
+          }
+        </article>`
+        )
+        .join('');
+    }
+
+    async function yukle() {
+      try {
+        const cevap = await fetch(`/api/yorum?yol=${encodeURIComponent(yol)}`);
+        const veri = await cevap.json();
+        if (!cevap.ok) throw new Error(veri.hata ?? 'Yorumlar alınamadı.');
+        ciz(veri.yorumlar ?? []);
+      } catch (hata) {
+        el('#y-liste').innerHTML = `<p class="y-bos">Yorumlar yüklenemedi: ${kacir(hata.message)}</p>`;
+      }
+    }
+
+    el('#y-form').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const durum = el('#y-durum');
+      const dugme = el('#y-gonder');
+
+      dugme.disabled = true;
+      durum.className = 'y-durum';
+      durum.textContent = 'Gönderiliyor…';
+
+      try {
+        const cevap = await fetch('/api/yorum', {
+          method: 'POST',
+          headers: { 'content-type': 'application/json' },
+          body: JSON.stringify({
+            yol,
+            ad: el('#y-ad').value,
+            eposta: el('#y-eposta').value,
+            metin: el('#y-metin').value,
+            tuzak: el('#y-tuzak').value,
+            acilis,
+          }),
+        });
+        const veri = await cevap.json();
+        if (!cevap.ok) throw new Error(veri.hata ?? 'Gönderilemedi.');
+
+        durum.className = 'y-durum ok';
+        durum.textContent = veri.mesaj ?? 'Yorumunuz alındı.';
+        el('#y-metin').value = '';
+      } catch (hata) {
+        durum.className = 'y-durum hata';
+        durum.textContent = hata.message;
+      } finally {
+        dugme.disabled = false;
+      }
+    });
+
+    yukle();
+  })();
+</script>
+
+<style>
+  .yorumlar {
+    max-width: 72ch;
+    margin: 46px auto 0;
+    padding-top: 30px;
+    border-top: 2px solid var(--line);
+  }
+  .yorum-bas {
+    display: flex;
+    align-items: baseline;
+    gap: 12px;
+    margin-bottom: 18px;
+  }
+  .yorum-bas h2 {
+    font-size: 20px;
+    margin: 0;
+  }
+  .yorum-bas span {
+    font-size: 13px;
+    color: var(--muted);
+    font-family: var(--mono);
+  }
+  .y-liste {
+    display: grid;
+    gap: 14px;
+  }
+  .y-bos {
+    font-size: 14px;
+    color: var(--muted);
+    margin: 0;
+  }
+  .y-kayit {
+    background: var(--paper);
+    border: 1px solid var(--line);
+    border-radius: var(--r-m);
+    padding: 15px 17px;
+  }
+  .y-ust {
+    display: flex;
+    align-items: baseline;
+    gap: 10px;
+    flex-wrap: wrap;
+    margin-bottom: 6px;
+  }
+  .y-ust b {
+    font-size: 14.5px;
+  }
+  .y-ust time {
+    font-size: 12px;
+    color: var(--muted);
+  }
+  .y-kayit p {
+    margin: 0;
+    font-size: 14.5px;
+    line-height: 1.65;
+    color: var(--ink-soft);
+  }
+  .y-yanit {
+    margin-top: 12px;
+    padding: 12px 14px;
+    border-left: 3px solid var(--indigo);
+    background: var(--tint);
+    border-radius: 0 var(--r-s) var(--r-s) 0;
+  }
+  .y-yanit b {
+    color: var(--indigo-d);
+    font-size: 13px;
+  }
+
+  .y-form {
+    margin-top: 26px;
+    background: var(--bg);
+    border: 1px solid var(--line);
+    border-radius: var(--r-m);
+    padding: 20px;
+  }
+  .y-form h3 {
+    margin: 0 0 6px;
+    font-size: 16px;
+  }
+  .y-not {
+    margin: 0 0 16px;
+    font-size: 13px;
+    color: var(--muted);
+  }
+  .y-form label {
+    display: grid;
+    gap: 5px;
+    font-size: 13px;
+    font-weight: 700;
+    color: var(--ink-soft);
+    margin-bottom: 14px;
+  }
+  .y-form label span {
+    font-weight: 400;
+    color: var(--muted);
+  }
+  .y-form :is(input, textarea) {
+    font: inherit;
+    font-weight: 400;
+    font-size: 14.5px;
+    padding: 10px 12px;
+    border: 1px solid var(--line);
+    border-radius: var(--r-s);
+    background: var(--paper);
+    resize: vertical;
+  }
+  .y-form :is(input, textarea):focus-visible {
+    outline: 2px solid var(--indigo);
+    outline-offset: 1px;
+  }
+  .y-ikili {
+    display: grid;
+    gap: 14px;
+  }
+  @media (min-width: 620px) {
+    .y-ikili {
+      grid-template-columns: 1fr 1fr;
+      gap: 14px 16px;
+    }
+  }
+  .y-tuzak {
+    position: absolute;
+    left: -9999px;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+  }
+  .y-alt {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    flex-wrap: wrap;
+  }
+  .y-durum {
+    font-size: 13px;
+    color: var(--muted);
+  }
+  .y-durum.ok {
+    color: var(--green-ink);
+  }
+  .y-durum.hata {
+    color: var(--clay-ink);
+  }
+  .y-gizlilik {
+    margin: 16px 0 0;
+    font-size: 12px;
+    line-height: 1.6;
+    color: var(--muted);
+  }
+</style>

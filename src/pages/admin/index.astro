@@ -4,6 +4,7 @@ import { getCollection } from 'astro:content';
 import { KOLEKSIYONLAR } from '../../admin/icerik';
 import { yerelMi, yazabilirMi } from '../../admin/depo';
 import { girisKurulu, yapilandirma } from '../../admin/oturum';
+import { kvKurulu } from '../../admin/kv';
 import { DERLEME } from '../../derleme.js';
 
 export const prerender = false;
@@ -40,6 +41,12 @@ const durumlar = [
     tamam: y.epostalar.length > 0,
     iyi: y.epostalar.join(', '),
     kotu: 'ADMIN_EPOSTALAR boş.',
+  },
+  {
+    ad: 'Yorumlar',
+    tamam: kvKurulu(),
+    iyi: 'Depo bağlı — yorumlar açık, yeni yorumlar onay bekliyor.',
+    kotu: 'KV deposu tanımlı değil: sitede yorum bölümü görünmez. KV_REST_API_URL ve KV_REST_API_TOKEN gerekir.',
   },
 ];
 ---
@@ -97,6 +104,7 @@ const durumlar = [
       <a class="y-dg" href="/admin/icerik/rehberler?yeni=1">Yeni rehber</a>
       <a class="y-dg ikincil" href="/admin/icerik/ipuclari?yeni=1">Yeni ipucu</a>
       <a class="y-dg ikincil" href="/admin/icerik/komutlar?yeni=1">Yeni komut</a>
+      <a class="y-dg ikincil" href="/admin/yorumlar">Yorumları yönet</a>
       <a class="y-dg ikincil" href="/admin/veri?dosya=src/data/menu.json">Menüyü düzenle</a>
       <a class="y-dg ikincil" href="/" target="_blank">Siteyi aç</a>
     </div>

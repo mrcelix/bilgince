@@ -106,6 +106,8 @@ Panel her kaydı bu jetonla commit'ler; commit mesajında düzenleyen e-posta ya
 | `GITHUB_JETON` | 2. adımdaki jeton |
 | `GITHUB_DEPO` | İsteğe bağlı, varsayılan `mrcelix/bilgince` |
 | `GITHUB_DAL` | İsteğe bağlı, varsayılan `main` |
+| `KV_REST_API_URL` | Yorumlar için; Upstash/Vercel KV bağlanınca kendiliğinden gelir |
+| `KV_REST_API_TOKEN` | Aynı |
 
 Oturum anahtarını üretmek için:
 
@@ -115,6 +117,33 @@ node -e "console.log(require('crypto').randomBytes(48).toString('base64url'))"
 
 Sonra yeniden dağıtın. `/admin` açıldığında gösterge panelindeki **Kurulum
 durumu** kutuları hangi parçanın eksik olduğunu söyler.
+
+### Yorumlar
+
+Yazı ve çözüm sayfalarının altındaki yorum bölümü. Yorumlar **onaydan sonra**
+yayımlanır; onay ve yanıt `/admin/yorumlar` ekranından yapılır.
+
+Depo olarak bir Upstash Redis (Vercel KV) veritabanı kullanılıyor — sitedeki tek
+çalışma zamanı verisi bu. Kurulumu:
+
+1. Vercel projesinde **Storage → Create Database → Upstash Redis** (ücretsiz katman yeterli).
+2. Veritabanını projeye bağlayın; Vercel `KV_REST_API_URL` ve `KV_REST_API_TOKEN`
+   değişkenlerini kendisi ekler. Upstash'i doğrudan kullanıyorsanız
+   `UPSTASH_REDIS_REST_URL` / `UPSTASH_REDIS_REST_TOKEN` adları da tanınır.
+3. Yeniden dağıtın.
+
+Değişkenler tanımlı değilken **yorum bölümü sitede hiç görünmez** — yarım çalışan
+bir form göstermek yerine bölüm tamamen gizlenir. Gösterge panelindeki "Yorumlar"
+kutusu durumu söyler.
+
+Spam ve kötüye kullanıma karşı: gizli tuzak alan, form açılışından itibaren en az
+üç saniye, on dakikada en fazla üç gönderim (IP'nin tuzlanmış özetine göre),
+en fazla iki bağlantı, uzunluk sınırları. Yorum metni HTML olarak değil **düz
+metin** olarak basılır.
+
+Saklanan veri: ad, yorum, tarih, sayfa yolu, isteğe bağlı e-posta (yalnızca
+panelde görünür, sitede asla) ve IP'nin tuzlanmış özeti. IP'nin kendisi
+saklanmaz.
 
 ### Güvenlik notları
 

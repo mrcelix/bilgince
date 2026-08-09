@@ -1,0 +1,223 @@
+---
+import Yonetim from '../../layouts/Yonetim.astro';
+import { kvKurulu } from '../../admin/kv';
+
+export const prerender = false;
+
+const kurulu = kvKurulu();
+---
+
+<Yonetim baslik="Yorumlar">
+  {
+    !kurulu && (
+      <section class="y-blok">
+        <h2>Yorum deposu yapılandırılmamış</h2>
+        <div class="y-kutu uyari">
+          Yorumların çalışması için bir Upstash Redis (Vercel KV) veritabanı bağlanmalı ve
+          <code>KV_REST_API_URL</code> ile <code>KV_REST_API_TOKEN</code> değişkenleri tanımlanmalı.
+          Kurulum adımları depodaki README dosyasında.
+        </div>
+        <p style="color:var(--muted);font-size:13.5px;margin:14px 0 0">
+          Depo bağlanana kadar site tarafında yorum bölümü hiç görünmez; yarım çalışan bir form
+          göstermek yerine bölüm tamamen gizlenir.
+        </p>
+      </section>
+    )
+  }
+
+  {
+    kurulu && (
+      <>
+        <section class="y-blok">
+          <div style="display:flex;align-items:center;gap:14px;flex-wrap:wrap">
+            <h2 style="margin:0;flex:1">
+              Onay bekleyenler <span id="m-bekleyenSayi" style="color:var(--muted);font-weight:400" />
+            </h2>
+            <button type="button" class="y-dg ikincil" id="m-yenile">Yenile</button>
+          </div>
+          <p class="y-durum" id="m-durum" style="margin-top:10px" role="status" aria-live="polite" />
+          <div id="m-bekleyen" style="margin-top:14px" />
+        </section>
+
+        <section class="y-blok">
+          <h2>Yayımlanmış yorumlar <span id="m-onayliSayi" style="color:var(--muted);font-weight:400" /></h2>
+          <div id="m-onayli" style="margin-top:14px" />
+        </section>
+      </>
+    )
+  }
+
+  <script>
+    (() => {
+      if (!document.getElementById('m-bekleyen')) return;
+      const el = (s) => document.querySelector(s);
+      const kacir = (m) =>
+        String(m).replace(/[<>&"]/g, (c) => ({ '<': '&lt;', '>': '&gt;', '&': '&amp;', '"': '&quot;' })[c]);
+
+      const bicim = new Intl.DateTimeFormat('tr-TR', {
+        day: 'numeric', month: 'long', year: 'numeric', hour: '2-digit', minute: '2-digit',
+      });
+
+      function kart(y, tur) {
+        const yanit = y.yanit
+          ? `<div class="m-yanit"><b>Yanıtınız:</b> ${kacir(y.yanit.metin)}</div>`
+          : '';
+        return `
+          <article class="m-kart" data-id="${kacir(y.id)}" data-yol="${kacir(y.yol ?? '')}">
+            <div class="m-ust">
+              <b>${kacir(y.ad)}</b>
+              ${y.eposta ? `<a href="mailto:${kacir(y.eposta)}">${kacir(y.eposta)}</a>` : '<span style="color:var(--muted)">e-posta yok</span>'}
+              <time>${bicim.format(new Date(y.tarih))}</time>
+              <a class="m-yol" href="${kacir(y.yol)}" target="_blank">${kacir(y.yol)}</a>
+            </div>
+            <p class="m-metin">${kacir(y.metin).replace(/\n/g, '<br>')}</p>
+            ${yanit}
+            <div class="m-islem">
+              ${
+                tur === 'bekleyen'
+                  ? `<button type="button" class="y-dg" data-islem="onayla">Onayla</button>
+                     <button type="button" class="y-dg tehlike" data-islem="reddet">Reddet</button>`
+                  : `<button type="button" class="y-dg ikincil" data-islem="yanitla">${y.yanit ? 'Yanıtı düzenle' : 'Yanıtla'}</button>
+                     <button type="button" class="y-dg tehlike" data-islem="sil">Sil</button>`
+              }
+            </div>
+          </article>`;
+      }
+
+      async function islem(govde) {
+        const cevap = await fetch('/api/admin/yorum', {
+          method: 'POST',
+          headers: { 'content-type': 'application/json' },
+          body: JSON.stringify(govde),
+        });
+        const sonuc = await cevap.json();
+        if (!cevap.ok) throw new Error(sonuc.hata ?? 'İşlem yapılamadı.');
+        return sonuc;
+      }
+
+      function baglantilariKur(kap, tur) {
+        kap.querySelectorAll('.m-kart').forEach((k) => {
+          k.querySelectorAll('button[data-islem]').forEach((b) =>
+            b.addEventListener('click', async () => {
+              const id = k.dataset.id;
+              const yol = k.dataset.yol;
+              const ne = b.dataset.islem;
+              const durum = el('#m-durum');
+
+              try {
+                if (ne === 'yanitla') {
+                  const mevcut = k.querySelector('.m-yanit')?.textContent?.replace('Yanıtınız: ', '') ?? '';
+                  const yanit = prompt('Yanıtınız (boş bırakırsanız yanıt kaldırılır):', mevcut);
+                  if (yanit === null) return;
+                  await islem({ islem: 'yanit', id, yol, yanit });
+                } else if (ne === 'sil') {
+                  if (!confirm('Bu yorum silinsin mi?')) return;
+                  await islem({ islem: 'sil', id, yol });
+                } else if (ne === 'reddet') {
+                  if (!confirm('Bu yorum reddedilsin mi? Kayıt tamamen silinir.')) return;
+                  await islem({ islem: 'reddet', id });
+                } else {
+                  await islem({ islem: 'onayla', id });
+                }
+                durum.className = 'y-durum ok';
+                durum.textContent = 'İşlem tamam.';
+                yukle();
+              } catch (hata) {
+                durum.className = 'y-durum hata';
+                durum.textContent = hata.message;
+              }
+            })
+          );
+        });
+      }
+
+      async function yukle() {
+        const durum = el('#m-durum');
+        try {
+          const cevap = await fetch('/api/admin/yorum');
+          const veri = await cevap.json();
+          if (!cevap.ok) throw new Error(veri.hata ?? 'Yorumlar alınamadı.');
+
+          const bekleyen = veri.bekleyen ?? [];
+          const onayli = veri.onayli ?? [];
+
+          el('#m-bekleyenSayi').textContent = bekleyen.length ? `· ${bekleyen.length}` : '';
+          el('#m-onayliSayi').textContent = onayli.length ? `· ${onayli.length}` : '';
+
+          el('#m-bekleyen').innerHTML = bekleyen.length
+            ? bekleyen.map((y) => kart(y, 'bekleyen')).join('')
+            : '<div class="y-kutu iyi">Onay bekleyen yorum yok.</div>';
+          el('#m-onayli').innerHTML = onayli.length
+            ? onayli.map((y) => kart(y, 'onayli')).join('')
+            : '<div class="y-kutu">Henüz yayımlanmış yorum yok.</div>';
+
+          baglantilariKur(el('#m-bekleyen'), 'bekleyen');
+          baglantilariKur(el('#m-onayli'), 'onayli');
+
+          if (!durum.textContent) durum.textContent = '';
+        } catch (hata) {
+          durum.className = 'y-durum hata';
+          durum.textContent = hata.message;
+        }
+      }
+
+      el('#m-yenile').addEventListener('click', yukle);
+      yukle();
+    })();
+  </script>
+
+  <style is:global>
+    .m-kart {
+      border: 1px solid var(--line);
+      border-radius: var(--r-m);
+      padding: 14px 16px;
+      background: var(--paper);
+      margin-bottom: 12px;
+    }
+    .m-ust {
+      display: flex;
+      align-items: baseline;
+      gap: 12px;
+      flex-wrap: wrap;
+      font-size: 12.5px;
+      color: var(--muted);
+      margin-bottom: 8px;
+    }
+    .m-ust b {
+      font-size: 14.5px;
+      color: var(--ink);
+    }
+    .m-yol {
+      margin-left: auto;
+      font-family: var(--mono);
+      font-size: 12px;
+    }
+    .m-metin {
+      margin: 0;
+      font-size: 14.5px;
+      line-height: 1.6;
+      color: var(--ink-soft);
+      white-space: pre-wrap;
+      word-break: break-word;
+    }
+    .m-yanit {
+      margin-top: 10px;
+      padding: 10px 12px;
+      border-left: 3px solid var(--indigo);
+      background: var(--tint);
+      font-size: 13.5px;
+      line-height: 1.6;
+      border-radius: 0 var(--r-s) var(--r-s) 0;
+    }
+    .m-islem {
+      display: flex;
+      gap: 8px;
+      margin-top: 12px;
+      flex-wrap: wrap;
+    }
+    .m-islem .y-dg {
+      font-size: 13px;
+      padding: 7px 14px;
+    }
+  </style>
+</Yonetim>

@@ -1,5 +1,6 @@
 ---
 import Base from '../../layouts/Base.astro';
+import Yorumlar from '../../components/Yorumlar.astro';
 import { getCollection, render } from 'astro:content';
 import { SITE, KONULAR, trTarih } from '../../site.js';
 
@@ -166,6 +167,8 @@ const url = `${SITE.url}/hizli-cozumler/${cozum.id}`;
       Bu çözüm işinize yaramadıysa ya da eksik bir adım varsa
       <a href="/hakkimda#iletisim" style="color:var(--indigo);font-weight:800">yazın</a> — güncelliyorum.
     </p>
+
+    <Yorumlar />
   </div>
 </Base>
 
