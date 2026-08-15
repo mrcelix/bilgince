@@ -375,9 +375,15 @@ const etkin = (p: string) => (yol === p || yol.startsWith(p + '/') ? 'page' : un
   const dugmeler = [...document.querySelectorAll<HTMLButtonElement>('[data-mega]')];
   const perde = document.getElementById('perde');
 
-  /** Perde tek yerden yönetiliyor: hem mega menü hem çekmece aynı katmanı kullanıyor. */
-  function perdeAyarla(acik: boolean) {
-    if (perde) perde.dataset.acik = acik ? 'evet' : 'hayir';
+  /** Perdenin durumu tek yerden türetiliyor: mega menü ya da çekmeceden biri
+      açıksa perde açık. Ayrıca çekmece açıkken perde başlığın da üstüne çıksın
+      diye `data-tam` işaretleniyor. */
+  function perdeTazele() {
+    if (!perde) return;
+    const megaAcik = dugmeler.some((d) => d.getAttribute('aria-expanded') === 'true');
+    const cekmeceAcik = cekmece?.dataset.acik === 'evet';
+    perde.dataset.acik = megaAcik || cekmeceAcik ? 'evet' : 'hayir';
+    perde.dataset.tam = cekmeceAcik ? 'evet' : 'hayir';
   }
 
   function megaAyarla(hangi: string | null) {
@@ -387,7 +393,7 @@ const etkin = (p: string) => (yol === p || yol.startsWith(p + '/') ? 'page' : un
       const panel = document.getElementById(d.getAttribute('aria-controls') ?? '');
       if (panel) panel.dataset.acik = acik ? 'evet' : 'hayir';
     });
-    perdeAyarla(Boolean(hangi));
+    perdeTazele();
   }
 
   dugmeler.forEach((d) => {
@@ -424,7 +430,7 @@ const etkin = (p: string) => (yol === p || yol.startsWith(p + '/') ? 'page' : un
     if (!cekmece) return;
     cekmece.dataset.acik = acik ? 'evet' : 'hayir';
     acDugme?.setAttribute('aria-expanded', String(acik));
-    perdeAyarla(acik);
+    perdeTazele();
     document.documentElement.style.overflow = acik ? 'hidden' : '';
     if (acik) {
       oncekiOdak = document.activeElement as HTMLElement;
@@ -448,6 +454,12 @@ const etkin = (p: string) => (yol === p || yol.startsWith(p + '/') ? 'page' : un
       e.preventDefault();
       ilk.focus();
     }
+  });
+
+  // Perdeye dokunmak açık olan her şeyi kapatıyor.
+  perde?.addEventListener('click', () => {
+    megaAyarla(null);
+    cekmeceAyarla(false);
   });
 
   acDugme?.addEventListener('click', () => cekmeceAyarla(true));

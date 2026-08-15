@@ -380,6 +380,11 @@ code {
   opacity: 1;
   visibility: visible;
 }
+/* Çekmece açıkken perde başlığın da üstüne çıkıyor (50 > başlık 40, < çekmece
+   60): yan panel modunda net kalması gereken tek şey panelin kendisi. */
+.perde[data-tam='evet'] {
+  z-index: 50;
+}
 @media (prefers-reduced-motion: reduce) {
   .perde {
     transition: none;
@@ -726,17 +731,35 @@ code {
   flex: none;
   cursor: pointer;
 }
+/* Mobil çekmece: sağdan kayarak açılan yan panel. Tam ekran değil — arkadaki
+   perdenin görünmesi için dar tutuluyor. Kapalıyken ekranın sağında bekliyor;
+   `visibility: hidden` sayesinde sekme sırasına da girmiyor. */
 .cekmece {
-  display: none;
   position: fixed;
-  inset: 0;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  width: min(360px, 86vw);
   z-index: 60;
   background: var(--paper);
+  border-left: 1px solid var(--line);
+  box-shadow: -20px 0 48px rgba(11, 16, 32, 0.22);
+  display: flex;
   flex-direction: column;
   overflow-y: auto;
+  overscroll-behavior: contain;
+  transform: translateX(100%);
+  visibility: hidden;
+  transition: transform 0.24s ease, visibility 0.24s;
 }
 .cekmece[data-acik='evet'] {
-  display: flex;
+  transform: translateX(0);
+  visibility: visible;
+}
+@media (prefers-reduced-motion: reduce) {
+  .cekmece {
+    transition: none;
+  }
 }
 .cekmece-ust {
   display: flex;
