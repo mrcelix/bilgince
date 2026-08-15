@@ -360,6 +360,32 @@ code {
   color: var(--ink);
 }
 
+/* ------------------------------------------------------------------- perde
+   Mega menü ya da mobil çekmece açıkken sayfayı geri plana atar: karartır ve
+   bulanıklaştırır. Katman sırası önemli — perde 38, mega menü 39, başlık 40:
+   böylece bulanıklık yalnızca sayfa içeriğine uygulanır, menünün ve başlığın
+   kendisi net kalır. */
+.perde {
+  position: fixed;
+  inset: 0;
+  z-index: 38;
+  background: rgba(11, 16, 32, 0.44);
+  backdrop-filter: blur(7px) saturate(0.8);
+  -webkit-backdrop-filter: blur(7px) saturate(0.8);
+  opacity: 0;
+  visibility: hidden;
+  transition: opacity 0.22s ease, visibility 0.22s;
+}
+.perde[data-acik='evet'] {
+  opacity: 1;
+  visibility: visible;
+}
+@media (prefers-reduced-motion: reduce) {
+  .perde {
+    transition: none;
+  }
+}
+
 /* --------------------------------------------------------------- mega menü */
 .mega {
   position: absolute;

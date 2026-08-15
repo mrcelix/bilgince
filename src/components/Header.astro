@@ -317,6 +317,10 @@ const etkin = (p: string) => (yol === p || yol.startsWith(p + '/') ? 'page' : un
   </div>
 </header>
 
+<!-- Mega menü ya da çekmece açıkken sayfayı geri plana atan perde.
+     Başlığın altında, içeriğin üstünde durur; tıklanınca menü kapanır. -->
+<div class="perde" id="perde" data-acik="hayir" aria-hidden="true"></div>
+
 <!-- ------------------------------------------------------- mobil çekmece -->
 <div class="cekmece" id="cekmece" data-acik="hayir">
   <div class="cekmece-ust">
@@ -369,6 +373,12 @@ const etkin = (p: string) => (yol === p || yol.startsWith(p + '/') ? 'page' : un
 <script>
   const bas = document.querySelector('.bas');
   const dugmeler = [...document.querySelectorAll<HTMLButtonElement>('[data-mega]')];
+  const perde = document.getElementById('perde');
+
+  /** Perde tek yerden yönetiliyor: hem mega menü hem çekmece aynı katmanı kullanıyor. */
+  function perdeAyarla(acik: boolean) {
+    if (perde) perde.dataset.acik = acik ? 'evet' : 'hayir';
+  }
 
   function megaAyarla(hangi: string | null) {
     dugmeler.forEach((d) => {
@@ -377,6 +387,7 @@ const etkin = (p: string) => (yol === p || yol.startsWith(p + '/') ? 'page' : un
       const panel = document.getElementById(d.getAttribute('aria-controls') ?? '');
       if (panel) panel.dataset.acik = acik ? 'evet' : 'hayir';
     });
+    perdeAyarla(Boolean(hangi));
   }
 
   dugmeler.forEach((d) => {
@@ -413,6 +424,7 @@ const etkin = (p: string) => (yol === p || yol.startsWith(p + '/') ? 'page' : un
     if (!cekmece) return;
     cekmece.dataset.acik = acik ? 'evet' : 'hayir';
     acDugme?.setAttribute('aria-expanded', String(acik));
+    perdeAyarla(acik);
     document.documentElement.style.overflow = acik ? 'hidden' : '';
     if (acik) {
       oncekiOdak = document.activeElement as HTMLElement;
