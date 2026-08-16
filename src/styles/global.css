@@ -45,9 +45,9 @@
 
   /* koyu bloklar: altlık, terminal, kod kutusu */
   --navy: #16203a;
-  --navy: light-dark(#16203a, #060a14);
+  --navy: light-dark(#16203a, #0d1524);
   --navy-2: #1e2b4d;
-  --navy-2: light-dark(#1e2b4d, #101828);
+  --navy-2: light-dark(#1e2b4d, #18223a);
 
   /* yazı */
   --ink: #16203a;
@@ -57,7 +57,7 @@
   /* Açık tondaki #6b7488 lavanta ve gri zeminde 4.0–4.33 kalıyordu, AA eşiği
      4.5. İki tık koyusu her zeminde eşiği geçiyor, görünürde fark yok. */
   --muted: #636b7f;
-  --muted: light-dark(#636b7f, #949eb6);
+  --muted: light-dark(#636b7f, #a0aac1);
 
   /* eylem rengi */
   --indigo: #3a45e0;
@@ -69,15 +69,17 @@
   /* Baş harf madalyonları: üstünde beyaz yazı var, iki temada da aynı kalıyor */
   --imza-gradyan: linear-gradient(150deg, #3a45e0, #2730a8);
 
-  /* yüzeyler */
+  /* Yüzey basamakları. Karanlıkta sıra bilerek şöyle: altlık ve terminal
+     sayfadan koyu, kart ve başlık sayfadan açık. Kartın yükseldiği, terminalin
+     gömüldüğü böyle okunuyor — koyu temada gölge bu işi yapamıyor. */
   --tint: #ebecfc;
-  --tint: light-dark(#ebecfc, #1d2442);
+  --tint: light-dark(#ebecfc, #28324f);
   --bg: #f4f6f9;
-  --bg: light-dark(#f4f6f9, #0b101d);
+  --bg: light-dark(#f4f6f9, #151d2e);
   --paper: #ffffff;
-  --paper: light-dark(#ffffff, #151c2d);
+  --paper: light-dark(#ffffff, #1f2840);
   --line: #e5e9f0;
-  --line: light-dark(#e5e9f0, #28324b);
+  --line: light-dark(#e5e9f0, #36415d);
 
   /* durum renkleri — `-ink` olanlar yazı, diğerleri dolgu/kenarlık */
   --amber: #efa013;
