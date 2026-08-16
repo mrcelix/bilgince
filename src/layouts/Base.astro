@@ -9,7 +9,10 @@ import { ARACLAR } from '../araclar.js';
 interface Props {
   baslik: string;
   aciklama: string;
-  /** /og/<slug>.png — verilmezse site geneli kart kullanılır */
+  /**
+   * /og/<slug>.png. Verilmezse araç sayfalarında kütükten türetilir
+   * (`/og/arac-<slug>.png`), diğer sayfalarda site geneli kart kullanılır.
+   */
   ogGorsel?: string;
   tur?: 'website' | 'article' | 'profile';
   jsonLd?: Record<string, unknown> | Record<string, unknown>[];
@@ -36,7 +39,7 @@ interface Props {
 const {
   baslik,
   aciklama,
-  ogGorsel = '/og/site.png',
+  ogGorsel,
   tur = 'website',
   jsonLd,
   noindex = false,
@@ -46,7 +49,16 @@ const {
 } = Astro.props;
 
 const kanonik = new URL(Astro.url.pathname.replace(/\/$/, '') || '/', Astro.site).href;
-const ogMutlak = new URL(ogGorsel, Astro.site).href;
+
+/* Araç sayfalarının yapısal verisi ve paylaşım kartı kütükten üretiliyor:
+   25 sayfaya tek tek şema ve kart yolu yazmak yerine adresten slug'ı bulup
+   araclar.json'daki kaydı kullanıyoruz. Yeni araç eklendiğinde ikisi de
+   kendiliğinden geliyor. */
+const aracSlug = Astro.url.pathname.match(/^\/araclar\/([^/]+)\/?$/)?.[1];
+const arac = aracSlug ? ARACLAR.find((a) => a.slug === aracSlug) : undefined;
+
+const ogYolu = ogGorsel ?? (arac ? `/og/arac-${arac.slug}.png` : '/og/site.png');
+const ogMutlak = new URL(ogYolu, Astro.site).href;
 const tamBaslik = baslik === SITE.name ? SITE.title : `${baslik} | ${SITE.name}`;
 // Ana sayfada başlık zaten site adı; "bilgince — bilgince" çıkmasın
 const gorselAlt = baslik === SITE.name ? SITE.title : `${baslik} — ${SITE.name}`;
@@ -59,12 +71,6 @@ const temelSema = {
   inLanguage: 'tr-TR',
   publisher: { '@type': 'Person', name: SITE.author.name, url: `${SITE.url}/hakkimda` },
 };
-
-/* Araç sayfalarının yapısal verisi kütükten üretiliyor: 25 sayfaya tek tek
-   şema yazmak yerine adresten slug'ı bulup araclar.json'daki kaydı kullanıyoruz.
-   Yeni araç eklendiğinde şema da kendiliğinden geliyor. */
-const aracSlug = Astro.url.pathname.match(/^\/araclar\/([^/]+)\/?$/)?.[1];
-const arac = aracSlug ? ARACLAR.find((a) => a.slug === aracSlug) : undefined;
 
 const aracSemalari = arac
   ? [
@@ -138,6 +144,10 @@ const semalar = [
 
     <meta name="theme-color" content="#16203a" />
     <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
+    <!-- SVG desteklemeyen tarayıcı ve iOS ana ekranı için PNG karşılıklar -->
+    <link rel="icon" href="/ikon/32.png" sizes="32x32" type="image/png" />
+    <link rel="apple-touch-icon" href="/ikon/180.png" />
+    <link rel="manifest" href="/site.webmanifest" />
     <link rel="alternate" type="application/rss+xml" title={`${SITE.name} — RSS`} href="/rss.xml" />
 
     <!-- yazı tipi ilk boyamadan önce hazır olsun, düzen kaymasın -->

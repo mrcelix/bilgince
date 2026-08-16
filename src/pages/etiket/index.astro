@@ -1,0 +1,101 @@
+---
+/**
+ * Etiket dizini. 260 etiket sayfası vardı ama kök adres 404 dönüyordu:
+ * adresi kırpan okuyucu da, bağlantıyı izleyen tarayıcı botu da duvara
+ * çarpıyordu. Etiketler kullanım sayısına göre sıralanıyor; en çok geçen
+ * etiketler yukarıda, tek kullanımlıklar aşağıda.
+ */
+import Base from '../../layouts/Base.astro';
+import { getCollection } from 'astro:content';
+import { SITE } from '../../site.js';
+
+const rehberler = (await getCollection('rehberler')).filter((r) => !r.data.taslak);
+const komutlar = await getCollection('komutlar');
+const ipuclari = await getCollection('ipuclari');
+const cozumler = await getCollection('cozumler');
+
+const sayaclar = new Map<string, number>();
+for (const etiket of [
+  ...rehberler.flatMap((r) => r.data.etiketler),
+  ...komutlar.flatMap((k) => k.data.etiketler),
+  ...ipuclari.flatMap((i) => i.data.etiketler),
+  ...cozumler.flatMap((c) => c.data.etiketler),
+]) {
+  sayaclar.set(etiket, (sayaclar.get(etiket) ?? 0) + 1);
+}
+
+// Önce çok kullanılanlar, eşitlikte alfabetik (Türkçe sıralamayla)
+const etiketler = [...sayaclar.entries()].sort(
+  (a, b) => b[1] - a[1] || a[0].localeCompare(b[0], 'tr')
+);
+
+const toplamIcerik = rehberler.length + komutlar.length + ipuclari.length + cozumler.length;
+---
+
+<Base
+  baslik="Etiketler"
+  aciklama={`Sitedeki ${toplamIcerik} içeriği kesen ${etiketler.length} etiket. Bir konuyu her tür içerikte birden aramak için.`}
+  kategori="Sayfa"
+  jsonLd={{
+    '@context': 'https://schema.org',
+    '@type': 'CollectionPage',
+    name: 'Etiketler',
+    url: `${SITE.url}/etiket`,
+    inLanguage: 'tr-TR',
+    numberOfItems: etiketler.length,
+  }}
+>
+  <div class="arama-bas">
+    <div class="kap">
+      <nav class="kirinti" aria-label="Kırıntı yolu" style="padding-top:0">
+        <a href="/">Ana sayfa</a><span class="ayrac">/</span><span aria-current="page">Etiketler</span>
+      </nav>
+      <h1>Etiketler</h1>
+      <p style="color:var(--muted);font-size:14px;margin-top:8px;max-width:66ch">
+        {etiketler.length} etiket, {toplamIcerik} içeriği kesiyor. Konular geniş başlıklar; etiketler
+        ise rehber, hızlı çözüm, ipucu ve komutları aynı anda tarayan ince süzgeçler.
+      </p>
+    </div>
+  </div>
+
+  <div class="kap" style="padding-bottom:64px">
+    <span class="cipler etiket-bulut">
+      {
+        etiketler.map(([etiket, adet]) => (
+          <a href={`/etiket/${etiket}`} data-agirlik={adet >= 8 ? 'yuksek' : adet >= 3 ? 'orta' : 'dusuk'}>
+            {etiket}
+            <span class="say">{adet}</span>
+          </a>
+        ))
+      }
+    </span>
+  </div>
+</Base>
+
+<style>
+  .etiket-bulut {
+    padding-top: 28px;
+  }
+  .etiket-bulut a {
+    display: inline-flex;
+    align-items: center;
+    gap: 7px;
+    /* Dokunma hedefi: parmakla basılabilir olsun */
+    padding: 8px 13px;
+  }
+  /* Kullanım sıklığı ağırlıkla okunuyor; renk tek başına ayrım taşımıyor */
+  .etiket-bulut a[data-agirlik='yuksek'] {
+    font-size: 13.5px;
+    font-weight: 800;
+    color: var(--ink);
+  }
+  .etiket-bulut a[data-agirlik='orta'] {
+    font-size: 12.5px;
+    color: var(--ink-soft);
+  }
+  .etiket-bulut .say {
+    font-family: var(--mono);
+    font-size: 10.5px;
+    color: var(--muted);
+  }
+</style>

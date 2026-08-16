@@ -5,6 +5,7 @@ import sharp from 'sharp';
 import fs from 'node:fs/promises';
 import path from 'node:path';
 import { SITE, KONULAR, slugla } from '../../site.js';
+import { ARACLAR } from '../../araclar.js';
 
 /* --------------------------------------------------------------------------
    1200×630 paylaşım kartı. Yazı tipi TTF/WOFF olmak zorunda (satori woff2
@@ -93,6 +94,7 @@ export async function getStaticPaths() {
   const rehberler = (await getCollection('rehberler')).filter((r) => !r.data.taslak);
   const projeler = await getCollection('projeler');
   const komutlar = await getCollection('komutlar');
+  const cozumler = await getCollection('cozumler');
   const konuAdi = (slug: string) => KONULAR.find((k) => k.slug === slug)?.ad ?? slug;
   const seriler = [...new Set(rehberler.map((r) => r.data.seri).filter(Boolean))] as string[];
 
@@ -116,6 +118,24 @@ export async function getStaticPaths() {
     ...projeler.map((p) => ({
       params: { slug: `proje-${p.id}` },
       props: { ust: `Proje · ${p.data.yil}`, baslik: p.data.baslik, alt: `· ${p.data.kapsam}` },
+    })),
+    // Araç kartları kütükten üretiliyor; yeni araç eklenince kartı da geliyor.
+    ...ARACLAR.map((a: { slug: string; ad: string; cevrimici?: boolean }) => ({
+      params: { slug: `arac-${a.slug}` },
+      props: {
+        ust: 'Araç',
+        baslik: a.ad,
+        // Tarayıcıda çalışması aracın satış noktası; karta da yazılıyor.
+        alt: a.cevrimici ? '· çevrimiçi sorgu' : '· tarayıcıda çalışır',
+      },
+    })),
+    ...cozumler.map((c) => ({
+      params: { slug: `cozum-${c.id}` },
+      props: {
+        ust: `Hızlı çözüm · ${konuAdi(c.data.konu)}`,
+        baslik: c.data.baslik,
+        alt: `· ${c.data.sure} dk`,
+      },
     })),
     ...KONULAR.map((k) => ({
       params: { slug: `konu-${k.slug}` },

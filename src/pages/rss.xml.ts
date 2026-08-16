@@ -9,6 +9,7 @@ export async function GET(context: APIContext) {
     .sort((a, b) => +b.data.yayin - +a.data.yayin);
 
   const ipuclari = await getCollection('ipuclari');
+  const cozumler = await getCollection('cozumler');
 
   const ogeler = [
     ...rehberler.map((r) => ({
@@ -17,6 +18,16 @@ export async function GET(context: APIContext) {
       pubDate: r.data.yayin,
       link: `/rehberler/${r.id}`,
       categories: ['rehber', r.data.konu, ...r.data.etiketler],
+      author: SITE.author.email,
+    })),
+    // Hızlı çözümler beslemenin dışında kalıyordu; kendi adresleri ve tarihleri
+    // olan tam sayfalar, rehberlerle aynı şekilde duyurulmalı.
+    ...cozumler.map((c) => ({
+      title: `Hızlı çözüm: ${c.data.baslik}`,
+      description: c.data.ozet,
+      pubDate: c.data.yayin,
+      link: `/hizli-cozumler/${c.id}`,
+      categories: ['hizli-cozum', c.data.konu, ...c.data.etiketler],
       author: SITE.author.email,
     })),
     ...ipuclari.map((i) => ({

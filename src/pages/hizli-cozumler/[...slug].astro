@@ -31,6 +31,7 @@ const url = `${SITE.url}/hizli-cozumler/${cozum.id}`;
   baslik={d.baslik}
   aciklama={d.ozet}
   tur="article"
+  ogGorsel={`/og/cozum-${cozum.id}.png`}
   makale={{ yayin: d.yayin, bolum: konu?.ad ?? d.konu, etiketler: d.etiketler }}
   jsonLd={[
     {

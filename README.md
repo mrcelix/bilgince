@@ -39,7 +39,9 @@ Pagefind'e hem süzgeç hem meta olarak yazılır. Arşiv, konu, etiket ve sayfa
 | `/rehberler/<slug>` | `src/pages/rehberler/[...slug].astro` | Yazı detayı: içindekiler, okuma çubuğu, önceki/sonraki |
 | `/rehberler/sayfa/<n>` | `src/pages/rehberler/sayfa/[sayfa].astro` | Arşivin 2. ve sonraki sayfaları (`SAYFA_BASI`, `src/site.js`) |
 | `/konu/<slug>` | `src/pages/konu/[konu].astro` | Konu arşivi ve seri ilerlemesi |
+| `/seri` | `src/pages/seri/index.astro` | Tüm seriler, bölüm listeleriyle |
 | `/seri/<slug>` | `src/pages/seri/[seri].astro` | Serinin bölümleri sırayla, `ItemList` şemasıyla |
+| `/etiket` | `src/pages/etiket/index.astro` | Etiket bulutu, kullanım sayısına göre |
 | `/etiket/<slug>` | `src/pages/etiket/[etiket].astro` | Etiketin geçtiği rehberler ve komutlar |
 | `/ipuclari` | `src/pages/ipuclari/index.astro` | Hızlı ipuçları |
 | `/komutlar` | `src/pages/komutlar.astro` | Komut kütüphanesi: konuya göre süzme, metin arama, kopyala düğmesi |
@@ -56,7 +58,9 @@ Pagefind'e hem süzgeç hem meta olarak yazılır. Arşiv, konu, etiket ve sayfa
 | `/ozgecmis` | `src/pages/ozgecmis.astro` | Zaman çizelgesi, yetenekler, sertifikalar, CV indirme |
 | `/ara` | `src/pages/ara.astro` | Pagefind arayüzü |
 | `/404` | `src/pages/404.astro` | Öneri bağlantılı hata sayfası |
-| `/rss.xml` | `src/pages/rss.xml.ts` | RSS akışı |
+| `/rss.xml` | `src/pages/rss.xml.ts` | RSS akışı: rehber, hızlı çözüm ve ipuçları |
+| `/ikon/<boyut>.png` | `src/pages/ikon/[boyut].png.ts` | 32/180/192/512 piksel PNG ikon (satori ile) |
+| `/site.webmanifest` | `src/pages/site.webmanifest.ts` | Web app manifest |
 | `/og/<slug>.png` | `src/pages/og/[...slug].png.ts` | 1200×630 paylaşım kartı (derleme sırasında üretilir) |
 
 ## Yönetim paneli
@@ -315,6 +319,17 @@ Yazı sayfaları ayrıca `article:published_time`, `article:modified_time`,
 
 Paylaşım kartları derleme sırasında satori + sharp ile üretilir. Yazı tipi
 `src/assets/fonts/` altındaki statik Nunito WOFF dosyalarından okunur (satori woff2 okuyamaz).
+
+Kart yolları: yazılar `/og/<slug>.png`, araçlar `/og/arac-<slug>.png`, hızlı çözümler
+`/og/cozum-<slug>.png`, konular `/og/konu-<slug>.png`, seriler `/og/seri-<slug>.png`.
+Araç kartları `araclar.json` kütüğünden üretiliyor ve `Base.astro` adresten türetip
+kendisi bağlıyor — araç sayfalarında `ogGorsel` yazmaya gerek yok.
+
+İkonlar da satori ile üretiliyor (`/ikon/<boyut>.png`), `favicon.svg`'yi sharp'a
+vererek değil: o yol yazı tipini sistemden arıyor ve Nunito kurulu olmayan makinede
+harf kayıyordu. İkon degrade dolgulu karo, harf beyaz — küçük boyutta beyaz zemin
+üstündeki ince harf kayboluyordu, ayrıca maskelenebilir (maskable) ikon için de
+doğru biçim bu.
 
 ## Tasarım
 
