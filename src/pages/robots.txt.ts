@@ -11,8 +11,9 @@ Allow: /
 # Site içi arama sonuçları indekslenmesin
 Disallow: /ara
 
-# Yönetim paneli
+# Yönetim paneli ve uçlar
 Disallow: /admin
+Disallow: /api/
 
 Sitemap: ${SITE.url}/sitemap-index.xml
 `,

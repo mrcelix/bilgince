@@ -2,7 +2,9 @@
 import '../styles/global.css';
 import Header from '../components/Header.astro';
 import Footer from '../components/Footer.astro';
+import Palet from '../components/Palet.astro';
 import { SITE } from '../site.js';
+import { ARACLAR } from '../araclar.js';
 
 interface Props {
   baslik: string;
@@ -19,6 +21,16 @@ interface Props {
    * Araç, Portfolyo, Sayfa. Hem süzgeç hem de sonuç etiketi olarak kullanılır.
    */
   kategori?: string;
+  /**
+   * Yazı sayfalarında `og:type=article` ile birlikte gönderilen tarih ve konu
+   * bilgisi. Facebook/LinkedIn önizlemesi ve haber toplayıcıları kullanıyor.
+   */
+  makale?: {
+    yayin?: Date;
+    guncelleme?: Date;
+    bolum?: string;
+    etiketler?: string[];
+  };
 }
 
 const {
@@ -30,11 +42,14 @@ const {
   noindex = false,
   aramaya = true,
   kategori = 'Sayfa',
+  makale,
 } = Astro.props;
 
 const kanonik = new URL(Astro.url.pathname.replace(/\/$/, '') || '/', Astro.site).href;
 const ogMutlak = new URL(ogGorsel, Astro.site).href;
 const tamBaslik = baslik === SITE.name ? SITE.title : `${baslik} | ${SITE.name}`;
+// Ana sayfada başlık zaten site adı; "bilgince — bilgince" çıkmasın
+const gorselAlt = baslik === SITE.name ? SITE.title : `${baslik} — ${SITE.name}`;
 
 const temelSema = {
   '@context': 'https://schema.org',
@@ -45,7 +60,47 @@ const temelSema = {
   publisher: { '@type': 'Person', name: SITE.author.name, url: `${SITE.url}/hakkimda` },
 };
 
-const semalar = [temelSema, ...(Array.isArray(jsonLd) ? jsonLd : jsonLd ? [jsonLd] : [])];
+/* Araç sayfalarının yapısal verisi kütükten üretiliyor: 25 sayfaya tek tek
+   şema yazmak yerine adresten slug'ı bulup araclar.json'daki kaydı kullanıyoruz.
+   Yeni araç eklendiğinde şema da kendiliğinden geliyor. */
+const aracSlug = Astro.url.pathname.match(/^\/araclar\/([^/]+)\/?$/)?.[1];
+const arac = aracSlug ? ARACLAR.find((a) => a.slug === aracSlug) : undefined;
+
+const aracSemalari = arac
+  ? [
+      {
+        '@context': 'https://schema.org',
+        '@type': 'SoftwareApplication',
+        name: arac.ad,
+        description: arac.ozet,
+        url: kanonik,
+        applicationCategory: 'UtilitiesApplication',
+        operatingSystem: 'Web',
+        browserRequirements: 'JavaScript gerektirir',
+        inLanguage: 'tr-TR',
+        // Araçların tamamı ücretsiz ve kayıt istemiyor; Google zengin sonuçta
+        // fiyatı arıyor, 0 TRY bunu karşılıyor.
+        offers: { '@type': 'Offer', price: '0', priceCurrency: 'TRY' },
+        isAccessibleForFree: true,
+        author: { '@type': 'Person', name: SITE.author.name, url: `${SITE.url}/hakkimda` },
+      },
+      {
+        '@context': 'https://schema.org',
+        '@type': 'BreadcrumbList',
+        itemListElement: [
+          { '@type': 'ListItem', position: 1, name: 'Ana sayfa', item: SITE.url },
+          { '@type': 'ListItem', position: 2, name: 'Araçlar', item: `${SITE.url}/araclar` },
+          { '@type': 'ListItem', position: 3, name: arac.ad, item: kanonik },
+        ],
+      },
+    ]
+  : [];
+
+const semalar = [
+  temelSema,
+  ...aracSemalari,
+  ...(Array.isArray(jsonLd) ? jsonLd : jsonLd ? [jsonLd] : []),
+];
 ---
 
 <!doctype html>
@@ -57,6 +112,8 @@ const semalar = [temelSema, ...(Array.isArray(jsonLd) ? jsonLd : jsonLd ? [jsonL
     <meta name="description" content={aciklama} />
     <link rel="canonical" href={kanonik} />
     {noindex && <meta name="robots" content="noindex, follow" />}
+
+    <meta name="author" content={SITE.author.name} />
 
     <meta name="theme-color" content="#16203a" />
     <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
@@ -75,11 +132,31 @@ const semalar = [temelSema, ...(Array.isArray(jsonLd) ? jsonLd : jsonLd ? [jsonL
     <meta property="og:image" content={ogMutlak} />
     <meta property="og:image:width" content="1200" />
     <meta property="og:image:height" content="630" />
+    <meta property="og:image:alt" content={gorselAlt} />
+
+    {
+      makale && (
+        <>
+          {makale.yayin && (
+            <meta property="article:published_time" content={makale.yayin.toISOString()} />
+          )}
+          {makale.guncelleme && (
+            <meta property="article:modified_time" content={makale.guncelleme.toISOString()} />
+          )}
+          {makale.bolum && <meta property="article:section" content={makale.bolum} />}
+          {(makale.etiketler ?? []).map((e) => (
+            <meta property="article:tag" content={e} />
+          ))}
+          <meta property="article:author" content={SITE.author.name} />
+        </>
+      )
+    }
 
     <meta name="twitter:card" content="summary_large_image" />
     <meta name="twitter:title" content={baslik} />
     <meta name="twitter:description" content={aciklama} />
     <meta name="twitter:image" content={ogMutlak} />
+    <meta name="twitter:image:alt" content={gorselAlt} />
 
     <script type="application/ld+json" set:html={JSON.stringify(semalar)} />
   </head>
@@ -96,5 +173,6 @@ const semalar = [temelSema, ...(Array.isArray(jsonLd) ? jsonLd : jsonLd ? [jsonL
       <slot />
     </main>
     <Footer />
+    <Palet />
   </body>
 </html>

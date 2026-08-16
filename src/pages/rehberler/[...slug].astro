@@ -78,6 +78,12 @@ const h2ler = headings.filter((h) => h.depth === 2);
   tur="article"
   ogGorsel={`/og/${girdi.id}.png`}
   jsonLd={semalar}
+  makale={{
+    yayin: d.yayin,
+    guncelleme: d.guncelleme ?? d.yayin,
+    bolum: konu?.ad ?? d.konu,
+    etiketler: d.etiketler,
+  }}
 >
   <div class="okuma-cubugu" aria-hidden="true"><span id="okuma"></span></div>
 

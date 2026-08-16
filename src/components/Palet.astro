@@ -1,0 +1,343 @@
+---
+/**
+ * Komut paleti — sitenin her yerinde Ctrl/⌘+K (ya da boş bir alandayken "/")
+ * ile açılır. Yazdıkça Pagefind dizininde arar, sonuçları kategorilere ayırır,
+ * ok tuşlarıyla gezilir. Arama dizini yalnızca üretim derlemesinde üretildiği
+ * için geliştirmede hızlı eylemler çalışır, arama kısmı uyarı gösterir.
+ */
+/* Sabitler bilerek `define:vars` ile geçirilmiyor: o yöntem betiği paketlemenin
+   dışında bırakıp 468 sayfanın her birine satır içi kopyalıyordu. Aşağıdaki
+   betik verisini kendi içe aktarımıyla alıyor; sonuç tek, önbelleklenen dosya. */
+---
+
+<div class="perde palet-perde" id="palet-perde" data-acik="hayir" aria-hidden="true"></div>
+
+<div class="palet" id="palet" data-acik="hayir" role="dialog" aria-modal="true" aria-label="Hızlı arama">
+  <div class="palet-kutu">
+    <div class="palet-ust">
+      <svg width="15" height="15" viewBox="0 0 14 14" fill="none" aria-hidden="true">
+        <circle cx="6.2" cy="6.2" r="4.2" stroke="currentColor" stroke-width="1.6"></circle>
+        <path d="M9.4 9.4L12 12" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"></path>
+      </svg>
+      <input
+        id="palet-girdi"
+        type="text"
+        role="combobox"
+        autocomplete="off"
+        spellcheck="false"
+        placeholder="Sitede ara: robocopy, hesap kilitleniyor, DMARC…"
+        aria-label="Sitede ara"
+        aria-expanded="false"
+        aria-controls="palet-liste"
+        aria-autocomplete="list"
+      />
+      <kbd class="palet-esc">esc</kbd>
+    </div>
+
+    <div class="palet-govde" id="palet-liste" role="listbox" aria-label="Sonuçlar"></div>
+
+    <div class="palet-alt">
+      <span><kbd>↑</kbd><kbd>↓</kbd> gez</span>
+      <span><kbd>↵</kbd> aç</span>
+      <span><kbd>esc</kbd> kapat</span>
+      <a href="/ara" class="palet-tum">Gelişmiş arama →</a>
+    </div>
+  </div>
+</div>
+
+<script>
+  import ayarlar from '../data/ayarlar.json';
+
+  // Sonuçların gruplanma sırası /ara sayfasıyla aynı.
+  const KATEGORILER = ['Rehber', 'Hızlı Çözüm', 'İpucu', 'Komut', 'Araç', 'Portfolyo', 'Sayfa'];
+
+  // Arama kutusu boşken görünen kısayollar.
+  const EYLEMLER = [
+    { ad: 'Rehberler', yol: '/rehberler', ipucu: 'Uzun anlatımlar' },
+    { ad: 'Hızlı Çözümler', yol: '/hizli-cozumler', ipucu: 'Belirtiden çözüme' },
+    { ad: 'Komut kütüphanesi', yol: '/komutlar', ipucu: 'Kopyala–yapıştır' },
+    { ad: 'Araçlar', yol: '/araclar', ipucu: 'Tarayıcıda çalışır' },
+    { ad: 'Hızlı ipuçları', yol: '/ipuclari', ipucu: 'Tek satırlık notlar' },
+    { ad: 'Portfolyo', yol: '/portfolyo', ipucu: 'Yapılmış işler' },
+  ];
+
+  const POPULER_ARAMALAR = ayarlar.populerAramalar;
+
+  (() => {
+    const palet = document.getElementById('palet');
+    const perde = document.getElementById('palet-perde');
+    const girdi = document.getElementById('palet-girdi');
+    const govde = document.getElementById('palet-liste');
+    if (!palet || !girdi || !govde) return;
+
+    const EN_COK = 24; // paletde gösterilecek en fazla sonuç
+    let pagefindSozu = null;
+    let secili = 0;
+    let ogeler = []; // gezilebilir kayıtlar: { url, dugum }
+    let oncekiOdak = null;
+
+    const kacir = (m) =>
+      String(m).replace(/[<>&"]/g, (c) => ({ '<': '&lt;', '>': '&gt;', '&': '&amp;', '"': '&quot;' })[c]);
+
+    /* Pagefind adresleri sondaki eğik çizgiyle üretiyor; site eğik çizgisiz
+       çalışıyor. Düzeltmezsek her tıklama bir yönlendirmeye takılır. */
+    const adresDuzelt = (u) => (u === '/' ? '/' : u.replace(/\/(?=#|$)/, ''));
+
+    /**
+     * Dizini bir kez yükler. Saklanan şey modül değil **söz**: palet açılırken
+     * ve ilk arama yapılırken iki ayrı çağrı geliyor, modülü saklamak ikisinin
+     * de yükleme başlatmasına ve `options()` çağrısının iki kez çalışmasına yol
+     * açıyordu — bu durumda `search()` reddediyor ve palet sessizce boş kalıyordu.
+     */
+    function pagefindYukle() {
+      if (pagefindSozu) return pagefindSozu;
+      pagefindSozu = (async () => {
+        /* Dosya yalnızca üretim derlemesinde, pagefind çalıştıktan sonra var olur;
+           değişken üzerinden çağrılıyor ki Vite derlemede çözmeye çalışmasın.
+           Geliştirme sunucusunda Vite adrese `?import` ekleyip 500 döndürüyor —
+           aramanın dev'de çalışmaması beklenen davranış, /ara ile aynı. */
+        const yol = '/pagefind/pagefind.js';
+        const modul = await import(/* @vite-ignore */ yol);
+        await modul.options({ excerptLength: 18 });
+        return modul;
+      })();
+      // Başarısız olursa sonraki denemede baştan kurulsun
+      pagefindSozu.catch(() => {
+        pagefindSozu = null;
+      });
+      return pagefindSozu;
+    }
+
+    /* --- çizim ------------------------------------------------------------ */
+
+    /** Çizimden sonra gezilebilir kayıtları toplayıp ilkini seçer. */
+    function ogeleriTazele() {
+      ogeler = [...govde.querySelectorAll('[role="option"]')];
+      ogeler.forEach((o, i) => (o.id = `palet-oge-${i}`));
+      secili = 0;
+      seciliyiIsaretle();
+    }
+
+    function seciliyiIsaretle() {
+      ogeler.forEach((o, i) => {
+        const aktif = i === secili;
+        o.setAttribute('aria-selected', String(aktif));
+        if (aktif) o.scrollIntoView({ block: 'nearest' });
+      });
+      girdi.setAttribute('aria-activedescendant', ogeler[secili]?.id ?? '');
+      girdi.setAttribute('aria-expanded', String(ogeler.length > 0));
+    }
+
+    /** Arama kutusu boşken: kısayollar ve popüler aramalar. */
+    function baslangiciCiz() {
+      govde.innerHTML =
+        `<div class="palet-grup"><h3>Bölümler</h3>` +
+        EYLEMLER.map(
+          (e) => `
+          <a class="palet-kayit" role="option" aria-selected="false" href="${kacir(e.yol)}">
+            <span class="palet-ad">${kacir(e.ad)}</span>
+            <span class="palet-yol">${kacir(e.ipucu)}</span>
+          </a>`
+        ).join('') +
+        `</div>` +
+        `<div class="palet-grup"><h3>Popüler aramalar</h3>` +
+        POPULER_ARAMALAR.map(
+          (q) => `
+          <button type="button" class="palet-kayit palet-oneri" role="option" aria-selected="false"
+                  data-sorgu="${kacir(q)}">
+            <span class="palet-ad">${kacir(q)}</span>
+            <span class="palet-yol">aramayı doldur</span>
+          </button>`
+        ).join('') +
+        `</div>`;
+
+      govde.querySelectorAll('.palet-oneri').forEach((b) =>
+        b.addEventListener('click', () => {
+          girdi.value = b.dataset.sorgu;
+          ara(girdi.value);
+          girdi.focus();
+        })
+      );
+      ogeleriTazele();
+    }
+
+    function mesaj(metin, sinif = '') {
+      govde.innerHTML = `<p class="palet-mesaj ${sinif}">${kacir(metin)}</p>`;
+      ogeler = [];
+      girdi.setAttribute('aria-expanded', 'false');
+      girdi.removeAttribute('aria-activedescendant');
+    }
+
+    function sonuclariCiz(gruplar, sorgu) {
+      const sirali = KATEGORILER.filter((k) => gruplar.has(k));
+      govde.innerHTML =
+        sirali
+          .map(
+            (k) => `
+        <div class="palet-grup">
+          <h3>${kacir(k)} <span>${gruplar.get(k).length}</span></h3>
+          ${gruplar
+            .get(k)
+            .map(
+              (s) => `
+            <a class="palet-kayit" role="option" aria-selected="false" href="${s.url}">
+              <span class="palet-ad">${kacir(s.baslik)}</span>
+              <span class="palet-ozet">${s.ozet}</span>
+            </a>`
+            )
+            .join('')}
+        </div>`
+          )
+          .join('') +
+        `<a class="palet-kayit palet-hepsi" role="option" aria-selected="false"
+            href="/ara?q=${encodeURIComponent(sorgu)}">
+           <span class="palet-ad">"${kacir(sorgu)}" için tüm sonuçlar</span>
+           <span class="palet-yol">gelişmiş arama sayfası</span>
+         </a>`;
+      ogeleriTazele();
+    }
+
+    /* --- arama ------------------------------------------------------------ */
+
+    let sonIstek = 0;
+    async function ara(sorgu) {
+      const istek = ++sonIstek;
+      if (!sorgu.trim()) {
+        baslangiciCiz();
+        return;
+      }
+
+      let veriler;
+      try {
+        const pf = await pagefindYukle();
+        const cevap = await pf.search(sorgu);
+        if (istek !== sonIstek) return; // daha yeni bir arama başladı
+        veriler = await Promise.all(cevap.results.slice(0, EN_COK).map((r) => r.data()));
+      } catch {
+        /* Arama tek parça sarmalanıyor: aramanın kendisi hata verdiğinde de
+           kullanıcı bir şey görsün. Önceden yalnızca yükleme yakalanıyordu,
+           `search()` reddettiğinde palet hiç tepki vermeden boş kalıyordu. */
+        mesaj('Arama şu an çalışmıyor. Dizin yalnızca üretim derlemesinde oluşur.', 'hata');
+        return;
+      }
+      if (istek !== sonIstek) return;
+
+      if (!veriler.length) {
+        mesaj(`"${sorgu}" için sonuç yok. Daha kısa bir sözcük deneyin.`, 'hata');
+        return;
+      }
+
+      const gruplar = new Map();
+      for (const v of veriler) {
+        const kategori = v.meta?.kategori ?? 'Sayfa';
+        if (!gruplar.has(kategori)) gruplar.set(kategori, []);
+        gruplar.get(kategori).push({
+          url: adresDuzelt(v.url),
+          baslik: v.meta?.title ?? v.url,
+          ozet: v.excerpt,
+        });
+      }
+      sonuclariCiz(gruplar, sorgu);
+    }
+
+    /* --- açma / kapama ---------------------------------------------------- */
+
+    function acikMi() {
+      return palet.dataset.acik === 'evet';
+    }
+
+    function ayarla(acik) {
+      palet.dataset.acik = acik ? 'evet' : 'hayir';
+      if (perde) perde.dataset.acik = acik ? 'evet' : 'hayir';
+      document.documentElement.style.overflow = acik ? 'hidden' : '';
+
+      if (acik) {
+        oncekiOdak = document.activeElement;
+        girdi.value = '';
+        baslangiciCiz();
+        // Geçiş sırasında odak kaçmasın diye bir kare bekleniyor
+        requestAnimationFrame(() => girdi.focus());
+        // Dizin ilk aramadan önce sessizce yüklensin
+        pagefindYukle().catch(() => {});
+      } else {
+        oncekiOdak?.focus?.();
+        oncekiOdak = null;
+      }
+    }
+
+    /* --- olaylar ---------------------------------------------------------- */
+
+    let zamanlayici;
+    girdi.addEventListener('input', () => {
+      clearTimeout(zamanlayici);
+      zamanlayici = setTimeout(() => ara(girdi.value), 160);
+    });
+
+    palet.addEventListener('keydown', (e) => {
+      if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
+        if (!ogeler.length) return;
+        e.preventDefault();
+        secili = (secili + (e.key === 'ArrowDown' ? 1 : -1) + ogeler.length) % ogeler.length;
+        seciliyiIsaretle();
+        return;
+      }
+      if (e.key === 'Enter') {
+        const hedef = ogeler[secili];
+        if (!hedef) return;
+        e.preventDefault();
+        hedef.click(); // bağlantıysa gider, öneriyse kutuyu doldurur
+        return;
+      }
+      if (e.key === 'Tab') {
+        // Odak paletin dışına çıkmasın: kutu ile alttaki bağlantı arasında döner
+        const sira = [girdi, palet.querySelector('.palet-tum')].filter(Boolean);
+        const simdi = sira.indexOf(document.activeElement);
+        const sonraki = (simdi + (e.shiftKey ? -1 : 1) + sira.length) % sira.length;
+        e.preventDefault();
+        sira[sonraki].focus();
+      }
+    });
+
+    document.addEventListener('keydown', (e) => {
+      const hedef = e.target;
+      const yaziliyor =
+        hedef instanceof HTMLElement &&
+        (hedef.tagName === 'INPUT' || hedef.tagName === 'TEXTAREA' || hedef.isContentEditable);
+
+      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'k') {
+        e.preventDefault();
+        ayarla(!acikMi());
+        return;
+      }
+      // "/" yalnızca bir yazı alanında değilken paleti açar
+      if (e.key === '/' && !yaziliyor && !acikMi()) {
+        e.preventDefault();
+        ayarla(true);
+        return;
+      }
+      if (e.key === 'Escape' && acikMi()) {
+        e.preventDefault();
+        ayarla(false);
+      }
+    });
+
+    perde?.addEventListener('click', () => ayarla(false));
+    // Alttaki "Gelişmiş arama" bağlantısı da kapatarak gitsin; yoksa geri
+    // gelindiğinde (bfcache) gövde kilitli kalıyor.
+    palet.querySelector('.palet-tum')?.addEventListener('click', () => ayarla(false));
+    // Sonuca tıklanınca sayfa değişecek; kilidi bırakmazsak geri gelindiğinde
+    // (bfcache) gövde kilitli kalır.
+    govde.addEventListener('click', (e) => {
+      if (e.target.closest('a')) ayarla(false);
+    });
+
+    // Başlıktaki arama kutusu ve mobil menüdeki "Ara" bağlantısı paleti açsın.
+    document.querySelectorAll('.ara-kutu, [data-palet-ac]').forEach((d) =>
+      d.addEventListener('click', (e) => {
+        e.preventDefault();
+        ayarla(true);
+      })
+    );
+  })();
+</script>
+

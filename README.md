@@ -16,6 +16,15 @@ npm run baglanti-kontrol   # dist/ içindeki kırık iç bağlantıları listele
 Arama (Pagefind) yalnızca `npm run build` sonrası çalışır; `npm run dev` sırasında `/ara`
 sayfası bunu belirten bir not gösterir.
 
+**Komut paleti:** her sayfada `Ctrl/⌘ + K` (ya da bir yazı alanında değilken `/`) hızlı
+aramayı açar. Kutu boşken bölüm kısayolları ve popüler aramalar; yazmaya başlayınca aynı
+Pagefind dizininde arayıp sonuçları kategorilere ayırır. Ok tuşlarıyla gezilir, `↵` açar,
+`esc` kapatır. Bileşen `src/components/Palet.astro`, stili `global.css` sonunda.
+
+Palet betiği bilerek `define:vars` kullanmıyor: o yöntem betiği paketlemenin dışında
+bırakıp aynı 9 KB'ı 468 sayfaya satır içi kopyalıyordu. Veriyi kendi içe aktarımıyla
+alıyor, sonuç tek ve önbelleklenen bir dosya. Stil de aynı nedenle bileşen içinde değil.
+
 `/ara` sonuçları **kategoriye göre gruplar**: Rehber, Hızlı Çözüm, İpucu, Komut, Araç,
 Portfolyo, Sayfa. Kategori `Base.astro`'ya geçilen `kategori` özelliğinden gelir ve
 Pagefind'e hem süzgeç hem meta olarak yazılır. Arşiv, konu, etiket ve sayfalama sayfaları
@@ -285,10 +294,24 @@ site haritası ve sunucu aynı biçimi kullanmazsa her adres bir yönlendirmeye 
 Her sayfada `<title>`, meta description, canonical, Open Graph, Twitter card ve JSON-LD var:
 
 - Yazılar → `TechArticle` + `BreadcrumbList`
+- Hızlı çözümler → `HowTo` + `BreadcrumbList`
+- Araç sayfaları → `SoftwareApplication` + `BreadcrumbList`
 - Konu ve arşiv sayfaları → `CollectionPage`
 - Projeler → `CreativeWork`
 - Hakkımda → `ProfilePage` + `Person` + `FAQPage`
 - Özgeçmiş → `Person` (`hasCredential`, `hasOccupation`)
+
+Araç sayfalarının şeması `Base.astro` içinde adresten üretiliyor: `/araclar/<slug>`
+kütükte (`src/data/araclar.json`) aranıp ad ve özet oradan alınıyor. 25 sayfaya tek tek
+şema yazmak yerine yeni araç eklendiğinde şema kendiliğinden geliyor.
+
+Site haritasındaki `<lastmod>` içerik dosyalarının ön bilgisinden okunuyor
+(`guncelleme` varsa o, yoksa `yayin`). Yapılandırma Node tarafında çalıştığı için
+koleksiyon API'si yok; `astro.config.mjs` içindeki `icerikTarihleri()` dosyaları
+doğrudan tarıyor. Liste sayfaları en yeni içeriğin tarihini alıyor.
+
+Yazı sayfaları ayrıca `article:published_time`, `article:modified_time`,
+`article:section` ve `article:tag` gönderiyor — `makale` özelliğiyle.
 
 Paylaşım kartları derleme sırasında satori + sharp ile üretilir. Yazı tipi
 `src/assets/fonts/` altındaki statik Nunito WOFF dosyalarından okunur (satori woff2 okuyamaz).
@@ -303,3 +326,47 @@ Tipografi tek aile: Nunito değişken ağırlık (300–1000), woff2 olarak göm
 ediliyor. Türkçe karakterler için latin-ext alt kümesi ayrıca yükleniyor.
 
 Tasarım önerilerinin ilk hâli `mockup/tema-onerileri.html` içinde duruyor.
+
+## Performans
+
+- **Önden çekme:** `prefetch: { prefetchAll: true, defaultStrategy: 'hover' }`. Fareyle
+  bağlantının üzerine gelindiğinde sayfa indiriliyor. `viewport` yerine `hover` seçildi;
+  bir listede 12+ bağlantı olduğu için görünür alan stratejisi gereksiz indirme yapıyor.
+  `experimental.clientPrerender` destekleyen tarayıcılarda Speculation Rules'a geçiyor —
+  sayfa yalnızca indirilmiyor, önden işleniyor da.
+- **Önbellek:** `vercel.json` içinde `_astro`, `fonts`, `og` bir yıl `immutable`; HTML
+  `s-maxage=600` + `stale-while-revalidate=604800` ile uç düğümde tutuluyor. Kurallar
+  birbirinin üstüne yazmasın diye HTML kuralı diğer yolları olumsuz ileri bakışla dışlıyor.
+- **Uzun listeler:** 78 ipucu ve 33 komut kartında `content-visibility: auto`; ekran
+  dışındaki kartların düzeni ve boyaması erteleniyor.
+- **Sayfa ağırlığı:** satır içi betik ve stil elden geldiğince ortak, önbelleklenen
+  dosyalara taşındı. Ölçmek için: `dist/client/index.html` içindeki `<style>` ve
+  `src` içermeyen `<script>` bloklarının toplam boyutuna bakın.
+
+`public/_headers` Netlify/Cloudflare biçimindedir ve **Vercel'de çalışmaz**; taşınabilirlik
+için duruyor. Vercel'de geçerli olan `vercel.json`.
+
+## Erişilebilirlik ve mobil
+
+- Markdown tabloları derleme sırasında `.tablo-sar` kapsayıcısına sarılıyor
+  (`astro.config.mjs` içindeki `tablolariSar` rehype eklentisi). Dar ekranda sayfanın
+  tamamı değil yalnızca tablo kayıyor; kapsayıcı `tabindex="0"` ile klavyeden de
+  kaydırılabiliyor.
+- Uzun kayıt defteri yolu, parametre ve adresler satır sonunda kırılıyor
+  (`code { overflow-wrap: break-word }`); `pre` bundan muaf, orada kaydırma doğru davranış.
+- Araç sayfalarının ızgarası `minmax(0, 1fr)` kullanıyor. Varsayılan `auto` sütun,
+  içeriğinin en küçük genişliğinin altına inemediği için geniş sonuç tablosu olan
+  araçlarda sayfanın tamamı yatay kayıyordu — sertifika okuyucuda 375 piksellik ekranda
+  760 piksel taşma vardı. Araç sonuç tabloları da `display: block; overflow-x: auto`
+  ile kendi içinde kayıyor (markdown olmadıkları için `tablo-sar`'a girmiyorlar).
+- Başlıktaki "Bültene katıl" düğmesi 1040 pikselin altında gizleniyor. 900–1040 arasında
+  başlık hâlâ masaüstü düzenindeydi ve toplam genişlik sığmıyordu. Seçici
+  `.bas > .kap > .dg` — `.bas .dg` mega menünün içindeki düğmeyi de yakalıyor.
+- Mobil menü sağdan açılan yan panel; arkadaki sayfa `.perde` ile kararıp bulanıklaşıyor.
+- Palet kutusu 16 piksel yazı kullanıyor — iOS Safari daha küçük yazıda sayfayı
+  yakınlaştırıyor.
+
+Yatay taşmayı ölçmek için sayfaları 375 piksellik bir `iframe` içinde açıp
+`documentElement.scrollWidth - 375` değerine bakın; `-4` beklenen (kaydırma çubuğu payı),
+pozitif değer taşma demektir. Tüm araç sayfaları ve ana sayfa türleri bu yöntemle
+375–1280 piksel arasında denendi.
