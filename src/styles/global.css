@@ -25,30 +25,96 @@
     U+20A0-20AB, U+20AD-20C0, U+2113, U+2C60-2C7F, U+A720-A7FF;
 }
 
+/* --------------------------------------------------------------- belirteçler
+   Her renk `light-dark(açık, karanlık)` ile tek satırda tanımlı. Hangisinin
+   geçerli olacağını `color-scheme` söylüyor: kök öğede `light dark` yazdığı
+   için varsayılan işletim sistemi tercihini izliyor; tema düğmesi kökteki
+   `data-tema` özniteliğini yazınca `color-scheme` tek bir değere sabitleniyor
+   ve seçim sistem tercihini eziyor.
+
+   Her belirteç iki kez yazılıyor: önce düz açık değer, sonra `light-dark()`.
+   `light-dark()` tanımayan eski tarayıcı ikinci satırı geçersiz sayıp
+   birincide kalıyor, yani açık temayı görüyor — renksiz bir sayfa değil.
+
+   Rol ayrımı: `--indigo` dolgu rengi (üstüne beyaz yazı biniyor, bu yüzden
+   karanlıkta da koyu kalmalı), `--indigo-metin` ise yazı rengi (karanlıkta
+   açılması gerekiyor). Aynı değişkeni iki iş için kullanmak, iki temada birden
+   okunabilir bir ton bırakmıyordu. */
 :root {
+  color-scheme: light dark;
+
+  /* koyu bloklar: altlık, terminal, kod kutusu */
   --navy: #16203a;
+  --navy: light-dark(#16203a, #060a14);
   --navy-2: #1e2b4d;
+  --navy-2: light-dark(#1e2b4d, #101828);
+
+  /* yazı */
   --ink: #16203a;
+  --ink: light-dark(#16203a, #e6eaf4);
   --ink-soft: #31405c;
-  --muted: #6b7488;
+  --ink-soft: light-dark(#31405c, #bdc6db);
+  /* Açık tondaki #6b7488 lavanta ve gri zeminde 4.0–4.33 kalıyordu, AA eşiği
+     4.5. İki tık koyusu her zeminde eşiği geçiyor, görünürde fark yok. */
+  --muted: #636b7f;
+  --muted: light-dark(#636b7f, #949eb6);
+
+  /* eylem rengi */
   --indigo: #3a45e0;
+  --indigo: light-dark(#3a45e0, #4a56ee);
+  --indigo-metin: #3a45e0;
+  --indigo-metin: light-dark(#3a45e0, #9aa4ff);
   --indigo-d: #2730a8;
+  --indigo-d: light-dark(#2730a8, #b7bdff);
+  /* Baş harf madalyonları: üstünde beyaz yazı var, iki temada da aynı kalıyor */
+  --imza-gradyan: linear-gradient(150deg, #3a45e0, #2730a8);
+
+  /* yüzeyler */
   --tint: #ebecfc;
+  --tint: light-dark(#ebecfc, #1d2442);
   --bg: #f4f6f9;
+  --bg: light-dark(#f4f6f9, #0b101d);
   --paper: #ffffff;
+  --paper: light-dark(#ffffff, #151c2d);
   --line: #e5e9f0;
+  --line: light-dark(#e5e9f0, #28324b);
+
+  /* durum renkleri — `-ink` olanlar yazı, diğerleri dolgu/kenarlık */
   --amber: #efa013;
   --amber-ink: #8a5a08;
+  --amber-ink: light-dark(#8a5a08, #f3b957);
   --green: #15a24a;
   --green-ink: #0d7436;
+  --green-ink: light-dark(#0d7436, #57d68d);
   --clay: #e0552b;
   --clay-ink: #b03c18;
+  --clay-ink: light-dark(#b03c18, #ff9d79);
+
+  /* perdenin ve gölgelerin karanlıkta daha koyu olması gerekiyor: altındaki
+     sayfa zaten koyu, açık temadaki yoğunluk orada yeterli ayrım vermiyor */
+  --perde-zemin: rgba(11, 16, 32, 0.44);
+  --perde-zemin: light-dark(rgba(11, 16, 32, 0.44), rgba(2, 4, 10, 0.66));
+  /* Gölge rengi: açık temada lacivert bir tül, karanlıkta düz siyah. Lacivert
+     gölge koyu zeminde hiç görünmüyor, kartlar birbirine yapışıyordu. */
+  --golge-renk: var(--golge-renk);
+  --golge-renk: light-dark(var(--golge-renk), rgba(0, 0, 0, 0.6));
+  --golge-guclu: 0 28px 70px rgba(11, 16, 32, 0.32);
+  --golge-guclu: light-dark(0 28px 70px rgba(11, 16, 32, 0.32), 0 28px 70px rgba(0, 0, 0, 0.62));
 
   --mono: ui-monospace, 'Cascadia Mono', 'Consolas', 'SF Mono', Menlo, monospace;
   --kap: 1180px;
   --r-s: 8px;
   --r-m: 14px;
   --r-l: 18px;
+}
+
+/* Tema düğmesinin seçimi: `color-scheme` tek değere inince `light-dark()`
+   sistem tercihine bakmadan o tarafı seçiyor. */
+:root[data-tema='aydinlik'] {
+  color-scheme: light;
+}
+:root[data-tema='karanlik'] {
+  color-scheme: dark;
 }
 
 *,
@@ -94,7 +160,7 @@ p {
   margin: 0;
 }
 :focus-visible {
-  outline: 2px solid var(--indigo);
+  outline: 2px solid var(--indigo-metin);
   outline-offset: 3px;
   border-radius: 4px;
 }
@@ -226,7 +292,7 @@ pre code {
   font-weight: 800;
   letter-spacing: 0.09em;
   text-transform: uppercase;
-  color: var(--indigo);
+  color: var(--indigo-metin);
 }
 
 /* ----------------------------------------------------------------- başlık */
@@ -290,7 +356,7 @@ pre code {
   font-weight: 1000;
   letter-spacing: -0.045em;
   padding-right: 14px;
-  color: var(--indigo);
+  color: var(--indigo-metin);
   background-image: linear-gradient(96deg, #3a45e0 0%, #7b3fd4 42%, #e8901a 100%);
   -webkit-background-clip: text;
   background-clip: text;
@@ -338,17 +404,17 @@ pre code {
 }
 .gez-bag:hover,
 .gez-bag[aria-current='page'] {
-  color: var(--indigo);
+  color: var(--indigo-metin);
 }
 .gez-bag[aria-current='page'] {
-  border-bottom-color: var(--indigo);
+  border-bottom-color: var(--indigo-metin);
 }
 .gez-bag .ok {
   transition: transform 0.18s ease;
 }
 .gez-bag[aria-expanded='true'] {
-  color: var(--indigo);
-  border-bottom-color: var(--indigo);
+  color: var(--indigo-metin);
+  border-bottom-color: var(--indigo-metin);
 }
 .gez-bag[aria-expanded='true'] .ok {
   transform: rotate(180deg);
@@ -373,6 +439,37 @@ pre code {
   border-color: var(--muted);
   color: var(--ink);
 }
+/* ------------------------------------------------------------- tema düğmesi
+   Her boyutta başlıkta duruyor — çekmeceye de koymak iki kopya demekti, tek
+   düğme hem masaüstünde hem telefonda tek dokunuşla erişilebilir. */
+.tema-dugme {
+  flex: none;
+  width: 36px;
+  height: 36px;
+  display: grid;
+  place-items: center;
+  border: 1px solid var(--line);
+  border-radius: var(--r-s);
+  background: var(--bg);
+  color: var(--muted);
+  cursor: pointer;
+  padding: 0;
+}
+.tema-dugme:hover {
+  border-color: var(--muted);
+  color: var(--ink);
+}
+/* Düğme gidilecek temayı gösteriyor: açık temadayken ay, karanlıkta güneş. */
+.tema-gunes {
+  display: none;
+}
+:root[data-tema='karanlik'] .tema-gunes {
+  display: block;
+}
+:root[data-tema='karanlik'] .tema-ay {
+  display: none;
+}
+
 /* Komut paletinin kısayolu: kutunun sağında, yazının akışını bozmadan */
 .ara-kisayol {
   margin-left: auto;
@@ -396,7 +493,7 @@ pre code {
   position: fixed;
   inset: 0;
   z-index: 38;
-  background: rgba(11, 16, 32, 0.44);
+  background: var(--perde-zemin);
   backdrop-filter: blur(7px) saturate(0.8);
   -webkit-backdrop-filter: blur(7px) saturate(0.8);
   opacity: 0;
@@ -426,7 +523,7 @@ pre code {
   right: 0;
   background: var(--paper);
   border-bottom: 3px solid var(--indigo);
-  box-shadow: 0 26px 50px -24px rgba(22, 32, 58, 0.4);
+  box-shadow: 0 26px 50px -24px var(--golge-renk);
   display: none;
   z-index: 39;
 }
@@ -476,14 +573,14 @@ pre code {
   transition: box-shadow 0.16s ease;
 }
 .one-cikan-konu:hover {
-  box-shadow: 0 12px 26px -18px rgba(22, 32, 58, 0.5);
+  box-shadow: 0 12px 26px -18px var(--golge-renk);
 }
 .one-cikan-konu .ikon {
   width: 38px;
   height: 38px;
   border-radius: 10px;
   background: var(--tint);
-  color: var(--indigo);
+  color: var(--indigo-metin);
   display: grid;
   place-items: center;
   flex: none;
@@ -522,11 +619,11 @@ pre code {
 .one-cikan-konu .sayi {
   font-size: 12.5px;
   font-weight: 800;
-  color: var(--indigo);
+  color: var(--indigo-metin);
   white-space: nowrap;
 }
 .one-cikan-konu:hover .ad {
-  color: var(--indigo);
+  color: var(--indigo-metin);
 }
 
 /* ana sayfadaki öne çıkan konu bandı */
@@ -628,12 +725,12 @@ pre code {
   color: var(--muted);
 }
 .mega-seri:hover .ad {
-  color: var(--indigo);
+  color: var(--indigo-metin);
 }
 .mega-tum {
   font-size: 12.5px;
   font-weight: 800;
-  color: var(--indigo);
+  color: var(--indigo-metin);
   margin-top: auto;
   padding-top: 6px;
 }
@@ -657,7 +754,7 @@ pre code {
   height: 34px;
   border-radius: 9px;
   background: var(--tint);
-  color: var(--indigo);
+  color: var(--indigo-metin);
   display: grid;
   place-items: center;
   flex: none;
@@ -684,7 +781,7 @@ pre code {
   margin-top: 3px;
 }
 .mega-bag:hover .ad {
-  color: var(--indigo);
+  color: var(--indigo-metin);
 }
 .mega-bag:hover .ikon {
   background: var(--indigo);
@@ -719,7 +816,7 @@ pre code {
   font-weight: 800;
   letter-spacing: 0.08em;
   text-transform: uppercase;
-  color: var(--indigo);
+  color: var(--indigo-metin);
 }
 .mega-kart .alt {
   font-size: 11.5px;
@@ -741,8 +838,8 @@ pre code {
   color: var(--muted);
 }
 .cipler a:hover {
-  color: var(--indigo);
-  border-color: var(--indigo);
+  color: var(--indigo-metin);
+  border-color: var(--indigo-metin);
 }
 
 /* ----------------------------------------------------------- mobil çekmece */
@@ -770,7 +867,7 @@ pre code {
   z-index: 60;
   background: var(--paper);
   border-left: 1px solid var(--line);
-  box-shadow: -20px 0 48px rgba(11, 16, 32, 0.22);
+  box-shadow: -20px 0 48px var(--golge-renk);
   display: flex;
   flex-direction: column;
   overflow-y: auto;
@@ -828,7 +925,7 @@ pre code {
   display: none;
 }
 .akordeon details[open] summary {
-  color: var(--indigo);
+  color: var(--indigo-metin);
 }
 .akordeon details[open] summary .ok {
   transform: rotate(180deg);
@@ -1021,7 +1118,7 @@ pre code {
 }
 .arac-alan :is(input, select, textarea):focus-visible,
 .arac-sayfa button:focus-visible {
-  outline: 2px solid var(--indigo);
+  outline: 2px solid var(--indigo-metin);
   outline-offset: 1px;
 }
 .arac-kaydirac {
@@ -1183,7 +1280,7 @@ pre code {
 }
 .arac-kart:hover {
   transform: translateY(-2px);
-  border-color: var(--indigo);
+  border-color: var(--indigo-metin);
 }
 .arac-kart .ust {
   display: flex;
@@ -1191,7 +1288,7 @@ pre code {
   gap: 9px;
 }
 .arac-kart .ust svg {
-  color: var(--indigo);
+  color: var(--indigo-metin);
 }
 .arac-kart b {
   font-size: 15px;
@@ -1238,7 +1335,7 @@ pre code {
 .bolum-bas a {
   font-size: 13.5px;
   font-weight: 800;
-  color: var(--indigo);
+  color: var(--indigo-metin);
   white-space: nowrap;
 }
 .bolum {
@@ -1263,7 +1360,7 @@ pre code {
 }
 .hero h1 em {
   font-style: normal;
-  color: var(--indigo);
+  color: var(--indigo-metin);
 }
 .hero .giris {
   margin-top: 18px;
@@ -1309,7 +1406,7 @@ pre code {
   font-weight: 800;
   letter-spacing: 0.15em;
   text-transform: uppercase;
-  color: var(--indigo);
+  color: var(--indigo-metin);
 }
 .panel-kart {
   background: var(--paper);
@@ -1443,7 +1540,7 @@ pre code {
   font-variant-numeric: tabular-nums;
 }
 .kart-alt b {
-  color: var(--indigo);
+  color: var(--indigo-metin);
   font-weight: 800;
 }
 .takipler {
@@ -1463,7 +1560,7 @@ pre code {
   transition: box-shadow 0.2s ease;
 }
 .takip:hover {
-  box-shadow: 0 16px 30px -22px rgba(22, 32, 58, 0.45);
+  box-shadow: 0 16px 30px -22px var(--golge-renk);
 }
 .takip h3 {
   font-size: 17px;
@@ -1495,7 +1592,7 @@ pre code {
   transition: box-shadow 0.2s ease, transform 0.2s ease;
 }
 .kart:hover {
-  box-shadow: 0 18px 34px -22px rgba(22, 32, 58, 0.45);
+  box-shadow: 0 18px 34px -22px var(--golge-renk);
   transform: translateY(-2px);
 }
 .kart-serit {
@@ -1571,7 +1668,7 @@ pre code {
 .ipucu-sol .bag {
   font-size: 13.5px;
   font-weight: 800;
-  color: var(--indigo);
+  color: var(--indigo-metin);
   margin-top: auto;
   padding-top: 8px;
 }
@@ -1681,7 +1778,7 @@ pre code {
   transition: box-shadow 0.2s ease, transform 0.2s ease;
 }
 .konu-kart:hover {
-  box-shadow: 0 16px 30px -22px rgba(22, 32, 58, 0.45);
+  box-shadow: 0 16px 30px -22px var(--golge-renk);
   transform: translateY(-2px);
 }
 .konu-kart .ikon {
@@ -1689,7 +1786,7 @@ pre code {
   height: 34px;
   border-radius: 10px;
   background: var(--tint);
-  color: var(--indigo);
+  color: var(--indigo-metin);
   display: grid;
   place-items: center;
 }
@@ -1749,7 +1846,7 @@ pre code {
   transition: box-shadow 0.2s ease, transform 0.2s ease;
 }
 .proje:hover {
-  box-shadow: 0 18px 34px -22px rgba(22, 32, 58, 0.45);
+  box-shadow: 0 18px 34px -22px var(--golge-renk);
   transform: translateY(-2px);
 }
 .proje .ust {
@@ -1769,7 +1866,7 @@ pre code {
   height: 34px;
   border-radius: 9px;
   background: var(--tint);
-  color: var(--indigo);
+  color: var(--indigo-metin);
   display: grid;
   place-items: center;
   flex: none;
@@ -1923,7 +2020,7 @@ pre code {
   flex-wrap: wrap;
 }
 .kirinti a:hover {
-  color: var(--indigo);
+  color: var(--indigo-metin);
 }
 .kirinti .ayrac {
   opacity: 0.45;
@@ -1968,7 +2065,7 @@ pre code {
   width: 38px;
   height: 38px;
   border-radius: 11px;
-  background: linear-gradient(150deg, var(--indigo), var(--indigo-d));
+  background: var(--imza-gradyan);
   color: #fff;
   display: grid;
   place-items: center;
@@ -2004,8 +2101,8 @@ pre code {
   color: var(--muted);
 }
 .paylas a:hover {
-  color: var(--indigo);
-  border-color: var(--indigo);
+  color: var(--indigo-metin);
+  border-color: var(--indigo-metin);
 }
 
 .yazi-duzen {
@@ -2049,7 +2146,7 @@ pre code {
   color: var(--ink);
 }
 .metin a {
-  color: var(--indigo);
+  color: var(--indigo-metin);
   font-weight: 700;
   text-decoration: underline;
   text-underline-offset: 3px;
@@ -2068,7 +2165,7 @@ pre code {
   color: var(--ink-soft);
 }
 .metin li::marker {
-  color: var(--indigo);
+  color: var(--indigo-metin);
   font-weight: 800;
 }
 .metin pre {
@@ -2117,7 +2214,7 @@ pre code {
   overscroll-behavior-x: contain;
 }
 .tablo-sar:focus-visible {
-  outline: 2px solid var(--indigo);
+  outline: 2px solid var(--indigo-metin);
   outline-offset: 2px;
 }
 .tablo-sar table {
@@ -2147,7 +2244,7 @@ pre code {
 .uyari p {
   font-size: 14.5px;
   line-height: 1.6;
-  color: #5b4415;
+  color: var(--amber-ink);
 }
 .uyari-yesil {
   background: rgba(21, 162, 74, 0.09);
@@ -2194,8 +2291,8 @@ pre code {
 }
 .icindekiler a:hover,
 .icindekiler a.etkin {
-  color: var(--indigo);
-  border-left-color: var(--indigo);
+  color: var(--indigo-metin);
+  border-left-color: var(--indigo-metin);
   font-weight: 800;
 }
 .yan-kutu {
@@ -2222,7 +2319,7 @@ pre code {
   font-variant-numeric: tabular-nums;
 }
 .yan-kutu a.baslikli:hover {
-  color: var(--indigo);
+  color: var(--indigo-metin);
 }
 .yan-tanitim {
   border-radius: var(--r-m);
@@ -2271,7 +2368,7 @@ pre code {
   width: 56px;
   height: 56px;
   border-radius: 15px;
-  background: linear-gradient(150deg, var(--indigo), var(--indigo-d));
+  background: var(--imza-gradyan);
   color: #fff;
   display: grid;
   place-items: center;
@@ -2319,7 +2416,7 @@ pre code {
   line-height: 1.28;
 }
 .os-kart:hover h3 {
-  color: var(--indigo);
+  color: var(--indigo-metin);
 }
 .os-kart.sonraki {
   text-align: right;
@@ -2390,7 +2487,7 @@ pre code {
 }
 .cip[aria-current='page'] {
   background: var(--indigo);
-  border-color: var(--indigo);
+  border-color: var(--indigo-metin);
   color: #fff;
 }
 
@@ -2445,7 +2542,7 @@ pre code {
   font-variant-numeric: tabular-nums;
 }
 .satir h3 a:hover {
-  color: var(--indigo);
+  color: var(--indigo-metin);
 }
 .yigin a {
   font-family: var(--mono);
@@ -2456,8 +2553,8 @@ pre code {
   padding: 3px 7px;
 }
 .yigin a:hover {
-  color: var(--indigo);
-  border-color: var(--indigo);
+  color: var(--indigo-metin);
+  border-color: var(--indigo-metin);
 }
 
 .sayfalama {
@@ -2488,7 +2585,7 @@ pre code {
 }
 .sayfalama [aria-current='page'] {
   background: var(--indigo);
-  border-color: var(--indigo);
+  border-color: var(--indigo-metin);
   color: #fff;
 }
 .sayfalama .ileri {
@@ -2513,7 +2610,7 @@ pre code {
 .ilerleme {
   height: 5px;
   border-radius: 999px;
-  background: rgba(22, 32, 58, 0.1);
+  background: var(--golge-renk);
   overflow: hidden;
 }
 .ilerleme span {
@@ -2705,7 +2802,7 @@ pre code {
   width: 100%;
   aspect-ratio: 1/1;
   border-radius: 16px;
-  background: linear-gradient(150deg, var(--indigo), var(--indigo-d));
+  background: var(--imza-gradyan);
   color: #fff;
   display: grid;
   place-items: center;
@@ -2780,7 +2877,7 @@ pre code {
   height: 34px;
   border-radius: 10px;
   background: var(--tint);
-  color: var(--indigo);
+  color: var(--indigo-metin);
   display: grid;
   place-items: center;
 }
@@ -2837,7 +2934,7 @@ pre code {
   height: 34px;
   border-radius: 10px;
   background: var(--tint);
-  color: var(--indigo);
+  color: var(--indigo-metin);
   display: grid;
   place-items: center;
   flex: none;
@@ -2856,7 +2953,7 @@ pre code {
   line-height: 1.45;
 }
 .kanal:hover .ad {
-  color: var(--indigo);
+  color: var(--indigo-metin);
 }
 
 .cv-duzen {
@@ -2921,7 +3018,7 @@ pre code {
   display: block;
 }
 .zaman-cizelgesi li.simdi .nokta {
-  border-color: var(--indigo);
+  border-color: var(--indigo-metin);
 }
 .zaman-cizelgesi li.simdi .nokta span {
   background: var(--indigo);
@@ -2937,7 +3034,7 @@ pre code {
 }
 .kurum {
   font-size: 13px;
-  color: var(--indigo);
+  color: var(--indigo-metin);
   font-weight: 700;
   margin-top: 2px;
   display: block;
@@ -2992,7 +3089,7 @@ pre code {
   width: 52px;
   height: 52px;
   border-radius: 14px;
-  background: linear-gradient(150deg, var(--indigo), var(--indigo-d));
+  background: var(--imza-gradyan);
   color: #fff;
   display: grid;
   place-items: center;
@@ -3049,11 +3146,12 @@ pre code {
 
 /* Pagefind arayüzünü tema renklerine bağla */
 :root {
-  --pagefind-ui-primary: #16203a;
-  --pagefind-ui-text: #16203a;
-  --pagefind-ui-background: #ffffff;
-  --pagefind-ui-border: #e5e9f0;
-  --pagefind-ui-tag: #ebecfc;
+  /* Pagefind'in kendi bileşeni de temayı izlesin */
+  --pagefind-ui-primary: var(--ink);
+  --pagefind-ui-text: var(--ink);
+  --pagefind-ui-background: var(--paper);
+  --pagefind-ui-border: var(--line);
+  --pagefind-ui-tag: var(--tint);
   --pagefind-ui-border-width: 1px;
   --pagefind-ui-border-radius: 11px;
   --pagefind-ui-font: 'Nunito', system-ui, sans-serif;
@@ -3067,7 +3165,7 @@ pre code {
   letter-spacing: -0.025em;
 }
 .pagefind-ui__result-title a:hover {
-  color: var(--indigo) !important;
+  color: var(--indigo-metin) !important;
 }
 .pagefind-ui__result-excerpt mark {
   background: rgba(239, 160, 19, 0.28);
@@ -3113,7 +3211,7 @@ pre code {
   font-weight: 900;
   letter-spacing: -0.06em;
   line-height: 0.9;
-  color: var(--indigo);
+  color: var(--indigo-metin);
   font-variant-numeric: tabular-nums;
 }
 .hata-404 h1 {
@@ -3159,7 +3257,7 @@ pre code {
   margin-top: 3px;
 }
 .oneriler a:hover {
-  color: var(--indigo);
+  color: var(--indigo-metin);
 }
 
 /* ------------------------------------------------------------------- duyarlı */
@@ -3340,7 +3438,7 @@ pre code {
   background: var(--paper);
   border: 1px solid var(--line);
   border-radius: var(--r-l);
-  box-shadow: 0 28px 70px rgba(11, 16, 32, 0.32);
+  box-shadow: var(--golge-guclu);
   overflow: hidden;
   opacity: 0;
   transform: translateY(-10px) scale(0.985);

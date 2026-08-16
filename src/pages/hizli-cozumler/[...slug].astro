@@ -84,7 +84,7 @@ const url = `${SITE.url}/hizli-cozumler/${cozum.id}`;
             <span class="baslik">Bu belirtileri yaşıyorsanız doğru yerdesiniz</span>
             <ul style="margin:6px 0 0;padding-left:18px;display:flex;flex-direction:column;gap:4px">
               {d.belirtiler.map((b) => (
-                <li style="font-size:14px;line-height:1.5;color:#5b4415">{b}</li>
+                <li style="font-size:14px;line-height:1.5;color:var(--amber-ink)">{b}</li>
               ))}
             </ul>
           </div>
@@ -166,7 +166,7 @@ const url = `${SITE.url}/hizli-cozumler/${cozum.id}`;
 
     <p style="margin-top:26px;font-size:13px;color:var(--muted);max-width:66ch">
       Bu çözüm işinize yaramadıysa ya da eksik bir adım varsa
-      <a href="/hakkimda#iletisim" style="color:var(--indigo);font-weight:800">yazın</a> — güncelliyorum.
+      <a href="/hakkimda#iletisim" style="color:var(--indigo-metin);font-weight:800">yazın</a> — güncelliyorum.
     </p>
 
     <Yorumlar />

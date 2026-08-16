@@ -1,6 +1,7 @@
 ---
 import { getCollection } from 'astro:content';
 import KonuIkon from './KonuIkon.astro';
+import Tema from './Tema.astro';
 import { SITE, KONULAR, GRUPLAR, POPULER_ARAMALAR, slugla, sayi } from '../site.js';
 import { ARACLAR } from '../araclar.js';
 
@@ -109,6 +110,7 @@ const etkin = (p: string) => (yol === p || yol.startsWith(p + '/') ? 'page' : un
       Ara
       <kbd class="ara-kisayol">Ctrl K</kbd>
     </a>
+    <Tema />
     <a class="dg" href="/#bulten">Bültene katıl</a>
 
     <button class="hamburger" type="button" aria-label="Menüyü aç" aria-expanded="false" data-cekmece-ac>

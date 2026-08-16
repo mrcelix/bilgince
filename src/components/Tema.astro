@@ -1,0 +1,79 @@
+---
+/**
+ * Tema düğmesi. Kökteki `data-tema` özniteliğini çevirir; renkler
+ * `global.css` içindeki `light-dark()` belirteçlerinden geliyor.
+ *
+ * Seçim yapılmadıysa sistem tercihi izleniyor ve işletim sistemi teması
+ * değiştiğinde sayfa da değişiyor. Bir kez düğmeye basıldıktan sonra seçim
+ * `localStorage`'a yazılıyor ve sistem tercihini eziyor.
+ *
+ * İlk boyamadan önce çalışması gereken kısım burada değil — `Base.astro`
+ * içindeki satır içi betikte, yoksa karanlık temada sayfa bir kare beyaz
+ * yanıp sönüyor.
+ */
+---
+
+<button class="tema-dugme" type="button" data-tema-degistir aria-label="Temayı değiştir">
+  <svg class="tema-gunes" width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true">
+    <circle cx="8" cy="8" r="3.1" stroke="currentColor" stroke-width="1.6"></circle>
+    <path
+      d="M8 1v1.6M8 13.4V15M15 8h-1.6M2.6 8H1M12.9 3.1l-1.1 1.1M4.2 11.8l-1.1 1.1M12.9 12.9l-1.1-1.1M4.2 4.2L3.1 3.1"
+      stroke="currentColor"
+      stroke-width="1.6"
+      stroke-linecap="round"></path>
+  </svg>
+  <svg class="tema-ay" width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true">
+    <path
+      d="M13.4 9.8A5.8 5.8 0 016.2 2.6a5.9 5.9 0 107.2 7.2z"
+      stroke="currentColor"
+      stroke-width="1.6"
+      stroke-linejoin="round"></path>
+  </svg>
+</button>
+
+<script>
+  (() => {
+    const kok = document.documentElement;
+    const dugmeler = [...document.querySelectorAll<HTMLButtonElement>('[data-tema-degistir]')];
+    if (!dugmeler.length) return;
+
+    const koyuSorgu = matchMedia('(prefers-color-scheme: dark)');
+
+    /** Tarayıcı çubuğunun rengi de temayı izlesin. */
+    function tarayiciRengi(tema: string) {
+      const etiket = document.querySelector<HTMLMetaElement>('meta[name="theme-color"]');
+      if (etiket) etiket.content = tema === 'karanlik' ? '#060a14' : '#16203a';
+    }
+
+    function uygula(tema: string, kaynak: 'secim' | 'sistem') {
+      kok.dataset.tema = tema;
+      kok.dataset.temaKaynak = kaynak;
+      tarayiciRengi(tema);
+      dugmeler.forEach((d) => {
+        d.setAttribute('aria-label', tema === 'karanlik' ? 'Açık temaya geç' : 'Karanlık temaya geç');
+        d.setAttribute('title', tema === 'karanlik' ? 'Açık temaya geç' : 'Karanlık temaya geç');
+      });
+    }
+
+    // Satır içi betik `data-tema`yı zaten yazdı; buradaki iş etiketleri kurmak.
+    uygula(kok.dataset.tema === 'karanlik' ? 'karanlik' : 'aydinlik', kok.dataset.temaKaynak === 'secim' ? 'secim' : 'sistem');
+
+    dugmeler.forEach((d) =>
+      d.addEventListener('click', () => {
+        const yeni = kok.dataset.tema === 'karanlik' ? 'aydinlik' : 'karanlik';
+        uygula(yeni, 'secim');
+        try {
+          localStorage.setItem('tema', yeni);
+        } catch {
+          /* gizli sekmede yazma engellenebilir; tema yine de bu sayfada değişti */
+        }
+      })
+    );
+
+    // Henüz seçim yapılmadıysa işletim sistemi temasını izlemeye devam et.
+    koyuSorgu.addEventListener('change', (e) => {
+      if (kok.dataset.temaKaynak === 'secim') return;
+      uygula(e.matches ? 'karanlik' : 'aydinlik', 'sistem');
+    });
+  })();
+</script>

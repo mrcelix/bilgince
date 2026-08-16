@@ -322,6 +322,36 @@ Renk mantığı: lacivert gövde metni, indigo eylem rengi, lavanta zemin blokla
 Kehribar ve yeşil dekor değil — kehribar dikkat/ipucu, yeşil doğrulanmış sonuç bildirir.
 Tüm belirteçler `src/styles/global.css` başındaki `:root` bloğunda.
 
+### Açık / karanlık tema
+
+Her renk `light-dark(açık, karanlık)` ile **tek satırda** tanımlı; hangisinin geçerli
+olacağını `color-scheme` söylüyor. Kökte `light dark` yazdığı için varsayılan işletim
+sistemi tercihi; tema düğmesi kökteki `data-tema` özniteliğini yazınca `color-scheme`
+tek değere sabitleniyor ve seçim sistemi eziyor. Seçim `localStorage`'daki `tema`
+anahtarında; seçim yokken sistem teması değişirse sayfa da değişiyor.
+
+Her belirteç iki kez yazılıyor — önce düz açık değer, sonra `light-dark()`. Eski
+tarayıcı ikinci satırı geçersiz sayıp birincide kalıyor, yani renksiz bir sayfa değil
+açık temayı görüyor.
+
+Tema `Base.astro`'nun `<head>`'indeki **satır içi** betikle ilk boyamadan önce
+uygulanıyor. Paketlenmiş betik geç kalıyor ve karanlık temada sayfa bir kare beyaz
+yanıp sönüyor — bu yüzden `is:inline`.
+
+**Rol ayrımı önemli:** `--indigo` dolgu rengi (üstüne beyaz yazı biniyor, karanlıkta da
+koyu kalmalı), `--indigo-metin` yazı rengi (karanlıkta açılmalı). Tek değişkeni iki iş
+için kullanmak iki temada birden okunabilir bir ton bırakmıyordu. Yeni bir yerde indigo
+kullanırken: **yazıysa `--indigo-metin`, dolgu/kenarlıksa `--indigo`.** `accent-color`
+bir dolgudur, `--indigo` alır.
+
+Wi-Fi QR aracının tuval ve SVG renkleri (`#ffffff` / `#16203a`) bilerek sabit: karekod
+okunabilirliği koyu-üstüne-açık gerektiriyor, misafir kartı da basılıyor.
+
+Kontrast ölçümü: sayfaları bir `iframe`'de açıp `data-tema`yı yazın, geçişleri
+`transition:none !important` ile kapatın (gizli sekmede duran geçiş eski rengi tutup
+yanlış ölçüm veriyor), sonra her metin öğesinin efektif zeminine karşı oranını hesaplayın.
+Eşik normal yazıda 4.5, 24 piksel üstü ya da 18.66 piksel kalın yazıda 3.
+
 Tipografi tek aile: Nunito değişken ağırlık (300–1000), woff2 olarak gömülü ve `preload`
 ediliyor. Türkçe karakterler için latin-ext alt kümesi ayrıca yükleniyor.
 

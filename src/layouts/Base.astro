@@ -115,6 +115,27 @@ const semalar = [
 
     <meta name="author" content={SITE.author.name} />
 
+    <script is:inline>
+      /* Tema ilk boyamadan önce belirlenmeli; paketlenmiş bir betik geç kalıyor
+         ve karanlık temada sayfa bir kare beyaz yanıp sönüyor. Bu yüzden satır
+         içi. Seçim yoksa sistem tercihi yazılıyor — böylece hem CSS hem düğme
+         ikonu tek bir öznitelikten okuyabiliyor. */
+      (() => {
+        const kok = document.documentElement;
+        let secim = null;
+        try {
+          secim = localStorage.getItem('tema');
+        } catch {}
+        const gecerli = secim === 'aydinlik' || secim === 'karanlik';
+        kok.dataset.tema = gecerli
+          ? secim
+          : matchMedia('(prefers-color-scheme: dark)').matches
+            ? 'karanlik'
+            : 'aydinlik';
+        kok.dataset.temaKaynak = gecerli ? 'secim' : 'sistem';
+      })();
+    </script>
+
     <meta name="theme-color" content="#16203a" />
     <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
     <link rel="alternate" type="application/rss+xml" title={`${SITE.name} — RSS`} href="/rss.xml" />
