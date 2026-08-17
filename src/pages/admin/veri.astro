@@ -22,6 +22,18 @@ const SABIT = [
     aciklama:
       'Araçlar menüsü ve /araclar dizini bu listeden üretilir. slug, sayfanın adresidir: /araclar/<slug>. ikon: akis, bulut, dugum, geri, kalkan, kure, kutu, pencere, sunucu, terminal.',
   },
+  {
+    yol: 'src/data/sayfalar.json',
+    ad: 'Ana sayfa giriş yazısı',
+    aciklama:
+      'Ana sayfadaki rozet, büyük başlık, giriş cümlesi ve iki düğme. Başlıkta *yıldız arasına* alınan kısım renkli vurgulanır. Giriş cümlesindeki {rehberSayisi} yer tutucusu güncel rehber sayısıyla doldurulur.',
+  },
+  {
+    yol: 'src/data/ozgecmis.json',
+    ad: 'Özgeçmiş ve SSS',
+    aciklama:
+      'deneyim: /ozgecmis zaman çizelgesi ve Person şemasındaki hasOccupation. sertifikalar: hasCredential. sss: /hakkimda sayfasındaki soru-cevap bloğu ve FAQPage şeması.',
+  },
 ];
 
 const url = Astro.url;

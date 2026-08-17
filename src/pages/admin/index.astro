@@ -101,9 +101,13 @@ const durumlar = [
   <section class="y-blok">
     <h2>Hızlı işler</h2>
     <div class="y-dugmeler">
-      <a class="y-dg" href="/admin/icerik/rehberler?yeni=1">Yeni rehber</a>
-      <a class="y-dg ikincil" href="/admin/icerik/ipuclari?yeni=1">Yeni ipucu</a>
-      <a class="y-dg ikincil" href="/admin/icerik/komutlar?yeni=1">Yeni komut</a>
+      {/* Adres `/admin/duzenle?...` olmalı: liste sayfası `yeni` parametresini
+          okumuyor, bu düğmeler yeni kayıt formu yerine listeyi açıyordu. */}
+      <a class="y-dg" href="/admin/duzenle?koleksiyon=rehberler&yeni=1">Yeni rehber</a>
+      <a class="y-dg ikincil" href="/admin/duzenle?koleksiyon=ipuclari&yeni=1">Yeni ipucu</a>
+      <a class="y-dg ikincil" href="/admin/duzenle?koleksiyon=komutlar&yeni=1">Yeni komut</a>
+      <a class="y-dg ikincil" href="/admin/duzenle?koleksiyon=cozumler&yeni=1">Yeni çözüm</a>
+      <a class="y-dg ikincil" href="/admin/betikler">Betikler</a>
       <a class="y-dg ikincil" href="/admin/yorumlar">Yorumları yönet</a>
       <a class="y-dg ikincil" href="/admin/veri?dosya=src/data/menu.json">Menüyü düzenle</a>
       <a class="y-dg ikincil" href="/" target="_blank">Siteyi aç</a>

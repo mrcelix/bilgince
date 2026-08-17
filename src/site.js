@@ -3,6 +3,7 @@
 // arayüzü koruyor, böylece panel eklendiğinde hiçbir sayfa değişmedi.
 import ayarlar from './data/ayarlar.json';
 import menuVerisi from './data/menu.json';
+import sayfaVerisi from './data/sayfalar.json';
 
 // Her konu ayrı bir JSON dosyası — admin panelinde koleksiyon olarak yönetiliyor.
 // Dosya adı slug'dır.
@@ -45,6 +46,21 @@ export const KONULAR = Object.entries(konuDosyalari)
   .sort((a, b) => (a.sira ?? 999) - (b.sira ?? 999));
 
 export const MENU = menuVerisi;
+
+/**
+ * Sayfa metinleri (şimdilik yalnızca ana sayfa giriş bloğu). Panelden
+ * düzenlenebilsin diye JSON'da; en çok bayatlayan yazılar burası.
+ */
+export const SAYFALAR = sayfaVerisi;
+
+/**
+ * Başlıktaki *yıldızlı* kısım vurgulanır. Metni parçalara ayırır:
+ * "BT altyapısını *anlaşılır* hale" → ['BT altyapısını ', 'anlaşılır', ' hale']
+ * Tek dönüş dizisi: tek sayılı indeksler vurgulanacak parçalar.
+ */
+export function vurguyaAyir(metin) {
+  return String(metin).split(/\*([^*]+)\*/);
+}
 export const POPULER_ARAMALAR = ayarlar.populerAramalar;
 export const SAYFA_BASI = ayarlar.sayfaBasi;
 

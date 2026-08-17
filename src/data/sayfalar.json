@@ -1,0 +1,9 @@
+{
+  "anaSayfa": {
+    "rozet": "Yeni seri · Entra ID'ye geçiş günlüğü",
+    "baslik": "BT altyapısını *anlaşılır* hale getiren teknik kaynak.",
+    "giris": "12 yıllık sistem yöneticiliğinden çıkarılmış {rehberSayisi} rehber. Her biri üretim ortamında denenmiş, adımları doğrulanmış ve güncel tutuluyor.",
+    "birinciDugme": { "yazi": "Rehberlere göz at", "adres": "/rehberler" },
+    "ikinciDugme": { "yazi": "Danışmanlık talebi", "adres": "/hakkimda#iletisim" }
+  }
+}

@@ -10,7 +10,7 @@ const koleksiyon = koleksiyonBul(slug);
 if (!koleksiyon) return Astro.redirect('/admin');
 
 let hata: string | null = null;
-let kayitlar: { ad: string; baslik: string; taslak: boolean; yayin: string }[] = [];
+let kayitlar: { ad: string; baslik: string; taslak: boolean; yayin: string; konu: string }[] = [];
 
 try {
   const adlar = (await dizinListele(koleksiyon.dizin)).filter((a) => a.endsWith(koleksiyon.uzanti));
@@ -24,9 +24,10 @@ try {
           baslik: yaml.match(/^baslik:[ \t]*(.*)$/m)?.[1]?.replace(/^["']|["']$/g, '') ?? ad,
           taslak: /^taslak:[ \t]*true/m.test(yaml),
           yayin: yaml.match(/^yayin:[ \t]*(.*)$/m)?.[1]?.trim() ?? '',
+          konu: yaml.match(/^konu:[ \t]*(.*)$/m)?.[1]?.trim().replace(/^["']|["']$/g, '') ?? '',
         };
       } catch {
-        return { ad, baslik: ad, taslak: false, yayin: '' };
+        return { ad, baslik: ad, taslak: false, yayin: '', konu: '' };
       }
     })
   );
@@ -34,6 +35,12 @@ try {
 } catch (e) {
   hata = e instanceof Error ? e.message : 'Liste okunamadı.';
 }
+
+// Süzgeç kutuları yalnızca işe yarayacaksa gösteriliyor
+const konular = [...new Set(kayitlar.map((k) => k.konu).filter(Boolean))].sort((a, b) =>
+  a.localeCompare(b, 'tr')
+);
+const taslakVar = kayitlar.some((k) => k.taslak);
 ---
 
 <Yonetim baslik={koleksiyon.ad}>
@@ -49,12 +56,48 @@ try {
     {hata && <div class="y-kutu kotu">{hata}</div>}
 
     {
+      !hata && kayitlar.length > 0 && (
+        <div class="y-suzgec">
+          <input
+            id="k-ara"
+            type="search"
+            placeholder={`${kayitlar.length} kayıt içinde ara: başlık, dosya adı, konu…`}
+            aria-label="Kayıtlarda ara"
+            autocomplete="off"
+          />
+          {konular.length > 1 && (
+            <select id="k-konu" aria-label="Konuya göre süz">
+              <option value="">Tüm konular</option>
+              {konular.map((k) => (
+                <option value={k}>{k}</option>
+              ))}
+            </select>
+          )}
+          {taslakVar && (
+            <label class="k-onay">
+              <input type="checkbox" id="k-taslak" />
+              Yalnızca taslaklar
+            </label>
+          )}
+          <span class="k-sayi" id="k-sayi" role="status" aria-live="polite" />
+        </div>
+      )
+    }
+
+    {
       !hata && (
-        <div class="y-liste">
+        <div class="y-liste" id="k-liste">
           {kayitlar.map((k) => (
-            <a class="y-satir" href={`/admin/duzenle?koleksiyon=${koleksiyon.slug}&ad=${encodeURIComponent(k.ad)}`}>
+            <a
+              class="y-satir"
+              href={`/admin/duzenle?koleksiyon=${koleksiyon.slug}&ad=${encodeURIComponent(k.ad)}`}
+              data-ara={`${k.baslik} ${k.ad} ${k.konu}`.toLocaleLowerCase('tr')}
+              data-konu={k.konu}
+              data-taslak={k.taslak ? 'evet' : 'hayir'}
+            >
               <b>{k.baslik}</b>
               {k.taslak && <span class="y-etiket taslak">taslak</span>}
+              {k.konu && <span class="y-etiket">{k.konu}</span>}
               {k.yayin && <code>{k.yayin}</code>}
               <code>{k.ad}</code>
             </a>
@@ -64,6 +107,7 @@ try {
     }
 
     {!hata && kayitlar.length === 0 && <div class="y-kutu">Bu koleksiyonda henüz kayıt yok.</div>}
+    <div class="y-kutu" id="k-bos" hidden>Süzgece uyan kayıt yok.</div>
   </section>
 
   <section class="y-blok">
@@ -78,4 +122,83 @@ try {
       }
     </div>
   </section>
+
+  <script>
+    (() => {
+      const liste = document.getElementById('k-liste');
+      if (!liste) return;
+      const ara = document.getElementById('k-ara');
+      const konu = document.getElementById('k-konu');
+      const taslak = document.getElementById('k-taslak');
+      const sayi = document.getElementById('k-sayi');
+      const bos = document.getElementById('k-bos');
+      const satirlar = [...liste.querySelectorAll('.y-satir')];
+
+      function suz() {
+        // Türkçe küçültme: "İPUCU" araması "ipucu" ile eşleşsin
+        const q = (ara?.value ?? '').trim().toLocaleLowerCase('tr');
+        const k = konu?.value ?? '';
+        const yalnizTaslak = taslak?.checked ?? false;
+        let gorunen = 0;
+
+        for (const satir of satirlar) {
+          const uyar =
+            (!q || satir.dataset.ara.includes(q)) &&
+            (!k || satir.dataset.konu === k) &&
+            (!yalnizTaslak || satir.dataset.taslak === 'evet');
+          satir.hidden = !uyar;
+          if (uyar) gorunen++;
+        }
+
+        if (sayi) sayi.textContent = gorunen === satirlar.length ? `${gorunen} kayıt` : `${gorunen} / ${satirlar.length}`;
+        if (bos) bos.hidden = gorunen > 0;
+      }
+
+      ara?.addEventListener('input', suz);
+      konu?.addEventListener('change', suz);
+      taslak?.addEventListener('change', suz);
+      // "/" arama kutusuna odaklanır — listede gezerken elini klavyeden çekmesin
+      addEventListener('keydown', (e) => {
+        if (e.key === '/' && document.activeElement?.tagName !== 'INPUT') {
+          e.preventDefault();
+          ara?.focus();
+        }
+      });
+      suz();
+    })();
+  </script>
+
+  <style>
+    .y-suzgec {
+      display: flex;
+      gap: 10px;
+      flex-wrap: wrap;
+      align-items: center;
+      margin-bottom: 14px;
+    }
+    .y-suzgec input[type='search'] {
+      flex: 1 1 260px;
+      min-width: 0;
+    }
+    .k-onay {
+      display: flex;
+      align-items: center;
+      gap: 7px;
+      font-size: 13px;
+      color: var(--ink-soft);
+      cursor: pointer;
+      white-space: nowrap;
+    }
+    .k-onay input {
+      width: 16px;
+      height: 16px;
+      accent-color: var(--indigo);
+    }
+    .k-sayi {
+      font-family: var(--mono);
+      font-size: 12px;
+      color: var(--muted);
+      margin-left: auto;
+    }
+  </style>
 </Yonetim>

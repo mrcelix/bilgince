@@ -71,10 +71,31 @@ depodaki bir dosyaya yazılır.
 
 | Ekran | Ne yönetir |
 | --- | --- |
-| `/admin` | Gösterge: sayaçlar, kurulum durumu, yayındaki derleme |
-| `/admin/icerik/<koleksiyon>` | Rehber, ipucu, komut, çözüm, proje listesi ve düzenleme |
+| `/admin` | Gösterge: sayaçlar, kurulum durumu, yayındaki derleme, hızlı işler |
+| `/admin/icerik/<koleksiyon>` | Rehber, ipucu, komut, çözüm, proje listesi — arama, konu süzgeci, taslak süzgeci |
 | `/admin/duzenle` | Tek kayıt: hızlı alanlar + ham frontmatter + gövde |
-| `/admin/veri` | `ayarlar.json`, `menu.json`, `araclar.json`, `konu/*.json` + yeni konu |
+| `/admin/betikler` | `public/araclar/` altındaki indirilebilir betikler; hangi çözümün bağlı olduğunu gösterir |
+| `/admin/yorumlar` | Yorum onayı, reddi, yanıtı, silinmesi |
+| `/admin/veri` | `ayarlar.json`, `menu.json`, `araclar.json`, `sayfalar.json`, `ozgecmis.json`, `konu/*.json` + yeni konu |
+
+**Panelin kapsamı.** Sitedeki her içerik türü panelden yönetilir:
+
+| İçerik | Nerede |
+| --- | --- |
+| Rehber, ipucu, komut, hızlı çözüm, proje | `/admin/icerik/<koleksiyon>` — koleksiyon şemasındaki **tüm** alanlar hızlı alan olarak var |
+| İndirilebilir betikler | `/admin/betikler` |
+| Menü grupları, konular, araç kütüğü, site ayarları | `/admin/veri` |
+| Ana sayfa giriş yazısı (rozet, başlık, giriş, düğmeler) | `/admin/veri` → `sayfalar.json` |
+| Özgeçmiş, sertifikalar, SSS | `/admin/veri` → `ozgecmis.json` |
+| Yorumlar | `/admin/yorumlar` |
+
+Panelin **dışında** kalan tek şey: `/hakkimda`, `/ozgecmis` ve `/portfolyo` gibi statik
+sayfaların uzun anlatı metinleri. Bunlar `.astro` dosyalarında duruyor; JSON dizesine
+çevirmek düzenlemeyi kolaylaştırmaz, zorlaştırırdı.
+
+Kolaylaştıran dokunuşlar: listelerde arama (`/` tuşu odaklar), konu ve taslak süzgeci;
+editörde <kbd>Ctrl</kbd>+<kbd>S</kbd> ile kaydetme, kaydedilmemiş değişiklik uyarısı,
+başlıktan dosya adı türetme, özet için 155 karakter sayacı ve zorunlu alan denetimi.
 
 **Yerelde** kimlik doğrulaması istemez ve doğrudan diske yazar:
 
@@ -221,9 +242,11 @@ Slug'ı değiştirmeyin — kalıcı bağlantı kırılır.
 
 Yayına almadan önce değiştirilmesi gerekenler:
 
-- `src/site.js` — ad-soyad, e-posta, sosyal hesaplar, bülten uç noktası
-- `src/cv.js` — iş deneyimi, sertifikalar, SSS
-- `src/content/projeler/*.md` — proje metrikleri
+- `src/data/ayarlar.json` — ad-soyad, e-posta, sosyal hesaplar, bülten uç noktası
+- `src/data/ozgecmis.json` — iş deneyimi, sertifikalar, SSS
+- `src/content/projeler/*.mdx` — proje metrikleri
+
+Üçü de `/admin/veri` ve `/admin/icerik/projeler` ekranlarından düzenlenebilir.
 
 Alan adı yalnızca `src/site.js` içindeki `url` alanında tanımlı; canonical, OG adresleri,
 RSS, site haritası ve `robots.txt` hepsi oradan türer. Değiştirmek için tek satır yeterli.

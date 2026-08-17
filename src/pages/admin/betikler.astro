@@ -1,0 +1,211 @@
+---
+/**
+ * İndirilebilir betikler. `public/araclar/` altındaki dosyalar hızlı çözüm
+ * sayfalarının "İndir" düğmesini besliyor; dosya ucu bu dizine yazmaya zaten
+ * izinliydi ama ekranı yoktu — betiği düzeltmek için depoya inmek gerekiyordu.
+ *
+ * Hangi çözümün hangi betiği kullandığı da burada gösteriliyor: bir betiği
+ * silmeden önce kimin bağlandığını görmek gerekiyor.
+ */
+import Yonetim from '../../layouts/Yonetim.astro';
+import { dizinListele, dosyaOku } from '../../admin/depo';
+import { frontmatterAyir, alanOku } from '../../admin/icerik';
+
+export const prerender = false;
+
+const DIZIN = 'public/araclar';
+const url = Astro.url;
+const secili = url.searchParams.get('dosya');
+
+let hata: string | null = null;
+let dosyalar: string[] = [];
+/** betik yolu → ona bağlanan çözümlerin dosya adı */
+const kullanim = new Map<string, string[]>();
+
+try {
+  dosyalar = (await dizinListele(DIZIN)).sort((a, b) => a.localeCompare(b, 'tr'));
+
+  const cozumler = (await dizinListele('src/content/cozumler')).filter((a) => a.endsWith('.mdx'));
+  for (const ad of cozumler) {
+    try {
+      const { icerik } = await dosyaOku(`src/content/cozumler/${ad}`);
+      const yol = alanOku(frontmatterAyir(icerik).yaml, 'dosya')
+        ?.trim()
+        .replace(/^["']|["']$/g, '');
+      if (!yol) continue;
+      const dosyaAdi = yol.split('/').pop()!;
+      kullanim.set(dosyaAdi, [...(kullanim.get(dosyaAdi) ?? []), ad]);
+    } catch {
+      /* tek bir çözüm okunamazsa liste yine de çalışsın */
+    }
+  }
+} catch (e) {
+  hata = e instanceof Error ? e.message : 'Betik dizini okunamadı.';
+}
+
+let icerik = '';
+if (secili && dosyalar.includes(secili)) {
+  try {
+    icerik = (await dosyaOku(`${DIZIN}/${secili}`)).icerik;
+  } catch (e) {
+    hata = e instanceof Error ? e.message : 'Dosya okunamadı.';
+  }
+}
+
+const sahipsiz = dosyalar.filter((d) => !kullanim.has(d));
+---
+
+<Yonetim baslik="Betikler">
+  <section class="y-blok">
+    <div style="display:flex;align-items:center;gap:14px;flex-wrap:wrap;margin-bottom:6px">
+      <h2 style="margin:0;flex:1">
+        İndirilebilir betikler <span style="color:var(--muted);font-weight:400">· {dosyalar.length}</span>
+      </h2>
+      <button type="button" class="y-dg" id="b-yeni">Yeni betik</button>
+    </div>
+    <p style="color:var(--muted);font-size:13.5px;margin:0 0 18px">
+      <code>public/araclar/</code> altındaki dosyalar. Hızlı çözümlerin <code>dosya</code> alanı
+      buraya işaret eder; adres <code>/araclar/&lt;dosya adı&gt;</code> olur.
+    </p>
+
+    {hata && <div class="y-kutu kotu">{hata}</div>}
+
+    {
+      sahipsiz.length > 0 && (
+        <div class="y-kutu" style="margin-bottom:14px">
+          Hiçbir çözüme bağlı olmayan {sahipsiz.length} betik var: {sahipsiz.join(', ')}. Bunlar sitede
+          yalnızca doğrudan adresle indirilebilir.
+        </div>
+      )
+    }
+
+    <div class="y-liste">
+      {
+        dosyalar.map((d) => (
+          <a class="y-satir" href={`/admin/betikler?dosya=${encodeURIComponent(d)}`} aria-current={d === secili ? 'true' : undefined}>
+            <b>{d}</b>
+            {kullanim.has(d) ? (
+              <span class="y-etiket">{kullanim.get(d)!.length} çözüm</span>
+            ) : (
+              <span class="y-etiket taslak">bağlı değil</span>
+            )}
+          </a>
+        ))
+      }
+    </div>
+  </section>
+
+  {
+    secili && (
+      <section class="y-blok">
+        <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:12px">
+          <h2 style="margin:0;flex:1">{secili}</h2>
+          <a class="y-dg ikincil" target="_blank" href={`/araclar/${secili}`}>
+            İndir
+          </a>
+          <button type="button" class="y-dg tehlike" id="b-sil">Sil</button>
+        </div>
+
+        {kullanim.has(secili) && (
+          <p style="color:var(--muted);font-size:13px;margin:0 0 12px">
+            Bağlı çözümler: {kullanim.get(secili)!.join(', ')}
+          </p>
+        )}
+
+        <div class="y-alan">
+          <label for="b-icerik">Betik içeriği</label>
+          <textarea id="b-icerik" rows="22" spellcheck="false" set:text={icerik} />
+          <small>Kaydetmek depoda bir commit oluşturur. <kbd>Ctrl</kbd>+<kbd>S</kbd> de kaydeder.</small>
+        </div>
+
+        <div class="y-dugmeler">
+          <button type="button" class="y-dg" id="b-kaydet">Kaydet</button>
+        </div>
+        <p class="y-durum" id="b-durum" style="margin-top:12px" role="status" aria-live="polite" />
+      </section>
+    )
+  }
+
+  <script define:vars={{ DIZIN, secili }}>
+    (() => {
+      const el = (s) => document.querySelector(s);
+      const durum = el('#b-durum');
+
+      el('#b-yeni')?.addEventListener('click', () => {
+        const ad = prompt('Yeni betiğin dosya adı (örn. disk-temizlik.ps1):');
+        if (!ad) return;
+        if (!/^[\w.-]+$/.test(ad)) {
+          alert('Dosya adında yalnızca harf, rakam, nokta, tire ve alt çizgi olabilir.');
+          return;
+        }
+        location.href = `/admin/betikler?dosya=${encodeURIComponent(ad)}&yeni=1`;
+      });
+
+      const kutu = el('#b-icerik');
+      if (!kutu) return;
+
+      let kirli = false;
+      kutu.addEventListener('input', () => (kirli = true));
+      addEventListener('beforeunload', (e) => {
+        if (!kirli) return;
+        e.preventDefault();
+        e.returnValue = '';
+      });
+
+      async function kaydet() {
+        const dugme = el('#b-kaydet');
+        dugme.disabled = true;
+        durum.className = 'y-durum';
+        durum.textContent = 'Kaydediliyor…';
+        try {
+          const cevap = await fetch('/api/admin/dosya', {
+            method: 'PUT',
+            headers: { 'content-type': 'application/json' },
+            body: JSON.stringify({
+              yol: `${DIZIN}/${secili}`,
+              icerik: kutu.value,
+              mesaj: `Betik güncellendi — ${secili}`,
+            }),
+          });
+          const sonuc = await cevap.json();
+          if (!cevap.ok) throw new Error(sonuc.hata ?? 'Kaydedilemedi.');
+          kirli = false;
+          durum.className = 'y-durum ok';
+          durum.textContent =
+            (sonuc.commit ? `Kaydedildi (commit ${sonuc.commit}). ` : 'Kaydedildi. ') + (sonuc.not ?? '');
+        } catch (e) {
+          durum.className = 'y-durum hata';
+          durum.textContent = e.message;
+        } finally {
+          dugme.disabled = false;
+        }
+      }
+
+      el('#b-kaydet').addEventListener('click', kaydet);
+      addEventListener('keydown', (e) => {
+        if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 's') {
+          e.preventDefault();
+          kaydet();
+        }
+      });
+
+      el('#b-sil')?.addEventListener('click', async () => {
+        if (!confirm(`"${secili}" silinsin mi? Ona bağlı çözümlerin indirme düğmesi kırılır.`)) return;
+        durum.className = 'y-durum';
+        durum.textContent = 'Siliniyor…';
+        try {
+          const cevap = await fetch(`/api/admin/dosya?yol=${encodeURIComponent(`${DIZIN}/${secili}`)}`, {
+            method: 'DELETE',
+          });
+          const sonuc = await cevap.json();
+          if (!cevap.ok) throw new Error(sonuc.hata ?? 'Silinemedi.');
+          kirli = false;
+          location.href = '/admin/betikler';
+        } catch (e) {
+          durum.className = 'y-durum hata';
+          durum.textContent = e.message;
+        }
+      });
+    })();
+  </script>
+</Yonetim>

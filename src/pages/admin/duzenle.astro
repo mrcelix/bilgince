@@ -91,9 +91,37 @@ if (ad) {
     <div class="y-dugmeler" style="margin-top:8px">
       <button type="button" class="y-dg" id="d-kaydet">Kaydet</button>
       {ad && <button type="button" class="y-dg tehlike" id="d-sil">Sil</button>}
+      <span class="d-kisayol"><kbd>Ctrl</kbd>+<kbd>S</kbd> kaydeder</span>
     </div>
     <p class="y-durum" id="d-durum" style="margin-top:12px" role="status" aria-live="polite"></p>
   </section>
+
+  <style>
+    .d-kisayol {
+      align-self: center;
+      font-size: 11.5px;
+      color: var(--muted);
+    }
+    .d-kisayol kbd {
+      font-family: var(--mono);
+      font-size: 10.5px;
+      border: 1px solid var(--line);
+      border-bottom-width: 2px;
+      border-radius: 4px;
+      padding: 1px 5px;
+      background: var(--paper);
+    }
+    .d-sayac {
+      font-variant-numeric: tabular-nums;
+    }
+    .d-sayac[data-durum='uzun'] {
+      color: var(--clay-ink);
+      font-weight: 700;
+    }
+    .d-sayac[data-durum='iyi'] {
+      color: var(--green-ink);
+    }
+  </style>
 
   <script
     define:vars={{
@@ -150,6 +178,20 @@ if (ad) {
           while (son < satirlar.length && (satirlar[son].trim() === '' || /^ {2,}/.test(satirlar[son]))) son++;
         }
         return [...satirlar.slice(0, bas), ...yeni, ...satirlar.slice(son)].join('\n');
+      };
+
+      /* Boş bırakılan blok alan anahtarıyla birlikte silinmeli: `komut: |` diye
+         gövdesiz bir anahtar bırakmak isteğe bağlı alanı boş metin yapıyor,
+         sayfalar da boş bir terminal kutusu çiziyordu. */
+      const blokSil = (yaml, anahtar) => {
+        const satirlar = yaml.split('\n');
+        const bas = satirlar.findIndex((s) => new RegExp(`^${anahtar}:`).test(s));
+        if (bas === -1) return yaml;
+        let son = bas + 1;
+        if (/^[^:]*:\s*[|>]/.test(satirlar[bas])) {
+          while (son < satirlar.length && (satirlar[son].trim() === '' || /^ {2,}/.test(satirlar[son]))) son++;
+        }
+        return [...satirlar.slice(0, bas), ...satirlar.slice(son)].join('\n');
       };
 
       const yamlDeger = (alan, girdi) => {
@@ -230,7 +272,10 @@ if (ad) {
       function alanlardanYamla(anahtar) {
         const { alan, girdi } = kutular.get(anahtar);
         if (alan.tur === 'blok') {
-          yamlAlani.value = blokYaz(yamlAlani.value, anahtar, girdi.value);
+          const metin = girdi.value.replace(/\s+$/, '');
+          yamlAlani.value = metin
+            ? blokYaz(yamlAlani.value, anahtar, metin)
+            : blokSil(yamlAlani.value, anahtar);
           return;
         }
         const ham = alan.tur === 'onay' ? String(girdi.checked) : girdi.value;
@@ -263,8 +308,45 @@ if (ad) {
         dosyaAdiGirdi.addEventListener('input', () => (dosyaAdiGirdi.dataset.elle = '1'));
       }
 
+      /* --- özet sayacı -------------------------------------------------------
+         Özet hem sayfada hem meta açıklamada kullanılıyor; Google 155 karakterden
+         sonrasını kesiyor. Sayaç yazarken uyarıyor, engellemiyor. */
+      const ozetKutu = kutular.get('ozet');
+      if (ozetKutu) {
+        const sayac = document.createElement('small');
+        sayac.className = 'd-sayac';
+        ozetKutu.girdi.parentElement.appendChild(sayac);
+        const tazele = () => {
+          const n = ozetKutu.girdi.value.trim().length;
+          sayac.textContent = `${n} / 155 karakter`;
+          sayac.dataset.durum = n > 155 ? 'uzun' : n >= 60 ? 'iyi' : 'kisa';
+        };
+        ozetKutu.girdi.addEventListener('input', tazele);
+        tazele();
+      }
+
+      /* --- kaydedilmemiş değişiklik ------------------------------------------
+         Panelde uzun bir gövde yazıp sekmeyi kapatmak kolay; tarayıcı sorsun. */
+      let kirli = false;
+      const kirlet = () => (kirli = true);
+      [...kutular.values()].forEach(({ girdi }) => {
+        girdi.addEventListener('input', kirlet);
+        girdi.addEventListener('change', kirlet);
+      });
+      yamlAlani.addEventListener('input', kirlet);
+      el('#d-govde')?.addEventListener('input', kirlet);
+      dosyaAdiGirdi?.addEventListener('input', kirlet);
+      addEventListener('beforeunload', (e) => {
+        if (!kirli) return;
+        e.preventDefault();
+        e.returnValue = '';
+      });
+
       /* --- kaydet ------------------------------------------------------------ */
       const durum = el('#d-durum');
+
+      /** Boş bırakılınca derlemeyi kıran alanlar; kaydetmeden önce uyarılıyor. */
+      const ZORUNLU = ['baslik', 'ozet', 'konu', 'kod', 'rol', 'yil'];
 
       el('#d-kaydet').addEventListener('click', async (e) => {
         const dugme = e.currentTarget;
@@ -272,6 +354,19 @@ if (ad) {
         if (!dosyaAdi) {
           durum.className = 'y-durum hata';
           durum.textContent = 'Dosya adı gerekli.';
+          dosyaAdiGirdi.focus();
+          return;
+        }
+
+        // Şema bu alanları zorunlu tutuyor; boşsa derleme kırılır, panelde yakala
+        const eksik = [...kutular.values()].filter(
+          ({ alan, girdi }) =>
+            ZORUNLU.includes(alan.anahtar) && alan.tur !== 'onay' && !String(girdi.value).trim()
+        );
+        if (eksik.length) {
+          durum.className = 'y-durum hata';
+          durum.textContent = `Şu alanlar boş bırakılamaz: ${eksik.map((x) => x.alan.etiket).join(', ')}`;
+          eksik[0].girdi.focus();
           return;
         }
 
@@ -300,6 +395,7 @@ if (ad) {
           durum.className = 'y-durum ok';
           durum.textContent =
             (sonuc.commit ? `Kaydedildi (commit ${sonuc.commit}). ` : 'Kaydedildi. ') + (sonuc.not ?? '');
+          kirli = false;
 
           if (!mevcutAd) {
             setTimeout(() => {
@@ -328,6 +424,7 @@ if (ad) {
             });
             const sonuc = await cevap.json();
             if (!cevap.ok) throw new Error(sonuc.hata ?? 'Silinemedi.');
+            kirli = false; // yoksa ayrılırken "kaydedilmemiş değişiklik" sorar
             location.href = `/admin/icerik/${new URLSearchParams(location.search).get('koleksiyon')}`;
           } catch (hata) {
             durum.className = 'y-durum hata';
@@ -336,6 +433,15 @@ if (ad) {
           }
         });
       }
+
+      /* --- klavye ------------------------------------------------------------
+         Ctrl/⌘+S kaydediyor: uzun bir gövde yazarken fareye uzanmak gerekmesin. */
+      addEventListener('keydown', (e) => {
+        if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 's') {
+          e.preventDefault();
+          el('#d-kaydet').click();
+        }
+      });
     })();
   </script>
 </Yonetim>

@@ -3,7 +3,7 @@ import Base from '../layouts/Base.astro';
 import Bulten from '../components/Bulten.astro';
 import KonuIkon from '../components/KonuIkon.astro';
 import { getCollection } from 'astro:content';
-import { SITE, KONULAR, slugla, trKisaTarih, trTarih, sayi } from '../site.js';
+import { SITE, KONULAR, SAYFALAR, vurguyaAyir, slugla, trKisaTarih, trTarih, sayi } from '../site.js';
 
 const hepsi = (await getCollection('rehberler'))
   .filter((r) => !r.data.taslak)
@@ -31,6 +31,12 @@ const seriler = [...new Set(hepsi.map((r) => r.data.seri).filter(Boolean))].map(
   };
 });
 
+/* Giriş bloğunun yazıları panelden düzenleniyor (src/data/sayfalar.json).
+   {rehberSayisi} yer tutucusu burada sayıyla doldurulur; metni yazan kişinin
+   sayıyı elle güncellemesi gerekmesin. */
+const giris = SAYFALAR.anaSayfa;
+const girisMetni = giris.giris.replace('{rehberSayisi}', String(hepsi.length));
+
 const renk = ['#3A45E0', '#EFA013', '#15A24A'];
 const enSonGuncelleme = hepsi
   .map((r) => r.data.guncelleme ?? r.data.yayin)
@@ -56,15 +62,18 @@ const enSonGuncelleme = hepsi
   <div class="kap">
     <section class="hero">
       <div>
-        <span class="rozet"><i></i>Yeni seri · Entra ID'ye geçiş günlüğü</span>
-        <h1>BT altyapısını <em>anlaşılır</em> hale getiren teknik kaynak.</h1>
-        <p class="giris">
-          12 yıllık sistem yöneticiliğinden çıkarılmış {hepsi.length} rehber. Her biri üretim ortamında
-          denenmiş, adımları doğrulanmış ve güncel tutuluyor.
-        </p>
+        <span class="rozet"><i></i>{giris.rozet}</span>
+        <h1>
+          {
+            /* Başlıktaki *yıldızlı* parça vurgulanır; tek sayılı indeksler
+               ayırıcının yakaladığı bölümler. */
+            vurguyaAyir(giris.baslik).map((parca, i) => (i % 2 ? <em>{parca}</em> : parca))
+          }
+        </h1>
+        <p class="giris">{girisMetni}</p>
         <div class="eylemler">
-          <a class="dg" href="/rehberler">Rehberlere göz at</a>
-          <a class="dg dg-hayalet" href="/hakkimda#iletisim">Danışmanlık talebi</a>
+          <a class="dg" href={giris.birinciDugme.adres}>{giris.birinciDugme.yazi}</a>
+          <a class="dg dg-hayalet" href={giris.ikinciDugme.adres}>{giris.ikinciDugme.yazi}</a>
         </div>
         <p class="not">
           <i></i>Son güncelleme: {trTarih(enSonGuncelleme)}
