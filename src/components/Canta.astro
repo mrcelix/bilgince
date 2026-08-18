@@ -1,0 +1,69 @@
+---
+/**
+ * Saha çantasının alt şeridi. Çanta boşken hiç görünmez; dolduğunda sayfanın
+ * altına ince bir şerit olarak gelir ve /canta sayfasına götürür.
+ *
+ * Ekleme düğmeleri içerik sayfalarında (`data-canta-ekle="<kimlik>"`); şerit
+ * onları tek yerden dinliyor, her sayfaya betik yazmak gerekmesin.
+ */
+---
+
+<div class="canta-serit" id="canta-serit" hidden>
+  <div class="kap">
+    <span class="canta-sayi"><b id="canta-adet">0</b> öğe çantada</span>
+    <span class="canta-ozet" id="canta-ozet"></span>
+    <a class="dg" href="/canta">Çantayı aç</a>
+    <button type="button" class="canta-kapat" id="canta-bosalt" aria-label="Çantayı boşalt">Boşalt</button>
+  </div>
+</div>
+
+<script>
+  import { oku, ekle, cikar, icindeMi, bosalt, degisince, dizin } from '../scripts/canta.js';
+
+  (() => {
+    const serit = document.getElementById('canta-serit');
+    const adet = document.getElementById('canta-adet');
+    const ozet = document.getElementById('canta-ozet');
+    if (!serit) return;
+
+    /** Ekleme düğmelerinin metnini çantadaki duruma göre günceller. */
+    function dugmeleriTazele() {
+      document.querySelectorAll('[data-canta-ekle]').forEach((d) => {
+        const icinde = icindeMi(d.dataset.cantaEkle);
+        d.dataset.durum = icinde ? 'ekli' : 'yok';
+        d.setAttribute('aria-pressed', String(icinde));
+        const etiket = d.querySelector('.canta-yazi');
+        if (etiket) etiket.textContent = icinde ? 'Çantada' : 'Çantaya ekle';
+      });
+    }
+
+    async function seridiTazele(kimlikler) {
+      serit.hidden = kimlikler.length === 0;
+      adet.textContent = String(kimlikler.length);
+      dugmeleriTazele();
+      if (!kimlikler.length || !ozet) return;
+      try {
+        const harita = await dizin();
+        const adlar = kimlikler.map((k) => harita.get(k)?.baslik).filter(Boolean);
+        ozet.textContent = adlar.slice(0, 2).join(' · ') + (adlar.length > 2 ? ` +${adlar.length - 2}` : '');
+      } catch {
+        ozet.textContent = '';
+      }
+    }
+
+    document.addEventListener('click', (e) => {
+      const dugme = e.target.closest('[data-canta-ekle]');
+      if (!dugme) return;
+      e.preventDefault();
+      const kimlik = dugme.dataset.cantaEkle;
+      icindeMi(kimlik) ? cikar(kimlik) : ekle(kimlik);
+    });
+
+    document.getElementById('canta-bosalt')?.addEventListener('click', () => {
+      if (confirm('Çantadaki her şey silinsin mi?')) bosalt();
+    });
+
+    degisince(seridiTazele);
+    seridiTazele(oku());
+  })();
+</script>

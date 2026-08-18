@@ -97,6 +97,9 @@ const kullanilan = KONULAR.filter((k) => komutlar.some((c) => c.data.konu === k.
               <button class="kopyala" type="button" data-kopyala>
                 Kopyala
               </button>
+              <button class="canta-ekle" type="button" data-canta-ekle={`komut:${c.id}`} aria-pressed="false">
+                <span aria-hidden="true">+</span> <span class="canta-yazi">Çantaya ekle</span>
+              </button>
             </div>
 
             {c.data.dikkat && (

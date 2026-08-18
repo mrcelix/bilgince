@@ -97,7 +97,12 @@ const url = `${SITE.url}/hizli-cozumler/${cozum.id}`;
       d.komut && (
         <section style="margin-top:24px;max-width:66ch">
           <span class="yan-etiket">30 saniyelik çözüm</span>
-          <pre class="kod" style="margin-top:8px"><code>{d.komut}</code></pre>
+          <div style="position:relative">
+            <pre class="kod" style="margin-top:8px"><code>{d.komut}</code></pre>
+            <button class="canta-ekle" type="button" data-canta-ekle={`cozum:${cozum.id}`} aria-pressed="false">
+              <span aria-hidden="true">+</span> <span class="canta-yazi">Çantaya ekle</span>
+            </button>
+          </div>
         </section>
       )
     }
@@ -122,6 +127,9 @@ const url = `${SITE.url}/hizli-cozumler/${cozum.id}`;
             </svg>
             İndir
           </a>
+          <button class="canta-ekle canta-ekle-duz" type="button" data-canta-ekle={`betik:${cozum.id}`} aria-pressed="false">
+            <span aria-hidden="true">+</span> <span class="canta-yazi">Çantaya ekle</span>
+          </button>
         </section>
       )
     }

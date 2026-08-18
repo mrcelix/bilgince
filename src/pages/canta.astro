@@ -1,0 +1,455 @@
+---
+import Base from '../layouts/Base.astro';
+import { SITE } from '../site.js';
+---
+
+<Base
+  baslik="Saha çantası"
+  aciklama="Komutları, hızlı çözümleri ve betikleri tek bir runbook'ta toplayın; PowerShell betiği, yazdırılabilir kontrol listesi ya da paylaşılabilir bağlantı olarak dışa aktarın."
+  noindex={true}
+  aramaya={false}
+>
+  <div class="arama-bas">
+    <div class="kap">
+      <nav class="kirinti" aria-label="Kırıntı yolu" style="padding-top:0">
+        <a href="/">Ana sayfa</a><span class="ayrac">/</span><span aria-current="page">Saha çantası</span>
+      </nav>
+      <h1>Saha çantası</h1>
+      <p style="color:var(--muted);font-size:14px;margin-top:8px;max-width:68ch">
+        Sitede gezerken topladığınız komutlar, hızlı çözümler ve betikler burada sıraya giriyor.
+        Sırayı değiştirin, başlık verin, sonra tek dosya olarak indirin. Her şey tarayıcınızda
+        kalıyor — sunucuya hiçbir şey gönderilmiyor.
+      </p>
+    </div>
+  </div>
+
+  <div class="kap" style="padding-bottom:64px">
+    <div class="c-paylasim" id="c-paylasim" hidden>
+      <b>Bu bağlantı bir çanta taşıyor.</b>
+      <span id="c-paylasim-ozet"></span>
+      <div class="c-dugmeler" style="margin-top:12px">
+        <button type="button" class="dg" id="c-al">Çantama al</button>
+        <button type="button" class="dg dg-hayalet" id="c-birlestir">Kendi çantama ekle</button>
+      </div>
+    </div>
+
+    <div class="c-bos" id="c-bos" hidden>
+      <h2>Çanta boş</h2>
+      <p>
+        Komut kütüphanesinde ya da bir hızlı çözüm sayfasında <b>Çantaya ekle</b> düğmesine basın.
+        Topladıklarınız burada birikir.
+      </p>
+      <div class="c-dugmeler" style="justify-content:center;margin-top:16px">
+        <a class="dg" href="/komutlar">Komut kütüphanesi</a>
+        <a class="dg dg-hayalet" href="/hizli-cozumler">Hızlı çözümler</a>
+      </div>
+    </div>
+
+    <div id="c-govde" hidden>
+      <div class="c-ust">
+        <span class="c-sayi" id="c-sayi"></span>
+        <div class="c-dugmeler">
+          <button type="button" class="dg" id="c-ps">PowerShell betiği indir</button>
+          <button type="button" class="dg dg-hayalet" id="c-md">Kontrol listesi (.md)</button>
+          <button type="button" class="dg dg-hayalet" id="c-bag">Bağlantıyı kopyala</button>
+          <button type="button" class="dg dg-hayalet" id="c-yazdir">Yazdır</button>
+        </div>
+      </div>
+      <p class="c-durum" id="c-durum" role="status" aria-live="polite"></p>
+
+      <div class="c-not">
+        <label for="c-baslik">Runbook başlığı</label>
+        <input id="c-baslik" type="text" placeholder="Örn. Cuma akşamı Entra ID geçişi" />
+        <small>Dışa aktarılan dosyanın başına ve adına yazılır.</small>
+      </div>
+
+      <ol class="c-liste" id="c-liste"></ol>
+    </div>
+  </div>
+
+  <script is:inline define:vars={{ siteAdi: SITE.name, siteAdres: SITE.url }}>
+    /* Modül içe aktaran betik `define:vars` alamıyor; site bilgisi buradan
+       geçiriliyor. */
+    window.__cantaSite = { ad: siteAdi, adres: siteAdres };
+  </script>
+
+  <script>
+    import { oku, yaz, cikar, tasi, degisince, dizin, adrestenOku, paylasimAdresi } from '../scripts/canta.js';
+
+    (() => {
+      const el = (s) => document.querySelector(s);
+      const liste = el('#c-liste');
+      const govde = el('#c-govde');
+      const bosKutu = el('#c-bos');
+      const durum = el('#c-durum');
+      const site = window.__cantaSite ?? { ad: 'bilgince', adres: '' };
+
+      const kacir = (m) =>
+        String(m ?? '').replace(/[<>&"]/g, (c) => ({ '<': '&lt;', '>': '&gt;', '&': '&amp;', '"': '&quot;' })[c]);
+
+      const TUR_ADI = { komut: 'Komut', cozum: 'Hızlı çözüm', betik: 'Betik' };
+
+      let harita = new Map();
+
+      /* --- çizim ---------------------------------------------------------- */
+      function ciz(kimlikler) {
+        // Dizinde olmayan kimlik: içerik silinmiş olabilir, sessizce atlanıyor
+        const varOlan = kimlikler.filter((k) => harita.has(k));
+        bosKutu.hidden = varOlan.length > 0;
+        govde.hidden = varOlan.length === 0;
+        if (!varOlan.length) return;
+
+        el('#c-sayi').textContent = varOlan.length + ' öğe';
+        liste.innerHTML = varOlan
+          .map((kimlik, i) => {
+            const o = harita.get(kimlik);
+            const govdeBlok = o.kod
+              ? '<pre class="kod"><code>' + kacir(o.kod) + '</code></pre>'
+              : '<p class="c-indir">İndirilecek dosya: <code>' + kacir(o.dosya) + '</code></p>';
+            return [
+              '<li class="c-kayit" data-kimlik="' + kacir(kimlik) + '">',
+              '  <div class="c-kayit-ust">',
+              '    <span class="etiket">' + (TUR_ADI[o.tur] ?? o.tur) + '</span>',
+              '    <b>' + kacir(o.baslik) + '</b>',
+              '    <span class="c-sira">',
+              '      <button type="button" data-tasi="-1" aria-label="Yukarı taşı"' + (i === 0 ? ' disabled' : '') + '>↑</button>',
+              '      <button type="button" data-tasi="1" aria-label="Aşağı taşı"' + (i === varOlan.length - 1 ? ' disabled' : '') + '>↓</button>',
+              '      <button type="button" data-cikar aria-label="Çantadan çıkar">✕</button>',
+              '    </span>',
+              '  </div>',
+              '  <p class="c-ozet">' + kacir(o.ozet) + '</p>',
+              o.dikkat ? '  <p class="c-dikkat">Dikkat: ' + kacir(o.dikkat) + '</p>' : '',
+              '  ' + govdeBlok,
+              '  <a class="c-kaynak" href="' + kacir(o.adres) + '">Kaynağı aç →</a>',
+              '</li>',
+            ]
+              .filter(Boolean)
+              .join('\n');
+          })
+          .join('');
+      }
+
+      liste.addEventListener('click', (e) => {
+        const kayit = e.target.closest('.c-kayit');
+        if (!kayit) return;
+        const kimlik = kayit.dataset.kimlik;
+        if (e.target.closest('[data-cikar]')) cikar(kimlik);
+        else if (e.target.closest('[data-tasi]')) {
+          tasi(kimlik, Number(e.target.closest('[data-tasi]').dataset.tasi));
+        }
+      });
+
+      /* --- dışa aktarma --------------------------------------------------- */
+      const bugun = () =>
+        new Date().toLocaleDateString('tr-TR', { day: 'numeric', month: 'long', year: 'numeric' });
+
+      const runbookBasligi = () => el('#c-baslik').value.trim() || 'Saha çantası';
+
+      function indir(uzanti, tur, metin) {
+        const govdeAdi =
+          runbookBasligi()
+            .toLocaleLowerCase('tr')
+            .replace(/[çğıöşü]/g, (h) => ({ ç: 'c', ğ: 'g', ı: 'i', ö: 'o', ş: 's', ü: 'u' })[h])
+            .replace(/[^a-z0-9]+/g, '-')
+            .replace(/^-+|-+$/g, '') || 'runbook';
+        const bag = document.createElement('a');
+        const adres = URL.createObjectURL(new Blob([metin], { type: tur }));
+        bag.href = adres;
+        bag.download = govdeAdi + uzanti;
+        bag.click();
+        URL.revokeObjectURL(adres);
+        durum.className = 'c-durum ok';
+        durum.textContent = govdeAdi + uzanti + ' indirildi.';
+      }
+
+      const ogeler = () => oku().filter((k) => harita.has(k)).map((k) => harita.get(k));
+
+      el('#c-ps').addEventListener('click', () => {
+        const o = ogeler();
+        const s = [
+          '<#',
+          '  ' + runbookBasligi(),
+          '  ' + site.ad + ' saha çantasından üretildi — ' + bugun(),
+          '  ' + site.adres + '/canta',
+          '',
+          '  ' + o.length + ' adım. Bu dosya doğrudan çalıştırılmak için değil, sırayla',
+          '  uygulanmak için üretildi: her komutu çalıştırmadan önce ne yaptığını okuyun.',
+          '#>',
+          '',
+        ];
+        o.forEach((x, i) => {
+          s.push('# ' + '-'.repeat(70));
+          s.push('# ' + (i + 1) + '. ' + x.baslik + '  [' + (TUR_ADI[x.tur] ?? x.tur) + ']');
+          if (x.ozet) s.push('# ' + x.ozet);
+          if (x.dikkat) s.push('# DİKKAT: ' + x.dikkat);
+          s.push('# Kaynak: ' + site.adres + x.adres, '');
+          if (x.kod) s.push(x.kod, '');
+          else s.push('# Betiği indirin: ' + site.adres + x.dosya, '');
+        });
+        indir('.ps1', 'text/plain;charset=utf-8', s.join('\n'));
+      });
+
+      el('#c-md').addEventListener('click', () => {
+        const o = ogeler();
+        const s = [
+          '# ' + runbookBasligi(),
+          '',
+          site.ad + ' saha çantasından üretildi — ' + bugun() + '. ' + o.length + ' adım.',
+          '',
+        ];
+        o.forEach((x, i) => {
+          s.push('## ' + (i + 1) + '. ' + x.baslik, '');
+          if (x.ozet) s.push(x.ozet, '');
+          if (x.dikkat) s.push('> **Dikkat:** ' + x.dikkat, '');
+          if (x.kod) s.push('```powershell', x.kod, '```', '');
+          else s.push('İndirilecek dosya: `' + site.adres + x.dosya + '`', '');
+          s.push('- [ ] Uygulandı', '- [ ] Doğrulandı', '');
+        });
+        indir('.md', 'text/markdown;charset=utf-8', s.join('\n'));
+      });
+
+      el('#c-bag').addEventListener('click', async () => {
+        const adres = paylasimAdresi(oku().filter((k) => harita.has(k)));
+        try {
+          await navigator.clipboard.writeText(adres);
+          durum.className = 'c-durum ok';
+          durum.textContent = 'Bağlantı kopyalandı. Açan kişi bu çantayı kendi çantasına alabilir.';
+        } catch {
+          // Pano izni yoksa adresi göster, kullanıcı elle kopyalasın
+          durum.className = 'c-durum';
+          durum.textContent = adres;
+        }
+      });
+
+      el('#c-yazdir').addEventListener('click', () => print());
+
+      /* --- açılış --------------------------------------------------------- */
+      async function baslat() {
+        try {
+          harita = await dizin();
+        } catch {
+          bosKutu.hidden = false;
+          return;
+        }
+
+        const paylasilan = adrestenOku();
+        if (paylasilan && paylasilan.length) {
+          /* Paylaşılan çanta kendi çantanızı ezmiyor: ne yapılacağına siz karar
+             verene kadar yalnızca gösteriliyor. */
+          const gecerli = paylasilan.filter((k) => harita.has(k));
+          const kutu = el('#c-paylasim');
+          kutu.hidden = false;
+          el('#c-paylasim-ozet').textContent =
+            gecerli.length +
+            ' öğe: ' +
+            gecerli.map((k) => harita.get(k).baslik).slice(0, 3).join(' · ') +
+            (gecerli.length > 3 ? ' +' + (gecerli.length - 3) : '');
+
+          const devam = (yeni) => {
+            yaz(yeni);
+            kutu.hidden = true;
+            history.replaceState(null, '', '/canta');
+            degisince(ciz);
+            ciz(oku());
+          };
+          el('#c-al').addEventListener('click', () => devam(gecerli));
+          el('#c-birlestir').addEventListener('click', () => devam([...new Set([...oku(), ...gecerli])]));
+
+          ciz(gecerli);
+          return;
+        }
+
+        degisince(ciz);
+        ciz(oku());
+      }
+
+      baslat();
+    })();
+  </script>
+
+  <style>
+    .c-dugmeler {
+      display: flex;
+      gap: 10px;
+      flex-wrap: wrap;
+    }
+    .c-bos {
+      border: 1px dashed var(--line);
+      border-radius: var(--r-l);
+      padding: 40px 28px;
+      text-align: center;
+      margin-top: 28px;
+      background: var(--paper);
+    }
+    .c-bos p {
+      color: var(--muted);
+      font-size: 14px;
+      margin-top: 8px;
+      max-width: 54ch;
+      margin-inline: auto;
+    }
+    .c-ust {
+      display: flex;
+      align-items: center;
+      gap: 14px;
+      flex-wrap: wrap;
+      padding-top: 28px;
+    }
+    .c-ust .c-dugmeler {
+      margin-left: auto;
+    }
+    .c-sayi {
+      font-family: var(--mono);
+      font-size: 13px;
+      color: var(--muted);
+    }
+    .c-durum {
+      font-size: 13px;
+      color: var(--muted);
+      min-height: 1.3em;
+      margin: 10px 0 0;
+      overflow-wrap: break-word;
+    }
+    .c-durum.ok {
+      color: var(--green-ink);
+    }
+    .c-not {
+      display: grid;
+      gap: 6px;
+      margin: 18px 0 4px;
+      max-width: 52ch;
+      font-size: 13px;
+      font-weight: 700;
+      color: var(--ink-soft);
+    }
+    .c-not input {
+      font: inherit;
+      font-weight: 400;
+      /* 16 piksel: iOS Safari daha küçük yazıda sayfayı yakınlaştırıyor */
+      font-size: 16px;
+      padding: 10px 12px;
+      border: 1px solid var(--line);
+      border-radius: var(--r-s);
+      background: var(--paper);
+      color: var(--ink);
+    }
+    .c-not small {
+      font-weight: 400;
+      color: var(--muted);
+    }
+
+    .c-liste {
+      list-style: none;
+      margin: 18px 0 0;
+      padding: 0;
+      display: grid;
+      /* `minmax(0, 1fr)` şart: varsayılan `auto` sütun içeriğinin en küçük
+         genişliğinin altına inemiyor ve uzun komut satırları sayfanın tamamını
+         yatay kaydırıyordu (375 pikselde 166 piksel taşma). */
+      grid-template-columns: minmax(0, 1fr);
+      gap: 16px;
+      counter-reset: adim;
+    }
+    .c-kayit {
+      border: 1px solid var(--line);
+      border-radius: var(--r-m);
+      background: var(--paper);
+      padding: 18px 20px;
+    }
+    .c-kayit-ust {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      flex-wrap: wrap;
+    }
+    .c-kayit-ust b {
+      font-size: 16px;
+      flex: 1;
+      min-width: 0;
+    }
+    .c-kayit-ust b::before {
+      counter-increment: adim;
+      content: counter(adim) '. ';
+      font-family: var(--mono);
+      font-size: 13px;
+      color: var(--muted);
+    }
+    .c-sira {
+      display: flex;
+      gap: 4px;
+    }
+    .c-sira button {
+      font: inherit;
+      font-size: 13px;
+      width: 32px;
+      height: 32px;
+      border: 1px solid var(--line);
+      border-radius: var(--r-s);
+      background: var(--bg);
+      color: var(--ink-soft);
+      cursor: pointer;
+    }
+    .c-sira button:hover:not([disabled]) {
+      border-color: var(--indigo-metin);
+      color: var(--indigo-metin);
+    }
+    .c-sira button[disabled] {
+      opacity: 0.35;
+      cursor: default;
+    }
+    .c-ozet {
+      font-size: 13.5px;
+      color: var(--muted);
+      margin: 8px 0 0;
+      line-height: 1.55;
+    }
+    .c-dikkat {
+      font-size: 13px;
+      color: var(--amber-ink);
+      margin: 8px 0 0;
+      font-weight: 700;
+    }
+    .c-kayit .kod {
+      margin-top: 12px;
+    }
+    .c-indir {
+      margin: 12px 0 0;
+      font-size: 13.5px;
+      color: var(--ink-soft);
+    }
+    .c-kaynak {
+      display: inline-block;
+      margin-top: 10px;
+      font-size: 13px;
+      font-weight: 700;
+      color: var(--indigo-metin);
+    }
+    .c-paylasim {
+      border: 1px solid var(--indigo);
+      background: var(--tint);
+      border-radius: var(--r-m);
+      padding: 18px 20px;
+      margin-top: 28px;
+      font-size: 14px;
+    }
+    .c-paylasim > span {
+      display: block;
+      color: var(--ink-soft);
+      margin-top: 4px;
+    }
+
+    /* Yazdırırken yalnızca adımlar kalsın */
+    @media print {
+      .c-ust .c-dugmeler,
+      .c-sira,
+      .c-durum,
+      .c-paylasim,
+      .c-not small {
+        display: none !important;
+      }
+      .c-kayit {
+        break-inside: avoid;
+      }
+    }
+  </style>
+</Base>

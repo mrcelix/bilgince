@@ -3631,3 +3631,111 @@ pre code {
     display: none;
   }
 }
+
+/* ------------------------------------------------------------ saha çantası
+   Ekleme düğmesi kod bloklarının sağ üstünde, "Kopyala"nın yanında duruyor.
+   Şerit yalnızca çanta doluyken görünür ve komut paletinin altında kalır. */
+.canta-ekle {
+  position: absolute;
+  top: 10px;
+  right: 88px;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font: inherit;
+  font-size: 11.5px;
+  font-weight: 700;
+  padding: 5px 10px;
+  border-radius: var(--r-s);
+  border: 1px solid rgba(255, 255, 255, 0.22);
+  background: rgba(255, 255, 255, 0.1);
+  color: #d5dcec;
+  cursor: pointer;
+}
+.canta-ekle:hover {
+  background: rgba(255, 255, 255, 0.18);
+  color: #fff;
+}
+.canta-ekle[data-durum='ekli'] {
+  background: rgba(21, 162, 74, 0.9);
+  border-color: transparent;
+  color: #fff;
+}
+/* Koyu kod bloğunun üstünde değil, açık zeminde duran sürüm */
+.canta-ekle-duz {
+  position: static;
+  border-color: var(--line);
+  background: var(--paper);
+  color: var(--ink-soft);
+}
+.canta-ekle-duz:hover {
+  background: var(--tint);
+  color: var(--indigo-d);
+}
+
+.canta-serit {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 45;
+  background: var(--navy);
+  color: #fff;
+  border-top: 1px solid var(--line);
+  box-shadow: 0 -10px 30px var(--golge-renk);
+}
+.canta-serit .kap {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding-top: 11px;
+  padding-bottom: 11px;
+  flex-wrap: wrap;
+}
+.canta-sayi {
+  font-size: 13px;
+  color: #b4bdd1;
+}
+.canta-sayi b {
+  color: #fff;
+  font-size: 15px;
+}
+.canta-ozet {
+  flex: 1;
+  min-width: 0;
+  font-size: 12.5px;
+  color: #8b97b4;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.canta-serit .dg {
+  padding: 8px 14px;
+  font-size: 13px;
+}
+.canta-kapat {
+  font: inherit;
+  font-size: 12.5px;
+  font-weight: 700;
+  background: none;
+  border: 1px solid rgba(255, 255, 255, 0.28);
+  border-radius: var(--r-s);
+  color: #b4bdd1;
+  padding: 7px 12px;
+  cursor: pointer;
+}
+.canta-kapat:hover {
+  color: #fff;
+  border-color: #fff;
+}
+
+@media (max-width: 620px) {
+  .canta-ozet {
+    display: none;
+  }
+  .canta-ekle {
+    /* Dar ekranda kopyala düğmesinin altına iner */
+    position: static;
+    margin-top: 8px;
+  }
+}
