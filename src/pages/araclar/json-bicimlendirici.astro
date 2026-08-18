@@ -1,0 +1,757 @@
+---
+import Base from '../../layouts/Base.astro';
+---
+
+<Base
+  baslik="JSON biçimlendirici ve yol bulucu"
+  aciklama="Bozuk JSON'da hatanın tam yerini gösterir, biçimlendirir, daraltır ve her alanın PowerShell / jq yolunu tek tıkla verir."
+  aramaya={true}
+  kategori="Araç"
+>
+  <div class="arama-bas">
+    <div class="kap">
+      <nav class="kirinti" aria-label="Kırıntı yolu" style="padding-top:0">
+        <a href="/">Ana sayfa</a><span class="ayrac">/</span><a href="/araclar">Araçlar</a><span
+          class="ayrac">/</span
+        ><span aria-current="page">JSON biçimlendirici</span>
+      </nav>
+      <h1>JSON biçimlendirici ve yol bulucu</h1>
+      <p style="color:var(--muted);font-size:14px;margin-top:8px;max-width:66ch">
+        API yanıtından ihtiyacınız olan alanı bulmak, sonra ona giden yolu betiğe yazmak. Ağaçta
+        tıkladığınız alanın PowerShell ve <code>jq</code> yolu hazır çıkar. Yapıştırdığınız veri
+        tarayıcıdan çıkmaz.
+      </p>
+    </div>
+  </div>
+
+  <div class="kap arac-sayfa">
+    <section class="arac-blok">
+      <h2 class="arac-h2"><span class="arac-no">1</span> JSON</h2>
+      <div class="arac-alan">
+        <textarea id="j-girdi" rows="9" spellcheck="false" placeholder="Buraya yapıştırın…"
+        ></textarea>
+      </div>
+      <div class="arac-dugmeler">
+        <button type="button" class="dg" id="j-bicimle">Biçimlendir</button>
+        <button type="button" class="dg dg-hayalet" id="j-daralt">Tek satıra indir</button>
+        <button type="button" class="dg dg-hayalet" id="j-sirala">Anahtarları sırala</button>
+        <button type="button" class="dg dg-hayalet" id="j-ornek">Örnek</button>
+        <button type="button" class="dg dg-hayalet" id="j-temizle">Temizle</button>
+      </div>
+      <p class="arac-durum" id="j-durum" role="status" aria-live="polite"></p>
+      <pre class="j-hata" id="j-hata" hidden></pre>
+    </section>
+
+    <section class="arac-blok" id="j-sonuc" hidden>
+      <h2 class="arac-h2"><span class="arac-no">2</span> Ağaç</h2>
+      <div class="arac-olcum" id="j-olcum"></div>
+      <div class="arac-dugmeler" style="margin-bottom:10px">
+        <button type="button" class="dg dg-hayalet" id="j-ac">Tümünü aç</button>
+        <button type="button" class="dg dg-hayalet" id="j-kapat">Tümünü kapat</button>
+      </div>
+      <div class="j-agac" id="j-agac"></div>
+    </section>
+
+    <section class="arac-blok" id="j-yol-blok" hidden>
+      <h2 class="arac-h2"><span class="arac-no">3</span> Seçilen alanın yolu</h2>
+      <div class="j-yollar">
+        <div class="j-yol">
+          <span class="yan-etiket">Değer</span>
+          <div class="j-yol-kutu"><code id="j-deger"></code></div>
+        </div>
+        <div class="j-yol">
+          <span class="yan-etiket">PowerShell</span>
+          <div class="j-yol-kutu">
+            <code id="j-ps"></code>
+            <button class="j-kop" type="button" data-kaynak="j-ps">Kopyala</button>
+          </div>
+        </div>
+        <div class="j-yol">
+          <span class="yan-etiket">jq</span>
+          <div class="j-yol-kutu">
+            <code id="j-jq"></code>
+            <button class="j-kop" type="button" data-kaynak="j-jq">Kopyala</button>
+          </div>
+        </div>
+        <div class="j-yol">
+          <span class="yan-etiket">JSONPath</span>
+          <div class="j-yol-kutu">
+            <code id="j-jp"></code>
+            <button class="j-kop" type="button" data-kaynak="j-jp">Kopyala</button>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="arac-blok" id="j-cikti-blok" hidden>
+      <h2 class="arac-h2"><span class="arac-no">4</span> Çıktı</h2>
+      <div style="position:relative">
+        <pre class="kod"><code id="j-cikti"></code></pre>
+        <button class="kopyala" type="button" id="j-cikti-kop">Kopyala</button>
+      </div>
+    </section>
+
+    <section class="arac-blok">
+      <h2 class="arac-h2"><span class="arac-no">5</span> PowerShell'de sık takılan yerler</h2>
+      <ul class="j-ipuclari">
+        <li>
+          <b>Derinlik sınırı.</b> <code>ConvertTo-Json</code> öntanımlı olarak yalnızca 2 seviye
+          gider, gerisini <code>System.Object[]</code> diye yazar. Neredeyse her zaman
+          <code>-Depth 10</code> ekleyin.
+        </li>
+        <li>
+          <b>Tek elemanlı dizi.</b> <code>ConvertFrom-Json</code> tek elemanlı diziyi tek nesneye
+          indirger; <code>@(...)</code> ile sarmalayın yoksa <code>.Count</code> beklenmedik çıkar.
+        </li>
+        <li>
+          <b>Hashtable değil.</b> Windows PowerShell 5.1'de <code>ConvertFrom-Json</code> bir
+          <code>PSCustomObject</code> döndürür; <code>-AsHashtable</code> yoktur.
+        </li>
+        <li>
+          <b>Tireli anahtar.</b> <code>content-type</code> gibi bir alana nokta ile erişilmez:
+          <code>$y.'content-type'</code> yazın. Araç bunu kendisi tırnaklar.
+        </li>
+        <li>
+          <b>Türkçe karakter.</b> Dosyaya yazarken <code>-Encoding utf8</code> vermezseniz 5.1
+          sistem kod sayfasına düşer.
+        </li>
+      </ul>
+    </section>
+  </div>
+
+  <script>
+    (() => {
+      const el = (s) => document.querySelector(s);
+      const kacir = (s) =>
+        String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+
+      let veri = null;
+
+      /* --- hata konumu -------------------------------------------------------
+         Her tarayıcı JSON.parse hatasını başka türlü yazar:
+           Firefox : "... at line 3 column 14 of the JSON data"
+           Safari  : "... at position 42"
+           Chrome  : "Unexpected token ']', ...\"b\": [1, 2,]... is not valid JSON"
+         Üçünü de aynı satır/sütun bilgisine indirger. */
+      function konumdan(ham, indis) {
+        const onces = ham.slice(0, indis);
+        return { satir: onces.split('\n').length, sutun: indis - onces.lastIndexOf('\n') };
+      }
+
+      /* --- kendi tarayıcımız -------------------------------------------------
+         Tarayıcıların JSON.parse hata mesajları birbirini tutmaz: Firefox satır
+         ve sütun verir, Safari konum verir, Chrome ise yalnızca kırpılmış bir
+         bağlam metni. Üçünden de güvenilir konum çıkmadığı için metni kendimiz
+         tarayıp ilk bozuk karakterin tam yerini ve Türkçe nedenini buluyoruz.
+         Değeri yine JSON.parse üretir; bu tarayıcı sadece hatayı anlatır. */
+      function jsonTara(m) {
+        let i = 0;
+
+        const hata = (mesaj, nerede = i) => ({ indis: nerede, mesaj });
+        const bosluk = () => {
+          while (i < m.length && (m[i] === ' ' || m[i] === '\t' || m[i] === '\n' || m[i] === '\r')) i++;
+        };
+        const bitti = (ne) => hata(`Belge beklenmedik yerde bitti — ${ne}`, m.length);
+        const yorumMu = () => m[i] === '/' && (m[i + 1] === '/' || m[i + 1] === '*');
+
+        function metin() {
+          i++; // açan tırnak
+          while (i < m.length) {
+            const k = m[i];
+            if (k === '\\') {
+              const tersEgik = i; // imleç ters eğik çizgiyi göstersin, sonrasını değil
+              i++;
+              if (i >= m.length) return bitti('kaçış dizisi yarım kaldı');
+              if (!'"\\/bfnrtu'.includes(m[i])) {
+                return hata(`Geçersiz kaçış dizisi: \\${m[i]}`, tersEgik);
+              }
+              if (m[i] === 'u') {
+                if (!/^[0-9a-fA-F]{4}/.test(m.slice(i + 1, i + 5))) {
+                  return hata('\\u kaçışından sonra dört onaltılık hane bekleniyordu', tersEgik);
+                }
+                i += 4;
+              }
+              i++;
+            } else if (k === '"') {
+              i++;
+              return null;
+            } else if (k < ' ') {
+              return hata(
+                'Metnin içinde kaçırılmamış denetim karakteri var — satır sonu için \\n yazın'
+              );
+            } else {
+              i++;
+            }
+          }
+          return bitti('kapanmamış bir metin var');
+        }
+
+        function sayi() {
+          const e = /^-?(0|[1-9]\d*)(\.\d+)?([eE][+-]?\d+)?/.exec(m.slice(i));
+          if (!e || !e[0]) return hata('Geçersiz sayı');
+          // 007 gibi başında sıfır olan sayılar JSON'da geçersizdir
+          if (/^-?0\d/.test(m.slice(i))) {
+            return hata('Sayı başında sıfır olamaz — 007 yerine 7 yazın ya da tırnak içine alın');
+          }
+          i += e[0].length;
+          return null;
+        }
+
+        function nesne() {
+          i++; // {
+          bosluk();
+          if (m[i] === '}') {
+            i++;
+            return null;
+          }
+          for (;;) {
+            bosluk();
+            if (i >= m.length) return bitti('nesne kapanmadı, } eksik');
+            if (m[i] === '}') return hata('Son özellikten sonra fazladan virgül var');
+            if (yorumMu()) return hata('JSON yorum satırı kabul etmez');
+            if (m[i] === "'") return hata('Anahtar adı çift tırnak içinde olmalı — JSON tek tırnak kabul etmez');
+            if (m[i] !== '"') return hata('Anahtar adı çift tırnak içinde olmalı — JSON, JavaScript değil');
+
+            let h = metin();
+            if (h) return h;
+
+            bosluk();
+            if (i >= m.length) return bitti('anahtardan sonra : eksik');
+            if (m[i] !== ':') return hata(`Anahtardan sonra : bekleniyordu, ${m[i]} bulundu`);
+            i++;
+
+            h = deger();
+            if (h) return h;
+
+            bosluk();
+            if (i >= m.length) return bitti('nesne kapanmadı, } eksik');
+            if (m[i] === ',') {
+              i++;
+              continue;
+            }
+            if (m[i] === '}') {
+              i++;
+              return null;
+            }
+            return hata(`Değerden sonra , ya da } bekleniyordu, ${m[i]} bulundu`);
+          }
+        }
+
+        function dizi() {
+          i++; // [
+          bosluk();
+          if (m[i] === ']') {
+            i++;
+            return null;
+          }
+          for (;;) {
+            bosluk();
+            if (i >= m.length) return bitti('dizi kapanmadı, ] eksik');
+            if (m[i] === ']') return hata('Son elemandan sonra fazladan virgül var');
+
+            const h = deger();
+            if (h) return h;
+
+            bosluk();
+            if (i >= m.length) return bitti('dizi kapanmadı, ] eksik');
+            if (m[i] === ',') {
+              i++;
+              continue;
+            }
+            if (m[i] === ']') {
+              i++;
+              return null;
+            }
+            return hata(`Elemandan sonra , ya da ] bekleniyordu, ${m[i]} bulundu`);
+          }
+        }
+
+        function deger() {
+          bosluk();
+          if (i >= m.length) return bitti('değer bekleniyordu');
+          const k = m[i];
+          if (k === '{') return nesne();
+          if (k === '[') return dizi();
+          if (k === '"') return metin();
+          if (k === '-' || (k >= '0' && k <= '9')) return sayi();
+          if (m.startsWith('true', i)) {
+            i += 4;
+            return null;
+          }
+          if (m.startsWith('false', i)) {
+            i += 5;
+            return null;
+          }
+          if (m.startsWith('null', i)) {
+            i += 4;
+            return null;
+          }
+          if (k === "'") return hata('JSON tek tırnak kabul etmez, çift tırnak kullanın');
+          if (/^(True|False|None|NULL|TRUE|FALSE)/.test(m.slice(i))) {
+            return hata('true, false ve null küçük harfle yazılır — bu Python ya da SQL değil');
+          }
+          if (/^(NaN|Infinity|-Infinity|undefined)/.test(m.slice(i))) {
+            return hata(`JSON ${/^-?Inf/.test(m.slice(i)) ? 'Infinity' : m.slice(i, i + 3)} değerini desteklemez`);
+          }
+          if (yorumMu()) return hata('JSON yorum satırı kabul etmez');
+          return hata(`Beklenmedik karakter: ${k}`);
+        }
+
+        const h = deger();
+        if (h) return h;
+        bosluk();
+        if (i < m.length) {
+          return hata('JSON bittikten sonra fazladan içerik var — iki belge yapıştırmış olabilirsiniz');
+        }
+        return null;
+      }
+
+      /* --- ayrıştırma ------------------------------------------------------- */
+      function ayristir() {
+        const ham = el('#j-girdi').value.trim();
+        el('#j-hata').hidden = true;
+
+        if (!ham) {
+          el('#j-durum').className = 'arac-durum hata';
+          el('#j-durum').textContent = 'Önce JSON yapıştırın.';
+          return false;
+        }
+
+        try {
+          veri = JSON.parse(ham);
+        } catch (h) {
+          veri = null;
+          const bulgu = jsonTara(ham);
+          el('#j-durum').className = 'arac-durum hata';
+          el('#j-durum').textContent = bulgu ? bulgu.mesaj : h.message;
+
+          const k = konumdan(ham, bulgu ? bulgu.indis : ham.length);
+          const satirlar = ham.split('\n');
+          const bas = Math.max(0, k.satir - 3);
+          const parca = satirlar
+            .slice(bas, k.satir)
+            .map((s, i) => `${String(bas + i + 1).padStart(4)} | ${s}`)
+            .join('\n');
+          el('#j-hata').textContent =
+            `${parca}\n     | ${' '.repeat(Math.max(0, k.sutun - 1))}^\n` +
+            `Satır ${k.satir}, sütun ${k.sutun}`;
+          el('#j-hata').hidden = false;
+          el('#j-sonuc').hidden = true;
+          el('#j-cikti-blok').hidden = true;
+          el('#j-yol-blok').hidden = true;
+          return false;
+        }
+
+        el('#j-durum').className = 'arac-durum ok';
+        return true;
+      }
+
+      /* --- ölçüm ------------------------------------------------------------ */
+      function olc(d) {
+        let anahtar = 0;
+        let dizi = 0;
+        let derinlik = 0;
+        const gez = (n, s) => {
+          derinlik = Math.max(derinlik, s);
+          if (Array.isArray(n)) {
+            dizi++;
+            n.forEach((x) => gez(x, s + 1));
+          } else if (n && typeof n === 'object') {
+            for (const [, v] of Object.entries(n)) {
+              anahtar++;
+              gez(v, s + 1);
+            }
+          }
+        };
+        gez(d, 0);
+        return { anahtar, dizi, derinlik };
+      }
+
+      /* --- ağaç çizimi ------------------------------------------------------ */
+      function tur(d) {
+        if (d === null) return 'null';
+        if (Array.isArray(d)) return 'dizi';
+        return typeof d;
+      }
+
+      function ozet(d) {
+        const t = tur(d);
+        if (t === 'dizi') return `[${d.length}]`;
+        if (t === 'object') return `{${Object.keys(d).length}}`;
+        if (t === 'string') return `"${d.length > 60 ? d.slice(0, 60) + '…' : d}"`;
+        return String(d);
+      }
+
+      function dugum(anahtar, deger, yol, seviye) {
+        const t = tur(deger);
+        const dal = t === 'dizi' || t === 'object';
+        const yolStr = JSON.stringify(yol);
+
+        let html = `<div class="j-satir" style="--s:${seviye}">`;
+        html += dal
+          ? `<button class="j-ok" type="button" aria-expanded="true">▾</button>`
+          : `<span class="j-ok j-bos"></span>`;
+        html += `<button class="j-anahtar" type="button" data-yol='${kacir(yolStr)}'>${kacir(anahtar)}</button>`;
+        html += `<span class="j-tur j-t-${t}">${t}</span>`;
+        html += `<span class="j-ozet">${kacir(ozet(deger))}</span>`;
+        html += '</div>';
+
+        if (dal) {
+          html += '<div class="j-cocuk">';
+          const girisler = Array.isArray(deger)
+            ? deger.map((v, i) => [i, v])
+            : Object.entries(deger);
+          for (const [a, v] of girisler.slice(0, 500)) {
+            html += dugum(a, v, [...yol, a], seviye + 1);
+          }
+          if (girisler.length > 500) {
+            html += `<div class="j-satir" style="--s:${seviye + 1}"><span class="j-ok j-bos"></span><span class="j-ozet">… ${girisler.length - 500} eleman daha</span></div>`;
+          }
+          html += '</div>';
+        }
+        return html;
+      }
+
+      /* --- yol biçimleri ---------------------------------------------------- */
+      const sadeAd = (a) => /^[A-Za-z_][A-Za-z0-9_]*$/.test(a);
+
+      function psYolu(yol) {
+        let s = '$yanit';
+        for (const p of yol) {
+          if (typeof p === 'number') s += `[${p}]`;
+          else s += sadeAd(p) ? `.${p}` : `.'${p.replace(/'/g, "''")}'`;
+        }
+        return s;
+      }
+
+      function jqYolu(yol) {
+        let s = '.';
+        let ilk = true;
+        for (const p of yol) {
+          if (typeof p === 'number') s += `[${p}]`;
+          else if (sadeAd(p)) s += (ilk ? '' : '.') + p;
+          else s += `["${p}"]`;
+          ilk = false;
+        }
+        return s === '.' ? '.' : s.replace(/^\.\./, '.');
+      }
+
+      function jpYolu(yol) {
+        let s = '$';
+        for (const p of yol) {
+          if (typeof p === 'number') s += `[${p}]`;
+          else s += sadeAd(p) ? `.${p}` : `['${p}']`;
+        }
+        return s;
+      }
+
+      function yolSec(yol) {
+        let d = veri;
+        for (const p of yol) d = d[p];
+
+        el('#j-yol-blok').hidden = false;
+        el('#j-deger').textContent =
+          typeof d === 'object' && d !== null ? ozet(d) : JSON.stringify(d);
+        el('#j-ps').textContent = psYolu(yol);
+        el('#j-jq').textContent = jqYolu(yol);
+        el('#j-jp').textContent = jpYolu(yol);
+      }
+
+      /* --- anahtar sıralama ------------------------------------------------- */
+      function sirala(d) {
+        if (Array.isArray(d)) return d.map(sirala);
+        if (d && typeof d === 'object') {
+          return Object.fromEntries(
+            Object.keys(d)
+              .sort((a, b) => a.localeCompare(b, 'tr'))
+              .map((a) => [a, sirala(d[a])])
+          );
+        }
+        return d;
+      }
+
+      /* --- çizim ------------------------------------------------------------ */
+      function ciz() {
+        const o = olc(veri);
+        el('#j-sonuc').hidden = false;
+        el('#j-olcum').innerHTML =
+          `<span>Tür: <b>${tur(veri)}</b></span>` +
+          `<span>Anahtar: <b>${o.anahtar}</b></span>` +
+          `<span>Dizi: <b>${o.dizi}</b></span>` +
+          `<span>Derinlik: <b>${o.derinlik}</b></span>` +
+          `<span>Boyut: <b>${(new Blob([el('#j-girdi').value]).size / 1024).toFixed(1)} KB</b></span>`;
+        el('#j-agac').innerHTML = dugum('kök', veri, [], 0);
+      }
+
+      function ciktiYaz(metin) {
+        el('#j-cikti-blok').hidden = false;
+        el('#j-cikti').textContent = metin;
+      }
+
+      /* --- olaylar ---------------------------------------------------------- */
+      el('#j-bicimle').addEventListener('click', () => {
+        if (!ayristir()) return;
+        const cikti = JSON.stringify(veri, null, 2);
+        ciz();
+        ciktiYaz(cikti);
+        el('#j-durum').textContent = 'Geçerli JSON. Ağaçta bir alana tıklayarak yolunu alın.';
+      });
+
+      el('#j-daralt').addEventListener('click', () => {
+        if (!ayristir()) return;
+        const cikti = JSON.stringify(veri);
+        ciz();
+        ciktiYaz(cikti);
+        const kazanc = el('#j-girdi').value.length - cikti.length;
+        el('#j-durum').textContent = `Tek satıra indirildi — ${kazanc.toLocaleString('tr-TR')} karakter kısaldı.`;
+      });
+
+      el('#j-sirala').addEventListener('click', () => {
+        if (!ayristir()) return;
+        veri = sirala(veri);
+        ciz();
+        ciktiYaz(JSON.stringify(veri, null, 2));
+        el('#j-durum').textContent = 'Anahtarlar alfabetik sıralandı — iki yanıtı karşılaştırmak için.';
+      });
+
+      el('#j-agac').addEventListener('click', (e) => {
+        const ok = e.target.closest('.j-ok:not(.j-bos)');
+        if (ok) {
+          const acik = ok.getAttribute('aria-expanded') === 'true';
+          ok.setAttribute('aria-expanded', String(!acik));
+          ok.textContent = acik ? '▸' : '▾';
+          ok.parentElement.nextElementSibling?.classList.toggle('j-gizli', acik);
+          return;
+        }
+        const anahtar = e.target.closest('.j-anahtar');
+        if (anahtar) {
+          document.querySelectorAll('.j-anahtar[data-secili]').forEach((x) => {
+            delete x.dataset.secili;
+          });
+          anahtar.dataset.secili = 'evet';
+          yolSec(JSON.parse(anahtar.dataset.yol));
+        }
+      });
+
+      el('#j-ac').addEventListener('click', () => {
+        document.querySelectorAll('.j-cocuk').forEach((c) => c.classList.remove('j-gizli'));
+        document.querySelectorAll('.j-ok:not(.j-bos)').forEach((o) => {
+          o.setAttribute('aria-expanded', 'true');
+          o.textContent = '▾';
+        });
+      });
+
+      el('#j-kapat').addEventListener('click', () => {
+        document.querySelectorAll('.j-cocuk').forEach((c, i) => {
+          if (i > 0) c.classList.add('j-gizli');
+        });
+        document.querySelectorAll('.j-ok:not(.j-bos)').forEach((o, i) => {
+          if (i === 0) return;
+          o.setAttribute('aria-expanded', 'false');
+          o.textContent = '▸';
+        });
+      });
+
+      el('#j-ornek').addEventListener('click', () => {
+        el('#j-girdi').value = JSON.stringify(
+          {
+            sunucu: 'SRV-UYG-03',
+            'content-type': 'application/json',
+            durum: { calisiyor: true, calismaSuresiSaat: 412, sonYenidenBaslatma: '2026-08-01T03:12:00+03:00' },
+            diskler: [
+              { harf: 'C', toplamGB: 120, bosGB: 14.2, tur: 'SSD' },
+              { harf: 'D', toplamGB: 2048, bosGB: 611.7, tur: 'HDD' },
+            ],
+            servisler: [
+              { ad: 'W3SVC', durum: 'Running', baslangic: 'Automatic' },
+              { ad: 'MSSQLSERVER', durum: 'Running', baslangic: 'Automatic' },
+              { ad: 'Spooler', durum: 'Stopped', baslangic: 'Disabled' },
+            ],
+            etiketler: ['üretim', 'iis', 'yedeklenen'],
+          },
+          null,
+          2
+        );
+        el('#j-bicimle').click();
+      });
+
+      el('#j-temizle').addEventListener('click', () => {
+        el('#j-girdi').value = '';
+        veri = null;
+        el('#j-durum').textContent = '';
+        el('#j-sonuc').hidden = true;
+        el('#j-cikti-blok').hidden = true;
+        el('#j-yol-blok').hidden = true;
+        el('#j-hata').hidden = true;
+      });
+
+      async function kopyala(dugme, metin) {
+        try {
+          await navigator.clipboard.writeText(metin);
+          const eski = dugme.textContent;
+          dugme.textContent = 'Kopyalandı';
+          setTimeout(() => (dugme.textContent = eski), 1600);
+        } catch {
+          /* pano izni yoksa kullanıcı elle seçer */
+        }
+      }
+
+      document.querySelectorAll('.j-kop').forEach((d) => {
+        d.addEventListener('click', () => kopyala(d, el(`#${d.dataset.kaynak}`).textContent));
+      });
+      el('#j-cikti-kop').addEventListener('click', (e) =>
+        kopyala(e.currentTarget, el('#j-cikti').textContent)
+      );
+    })();
+  </script>
+
+  <style>
+    .arac-dugmeler {
+      display: flex;
+      gap: 10px;
+      flex-wrap: wrap;
+      margin-top: 4px;
+    }
+    .j-hata {
+      background: light-dark(#fef2f2, #3b1d1d);
+      border: 1px solid light-dark(#fecaca, #7f2b2b);
+      color: light-dark(#991b1b, #fca5a5);
+      border-radius: 10px;
+      padding: 12px 14px;
+      font-size: 12px;
+      line-height: 1.6;
+      overflow-x: auto;
+      margin-top: 10px;
+      white-space: pre;
+    }
+    .j-agac {
+      border: 1px solid var(--line);
+      border-radius: 10px;
+      padding: 10px 6px;
+      background: var(--paper);
+      max-height: 460px;
+      overflow: auto;
+      font-family: var(--mono, ui-monospace, monospace);
+      font-size: 12.5px;
+    }
+    .j-satir {
+      display: flex;
+      align-items: baseline;
+      gap: 7px;
+      padding: 2px 8px 2px calc(8px + var(--s) * 16px);
+      border-radius: 5px;
+      white-space: nowrap;
+    }
+    .j-satir:hover {
+      background: var(--tint);
+    }
+    .j-ok {
+      width: 14px;
+      flex: 0 0 14px;
+      border: 0;
+      background: transparent;
+      color: var(--muted);
+      cursor: pointer;
+      font-size: 11px;
+      padding: 0;
+      line-height: 1.4;
+    }
+    .j-bos {
+      cursor: default;
+    }
+    .j-anahtar {
+      border: 0;
+      background: transparent;
+      padding: 1px 4px;
+      border-radius: 4px;
+      font: inherit;
+      color: var(--ink);
+      font-weight: 600;
+      cursor: pointer;
+    }
+    .j-anahtar:hover {
+      background: var(--tint);
+      color: var(--indigo-metin);
+    }
+    .j-anahtar[data-secili] {
+      background: var(--indigo);
+      color: #fff;
+    }
+    .j-tur {
+      font-size: 10.5px;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+      color: var(--muted);
+      border: 1px solid var(--line);
+      border-radius: 4px;
+      padding: 0 4px;
+    }
+    .j-t-string {
+      color: light-dark(#0f766e, #5eead4);
+    }
+    .j-t-number {
+      color: light-dark(#b45309, #fbbf24);
+    }
+    .j-t-boolean {
+      color: light-dark(#7c3aed, #c4b5fd);
+    }
+    .j-ozet {
+      color: var(--muted);
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    .j-gizli {
+      display: none;
+    }
+    .j-yollar {
+      display: grid;
+      gap: 12px;
+    }
+    .j-yol-kutu {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      background: var(--tint);
+      border: 1px solid var(--line);
+      border-radius: 9px;
+      padding: 9px 10px 9px 12px;
+      margin-top: 5px;
+    }
+    .j-yol-kutu code {
+      flex: 1;
+      min-width: 0;
+      font-size: 12.5px;
+      overflow-x: auto;
+      white-space: nowrap;
+    }
+    .j-kop {
+      flex: 0 0 auto;
+      border: 1px solid var(--line);
+      background: var(--paper);
+      border-radius: 7px;
+      padding: 4px 10px;
+      font-size: 11.5px;
+      color: var(--muted);
+      cursor: pointer;
+      font-family: inherit;
+    }
+    .j-kop:hover {
+      border-color: var(--indigo);
+      color: var(--indigo-metin);
+    }
+    .j-ipuclari {
+      list-style: none;
+      margin: 0;
+      padding: 0;
+      display: grid;
+      gap: 11px;
+    }
+    .j-ipuclari li {
+      font-size: 13.5px;
+      line-height: 1.6;
+      color: var(--ink-soft);
+      border-left: 2px solid var(--line);
+      padding-left: 13px;
+    }
+  </style>
+</Base>

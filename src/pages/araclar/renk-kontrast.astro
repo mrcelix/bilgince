@@ -1,0 +1,556 @@
+---
+import Base from '../../layouts/Base.astro';
+---
+
+<Base
+  baslik="Renk kontrast denetleyici"
+  aciklama="İki rengin WCAG kontrast oranını hesaplar, AA/AAA sonucunu verir ve geçmiyorsa en yakın geçen tonu önerir. Kurum içi panolar ve raporlar için."
+  aramaya={true}
+  kategori="Araç"
+>
+  <div class="arama-bas">
+    <div class="kap">
+      <nav class="kirinti" aria-label="Kırıntı yolu" style="padding-top:0">
+        <a href="/">Ana sayfa</a><span class="ayrac">/</span><a href="/araclar">Araçlar</a><span
+          class="ayrac">/</span
+        ><span aria-current="page">Renk kontrastı</span>
+      </nav>
+      <h1>Renk kontrast denetleyici</h1>
+      <p style="color:var(--muted);font-size:14px;margin-top:8px;max-width:66ch">
+        İç portal, izleme panosu, rapor şablonu… Kurum içi bir arayüz de erişilebilir olmak
+        zorunda. İki rengi girin, WCAG oranını ve geçip geçmediğini görün; geçmiyorsa araç en yakın
+        geçen tonu önerir.
+      </p>
+    </div>
+  </div>
+
+  <div class="kap arac-sayfa">
+    <section class="arac-blok">
+      <h2 class="arac-h2"><span class="arac-no">1</span> Renkler</h2>
+      <div class="rk-girisler">
+        <div class="rk-giris">
+          <span class="yan-etiket">Ön plan (metin)</span>
+          <div class="rk-kutu">
+            <input type="color" id="rk-on-secici" value="#636b7f" aria-label="Ön plan rengi seç" />
+            <input type="text" id="rk-on" value="#636b7f" spellcheck="false" />
+          </div>
+        </div>
+        <button type="button" class="rk-degis" id="rk-degis" title="Renkleri değiştir">⇅</button>
+        <div class="rk-giris">
+          <span class="yan-etiket">Arka plan</span>
+          <div class="rk-kutu">
+            <input type="color" id="rk-arka-secici" value="#ffffff" aria-label="Arka plan rengi seç" />
+            <input type="text" id="rk-arka" value="#ffffff" spellcheck="false" />
+          </div>
+        </div>
+      </div>
+      <p class="arac-durum" id="rk-durum" role="status" aria-live="polite"></p>
+    </section>
+
+    <section class="arac-blok">
+      <h2 class="arac-h2"><span class="arac-no">2</span> Sonuç</h2>
+      <div class="rk-sonuc">
+        <div class="rk-oran">
+          <b id="rk-oran">—</b>
+          <span>kontrast oranı</span>
+        </div>
+        <div class="rk-rozetler" id="rk-rozetler"></div>
+      </div>
+
+      <div class="rk-onizleme" id="rk-onizleme">
+        <p class="rk-buyuk">Büyük başlık — 24 piksel</p>
+        <p class="rk-orta">Alt başlık — 19 piksel kalın</p>
+        <p class="rk-kucuk">
+          Gövde metni — 15 piksel. Sunucu 03 üzerindeki disk doluluk oranı son yedi günde %71'den
+          %88'e çıktı; mevcut hızla kalan boş alan 19 gün sonra tükenir.
+        </p>
+        <p class="rk-mini">Yardımcı metin — 12 piksel</p>
+      </div>
+    </section>
+
+    <section class="arac-blok" id="rk-oneri-blok" hidden>
+      <h2 class="arac-h2"><span class="arac-no">3</span> En yakın geçen ton</h2>
+      <p class="arac-not">
+        Renginizin tonunu ve doygunluğunu koruyup yalnızca açıklığını değiştirerek eşiği geçen en
+        yakın değeri arıyoruz — böylece marka rengi tanınabilir kalır.
+      </p>
+      <div class="rk-oneriler" id="rk-oneriler"></div>
+    </section>
+
+    <section class="arac-blok">
+      <h2 class="arac-h2"><span class="arac-no">4</span> Eşikler ne anlama geliyor?</h2>
+      <div class="rk-kaydir">
+        <table class="rk-tablo">
+          <thead>
+            <tr><th>Kural</th><th>Eşik</th><th>Nereye uygulanır</th></tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td><b>AA — normal metin</b></td>
+              <td>4.5:1</td>
+              <td>19 pikselden küçük ya da kalın olmayan her metin. Pratikte gövde metninin tamamı.</td>
+            </tr>
+            <tr>
+              <td><b>AA — büyük metin</b></td>
+              <td>3:1</td>
+              <td>24 piksel ve üzeri, ya da 19 piksel + kalın. Başlıklar.</td>
+            </tr>
+            <tr>
+              <td><b>AA — arayüz ögesi</b></td>
+              <td>3:1</td>
+              <td>Giriş alanı kenarlığı, odak halkası, grafik çizgisi, ikon.</td>
+            </tr>
+            <tr>
+              <td><b>AAA — normal metin</b></td>
+              <td>7:1</td>
+              <td>Kamu kurumu siteleri ve uzun okuma metinleri için hedeflenir.</td>
+            </tr>
+            <tr>
+              <td><b>AAA — büyük metin</b></td>
+              <td>4.5:1</td>
+              <td>Başlıklarda AAA hedefi.</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+      <p class="arac-not">
+        <b>Sık yapılan hata:</b> yalnızca renkle bilgi vermek. Kırmızı/yeşil durum noktaları
+        kontrastı geçse bile renk körlüğünde ayırt edilemez — ikon veya metin etiketi ekleyin.
+      </p>
+    </section>
+  </div>
+
+  <script>
+    (() => {
+      const el = (s) => document.querySelector(s);
+
+      /* --- renk çözümleme ---------------------------------------------------- */
+      function coz(metin) {
+        const t = metin.trim().toLowerCase();
+        let m = /^#?([0-9a-f]{3})$/.exec(t);
+        if (m) {
+          const [a, b, c] = m[1];
+          return [parseInt(a + a, 16), parseInt(b + b, 16), parseInt(c + c, 16)];
+        }
+        m = /^#?([0-9a-f]{6})$/.exec(t);
+        if (m) {
+          return [
+            parseInt(m[1].slice(0, 2), 16),
+            parseInt(m[1].slice(2, 4), 16),
+            parseInt(m[1].slice(4, 6), 16),
+          ];
+        }
+        m = /^rgba?\(\s*(\d+)[\s,]+(\d+)[\s,]+(\d+)/.exec(t);
+        if (m) return [Number(m[1]), Number(m[2]), Number(m[3])];
+        return null;
+      }
+
+      const onaltiya = (r) =>
+        '#' + r.map((k) => Math.round(Math.max(0, Math.min(255, k))).toString(16).padStart(2, '0')).join('');
+
+      /* --- WCAG bağıl parlaklık ---------------------------------------------- */
+      function parlaklik([r, g, b]) {
+        const k = [r, g, b].map((d) => {
+          const s = d / 255;
+          return s <= 0.03928 ? s / 12.92 : ((s + 0.055) / 1.055) ** 2.4;
+        });
+        return 0.2126 * k[0] + 0.7152 * k[1] + 0.0722 * k[2];
+      }
+
+      function kontrast(a, b) {
+        const p1 = parlaklik(a);
+        const p2 = parlaklik(b);
+        return (Math.max(p1, p2) + 0.05) / (Math.min(p1, p2) + 0.05);
+      }
+
+      /* --- HSL dönüşümü (ton korunarak açıklık aramak için) ------------------ */
+      function hsle([r, g, b]) {
+        r /= 255;
+        g /= 255;
+        b /= 255;
+        const enb = Math.max(r, g, b);
+        const enk = Math.min(r, g, b);
+        const l = (enb + enk) / 2;
+        let h = 0;
+        let s = 0;
+        if (enb !== enk) {
+          const d = enb - enk;
+          s = l > 0.5 ? d / (2 - enb - enk) : d / (enb + enk);
+          if (enb === r) h = ((g - b) / d + (g < b ? 6 : 0)) / 6;
+          else if (enb === g) h = ((b - r) / d + 2) / 6;
+          else h = ((r - g) / d + 4) / 6;
+        }
+        return [h, s, l];
+      }
+
+      function rgbye([h, s, l]) {
+        if (s === 0) {
+          const d = Math.round(l * 255);
+          return [d, d, d];
+        }
+        const q = l < 0.5 ? l * (1 + s) : l + s - l * s;
+        const p = 2 * l - q;
+        const kanal = (t) => {
+          if (t < 0) t += 1;
+          if (t > 1) t -= 1;
+          if (t < 1 / 6) return p + (q - p) * 6 * t;
+          if (t < 1 / 2) return q;
+          if (t < 2 / 3) return p + (q - p) * (2 / 3 - t) * 6;
+          return p;
+        };
+        return [kanal(h + 1 / 3) * 255, kanal(h) * 255, kanal(h - 1 / 3) * 255];
+      }
+
+      /** Tonu koruyarak eşiği geçen en yakın açıklığı bulur. */
+      function tonAra(on, arka, esik) {
+        const [h, s, l0] = hsle(on);
+        let enIyi = null;
+        // Açıklığı iki yönde 0.005 adımlarla tarayıp ilk geçeni al
+        for (let adim = 0.005; adim <= 1; adim += 0.005) {
+          for (const yon of [-1, 1]) {
+            const l = l0 + yon * adim;
+            if (l < 0 || l > 1) continue;
+            const aday = rgbye([h, s, l]).map(Math.round);
+            if (kontrast(aday, arka) >= esik) {
+              enIyi = { renk: aday, oran: kontrast(aday, arka), fark: adim, yon };
+              break;
+            }
+          }
+          if (enIyi) break;
+        }
+        return enIyi;
+      }
+
+      /* --- çizim ------------------------------------------------------------ */
+      const ESIKLER = [
+        ['AA normal', 4.5],
+        ['AA büyük', 3],
+        ['AA arayüz', 3],
+        ['AAA normal', 7],
+        ['AAA büyük', 4.5],
+      ];
+
+      function hesapla() {
+        const on = coz(el('#rk-on').value);
+        const arka = coz(el('#rk-arka').value);
+        const durum = el('#rk-durum');
+
+        if (!on || !arka) {
+          durum.className = 'arac-durum hata';
+          durum.textContent = 'Renkleri #rrggbb, #rgb ya da rgb(r, g, b) biçiminde girin.';
+          return;
+        }
+
+        el('#rk-on-secici').value = onaltiya(on);
+        el('#rk-arka-secici').value = onaltiya(arka);
+
+        const oran = kontrast(on, arka);
+        el('#rk-oran').textContent = oran.toFixed(2) + ':1';
+
+        el('#rk-rozetler').innerHTML = ESIKLER.map(([ad, esik]) => {
+          const gecti = oran >= esik;
+          return `<span class="rk-rozet" data-gecti="${gecti}">${ad} <b>${gecti ? 'geçti' : 'kaldı'}</b> <i>${esik}:1</i></span>`;
+        }).join('');
+
+        const o = el('#rk-onizleme');
+        o.style.background = onaltiya(arka);
+        o.style.color = onaltiya(on);
+
+        durum.className = 'arac-durum ' + (oran >= 4.5 ? 'ok' : oran >= 3 ? '' : 'hata');
+        durum.textContent =
+          oran >= 7
+            ? 'AAA dahil her eşiği geçiyor.'
+            : oran >= 4.5
+              ? 'Gövde metni için yeterli (AA).'
+              : oran >= 3
+                ? 'Yalnızca büyük metin ve arayüz ögesi için yeterli — gövde metninde kullanmayın.'
+                : 'Hiçbir eşiği geçmiyor.';
+
+        /* --- öneriler --- */
+        const eksikler = [
+          ['AA normal metin', 4.5],
+          ['AAA normal metin', 7],
+        ].filter(([, e]) => oran < e);
+
+        if (!eksikler.length) {
+          el('#rk-oneri-blok').hidden = true;
+          return;
+        }
+
+        const kartlar = eksikler
+          .map(([ad, esik]) => {
+            const s = tonAra(on, arka, esik);
+            if (!s) {
+              return `<div class="rk-oneri"><span class="yan-etiket">${ad} (${esik}:1)</span><p class="rk-yok">Bu arka planla tonu koruyarak ulaşılamıyor — arka planı da değiştirmeniz gerekir.</p></div>`;
+            }
+            const kod = onaltiya(s.renk);
+            return (
+              `<div class="rk-oneri">` +
+              `<span class="yan-etiket">${ad} (${esik}:1)</span>` +
+              `<div class="rk-oneri-govde" style="background:${onaltiya(arka)};color:${kod}">Örnek metin</div>` +
+              `<div class="rk-oneri-alt">` +
+              `<code>${kod}</code>` +
+              `<span>${s.oran.toFixed(2)}:1 · ${s.yon < 0 ? 'koyulaştırıldı' : 'açıldı'}</span>` +
+              `<button type="button" class="rk-uygula" data-renk="${kod}">Uygula</button>` +
+              `</div></div>`
+            );
+          })
+          .join('');
+
+        el('#rk-oneriler').innerHTML = kartlar;
+        el('#rk-oneri-blok').hidden = false;
+      }
+
+      /* --- olaylar ---------------------------------------------------------- */
+      el('#rk-on').addEventListener('input', hesapla);
+      el('#rk-arka').addEventListener('input', hesapla);
+      el('#rk-on-secici').addEventListener('input', (e) => {
+        el('#rk-on').value = e.target.value;
+        hesapla();
+      });
+      el('#rk-arka-secici').addEventListener('input', (e) => {
+        el('#rk-arka').value = e.target.value;
+        hesapla();
+      });
+
+      el('#rk-degis').addEventListener('click', () => {
+        const a = el('#rk-on').value;
+        el('#rk-on').value = el('#rk-arka').value;
+        el('#rk-arka').value = a;
+        hesapla();
+      });
+
+      el('#rk-oneriler').addEventListener('click', (e) => {
+        const d = e.target.closest('.rk-uygula');
+        if (!d) return;
+        el('#rk-on').value = d.dataset.renk;
+        hesapla();
+      });
+
+      hesapla();
+    })();
+  </script>
+
+  <style>
+    .rk-girisler {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+      gap: 12px;
+      align-items: end;
+    }
+    @media (max-width: 560px) {
+      .rk-girisler {
+        grid-template-columns: minmax(0, 1fr);
+      }
+      .rk-degis {
+        justify-self: start;
+      }
+    }
+    .rk-kutu {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      border: 1px solid var(--line);
+      border-radius: 10px;
+      padding: 6px 10px 6px 6px;
+      background: var(--paper);
+      margin-top: 5px;
+    }
+    .rk-kutu input[type='color'] {
+      width: 38px;
+      height: 34px;
+      border: 1px solid var(--line);
+      border-radius: 7px;
+      padding: 2px;
+      background: transparent;
+      cursor: pointer;
+      flex: 0 0 auto;
+    }
+    .rk-kutu input[type='text'] {
+      flex: 1;
+      min-width: 0;
+      border: 0;
+      background: transparent;
+      font-family: var(--mono, ui-monospace, monospace);
+      font-size: 14px;
+      color: var(--ink);
+    }
+    .rk-kutu input[type='text']:focus {
+      outline: none;
+    }
+    .rk-kutu:focus-within {
+      border-color: var(--indigo);
+      box-shadow: 0 0 0 3px var(--tint);
+    }
+    .rk-degis {
+      border: 1px solid var(--line);
+      background: var(--paper);
+      border-radius: 9px;
+      width: 38px;
+      height: 46px;
+      cursor: pointer;
+      color: var(--muted);
+      font-size: 16px;
+    }
+    .rk-degis:hover {
+      border-color: var(--indigo);
+      color: var(--indigo-metin);
+    }
+    .rk-sonuc {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      gap: 18px;
+    }
+    .rk-oran {
+      display: grid;
+      line-height: 1.1;
+    }
+    .rk-oran b {
+      font-size: 34px;
+      letter-spacing: -0.02em;
+    }
+    .rk-oran span {
+      font-size: 12px;
+      color: var(--muted);
+    }
+    .rk-rozetler {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+    }
+    .rk-rozet {
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
+      border-radius: 999px;
+      padding: 5px 11px;
+      font-size: 12px;
+      border: 1px solid var(--line);
+      color: var(--muted);
+    }
+    .rk-rozet i {
+      font-style: normal;
+      opacity: 0.7;
+      font-size: 11px;
+    }
+    .rk-rozet[data-gecti='true'] {
+      background: light-dark(#ecfdf5, #06301f);
+      border-color: light-dark(#a7f3d0, #12694a);
+      color: light-dark(#065f46, #6ee7b7);
+    }
+    .rk-rozet[data-gecti='false'] {
+      background: light-dark(#fef2f2, #3b1d1d);
+      border-color: light-dark(#fecaca, #7f2b2b);
+      color: light-dark(#991b1b, #fca5a5);
+    }
+    .rk-onizleme {
+      margin-top: 18px;
+      border: 1px solid var(--line);
+      border-radius: 12px;
+      padding: 22px 24px;
+    }
+    .rk-onizleme p {
+      margin: 0 0 12px;
+    }
+    .rk-onizleme p:last-child {
+      margin-bottom: 0;
+    }
+    .rk-buyuk {
+      font-size: 24px;
+      font-weight: 700;
+      letter-spacing: -0.01em;
+    }
+    .rk-orta {
+      font-size: 19px;
+      font-weight: 700;
+    }
+    .rk-kucuk {
+      font-size: 15px;
+      line-height: 1.65;
+      max-width: 60ch;
+    }
+    .rk-mini {
+      font-size: 12px;
+    }
+    .rk-oneriler {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(min(250px, 100%), 1fr));
+      gap: 14px;
+      margin-top: 12px;
+    }
+    .rk-oneri {
+      border: 1px solid var(--line);
+      border-radius: 11px;
+      padding: 12px 14px;
+    }
+    .rk-oneri-govde {
+      border-radius: 8px;
+      padding: 16px;
+      font-size: 15px;
+      margin: 7px 0 9px;
+      text-align: center;
+    }
+    .rk-oneri-alt {
+      display: flex;
+      align-items: center;
+      gap: 9px;
+      flex-wrap: wrap;
+      font-size: 12px;
+      color: var(--muted);
+    }
+    .rk-oneri-alt code {
+      font-size: 12.5px;
+      color: var(--ink);
+    }
+    .rk-uygula {
+      margin-left: auto;
+      border: 1px solid var(--line);
+      background: var(--paper);
+      border-radius: 7px;
+      padding: 4px 10px;
+      font-size: 11.5px;
+      color: var(--muted);
+      cursor: pointer;
+      font-family: inherit;
+    }
+    .rk-uygula:hover {
+      border-color: var(--indigo);
+      color: var(--indigo-metin);
+    }
+    .rk-yok {
+      font-size: 12.5px;
+      color: var(--muted);
+      line-height: 1.55;
+      margin: 7px 0 0;
+    }
+    .rk-kaydir {
+      overflow-x: auto;
+    }
+    .rk-tablo {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 13px;
+      min-width: 500px;
+    }
+    .rk-tablo th,
+    .rk-tablo td {
+      text-align: left;
+      padding: 9px 12px;
+      border-bottom: 1px solid var(--line);
+      vertical-align: top;
+      line-height: 1.55;
+    }
+    .rk-tablo th {
+      color: var(--muted);
+      font-size: 11.5px;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+    }
+    .rk-tablo td:nth-child(2) {
+      white-space: nowrap;
+      color: var(--indigo-metin);
+      font-family: var(--mono, ui-monospace, monospace);
+    }
+  </style>
+</Base>

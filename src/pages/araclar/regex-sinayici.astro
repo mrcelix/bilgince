@@ -1,0 +1,614 @@
+---
+import Base from '../../layouts/Base.astro';
+
+const hazirlar = [
+  {
+    ad: 'IPv4 adresi',
+    desen: '\\b((25[0-5]|2[0-4]\\d|1\\d\\d|[1-9]?\\d)\\.){3}(25[0-5]|2[0-4]\\d|1\\d\\d|[1-9]?\\d)\\b',
+    bayrak: 'g',
+  },
+  {
+    ad: 'E-posta',
+    desen: "[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\\.[A-Za-z]{2,}",
+    bayrak: 'gi',
+  },
+  {
+    ad: 'Windows olay kimliği satırı',
+    desen: 'EventID[:\\s=]+(\\d{1,5})',
+    bayrak: 'gi',
+  },
+  {
+    ad: 'ISO 8601 tarih',
+    desen: '\\d{4}-\\d{2}-\\d{2}[T ]\\d{2}:\\d{2}:\\d{2}(?:\\.\\d+)?(?:Z|[+-]\\d{2}:?\\d{2})?',
+    bayrak: 'g',
+  },
+  {
+    ad: 'Apache/Nginx erişim satırı',
+    desen: '^(?<istemci>\\S+) \\S+ \\S+ \\[(?<zaman>[^\\]]+)\\] "(?<yontem>\\w+) (?<yol>\\S+)[^"]*" (?<durum>\\d{3}) (?<boyut>\\d+|-)',
+    bayrak: 'gm',
+  },
+  {
+    ad: 'MAC adresi',
+    desen: '\\b[0-9A-Fa-f]{2}([:-])(?:[0-9A-Fa-f]{2}\\1){4}[0-9A-Fa-f]{2}\\b',
+    bayrak: 'g',
+  },
+  {
+    ad: 'UNC / paylaşım yolu',
+    desen: '\\\\\\\\[A-Za-z0-9._-]+\\\\[A-Za-z0-9$._ -]+(?:\\\\[^\\\\\\r\\n]*)*',
+    bayrak: 'g',
+  },
+  {
+    ad: 'Sertifika seri numarası',
+    desen: '\\b(?:[0-9a-fA-F]{2}[: ]){7,}[0-9a-fA-F]{2}\\b',
+    bayrak: 'g',
+  },
+];
+---
+
+<Base
+  baslik="Regex sınayıcı"
+  aciklama="Düzenli ifadenizi gerçek günlük metniyle canlı sınayın: eşleşmeler renkli işaretlenir, gruplar tabloda listelenir, hazır desenler bir tık uzağınızda."
+  aramaya={true}
+  kategori="Araç"
+>
+  <div class="arama-bas">
+    <div class="kap">
+      <nav class="kirinti" aria-label="Kırıntı yolu" style="padding-top:0">
+        <a href="/">Ana sayfa</a><span class="ayrac">/</span><a href="/araclar">Araçlar</a><span
+          class="ayrac">/</span
+        ><span aria-current="page">Regex sınayıcı</span>
+      </nav>
+      <h1>Regex sınayıcı</h1>
+      <p style="color:var(--muted);font-size:14px;margin-top:8px;max-width:66ch">
+        Günlük ayrıştırırken deseni kör kör yazmak yerine gerçek satırlar üzerinde deneyin.
+        Eşleşmeler metnin içinde işaretlenir, yakalama grupları ayrı listelenir. Her şey tarayıcıda
+        çalışır — yapıştırdığınız günlük hiçbir yere gitmez.
+      </p>
+    </div>
+  </div>
+
+  <div class="kap arac-sayfa">
+    <section class="arac-blok">
+      <h2 class="arac-h2"><span class="arac-no">1</span> Desen</h2>
+      <div class="r-desen">
+        <span class="r-sla">/</span>
+        <input id="r-desen" type="text" spellcheck="false" autocomplete="off" placeholder="\d+" />
+        <span class="r-sla">/</span>
+        <input id="r-bayrak" type="text" spellcheck="false" autocomplete="off" value="gm" />
+      </div>
+      <div class="r-bayraklar">
+        {
+          [
+            ['g', 'tümü', 'İlk eşleşmeden sonra durma'],
+            ['i', 'büyük/küçük', 'Harf büyüklüğünü yok say'],
+            ['m', 'çok satır', '^ ve $ her satırın başı/sonu'],
+            ['s', 'nokta hepsi', 'Nokta satır sonunu da eşler'],
+            ['u', 'unicode', 'Unicode kaçışlarını çözümle'],
+          ].map(([harf, ad, aciklama]) => (
+            <label class="r-bayrak" title={aciklama}>
+              <input type="checkbox" data-bayrak={harf} />
+              <code>{harf}</code>
+              <span>{ad}</span>
+            </label>
+          ))
+        }
+      </div>
+      <p class="arac-durum" id="r-durum" role="status" aria-live="polite"></p>
+
+      <span class="yan-etiket" style="margin-top:14px;display:block">Hazır desenler</span>
+      <div class="r-hazirlar">
+        {
+          hazirlar.map((h) => (
+            <button
+              type="button"
+              class="r-hazir"
+              data-desen={h.desen}
+              data-bayrak={h.bayrak}
+              data-ad={h.ad}
+            >
+              {h.ad}
+            </button>
+          ))
+        }
+      </div>
+    </section>
+
+    <section class="arac-blok">
+      <h2 class="arac-h2"><span class="arac-no">2</span> Sınanacak metin</h2>
+      <div class="arac-alan">
+        <textarea id="r-metin" rows="10" spellcheck="false"></textarea>
+      </div>
+      <div class="arac-dugmeler">
+        <button type="button" class="dg dg-hayalet" id="r-ornek">Örnek günlük yapıştır</button>
+        <button type="button" class="dg dg-hayalet" id="r-temizle">Temizle</button>
+      </div>
+    </section>
+
+    <section class="arac-blok">
+      <h2 class="arac-h2"><span class="arac-no">3</span> Eşleşmeler</h2>
+      <div class="arac-olcum" id="r-olcum"><span>Henüz sınanmadı</span></div>
+      <div class="r-isaret" id="r-isaret" aria-live="polite"></div>
+      <div id="r-tablo-kutu" hidden>
+        <span class="yan-etiket">Yakalama grupları</span>
+        <div class="r-kaydir">
+          <table class="r-tablo">
+            <thead>
+              <tr><th>#</th><th>Eşleşme</th><th>Konum</th><th>Gruplar</th></tr>
+            </thead>
+            <tbody id="r-tablo"></tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+
+    <section class="arac-blok">
+      <h2 class="arac-h2"><span class="arac-no">4</span> Sık düşülen tuzaklar</h2>
+      <ul class="r-ipuclari">
+        <li>
+          <b>Nokta her şeyi eşler.</b> <code>10.0.0.1</code> ararken <code>10.0.0.1</code> yazarsanız
+          <code>10a0b0c1</code> de eşleşir. Noktayı <code>\.</code> diye kaçırın.
+        </li>
+        <li>
+          <b>Açgözlü nicelik belirteci.</b> <code>&quot;.*&quot;</code> satırdaki ilk tırnaktan son
+          tırnağa kadar her şeyi yutar. Tembel biçimi <code>&quot;.*?&quot;</code> kullanın.
+        </li>
+        <li>
+          <b>Bayrak <code>g</code> yoksa</b> yalnızca ilk eşleşme döner. Günlük tararken neredeyse
+          her zaman istersiniz.
+        </li>
+        <li>
+          <b>Katastrofik geri izleme.</b> <code>(a+)+b</code> gibi iç içe niceleyiciler uzun metinde
+          tarayıcıyı — ve sunucuda çalışıyorsa iş parçacığını — dakikalarca kilitleyebilir. Araç
+          aramayı ayrı bir işçide çalıştırır ve 2 saniyede kesip uyarır; aynı deseni üretime
+          koymadan önce bunu bir işaret sayın.
+        </li>
+        <li>
+          <b>Adlandırılmış grup</b> okunurluğu ciddi artırır: <code>(?&lt;durum&gt;\d&#123;3&#125;)</code>.
+          Aşağıdaki tabloda ada göre görürsünüz.
+        </li>
+      </ul>
+    </section>
+  </div>
+
+  <script>
+    (() => {
+      const el = (s) => document.querySelector(s);
+      const desenAlan = el('#r-desen');
+      const bayrakAlan = el('#r-bayrak');
+      const metinAlan = el('#r-metin');
+      const durum = el('#r-durum');
+
+      const kacir = (s) =>
+        s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+
+      /** Onay kutularını bayrak metniyle eşitler. */
+      function kutulariEsitle() {
+        const b = bayrakAlan.value;
+        document.querySelectorAll('[data-bayrak]').forEach((k) => {
+          k.checked = b.includes(k.dataset.bayrak);
+        });
+      }
+
+      /* --- arama işçisi ------------------------------------------------------
+         Katastrofik geri izlemede tek bir exec() çağrısı dakikalarca dönebilir ve
+         ana iş parçacığında süre denetimi işe yaramaz — kod zaten çalışmıyordur.
+         Bu yüzden arama ayrı bir işçide yapılır; süre dolunca işçi sonlandırılır. */
+      const ISCI_KODU = `
+        self.onmessage = (o) => {
+          const { desen, bayrak, metin } = o.data;
+          const re = new RegExp(desen, bayrak);
+          const cikti = [];
+          const basla = Date.now();
+          if (re.global) {
+            re.lastIndex = 0;
+            let e;
+            while ((e = re.exec(metin)) !== null) {
+              cikti.push({ tam: e[0], index: e.index, gruplar: e.slice(1), adlar: e.groups || null });
+              if (e[0] === '') re.lastIndex++;
+              if (cikti.length >= 2000) break;
+            }
+          } else {
+            const e = re.exec(metin);
+            if (e) cikti.push({ tam: e[0], index: e.index, gruplar: e.slice(1), adlar: e.groups || null });
+          }
+          self.postMessage({ cikti, sure: Date.now() - basla });
+        };
+      `;
+
+      let isci = null;
+      let iscininAdresi = null;
+
+      /** İşçi kurulamazsa (eski tarayıcı, katı CSP) null döner; arama ana iş
+          parçacığına düşer — süre koruması olmadan ama çalışır hâlde. */
+      function isciKur() {
+        try {
+          if (!iscininAdresi) {
+            iscininAdresi = URL.createObjectURL(
+              new Blob([ISCI_KODU], { type: 'text/javascript' })
+            );
+          }
+          isci = new Worker(iscininAdresi);
+          return isci;
+        } catch {
+          isci = null;
+          return null;
+        }
+      }
+
+      /** İşçinin yaptığı işin ana iş parçacığındaki eşi. */
+      function anaIsParcacigindaAra(desen, bayrak, metin) {
+        const re = new RegExp(desen, bayrak);
+        const cikti = [];
+        const basla = performance.now();
+        if (re.global) {
+          re.lastIndex = 0;
+          let e;
+          while ((e = re.exec(metin)) !== null) {
+            cikti.push({ tam: e[0], index: e.index, gruplar: e.slice(1), adlar: e.groups || null });
+            if (e[0] === '') re.lastIndex++;
+            if (cikti.length >= 2000) break;
+          }
+        } else {
+          const e = re.exec(metin);
+          if (e) cikti.push({ tam: e[0], index: e.index, gruplar: e.slice(1), adlar: e.groups || null });
+        }
+        return { cikti, sure: Math.round(performance.now() - basla) };
+      }
+
+      let sayac = 0;
+
+      function sina() {
+        const desen = desenAlan.value;
+        const metin = metinAlan.value;
+        const kusak = ++sayac;
+
+        el('#r-isaret').innerHTML = '';
+        el('#r-tablo').innerHTML = '';
+        el('#r-tablo-kutu').hidden = true;
+
+        if (!desen) {
+          durum.className = 'arac-durum';
+          durum.textContent = '';
+          el('#r-olcum').innerHTML = '<span>Henüz sınanmadı</span>';
+          return;
+        }
+
+        try {
+          new RegExp(desen, bayrakAlan.value);
+        } catch (h) {
+          durum.className = 'arac-durum hata';
+          durum.textContent = `Geçersiz desen: ${h.message}`;
+          el('#r-olcum').innerHTML = '<span>—</span>';
+          return;
+        }
+
+        if (!metin) {
+          durum.className = 'arac-durum ok';
+          durum.textContent = 'Desen geçerli. Sınamak için metin girin.';
+          el('#r-olcum').innerHTML = '<span>Desen geçerli</span>';
+          return;
+        }
+
+        // Önceki arama hâlâ sürüyorsa iptal et
+        if (isci) isci.terminate();
+        const su = isciKur();
+
+        if (!su) {
+          const sonuc = anaIsParcacigindaAra(desen, bayrakAlan.value, metin);
+          ciz(sonuc.cikti, sonuc.sure, metin);
+          return;
+        }
+
+        const kesici = setTimeout(() => {
+          su.terminate();
+          isci = null;
+          if (kusak !== sayac) return;
+          durum.className = 'arac-durum hata';
+          durum.textContent =
+            'Arama 2 saniyeyi aştı ve kesildi — desen büyük olasılıkla katastrofik geri izlemeye giriyor. ' +
+            'İç içe niceleyicileri (ör. (a+)+) sadeleştirin.';
+          el('#r-olcum').innerHTML = '<span>Kesildi</span>';
+        }, 2000);
+
+        su.onmessage = (o) => {
+          clearTimeout(kesici);
+          if (kusak !== sayac) return; // daha yeni bir arama başlamış
+          ciz(o.data.cikti, o.data.sure, metin);
+        };
+
+        su.onerror = () => {
+          clearTimeout(kesici);
+          if (kusak !== sayac) return;
+          durum.className = 'arac-durum hata';
+          durum.textContent = 'Arama sırasında beklenmedik bir hata oluştu.';
+        };
+
+        su.postMessage({ desen, bayrak: bayrakAlan.value, metin });
+      }
+
+      function ciz(eslesmeler, sure, metin) {
+        /* --- metni işaretle --- */
+        let html = '';
+        let imlec = 0;
+        for (const e of eslesmeler) {
+          if (e.index < imlec) continue; // örtüşmeyi atla
+          html += kacir(metin.slice(imlec, e.index));
+          html += `<mark>${kacir(e.tam) || '&#8203;'}</mark>`;
+          imlec = e.index + e.tam.length;
+        }
+        html += kacir(metin.slice(imlec));
+        el('#r-isaret').innerHTML = html || '&nbsp;';
+
+        /* --- ölçüm --- */
+        const gruplu = eslesmeler.filter((e) => e.gruplar.length > 0).length;
+        el('#r-olcum').innerHTML =
+          `<span>Eşleşme: <b>${eslesmeler.length}</b></span>` +
+          `<span>Süre: <b>${sure} ms</b></span>` +
+          (gruplu ? `<span>Gruplu: <b>${gruplu}</b></span>` : '');
+
+        /* --- tablo --- */
+        if (eslesmeler.length) {
+          const govde = eslesmeler
+            .slice(0, 200)
+            .map((e, i) => {
+              const gruplar = [];
+              e.gruplar.forEach((deger, g) => {
+                if (deger !== undefined) gruplar.push(`<b>${g + 1}</b> ${kacir(deger)}`);
+              });
+              if (e.adlar) {
+                for (const [ad, deger] of Object.entries(e.adlar)) {
+                  if (deger !== undefined) gruplar.push(`<b>${kacir(ad)}</b> ${kacir(deger)}`);
+                }
+              }
+              return (
+                `<tr><td>${i + 1}</td>` +
+                `<td><code>${kacir(e.tam)}</code></td>` +
+                `<td>${e.index}</td>` +
+                `<td>${gruplar.length ? gruplar.join('<br>') : '<span class="r-yok">—</span>'}</td></tr>`
+              );
+            })
+            .join('');
+          el('#r-tablo').innerHTML = govde;
+          el('#r-tablo-kutu').hidden = false;
+        }
+
+        durum.className = eslesmeler.length ? 'arac-durum ok' : 'arac-durum';
+        durum.textContent = eslesmeler.length
+          ? `${eslesmeler.length} eşleşme bulundu.`
+          : 'Desen geçerli ama hiçbir şey eşleşmedi.';
+      }
+
+      /* --- olaylar --- */
+      let zaman;
+      const gecikmeliSina = () => {
+        clearTimeout(zaman);
+        zaman = setTimeout(sina, 180);
+      };
+
+      desenAlan.addEventListener('input', gecikmeliSina);
+      metinAlan.addEventListener('input', gecikmeliSina);
+      bayrakAlan.addEventListener('input', () => {
+        kutulariEsitle();
+        gecikmeliSina();
+      });
+
+      document.querySelectorAll('[data-bayrak]').forEach((k) => {
+        k.addEventListener('change', () => {
+          const harf = k.dataset.bayrak;
+          const su = new Set(bayrakAlan.value.split(''));
+          k.checked ? su.add(harf) : su.delete(harf);
+          bayrakAlan.value = [...su].join('');
+          sina();
+        });
+      });
+
+      document.querySelectorAll('.r-hazir').forEach((d) => {
+        d.addEventListener('click', () => {
+          desenAlan.value = d.dataset.desen;
+          bayrakAlan.value = d.dataset.bayrak;
+          kutulariEsitle();
+          sina();
+          desenAlan.focus();
+        });
+      });
+
+      el('#r-ornek').addEventListener('click', () => {
+        metinAlan.value = [
+          '10.20.0.14 - - [18/Aug/2026:09:14:22 +0300] "GET /saglik HTTP/1.1" 200 512',
+          '10.20.0.14 - - [18/Aug/2026:09:14:23 +0300] "POST /api/oturum HTTP/1.1" 401 118',
+          '192.168.4.9 - - [18/Aug/2026:09:15:01 +0300] "GET /rapor.pdf HTTP/1.1" 200 1048576',
+          '172.16.8.201 - - [18/Aug/2026:09:15:44 +0300] "GET /admin HTTP/1.1" 403 0',
+          '10.20.0.31 - - [18/Aug/2026:09:16:12 +0300] "GET /api/kullanici HTTP/1.1" 500 89',
+          '',
+          '2026-08-18T09:20:11+03:00 sunucu01 sshd[4412]: Failed password for gecersiz from 203.0.113.44',
+          'EventID: 4625  Hesap: yedek-servis  Kaynak: SRV-DOSYA-02',
+          'EventID=4740 Hesap=mcelik Kilit kaynağı: 10.20.0.14',
+          'MAC 00:1B:44:11:3A:B7 için DHCP kirası verilemedi',
+          'Paylaşım erişilemiyor: \\\\SRV-DOSYA-02\\Ortak\\Muhasebe',
+          'Uyarı: ali.veli@ornek.com.tr adresine bildirim gönderilemedi',
+        ].join('\n');
+        if (!desenAlan.value) {
+          desenAlan.value = document.querySelector('.r-hazir').dataset.desen;
+          bayrakAlan.value = document.querySelector('.r-hazir').dataset.bayrak;
+          kutulariEsitle();
+        }
+        sina();
+      });
+
+      el('#r-temizle').addEventListener('click', () => {
+        metinAlan.value = '';
+        sina();
+      });
+
+      kutulariEsitle();
+    })();
+  </script>
+
+  <style>
+    .r-desen {
+      display: flex;
+      align-items: stretch;
+      gap: 0;
+      border: 1px solid var(--line);
+      border-radius: 10px;
+      overflow: hidden;
+      background: var(--paper);
+      font-family: var(--mono, ui-monospace, monospace);
+    }
+    .r-desen input {
+      border: 0;
+      background: transparent;
+      padding: 11px 4px;
+      font: inherit;
+      font-size: 14px;
+      color: var(--ink);
+      min-width: 0;
+    }
+    .r-desen input:focus {
+      outline: none;
+    }
+    .r-desen:focus-within {
+      border-color: var(--indigo);
+      box-shadow: 0 0 0 3px var(--tint);
+    }
+    #r-desen {
+      flex: 1;
+    }
+    #r-bayrak {
+      width: 5.5em;
+      color: var(--indigo-metin);
+    }
+    .r-sla {
+      display: flex;
+      align-items: center;
+      padding: 0 8px;
+      color: var(--muted);
+      font-size: 15px;
+      background: var(--tint);
+    }
+    .r-bayraklar {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      margin-top: 10px;
+    }
+    .r-bayrak {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      border: 1px solid var(--line);
+      border-radius: 999px;
+      padding: 5px 11px 5px 8px;
+      font-size: 12.5px;
+      color: var(--muted);
+      cursor: pointer;
+      background: var(--paper);
+    }
+    .r-bayrak:has(input:checked) {
+      border-color: var(--indigo);
+      color: var(--indigo-metin);
+      background: var(--tint);
+    }
+    .r-bayrak code {
+      font-size: 12px;
+      font-weight: 700;
+    }
+    .r-hazirlar {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      margin-top: 8px;
+    }
+    .r-hazir {
+      border: 1px dashed var(--line);
+      background: transparent;
+      border-radius: 999px;
+      padding: 6px 12px;
+      font-size: 12.5px;
+      color: var(--ink-soft);
+      cursor: pointer;
+      font-family: inherit;
+    }
+    .r-hazir:hover {
+      border-style: solid;
+      border-color: var(--indigo);
+      color: var(--indigo-metin);
+      background: var(--tint);
+    }
+    .r-isaret {
+      white-space: pre-wrap;
+      word-break: break-word;
+      font-family: var(--mono, ui-monospace, monospace);
+      font-size: 12.5px;
+      line-height: 1.75;
+      background: var(--tint);
+      border: 1px solid var(--line);
+      border-radius: 10px;
+      padding: 14px;
+      margin-top: 12px;
+      max-height: 380px;
+      overflow: auto;
+    }
+    .r-isaret mark {
+      background: light-dark(#fde68a, #7c5b12);
+      color: inherit;
+      border-radius: 3px;
+      padding: 1px 0;
+      box-shadow: 0 0 0 1px light-dark(#f0c33c, #a97f1c);
+    }
+    .r-kaydir {
+      overflow-x: auto;
+      margin-top: 8px;
+    }
+    .r-tablo {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 12.5px;
+    }
+    .r-tablo th,
+    .r-tablo td {
+      text-align: left;
+      padding: 7px 10px;
+      border-bottom: 1px solid var(--line);
+      vertical-align: top;
+    }
+    .r-tablo th {
+      color: var(--muted);
+      font-weight: 600;
+      font-size: 11.5px;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+    }
+    .r-tablo code {
+      font-size: 12px;
+      word-break: break-all;
+    }
+    .r-tablo b {
+      color: var(--indigo-metin);
+      font-size: 11.5px;
+    }
+    .r-yok {
+      color: var(--muted);
+    }
+    .r-ipuclari {
+      list-style: none;
+      margin: 0;
+      padding: 0;
+      display: grid;
+      gap: 11px;
+    }
+    .r-ipuclari li {
+      font-size: 13.5px;
+      line-height: 1.6;
+      color: var(--ink-soft);
+      border-left: 2px solid var(--line);
+      padding-left: 13px;
+    }
+    .arac-dugmeler {
+      display: flex;
+      gap: 10px;
+      flex-wrap: wrap;
+      margin-top: 4px;
+    }
+  </style>
+</Base>

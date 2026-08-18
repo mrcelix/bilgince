@@ -1,0 +1,418 @@
+---
+import Base from '../../layouts/Base.astro';
+---
+
+<Base
+  baslik="UUID, ULID ve rastgele kimlik üreteci"
+  aciklama="UUID v4/v7, ULID, NanoID ve kısa kod üretir; toplu üretim, biçim seçenekleri ve çakışma olasılığı hesabıyla."
+  aramaya={true}
+  kategori="Araç"
+>
+  <div class="arama-bas">
+    <div class="kap">
+      <nav class="kirinti" aria-label="Kırıntı yolu" style="padding-top:0">
+        <a href="/">Ana sayfa</a><span class="ayrac">/</span><a href="/araclar">Araçlar</a><span
+          class="ayrac">/</span
+        ><span aria-current="page">Kimlik üreteci</span>
+      </nav>
+      <h1>UUID, ULID ve rastgele kimlik üreteci</h1>
+      <p style="color:var(--muted);font-size:14px;margin-top:8px;max-width:66ch">
+        Test verisi, korelasyon kimliği, kiracı anahtarı, dosya adı… Hepsi tarayıcının
+        <code>crypto.getRandomValues</code> kaynağıyla üretilir; sunucuya hiçbir şey gitmez.
+      </p>
+    </div>
+  </div>
+
+  <div class="kap arac-sayfa">
+    <section class="arac-blok">
+      <h2 class="arac-h2"><span class="arac-no">1</span> Tür</h2>
+      <div class="k-turler" role="radiogroup" aria-label="Kimlik türü">
+        <label class="k-tur">
+          <input type="radio" name="k-tur" value="uuid4" checked />
+          <b>UUID v4</b>
+          <span>Tamamen rastgele. En yaygın seçim.</span>
+        </label>
+        <label class="k-tur">
+          <input type="radio" name="k-tur" value="uuid7" />
+          <b>UUID v7</b>
+          <span>Zaman öncüllü — sıralanabilir, veri tabanı dizinine dost.</span>
+        </label>
+        <label class="k-tur">
+          <input type="radio" name="k-tur" value="ulid" />
+          <b>ULID</b>
+          <span>26 karakter, Base32, sözlük sırası = zaman sırası.</span>
+        </label>
+        <label class="k-tur">
+          <input type="radio" name="k-tur" value="nano" />
+          <b>NanoID</b>
+          <span>21 karakter, URL güvenli. Kısa bağlantılar için.</span>
+        </label>
+        <label class="k-tur">
+          <input type="radio" name="k-tur" value="kisa" />
+          <b>Kısa kod</b>
+          <span>Karışan harfler (0/O, 1/l/I) çıkarılmış; sesli okunabilir.</span>
+        </label>
+        <label class="k-tur">
+          <input type="radio" name="k-tur" value="hex" />
+          <b>Onaltılık</b>
+          <span>Ham rastgele bayt. Anahtar ve tuz üretimi için.</span>
+        </label>
+      </div>
+    </section>
+
+    <section class="arac-blok">
+      <h2 class="arac-h2"><span class="arac-no">2</span> Seçenekler</h2>
+      <div class="arac-alanlar">
+        <label class="arac-alan"
+          >Adet
+          <input id="k-adet" type="number" min="1" max="5000" value="10" />
+        </label>
+        <label class="arac-alan" id="k-uzunluk-alan"
+          >Uzunluk
+          <input id="k-uzunluk" type="number" min="4" max="128" value="21" />
+        </label>
+        <label class="arac-alan"
+          >Önek (isteğe bağlı)
+          <input id="k-onek" type="text" spellcheck="false" placeholder="ör. srv_" />
+        </label>
+      </div>
+      <div class="k-secenekler">
+        <label class="k-sec"><input type="checkbox" id="k-buyuk" /> <span>BÜYÜK HARF</span></label>
+        <label class="k-sec"><input type="checkbox" id="k-tire" /> <span>Tireleri çıkar</span></label>
+        <label class="k-sec"
+          ><input type="checkbox" id="k-suslu" /> <span>Süslü parantez içine al</span></label
+        >
+        <label class="k-sec"><input type="checkbox" id="k-tirnak" /> <span>Tırnak ve virgül</span></label>
+      </div>
+      <div class="arac-dugmeler">
+        <button type="button" class="dg" id="k-uret">Üret</button>
+        <button type="button" class="dg dg-hayalet" id="k-kopyala">Tümünü kopyala</button>
+        <button type="button" class="dg dg-hayalet" id="k-indir">.txt indir</button>
+      </div>
+      <p class="arac-durum" id="k-durum" role="status" aria-live="polite"></p>
+    </section>
+
+    <section class="arac-blok">
+      <h2 class="arac-h2"><span class="arac-no">3</span> Sonuç</h2>
+      <div class="arac-olcum" id="k-olcum"></div>
+      <div style="position:relative">
+        <pre class="kod k-cikti"><code id="k-cikti"></code></pre>
+      </div>
+    </section>
+
+    <section class="arac-blok">
+      <h2 class="arac-h2"><span class="arac-no">4</span> Hangisini seçmeli?</h2>
+      <div class="k-kaydir">
+        <table class="k-tablo">
+          <thead>
+            <tr><th>Durum</th><th>Öneri</th><th>Neden</th></tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td>Veri tabanı birincil anahtarı</td>
+              <td><b>UUID v7</b></td>
+              <td>Zaman öncüllü olduğu için ekleme sırası dizini parçalamaz; v4'te her satır rastgele yere düşer.</td>
+            </tr>
+            <tr>
+              <td>Günlük korelasyon kimliği</td>
+              <td><b>ULID</b></td>
+              <td>26 karakter, tire yok, sözlük sırası zaman sırası — grep ile aralık taraması kolay.</td>
+            </tr>
+            <tr>
+              <td>Kısa paylaşım bağlantısı</td>
+              <td><b>NanoID</b></td>
+              <td>21 karakterde UUID v4 ile aynı çarpışma direnci, URL'de kaçış gerekmez.</td>
+            </tr>
+            <tr>
+              <td>Kullanıcıya telefonda okunacak kod</td>
+              <td><b>Kısa kod</b></td>
+              <td>0/O ve 1/l/I çıkarıldığı için yanlış yazım hataları kaybolur.</td>
+            </tr>
+            <tr>
+              <td>API anahtarı, imza tuzu</td>
+              <td><b>Onaltılık 32+ bayt</b></td>
+              <td>Ham entropi; biçim değil bit sayısı önemlidir.</td>
+            </tr>
+            <tr>
+              <td>Windows kayıt defteri / GUID alanı</td>
+              <td><b>UUID v4, süslü parantezli</b></td>
+              <td>Microsoft araçları <code>&#123;…&#125;</code> biçimini bekler.</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+      <p class="arac-not" id="k-carpisma"></p>
+    </section>
+  </div>
+
+  <script>
+    (() => {
+      const el = (s) => document.querySelector(s);
+      const bayt = (n) => crypto.getRandomValues(new Uint8Array(n));
+      const onaltilik = (d) => [...d].map((b) => b.toString(16).padStart(2, '0')).join('');
+
+      const B32 = '0123456789ABCDEFGHJKMNPQRSTVWXYZ'; // Crockford — I, L, O, U yok
+      const NANO = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789_-';
+      const KISA = 'ACDEFGHJKMNPQRTUVWXY34679'; // karışan harf ve rakamlar çıkarıldı
+
+      /** Verilen alfabeden önyargısız rastgele dizi üretir. */
+      function alfabedenSec(alfabe, uzunluk) {
+        const n = alfabe.length;
+        // 256'nın n'e tam bölünmeyen artığı reddedilerek modulo önyargısı kaldırılır
+        const esik = 256 - (256 % n);
+        let s = '';
+        while (s.length < uzunluk) {
+          for (const b of bayt(uzunluk)) {
+            if (b >= esik) continue;
+            s += alfabe[b % n];
+            if (s.length === uzunluk) break;
+          }
+        }
+        return s;
+      }
+
+      function uuid4() {
+        if (crypto.randomUUID) return crypto.randomUUID();
+        const d = bayt(16);
+        d[6] = (d[6] & 0x0f) | 0x40; // sürüm 4
+        d[8] = (d[8] & 0x3f) | 0x80; // RFC 4122 varyantı
+        const h = onaltilik(d);
+        return `${h.slice(0, 8)}-${h.slice(8, 12)}-${h.slice(12, 16)}-${h.slice(16, 20)}-${h.slice(20)}`;
+      }
+
+      function uuid7() {
+        const d = bayt(16);
+        const ms = Date.now();
+        // İlk 48 bit: Unix milisaniye — sıralanabilirliği bu sağlar
+        d[0] = (ms / 2 ** 40) & 0xff;
+        d[1] = (ms / 2 ** 32) & 0xff;
+        d[2] = (ms / 2 ** 24) & 0xff;
+        d[3] = (ms / 2 ** 16) & 0xff;
+        d[4] = (ms / 2 ** 8) & 0xff;
+        d[5] = ms & 0xff;
+        d[6] = (d[6] & 0x0f) | 0x70; // sürüm 7
+        d[8] = (d[8] & 0x3f) | 0x80;
+        const h = onaltilik(d);
+        return `${h.slice(0, 8)}-${h.slice(8, 12)}-${h.slice(12, 16)}-${h.slice(16, 20)}-${h.slice(20)}`;
+      }
+
+      function ulid() {
+        let zaman = '';
+        let ms = Date.now();
+        for (let i = 9; i >= 0; i--) {
+          zaman = B32[ms % 32] + zaman;
+          ms = Math.floor(ms / 32);
+        }
+        return zaman + alfabedenSec(B32, 16);
+      }
+
+      function uret() {
+        const tur = document.querySelector('input[name="k-tur"]:checked').value;
+        const adet = Math.min(5000, Math.max(1, Number(el('#k-adet').value) || 1));
+        const uzunluk = Math.min(128, Math.max(4, Number(el('#k-uzunluk').value) || 21));
+        const onek = el('#k-onek').value;
+
+        const uretici = {
+          uuid4,
+          uuid7,
+          ulid,
+          nano: () => alfabedenSec(NANO, uzunluk),
+          kisa: () => alfabedenSec(KISA, uzunluk),
+          hex: () => onaltilik(bayt(Math.ceil(uzunluk / 2))).slice(0, uzunluk),
+        }[tur];
+
+        let liste = Array.from({ length: adet }, uretici);
+
+        if (el('#k-tire').checked) liste = liste.map((s) => s.replace(/-/g, ''));
+        if (el('#k-buyuk').checked) liste = liste.map((s) => s.toUpperCase());
+        else if (tur === 'ulid' || tur === 'kisa') {
+          /* bu türler zaten büyük harf */
+        }
+        if (el('#k-suslu').checked) liste = liste.map((s) => `{${s}}`);
+        if (onek) liste = liste.map((s) => onek + s);
+        if (el('#k-tirnak').checked)
+          liste = liste.map((s, i) => `"${s}"${i < liste.length - 1 ? ',' : ''}`);
+
+        el('#k-cikti').textContent = liste.join('\n');
+
+        const benzersiz = new Set(liste).size;
+        el('#k-olcum').innerHTML =
+          `<span>Üretilen: <b>${adet.toLocaleString('tr-TR')}</b></span>` +
+          `<span>Benzersiz: <b>${benzersiz.toLocaleString('tr-TR')}</b></span>` +
+          `<span>Uzunluk: <b>${liste[0].length}</b></span>` +
+          `<span>Entropi: <b>${entropi(tur, uzunluk)} bit</b></span>`;
+
+        el('#k-durum').className = 'arac-durum ok';
+        el('#k-durum').textContent = `${adet.toLocaleString('tr-TR')} kimlik üretildi.`;
+        carpismaYaz(tur, uzunluk);
+      }
+
+      function entropi(tur, uzunluk) {
+        if (tur === 'uuid4') return 122;
+        if (tur === 'uuid7') return 74; // zaman kısmı tahmin edilebilir
+        if (tur === 'ulid') return 80;
+        if (tur === 'nano') return Math.round(uzunluk * Math.log2(64));
+        if (tur === 'kisa') return Math.round(uzunluk * Math.log2(KISA.length));
+        return uzunluk * 4;
+      }
+
+      /** Doğum günü paradoksuyla %1 çarpışma olasılığına kaç kimlikte ulaşılır. */
+      function carpismaYaz(tur, uzunluk) {
+        const bit = entropi(tur, uzunluk);
+        // n ≈ sqrt(2 * 2^bit * ln(1/(1-p))), p = 0.01
+        const log2n = 0.5 * (1 + bit + Math.log2(Math.log(1 / 0.99)));
+        const adet = 2 ** log2n;
+        const yazi =
+          adet > 1e15
+            ? `${(adet / 1e15).toPrecision(3)} katrilyon`
+            : adet > 1e12
+              ? `${(adet / 1e12).toPrecision(3)} trilyon`
+              : adet > 1e9
+                ? `${(adet / 1e9).toPrecision(3)} milyar`
+                : adet > 1e6
+                  ? `${(adet / 1e6).toPrecision(3)} milyon`
+                  : Math.round(adet).toLocaleString('tr-TR');
+        el('#k-carpisma').innerHTML =
+          `<b>Çarpışma:</b> bu biçimde yaklaşık <b>${yazi}</b> kimlik ürettiğinizde ` +
+          `iki tanesinin aynı çıkma olasılığı %1'e ulaşır (${bit} bit entropi, doğum günü sınırı). ` +
+          `Karşılaştırma için: tüm dünyada saniyede bir milyon kimlik üretseniz bile UUID v4'te bu sınıra ` +
+          `insan ömrü boyunca yaklaşamazsınız.`;
+      }
+
+      /* --- tür değişince alan görünürlüğü --- */
+      function alanlariGuncelle() {
+        const tur = document.querySelector('input[name="k-tur"]:checked').value;
+        const sabit = ['uuid4', 'uuid7', 'ulid'].includes(tur);
+        el('#k-uzunluk-alan').style.display = sabit ? 'none' : '';
+        el('#k-tire').parentElement.style.display = tur.startsWith('uuid') ? '' : 'none';
+        el('#k-suslu').parentElement.style.display = tur.startsWith('uuid') ? '' : 'none';
+        if (tur === 'nano') el('#k-uzunluk').value = 21;
+        if (tur === 'kisa') el('#k-uzunluk').value = 8;
+        if (tur === 'hex') el('#k-uzunluk').value = 64;
+      }
+
+      document.querySelectorAll('input[name="k-tur"]').forEach((r) =>
+        r.addEventListener('change', () => {
+          alanlariGuncelle();
+          uret();
+        })
+      );
+
+      el('#k-uret').addEventListener('click', uret);
+
+      el('#k-kopyala').addEventListener('click', async (e) => {
+        try {
+          await navigator.clipboard.writeText(el('#k-cikti').textContent);
+          e.currentTarget.textContent = 'Kopyalandı';
+          setTimeout(() => (e.currentTarget.textContent = 'Tümünü kopyala'), 1600);
+        } catch {
+          el('#k-durum').className = 'arac-durum hata';
+          el('#k-durum').textContent = 'Pano izni yok — metni elle seçip kopyalayın.';
+        }
+      });
+
+      el('#k-indir').addEventListener('click', () => {
+        const b = new Blob([el('#k-cikti').textContent], { type: 'text/plain;charset=utf-8' });
+        const a = document.createElement('a');
+        a.href = URL.createObjectURL(b);
+        a.download = 'kimlikler.txt';
+        a.click();
+        URL.revokeObjectURL(a.href);
+      });
+
+      alanlariGuncelle();
+      uret();
+    })();
+  </script>
+
+  <style>
+    .arac-dugmeler {
+      display: flex;
+      gap: 10px;
+      flex-wrap: wrap;
+      margin-top: 4px;
+    }
+    .k-turler {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(min(230px, 100%), 1fr));
+      gap: 10px;
+    }
+    .k-tur {
+      display: grid;
+      gap: 3px;
+      border: 1px solid var(--line);
+      border-radius: 11px;
+      padding: 12px 14px;
+      cursor: pointer;
+      background: var(--paper);
+      position: relative;
+    }
+    .k-tur input {
+      position: absolute;
+      opacity: 0;
+      pointer-events: none;
+    }
+    .k-tur b {
+      font-size: 14px;
+    }
+    .k-tur span {
+      font-size: 12.5px;
+      color: var(--muted);
+      line-height: 1.5;
+    }
+    .k-tur:has(input:checked) {
+      border-color: var(--indigo);
+      background: var(--tint);
+      box-shadow: 0 0 0 1px var(--indigo);
+    }
+    .k-tur:has(input:focus-visible) {
+      outline: 2px solid var(--indigo);
+      outline-offset: 2px;
+    }
+    .k-secenekler {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 14px;
+      margin: 12px 0;
+    }
+    .k-sec {
+      display: inline-flex;
+      align-items: center;
+      gap: 7px;
+      font-size: 13px;
+      color: var(--ink-soft);
+      cursor: pointer;
+    }
+    .k-cikti {
+      max-height: 340px;
+      overflow: auto;
+    }
+    .k-kaydir {
+      overflow-x: auto;
+    }
+    .k-tablo {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 13px;
+      min-width: 520px;
+    }
+    .k-tablo th,
+    .k-tablo td {
+      text-align: left;
+      padding: 9px 12px;
+      border-bottom: 1px solid var(--line);
+      vertical-align: top;
+      line-height: 1.55;
+    }
+    .k-tablo th {
+      color: var(--muted);
+      font-size: 11.5px;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+    }
+    .k-tablo td:nth-child(2) {
+      white-space: nowrap;
+      color: var(--indigo-metin);
+    }
+  </style>
+</Base>

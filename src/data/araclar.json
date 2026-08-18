@@ -223,5 +223,59 @@
     "etiket": "",
     "cevrimici": true,
     "grup": "Üretim & Paylaşım"
+  },
+  {
+    "slug": "cidr-birlestirici",
+    "ad": "CIDR birleştirici ve bölücü",
+    "ozet": "Dağınık IP bloklarını en az sayıda CIDR'a indirger, çakışmayı gösterir, blok böler.",
+    "ikon": "dugum",
+    "etiket": "yeni",
+    "cevrimici": false,
+    "grup": "Ağ & DNS"
+  },
+  {
+    "slug": "regex-sinayici",
+    "ad": "Regex sınayıcı",
+    "ozet": "Düzenli ifadeyi gerçek günlük metniyle canlı sınayın; gruplar tabloda, hazır desenler bir tık uzağınızda.",
+    "ikon": "terminal",
+    "etiket": "yeni",
+    "cevrimici": false,
+    "grup": "Metin, Kod & Zaman"
+  },
+  {
+    "slug": "json-bicimlendirici",
+    "ad": "JSON biçimlendirici ve yol bulucu",
+    "ozet": "Bozuk JSON'da hatanın satırını gösterir; her alanın PowerShell ve jq yolunu tek tıkla verir.",
+    "ikon": "kutu",
+    "etiket": "yeni",
+    "cevrimici": false,
+    "grup": "Metin, Kod & Zaman"
+  },
+  {
+    "slug": "kimlik-ureteci",
+    "ad": "UUID, ULID ve kimlik üreteci",
+    "ozet": "UUID v4/v7, ULID, NanoID ve okunabilir kısa kod; toplu üretim ve çarpışma hesabıyla.",
+    "ikon": "kalkan",
+    "etiket": "yeni",
+    "cevrimici": false,
+    "grup": "Üretim & Paylaşım"
+  },
+  {
+    "slug": "renk-kontrast",
+    "ad": "Renk kontrast denetleyici",
+    "ozet": "WCAG oranını hesaplar, AA/AAA sonucunu verir, geçmiyorsa tonu koruyan en yakın rengi önerir.",
+    "ikon": "pencere",
+    "etiket": "yeni",
+    "cevrimici": false,
+    "grup": "Erişilebilirlik & Arayüz"
+  },
+  {
+    "slug": "k8s-kaynak-planlayici",
+    "ad": "Kubernetes kaynak planlayıcı",
+    "ozet": "Ölçümden request/limit türetir, QoS ve düğüm kapasitesini hesaplar, YAML üretir.",
+    "ikon": "sunucu",
+    "etiket": "yeni",
+    "cevrimici": false,
+    "grup": "Bulut & Konteyner"
   }
 ]
