@@ -56,6 +56,11 @@ Pagefind'e hem süzgeç hem meta olarak yazılır. Arşiv, konu, etiket ve sayfa
 | `/portfolyo/<slug>` | `src/pages/portfolyo/[...slug].astro` | Sorun → Yaklaşım → Sonuç, aşamalar, metrikler |
 | `/hakkimda` | `src/pages/hakkimda.astro` | Anlatı, SSS, iletişim kanalları — metinler `sayfalar` koleksiyonundan |
 | `/ozgecmis` | `src/pages/ozgecmis.astro` | Zaman çizelgesi, yetenekler, sertifikalar, CV indirme — metinler `sayfalar` koleksiyonundan |
+| `/tani` | `src/pages/tani.astro` | Tanı sihirbazı: belirtiden çözüme |
+| `/canta` | `src/pages/canta.astro` | Saha çantası: runbook derleyici |
+| `/canta.json` | `src/pages/canta.json.ts` | Çantanın içerik dizini |
+| `/cevrimdisi` | `src/pages/cevrimdisi.astro` | Çevrimdışıyken açılan sayfa |
+| `/sw.js` | `src/pages/sw.js.ts` | Service worker (çevrimdışı önbellek) |
 | `/ara` | `src/pages/ara.astro` | Pagefind arayüzü |
 | `/404` | `src/pages/404.astro` | Öneri bağlantılı hata sayfası |
 | `/rss.xml` | `src/pages/rss.xml.ts` | RSS akışı: rehber, hızlı çözüm ve ipuçları |
@@ -443,3 +448,37 @@ Yatay taşmayı ölçmek için sayfaları 375 piksellik bir `iframe` içinde aç
 `documentElement.scrollWidth - 375` değerine bakın; `-4` beklenen (kaydırma çubuğu payı),
 pozitif değer taşma demektir. Tüm araç sayfaları ve ana sayfa türleri bu yöntemle
 375–1280 piksel arasında denendi.
+
+## Saha araçları
+
+Üç özellik birbirine bağlı: sihirbaz çözümü buluyor, çanta topluyor, service
+worker sunucu odasına taşıyor.
+
+**Tanı sihirbazı (`/tani`).** Hızlı çözümlerin `belirtiler` alanından besleniyor
+(101 belirti, 25 çözüm). Üç adım: sorun nerede → hangi belirtiler → eşleşen
+çözümler. Sıralama puanla: kaç belirti örtüşüyor, eşitlikte az belirtili olan
+önde çünkü daha dar kapsamlı çözüm daha isabetli. Veri sayfaya gömülü, ağ gidiş
+dönüşü yok.
+
+**Saha çantası (`/canta`).** Komut, hızlı çözüm ve betikleri toplayıp `.ps1`,
+`.md` ya da paylaşılabilir bağlantı olarak dışa aktarıyor. Çanta yalnızca kimlik
+listesi tutuyor (localStorage + adres), içerik derleme zamanı üretilen
+`/canta.json` dizininden geliyor — paylaşım bağlantısı kısa kalıyor ve dışa
+aktarma her sayfada çalışıyor. Paylaşılan bir bağlantı kendi çantanızı ezmiyor:
+"çantama al" ya da "kendi çantama ekle" diye soruyor.
+
+**Çevrimdışı paket (`/sw.js`).** Kurulumda kabuk önbelleğe alınıyor: ana sayfa,
+komut kütüphanesi, sihirbaz, çanta, 25 hızlı çözüm sayfası ve yazı tipleri.
+Sonrası tür bazlı — değişmez varlıklar (`/_astro`, `/fonts`, `/og`, `/ikon`)
+önce önbellekten; sayfalar önce ağdan, olmazsa önbellekten, o da yoksa
+`/cevrimdisi`; indirilebilir betikler ağdan gelince saklanıyor, yani bir kez
+indirdiğiniz betik veri merkezinde de elinizin altında.
+
+Önbellek adı derleme numarasını taşıyor, yeni dağıtımda eskisi siliniyor.
+`/admin` ve `/api/` hiç önbelleğe girmiyor — orada tazelik ve oturum önemli.
+`sw.js` dosyası `vercel.json`'daki HTML önbellek kuralının dışında tutuluyor.
+
+Dikkat edilecek bir CSS tuzağı: `hidden` özniteliğiyle gizlenen bir öğeye
+`display` vermek tarayıcının `[hidden] { display: none }` kuralını ezer. Bu
+yüzden çevrimdışı şeridinin `display: flex` kuralı `:not([hidden])` ile
+sınırlanmış.

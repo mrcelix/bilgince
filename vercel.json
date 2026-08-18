@@ -30,7 +30,7 @@
       ]
     },
     {
-      "source": "/((?!api/|admin|_astro/|fonts/|og/|pagefind/|robots\\.txt|rss\\.xml|sitemap).*)",
+      "source": "/((?!api/|admin|_astro/|fonts/|og/|pagefind/|robots\\.txt|rss\\.xml|sitemap|sw\\.js).*)",
       "headers": [
         {
           "key": "Cache-Control",

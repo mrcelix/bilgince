@@ -1,0 +1,85 @@
+---
+/**
+ * Çevrimdışıyken açılan sayfa. Service worker, önbellekte olmayan bir sayfaya
+ * gidilmek istendiğinde buraya düşürüyor.
+ */
+import Base from '../layouts/Base.astro';
+---
+
+<Base
+  baslik="Çevrimdışısınız"
+  aciklama="Bağlantı yok. Önbelleğe alınmış sayfalar açılmaya devam ediyor."
+  noindex={true}
+  aramaya={false}
+>
+  <div class="kap" style="padding-top:60px;padding-bottom:80px;max-width:62ch">
+    <span class="etiket">Bağlantı yok</span>
+    <h1 style="font-size:clamp(26px,4vw,36px);font-weight:900;letter-spacing:-.035em;margin-top:14px">
+      İnternet yok, ama her şey bitmedi.
+    </h1>
+    <p style="color:var(--muted);font-size:16px;line-height:1.65;margin-top:14px">
+      Bu sayfa önbellekte yoktu. Daha önce açtıklarınız ve çevrimdışı için ayrılmış bölümler
+      çalışmaya devam ediyor:
+    </p>
+
+    <div class="cd-baglar">
+      <a class="cd-bag" href="/komutlar">
+        <b>Komut kütüphanesi</b>
+        <span>33 komut, kopyala–yapıştır</span>
+      </a>
+      <a class="cd-bag" href="/tani">
+        <b>Tanı sihirbazı</b>
+        <span>Belirtiden çözüme</span>
+      </a>
+      <a class="cd-bag" href="/canta">
+        <b>Saha çantası</b>
+        <span>Topladığınız runbook</span>
+      </a>
+      <a class="cd-bag" href="/hizli-cozumler">
+        <b>Hızlı çözümler</b>
+        <span>Hepsi çevrimdışı hazır</span>
+      </a>
+    </div>
+
+    <p style="color:var(--muted);font-size:13.5px;margin-top:24px">
+      Bağlantı gelince sayfa kendiliğinden tazelenir. İndirdiğiniz betikler de önbellekte
+      kalır — bir kez indirdiyseniz sunucu odasında yine elinizin altında.
+    </p>
+
+    <button type="button" class="dg" id="cd-yenile" style="margin-top:20px">Yeniden dene</button>
+  </div>
+
+  <script>
+    // Bağlantı geri gelince kullanıcıyı beklemeye bırakma
+    addEventListener('online', () => location.reload());
+    document.getElementById('cd-yenile')?.addEventListener('click', () => location.reload());
+  </script>
+
+  <style>
+    .cd-baglar {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(min(200px, 100%), 1fr));
+      gap: 12px;
+      margin-top: 22px;
+    }
+    .cd-bag {
+      display: grid;
+      gap: 3px;
+      border: 1px solid var(--line);
+      border-radius: var(--r-m);
+      background: var(--paper);
+      padding: 15px 17px;
+    }
+    .cd-bag:hover {
+      border-color: var(--indigo-metin);
+      background: var(--tint);
+    }
+    .cd-bag b {
+      font-size: 15px;
+    }
+    .cd-bag span {
+      font-size: 12.5px;
+      color: var(--muted);
+    }
+  </style>
+</Base>

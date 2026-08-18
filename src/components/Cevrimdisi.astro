@@ -1,0 +1,63 @@
+---
+/**
+ * Service worker kaydı ve çevrimdışı göstergesi.
+ *
+ * Kayıt sayfa yüklendikten sonra yapılıyor: ilk boyamayla yarışmasın.
+ * Yönetim panelinde kayıt yapılmıyor — orada tazelik oturumdan daha önemli.
+ */
+---
+
+<div class="cd-serit" id="cd-serit" hidden role="status" aria-live="polite">
+  <span class="cd-nokta" aria-hidden="true"></span>
+  Çevrimdışısınız — önbellekteki sayfalar açılmaya devam ediyor.
+</div>
+
+<script>
+  (() => {
+    if (!('serviceWorker' in navigator)) return;
+    if (location.pathname.startsWith('/admin')) return;
+
+    addEventListener('load', () => {
+      navigator.serviceWorker.register('/sw.js').catch(() => {
+        /* Kayıt başarısız olursa site normal çalışmaya devam eder */
+      });
+    });
+
+    const serit = document.getElementById('cd-serit');
+    const tazele = () => {
+      if (serit) serit.hidden = navigator.onLine;
+    };
+    addEventListener('online', tazele);
+    addEventListener('offline', tazele);
+    tazele();
+  })();
+</script>
+
+<style>
+  /* Akışın en üstünde duruyor, sabitlenmiyor: sabit konumlandırma yapışkan
+     başlığın üstünü örtüyordu. Görününce sayfayı aşağı itiyor.
+
+     `:not([hidden])` şart: yazar stilindeki `display` tarayıcının
+     `[hidden] { display: none }` kuralını eziyor ve şerit gizliyken de
+     134 piksel yer kaplıyordu. */
+  .cd-serit:not([hidden]) {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+  }
+  .cd-serit {
+    background: var(--amber);
+    color: #2b1d02;
+    font-size: 12.5px;
+    font-weight: 700;
+    text-align: center;
+    padding: 7px 16px;
+  }
+  .cd-nokta {
+    width: 7px;
+    height: 7px;
+    border-radius: 50%;
+    background: #2b1d02;
+  }
+</style>
