@@ -1,4 +1,4 @@
-<#
+﻿<#
 .SYNOPSIS
     Disklerin fiziksel sağlığını, birim durumunu ve yaklaşan arıza işaretlerini
     raporlar.
@@ -64,8 +64,8 @@ foreach ($d in $diskler) {
     if (-not $s) { continue }
 
     $satir = "{0,-30} okuma hatası: {1,-6} yazma hatası: {2,-6} yeniden konumlanan: {3,-6} sıcaklık: {4}" -f
-        $d.FriendlyName, ($s.ReadErrorsTotal ?? '-'), ($s.WriteErrorsTotal ?? '-'),
-        ($s.ReadErrorsUncorrected ?? '-'), $(if ($s.Temperature) { "$($s.Temperature)°C" } else { '-' })
+        $d.FriendlyName, $(if ($null -ne $s.ReadErrorsTotal) { $s.ReadErrorsTotal } else { '-' }), $(if ($null -ne $s.WriteErrorsTotal) { $s.WriteErrorsTotal } else { '-' }),
+        $(if ($null -ne $s.ReadErrorsUncorrected) { $s.ReadErrorsUncorrected } else { '-' }), $(if ($s.Temperature) { "$($s.Temperature)°C" } else { '-' })
     $tur = 'Bilgi'
 
     if ($s.ReadErrorsUncorrected -gt 0) {

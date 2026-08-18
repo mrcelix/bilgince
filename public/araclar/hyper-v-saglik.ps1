@@ -1,4 +1,4 @@
-<#
+﻿<#
 .SYNOPSIS
     Hyper-V ana makinesinin ve üzerindeki sanal makinelerin sağlığını çıkarır.
 

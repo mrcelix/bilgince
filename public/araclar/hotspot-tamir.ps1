@@ -1,4 +1,4 @@
-<#
+﻿<#
 .SYNOPSIS
     Kafe, otel ve havaalanı hotspot'larında "bağlandı ama internet yok"
     durumunu çözmeye çalışır.

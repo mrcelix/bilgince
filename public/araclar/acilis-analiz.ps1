@@ -1,4 +1,4 @@
-<#
+﻿<#
 .SYNOPSIS
     Yavaş açılan bilgisayarın sebebini ölçer.
 

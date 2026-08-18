@@ -1,4 +1,4 @@
-<#
+﻿<#
 .SYNOPSIS
     "Grup ilkesi uygulanmıyor" şikâyetini adım adım daraltır.
 

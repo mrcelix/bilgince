@@ -1,4 +1,4 @@
-<#
+﻿<#
 .SYNOPSIS
     "İnternet yok" şikâyetinde katman katman ilerleyen tek sayfalık ağ raporu.
 

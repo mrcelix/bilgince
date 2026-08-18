@@ -1,4 +1,4 @@
-<#
+﻿<#
 .SYNOPSIS
     Bir Windows makinesinin sertleştirme durumunu tek sayfada raporlar.
 

@@ -1,4 +1,4 @@
-<#
+﻿<#
 .SYNOPSIS
     "Giriş yapamıyorum" şikâyetinde hesap tarafını ve makine tarafını birlikte
     denetler.
@@ -133,7 +133,7 @@ $benimkiler = $olaylar | Where-Object { $_.Message -match [regex]::Escape($Kulla
 if ($benimkiler) {
     foreach ($o in $benimkiler | Select-Object -First 8) {
         $kod = ([regex]::Match($o.Message, 'Sub Status:\s*(0x[0-9A-Fa-f]+)')).Groups[1].Value
-        $anlam = $altKodlar[$kod.ToUpper()] ?? 'bilinmeyen alt kod'
+        $anlam = if ($altKodlar.ContainsKey($kod.ToUpper())) { $altKodlar[$kod.ToUpper()] } else { 'bilinmeyen alt kod' }
         $kaynak = ([regex]::Match($o.Message, 'Workstation Name:\s*(\S+)')).Groups[1].Value
         Yaz ("  {0}  {1}  {2}  (kaynak: {3})" -f $o.TimeCreated.ToString('dd.MM HH:mm'), $kod, $anlam, $kaynak) Hata
     }

@@ -1,4 +1,4 @@
-<#
+﻿<#
 .SYNOPSIS
     Sürekli kilitlenen Active Directory hesabının kilidi nereden yediğini bulur.
 

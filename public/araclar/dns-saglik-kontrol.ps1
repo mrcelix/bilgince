@@ -1,4 +1,4 @@
-<#
+﻿<#
 .SYNOPSIS
     İç DNS altyapısının sağlığını ve en sık yapılan yapılandırma hatalarını
     denetler.
@@ -135,7 +135,7 @@ foreach ($k in $srvKayitlari) {
 Yaz "`n--- 6. Çözümleme sınamaları ---" Baslik
 foreach ($ad in $Alan, "www.microsoft.com", $env:COMPUTERNAME) {
     $r = Resolve-DnsName $ad -Server $Sunucu -ErrorAction SilentlyContinue | Select-Object -First 1
-    Yaz ("  {0,-28} → {1}" -f $ad, $(if ($r) { $r.IPAddress ?? $r.NameHost } else { 'ÇÖZÜLEMEDİ' })) `
+    Yaz ("  {0,-28} → {1}" -f $ad, $(if ($r) { $(if ($r.IPAddress) { $r.IPAddress } else { $r.NameHost }) } else { 'ÇÖZÜLEMEDİ' })) `
         $(if ($r) { 'Iyi' } else { 'Hata' })
 }
 

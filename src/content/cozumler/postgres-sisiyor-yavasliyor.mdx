@@ -1,0 +1,23 @@
+---
+baslik: "PostgreSQL şişiyor ve yavaşlıyor"
+ozet: "Ölü satırlar temizlenmiyorsa sebep genelde uzun süre açık kalan bir işlemdir."
+konu: "veritabani"
+etiketler: ["postgresql", "bakim", "performans"]
+belirtiler:
+  - "Tablo boyutu satır sayısına göre çok büyük"
+  - "Sorgular zamanla yavaşlıyor"
+  - "autovacuum çalışıyor ama ölü satırlar azalmıyor"
+  - "Disk kullanımı sürekli artıyor"
+yayin: 2026-08-18
+sure: 5
+komut: |
+  SELECT pid, now()-xact_start AS sure, state FROM pg_stat_activity WHERE xact_start IS NOT NULL ORDER BY xact_start LIMIT 5;
+dosya: "/araclar/postgres-saglik.sh"
+dosyaAdi: "postgres-saglik.sh"
+dosyaAciklama: "PostgreSQL örneğinin bakım ve performans durumunu raporlar."
+platform: "linux"
+ilgiliRehberler: []
+sira: 66
+---
+
+Betik hiçbir şeyi değiştirmez; yalnızca rapor üretir. Çıktıyı okuyup kararı siz verirsiniz.

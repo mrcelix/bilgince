@@ -1,4 +1,4 @@
-<#
+﻿<#
 .SYNOPSIS
     Olay günlüklerinin son N saatini gruplayıp okunur bir özet çıkarır; bilinen
     kritik olay kimliklerini açıklamasıyla birlikte gösterir.

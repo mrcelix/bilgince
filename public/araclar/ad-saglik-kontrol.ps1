@@ -1,4 +1,4 @@
-<#
+﻿<#
 .SYNOPSIS
     Active Directory ortamının sağlığını tek raporda çıkarır.
 

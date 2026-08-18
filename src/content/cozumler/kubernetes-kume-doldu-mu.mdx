@@ -1,0 +1,23 @@
+---
+baslik: "Küme gerçekten dolu mu?"
+ozet: "Zamanlanamayan pod her zaman kapasite sorunu değildir. İstek, sınır ve gerçek kullanım üç ayrı şeydir."
+konu: "kubernetes"
+etiketler: ["kubernetes", "kapasite"]
+belirtiler:
+  - "Podlar Pending durumunda bekliyor"
+  - "Insufficient cpu ya da memory uyarısı"
+  - "Düğümlerde yer varmış gibi görünüyor"
+  - "Yeni dağıtım zamanlanmıyor"
+yayin: 2026-08-18
+sure: 5
+komut: |
+  kubectl get pods -A --field-selector status.phase=Pending -o wide
+dosya: "/araclar/k8s-kaynak-envanteri.ps1"
+dosyaAdi: "k8s-kaynak-envanteri.ps1"
+dosyaAciklama: "Küme kaynak isteklerini ve gerçek kullanımı karşılaştırır."
+platform: "genel"
+ilgiliRehberler: []
+sira: 61
+---
+
+Betik hiçbir şeyi değiştirmez; yalnızca rapor üretir. Çıktıyı okuyup kararı siz verirsiniz.

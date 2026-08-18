@@ -1,4 +1,4 @@
-<#
+﻿<#
 .SYNOPSIS
     Bir alan adının e-posta yapılandırmasını DNS üzerinden denetler.
 

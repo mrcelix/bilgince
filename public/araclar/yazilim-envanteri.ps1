@@ -1,4 +1,4 @@
-<#
+﻿<#
 .SYNOPSIS
     Makinede kurulu yazılımların envanterini çıkarır; lisans ve güvenlik
     açısından dikkat çekenleri işaretler.

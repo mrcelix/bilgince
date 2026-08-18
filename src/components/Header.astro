@@ -27,9 +27,14 @@ const seriler = [...new Set(rehberler.map((r) => r.data.seri).filter(Boolean))].
 // Öne çıkan konular küme sütunlarından çıkarılıp menünün üstünde tam genişlik
 // bir şeride alınıyor; böylece sütun sayısı da kontrolde kalıyor.
 const oneCikanKonular = KONULAR.filter((k) => k.oneCikan);
-const gorunenGruplar = GRUPLAR.filter((g) =>
-  KONULAR.some((k) => k.grup === g.ad && !k.oneCikan)
-);
+const gorunenGruplar = GRUPLAR.filter((g) => KONULAR.some((k) => k.grup === g.ad));
+
+/* Menü en dolu kümeyle açılıyor. Menü sırası editöryel (menu.json) ve ilk
+   kümede tek konu olabiliyor; panel o zaman boş görünüyordu. */
+const varsayilanKume = [...gorunenGruplar].sort(
+  (a, b) =>
+    KONULAR.filter((k) => k.grup === b.ad).length - KONULAR.filter((k) => k.grup === a.ad).length
+)[0]?.ad;
 
 // Araçlar menüsü: indirilebilir betikler tek tek elle yazılmıyor, çözüm
 // kayıtlarındaki `dosya` alanından türüyor — yeni betik eklenince menü kendi
@@ -131,297 +136,263 @@ const etkin = (p: string) => (yol === p || yol.startsWith(p + '/') ? 'page' : un
   </div>
 
   <!-- ------------------------------------------------ Konular mega menüsü -->
-  <div class="mega mega-genis" id="mega-konular" data-acik="hayir">
-    <div class="mega-ust">
-      <div class="kap">
+  <div class="mega mega-ray" id="mega-konular" data-acik="hayir">
+    <div class="kap mega-ray-kap">
+      <!-- sol ray: kümeler -->
+      <div class="mega-ray-sol" role="tablist" aria-label="Konu kümeleri">
         <label class="mega-ara">
-          <svg width="13" height="13" viewBox="0 0 14 14" fill="none" aria-hidden="true">
-            <circle cx="6.2" cy="6.2" r="4.2" stroke="currentColor" stroke-width="1.6"></circle>
-            <path d="M9.4 9.4L12 12" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"></path>
+          <svg width="12" height="12" viewBox="0 0 14 14" fill="none" aria-hidden="true">
+            <circle cx="6.2" cy="6.2" r="4.2" stroke="currentColor" stroke-width="1.7"></circle>
+            <path d="M9.4 9.4L12 12" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"></path>
           </svg>
-          <input
-            type="search"
-            placeholder="Konularda süz: kubernetes, yedekleme, entra…"
-            aria-label="Konularda süz"
-            autocomplete="off"
-            data-mega-suzgec="konular"
-          />
+          <input type="search" placeholder="Konu ara" aria-label="Konularda ara" autocomplete="off"
+                 data-mega-suzgec="konular" />
         </label>
-        <span class="mega-sayac" data-mega-sayac="konular"></span>
-        <a class="mega-tum" href="/rehberler">Tüm arşiv · {rehberler.length} rehber →</a>
-      </div>
-    </div>
-
-    <div class="mega-govde" data-mega-kap="konular">
-      {
-        oneCikanKonular.length > 0 && (
-          <div class="kap mega-one-serit" data-mega-obek>
-            {oneCikanKonular.map((k) => (
-              <a class="one-cikan-konu" href={`/konu/${k.slug}`} data-mega-oge={`${k.ad} ${k.ozet}`}>
-                <span class="ikon" aria-hidden="true">
-                  <KonuIkon ad={k.ikon} />
-                </span>
-                <span class="govde">
-                  <span class="ad">
-                    {k.ad}
-                    <span class="say">{say(k.slug)}</span>
-                  </span>
-                  <span class="ac">{k.ozet}</span>
-                </span>
-              </a>
-            ))}
-          </div>
-        )
-      }
-
-      <div class="kap mega-izgara">
         {
-          GRUPLAR.filter((g) => KONULAR.some((k) => k.grup === g.ad)).map((grup) => (
-            <div class="mega-obek" data-mega-obek>
-              <span class="mega-etiket">{grup.ad}</span>
-              <span class="mega-grup-ozet">{grup.ozet}</span>
-              {KONULAR.filter((k) => k.grup === grup.ad).map((k) => (
-                <a class="mega-sik" href={`/konu/${k.slug}`} data-mega-oge={`${k.ad} ${k.ozet} ${grup.ad}`}>
-                  <span class="ikon" aria-hidden="true">
-                    <KonuIkon ad={k.ikon} />
-                  </span>
-                  <span class="govde">
-                    <span class="ad">
-                      {k.ad}
-                      <span class="say">{say(k.slug)}</span>
+          gorunenGruplar.map((grup) => (
+            <button
+              type="button"
+              class="mega-ray-dugme"
+              role="tab"
+              aria-selected={grup.ad === varsayilanKume ? 'true' : 'false'}
+              data-ray-hedef={grup.ad}
+            >
+              <span class="ad">{grup.ad}</span>
+              <span class="say">{KONULAR.filter((k) => k.grup === grup.ad).length}</span>
+            </button>
+          ))
+        }
+        <a class="mega-ray-alt" href="/rehberler">Tüm arşiv · {rehberler.length} rehber →</a>
+      </div>
+
+      <!-- sağ bölme: seçili kümenin konuları -->
+      <div class="mega-ray-sag" data-mega-kap="konular">
+        {
+          gorunenGruplar.map((grup) => (
+            <div class="mega-ray-bolme" data-ray-bolme={grup.ad} hidden={grup.ad !== varsayilanKume}>
+              <span class="mega-bolme-ozet">{grup.ozet}</span>
+              <div class="mega-kartlar">
+                {KONULAR.filter((k) => k.grup === grup.ad).map((k) => (
+                  <a
+                    class="mega-kk"
+                    href={`/konu/${k.slug}`}
+                    data-mega-oge={`${k.ad} ${k.ozet} ${grup.ad}`}
+                    data-bos={say(k.slug) === 0 ? 'evet' : 'hayir'}
+                  >
+                    <span class="ikon" aria-hidden="true">
+                      <KonuIkon ad={k.ikon} />
                     </span>
-                    <span class="ac">{k.ozet}</span>
-                  </span>
-                </a>
-              ))}
+                    <span class="govde">
+                      <span class="ad">
+                        {k.ad}
+                        {say(k.slug) > 0 && <span class="say">{say(k.slug)}</span>}
+                      </span>
+                      <span class="ac">{k.ozet}</span>
+                    </span>
+                  </a>
+                ))}
+              </div>
             </div>
           ))
         }
+        <p class="mega-bos" data-mega-bos="konular" hidden>Bu aramaya uyan konu yok.</p>
       </div>
-
-      <p class="mega-bos" data-mega-bos="konular" hidden>Bu süzgece uyan konu yok.</p>
     </div>
   </div>
 
   <!-- ---------------------------------------------- Kaynaklar mega menüsü -->
-  <div class="mega mega-genis" id="mega-kaynaklar" data-acik="hayir">
-    <div class="mega-ust">
-      <div class="kap">
+  <div class="mega mega-ray" id="mega-kaynaklar" data-acik="hayir">
+    <div class="kap mega-ray-kap">
+      <div class="mega-ray-sol" role="tablist" aria-label="Kaynak türleri">
         <label class="mega-ara">
-          <svg width="13" height="13" viewBox="0 0 14 14" fill="none" aria-hidden="true">
-            <circle cx="6.2" cy="6.2" r="4.2" stroke="currentColor" stroke-width="1.6"></circle>
-            <path d="M9.4 9.4L12 12" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"></path>
+          <svg width="12" height="12" viewBox="0 0 14 14" fill="none" aria-hidden="true">
+            <circle cx="6.2" cy="6.2" r="4.2" stroke="currentColor" stroke-width="1.7"></circle>
+            <path d="M9.4 9.4L12 12" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"></path>
           </svg>
-          <input
-            type="search"
-            placeholder="Kaynaklarda süz: seri, etiket, ipucu…"
-            aria-label="Kaynaklarda süz"
-            autocomplete="off"
-            data-mega-suzgec="kaynaklar"
-          />
+          <input type="search" placeholder="Kaynak ara" aria-label="Kaynaklarda ara" autocomplete="off"
+                 data-mega-suzgec="kaynaklar" />
         </label>
-        <span class="mega-sayac" data-mega-sayac="kaynaklar"></span>
-        <a class="mega-tum" href="/ara">Gelişmiş arama →</a>
+        <button type="button" class="mega-ray-dugme" role="tab" aria-selected="true" data-ray-hedef="kutuphane">
+          <span class="ad">Kütüphaneler</span><span class="say">4</span>
+        </button>
+        <button type="button" class="mega-ray-dugme" role="tab" aria-selected="false" data-ray-hedef="gezinme">
+          <span class="ad">Gezinme</span><span class="say">4</span>
+        </button>
+        <button type="button" class="mega-ray-dugme" role="tab" aria-selected="false" data-ray-hedef="seri">
+          <span class="ad">Seriler</span><span class="say">{seriler.length}</span>
+        </button>
+        <a class="mega-ray-alt" href="/ara">Gelişmiş arama →</a>
       </div>
-    </div>
 
-    <div class="mega-govde" data-mega-kap="kaynaklar">
-      <div class="kap mega-izgara">
-        <div class="mega-obek" data-mega-obek>
-          <span class="mega-etiket">Kütüphaneler</span>
-          <span class="mega-grup-ozet">Kopyala ve çalıştır</span>
-          <a class="mega-sik" href="/hizli-cozumler" data-mega-oge="Hızlı Çözümler belirti">
-            <span class="ikon" aria-hidden="true"><KonuIkon ad="kalkan" /></span>
-            <span class="govde">
-              <span class="ad">Hızlı Çözümler<span class="say">{cozumler.length}</span></span>
-              <span class="ac">Belirtiden çözüme, indirilebilir araçlarla</span>
-            </span>
-          </a>
-          <a class="mega-sik" href="/komutlar" data-mega-oge="Komut kütüphanesi">
-            <span class="ikon" aria-hidden="true"><KonuIkon ad="terminal" /></span>
-            <span class="govde">
-              <span class="ad">Komut kütüphanesi<span class="say">{komutlar.length}</span></span>
-              <span class="ac">Denenmiş tek satırlar, uyarısıyla birlikte</span>
-            </span>
-          </a>
-          <a class="mega-sik" href="/ipuclari" data-mega-oge="Hızlı ipuçları notlar">
-            <span class="ikon" aria-hidden="true"><KonuIkon ad="pencere" /></span>
-            <span class="govde">
-              <span class="ad">Hızlı ipuçları<span class="say">{ipuclari.length}</span></span>
-              <span class="ac">Tek ekranda biten notlar</span>
-            </span>
-          </a>
-          <a class="mega-sik" href="/rehberler" data-mega-oge="Rehberler arşiv">
-            <span class="ikon" aria-hidden="true"><KonuIkon ad="kutu" /></span>
-            <span class="govde">
-              <span class="ad">Rehberler<span class="say">{rehberler.length}</span></span>
-              <span class="ac">Uzun anlatım, sonunda doğrulama adımı</span>
-            </span>
-          </a>
+      <div class="mega-ray-sag" data-mega-kap="kaynaklar">
+        <div class="mega-ray-bolme" data-ray-bolme="kutuphane">
+          <span class="mega-bolme-ozet">Kopyala ve çalıştır</span>
+          <div class="mega-kartlar">
+            <a class="mega-kk" href="/hizli-cozumler" data-mega-oge="Hızlı Çözümler belirti">
+              <span class="ikon" aria-hidden="true"><KonuIkon ad="kalkan" /></span>
+              <span class="govde">
+                <span class="ad">Hızlı Çözümler<span class="say">{cozumler.length}</span></span>
+                <span class="ac">Belirtiden çözüme, indirilebilir araçlarla</span>
+              </span>
+            </a>
+            <a class="mega-kk" href="/komutlar" data-mega-oge="Komut kütüphanesi">
+              <span class="ikon" aria-hidden="true"><KonuIkon ad="terminal" /></span>
+              <span class="govde">
+                <span class="ad">Komut kütüphanesi<span class="say">{komutlar.length}</span></span>
+                <span class="ac">Denenmiş tek satırlar, uyarısıyla</span>
+              </span>
+            </a>
+            <a class="mega-kk" href="/ipuclari" data-mega-oge="Hızlı ipuçları notlar">
+              <span class="ikon" aria-hidden="true"><KonuIkon ad="pencere" /></span>
+              <span class="govde">
+                <span class="ad">Hızlı ipuçları<span class="say">{ipuclari.length}</span></span>
+                <span class="ac">Tek ekranda biten notlar</span>
+              </span>
+            </a>
+            <a class="mega-kk" href="/rehberler" data-mega-oge="Rehberler arşiv">
+              <span class="ikon" aria-hidden="true"><KonuIkon ad="kutu" /></span>
+              <span class="govde">
+                <span class="ad">Rehberler<span class="say">{rehberler.length}</span></span>
+                <span class="ac">Uzun anlatım, sonunda doğrulama adımı</span>
+              </span>
+            </a>
+          </div>
         </div>
 
-        <div class="mega-obek" data-mega-obek>
-          <span class="mega-etiket">Gezinme</span>
-          <span class="mega-grup-ozet">İçeriği kesen yollar</span>
-          <a class="mega-sik" href="/tani" data-mega-oge="Tanı sihirbazı belirti">
-            <span class="ikon" aria-hidden="true"><KonuIkon ad="dugum" /></span>
-            <span class="govde">
-              <span class="ad">Tanı sihirbazı</span>
-              <span class="ac">Belirtiyi seç, çözüme git</span>
-            </span>
-          </a>
-          <a class="mega-sik" href="/seri" data-mega-oge="Seriler bölüm">
-            <span class="ikon" aria-hidden="true"><KonuIkon ad="akis" /></span>
-            <span class="govde">
-              <span class="ad">Seriler<span class="say">{seriler.length}</span></span>
-              <span class="ac">Sırayla okunmak üzere yazıldı</span>
-            </span>
-          </a>
-          <a class="mega-sik" href="/etiket" data-mega-oge="Etiketler bulut">
-            <span class="ikon" aria-hidden="true"><KonuIkon ad="dugum" /></span>
-            <span class="govde">
-              <span class="ad">Etiketler</span>
-              <span class="ac">Tüm içeriği kesen ince süzgeçler</span>
-            </span>
-          </a>
-          <a class="mega-sik" href="/rss.xml" data-mega-oge="RSS akışı">
-            <span class="ikon" aria-hidden="true"><KonuIkon ad="geri" /></span>
-            <span class="govde">
-              <span class="ad">RSS akışı</span>
-              <span class="ac">Bültene alternatif</span>
-            </span>
-          </a>
+        <div class="mega-ray-bolme" data-ray-bolme="gezinme" hidden>
+          <span class="mega-bolme-ozet">İçeriği kesen yollar</span>
+          <div class="mega-kartlar">
+            <a class="mega-kk" href="/tani" data-mega-oge="Tanı sihirbazı belirti">
+              <span class="ikon" aria-hidden="true"><KonuIkon ad="dugum" /></span>
+              <span class="govde">
+                <span class="ad">Tanı sihirbazı</span>
+                <span class="ac">Belirtiyi seç, çözüme git</span>
+              </span>
+            </a>
+            <a class="mega-kk" href="/canta" data-mega-oge="Saha çantası runbook">
+              <span class="ikon" aria-hidden="true"><KonuIkon ad="kutu" /></span>
+              <span class="govde">
+                <span class="ad">Saha çantası</span>
+                <span class="ac">Topladıklarını tek dosyaya çevir</span>
+              </span>
+            </a>
+            <a class="mega-kk" href="/etiket" data-mega-oge="Etiketler bulut">
+              <span class="ikon" aria-hidden="true"><KonuIkon ad="akis" /></span>
+              <span class="govde">
+                <span class="ad">Etiketler</span>
+                <span class="ac">Tüm içeriği kesen ince süzgeçler</span>
+              </span>
+            </a>
+            <a class="mega-kk" href="/rss.xml" data-mega-oge="RSS akışı">
+              <span class="ikon" aria-hidden="true"><KonuIkon ad="geri" /></span>
+              <span class="govde">
+                <span class="ad">RSS akışı</span>
+                <span class="ac">Bültene alternatif</span>
+              </span>
+            </a>
+          </div>
         </div>
 
-        <div class="mega-obek mega-obek-genis" data-mega-obek>
-          <span class="mega-etiket">Seriler</span>
-          <span class="mega-grup-ozet">Sırayla okunmak üzere</span>
-          <div class="mega-seriler">
+        <div class="mega-ray-bolme" data-ray-bolme="seri" hidden>
+          <span class="mega-bolme-ozet">Sırayla okunmak üzere yazıldı</span>
+          <div class="mega-kartlar">
             {
               seriler.map((s) => (
-                <a class="mega-seri" href={`/seri/${slugla(s.ad)}`} data-mega-oge={s.ad}>
-                  <span class="ad">{s.ad}</span>
-                  <span class="ilerleme">
-                    <span style={`width:${Math.round((s.yayinda / Math.max(s.planlanan, 1)) * 100)}%`} />
-                  </span>
-                  <span class="ac">
-                    {s.planlanan} bölümün {s.yayinda} tanesi yayında
+                <a class="mega-kk mega-kk-seri" href={`/seri/${slugla(s.ad)}`} data-mega-oge={s.ad}>
+                  <span class="govde">
+                    <span class="ad">{s.ad}</span>
+                    <span class="ilerleme">
+                      <span style={`width:${Math.round((s.yayinda / Math.max(s.planlanan, 1)) * 100)}%`} />
+                    </span>
+                    <span class="ac">{s.planlanan} bölümün {s.yayinda} tanesi yayında</span>
                   </span>
                 </a>
               ))
             }
           </div>
         </div>
-      </div>
 
-      <p class="mega-bos" data-mega-bos="kaynaklar" hidden>Bu süzgece uyan kaynak yok.</p>
+        <p class="mega-bos" data-mega-bos="kaynaklar" hidden>Bu aramaya uyan kaynak yok.</p>
+      </div>
     </div>
   </div>
 
   <!-- ------------------------------------------------- Araçlar mega menüsü -->
-  <div class="mega mega-genis" id="mega-araclar" data-acik="hayir">
-    <div class="mega-ust">
-      <div class="kap">
+  <div class="mega mega-ray" id="mega-araclar" data-acik="hayir">
+    <div class="kap mega-ray-kap">
+      <div class="mega-ray-sol" role="tablist" aria-label="Araç türleri">
         <label class="mega-ara">
-          <svg width="13" height="13" viewBox="0 0 14 14" fill="none" aria-hidden="true">
-            <circle cx="6.2" cy="6.2" r="4.2" stroke="currentColor" stroke-width="1.6"></circle>
-            <path d="M9.4 9.4L12 12" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"></path>
+          <svg width="12" height="12" viewBox="0 0 14 14" fill="none" aria-hidden="true">
+            <circle cx="6.2" cy="6.2" r="4.2" stroke="currentColor" stroke-width="1.7"></circle>
+            <path d="M9.4 9.4L12 12" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"></path>
           </svg>
-          <input
-            type="search"
-            placeholder="Araçlarda süz: parola, dns, sertifika…"
-            aria-label="Araçlarda süz"
-            autocomplete="off"
-            data-mega-suzgec="araclar"
-          />
+          <input type="search" placeholder="Araç ara" aria-label="Araçlarda ara" autocomplete="off"
+                 data-mega-suzgec="araclar" />
         </label>
-        <span class="mega-sayac" data-mega-sayac="araclar"></span>
-        <a class="mega-tum" href="/araclar">Tüm araçlar →</a>
-      </div>
-    </div>
-
-    <div class="mega-govde" data-mega-kap="araclar">
-      <div class="kap mega-izgara">
         {
-          aracGruplari.map((g) => (
-            <div class="mega-obek" data-mega-obek>
-              <span class="mega-etiket">{g.ad}</span>
-              {g.araclar.map((a) => (
-                <a class="mega-sik" href={`/araclar/${a.slug}`} data-mega-oge={`${a.ad} ${a.ozet} ${a.grup}`}>
-                  <span class="ikon" aria-hidden="true">
-                    <KonuIkon ad={a.ikon} />
-                  </span>
-                  <span class="govde">
-                    <span class="ad">
-                      {a.ad}
-                      {a.etiket && <span class="say">{a.etiket}</span>}
+          aracGruplari.map((g, i) => (
+            <button
+              type="button"
+              class="mega-ray-dugme"
+              role="tab"
+              aria-selected={i === 0 ? 'true' : 'false'}
+              data-ray-hedef={g.ad}
+            >
+              <span class="ad">{g.ad}</span>
+              <span class="say">{g.araclar.length}</span>
+            </button>
+          ))
+        }
+        <button type="button" class="mega-ray-dugme" role="tab" aria-selected="false" data-ray-hedef="betikler">
+          <span class="ad">İndirilebilir betikler</span><span class="say">{betikler.length}</span>
+        </button>
+        <a class="mega-ray-alt" href="/araclar">Tüm araçlar · {ARACLAR.length} üreteç →</a>
+      </div>
+
+      <div class="mega-ray-sag" data-mega-kap="araclar">
+        {
+          aracGruplari.map((g, i) => (
+            <div class="mega-ray-bolme" data-ray-bolme={g.ad} hidden={i !== 0}>
+              <span class="mega-bolme-ozet">Tarayıcıda çalışır, kurulum yok</span>
+              <div class="mega-kartlar">
+                {g.araclar.map((a) => (
+                  <a class="mega-kk" href={`/araclar/${a.slug}`} data-mega-oge={`${a.ad} ${a.ozet} ${a.grup}`}>
+                    <span class="ikon" aria-hidden="true">
+                      <KonuIkon ad={a.ikon} />
                     </span>
-                    <span class="ac">{a.ozet}</span>
-                  </span>
-                </a>
-              ))}
+                    <span class="govde">
+                      <span class="ad">
+                        {a.ad}
+                        {a.etiket && <span class="say">{a.etiket}</span>}
+                      </span>
+                      <span class="ac">{a.ozet}</span>
+                    </span>
+                  </a>
+                ))}
+              </div>
             </div>
           ))
         }
 
-        <div class="mega-obek" data-mega-obek>
-          <span class="mega-etiket">Kütüphaneler</span>
-          <a class="mega-sik" href="/komutlar" data-mega-oge="Komut kütüphanesi kopyala">
-            <span class="ikon" aria-hidden="true"><KonuIkon ad="terminal" /></span>
-            <span class="govde">
-              <span class="ad">Komut kütüphanesi<span class="say">{komutlar.length}</span></span>
-              <span class="ac">Konuya göre süz, tek tıkla kopyala</span>
-            </span>
-          </a>
-          <a class="mega-sik" href="/tani" data-mega-oge="Tanı sihirbazı belirti">
-            <span class="ikon" aria-hidden="true"><KonuIkon ad="dugum" /></span>
-            <span class="govde">
-              <span class="ad">Tanı sihirbazı</span>
-              <span class="ac">Belirtiyi seç, çözümü bul</span>
-            </span>
-          </a>
-          <a class="mega-sik" href="/canta" data-mega-oge="Saha çantası runbook">
-            <span class="ikon" aria-hidden="true"><KonuIkon ad="kutu" /></span>
-            <span class="govde">
-              <span class="ad">Saha çantası</span>
-              <span class="ac">Topladıklarını tek dosyaya çevir</span>
-            </span>
-          </a>
-        </div>
-      </div>
-
-      <div class="mega-alt-baslik">
-        <div class="kap">
-          <span class="mega-etiket">İndirilebilir betikler</span>
-          <span class="mega-grup-ozet">
-            PowerShell · {betikler.length} betik · değişiklik yapmadan önce okuyun
-          </span>
-        </div>
-      </div>
-
-      <div class="kap mega-izgara">
-        {
-          betikGruplari.map((g) => (
-            <div class="mega-obek" data-mega-obek>
-              <span class="mega-etiket ikincil">{g.ad}</span>
-              {g.betikler.map((b) => (
-                <a
-                  class="mega-sik dar"
-                  href={`/hizli-cozumler/${b.id}`}
-                  data-mega-oge={`${b.data.dosyaAdi ?? ''} ${b.data.baslik}`}
-                >
+        <div class="mega-ray-bolme" data-ray-bolme="betikler" hidden>
+          <span class="mega-bolme-ozet">PowerShell · değişiklik yapmadan önce okuyun</span>
+          <div class="mega-kartlar">
+            {
+              betikler.map((b) => (
+                <a class="mega-kk" href={`/hizli-cozumler/${b.id}`} data-mega-oge={`${b.data.dosyaAdi ?? ''} ${b.data.baslik}`}>
+                  <span class="ikon" aria-hidden="true"><KonuIkon ad="akis" /></span>
                   <span class="govde">
                     <span class="ad kod">{b.data.dosyaAdi ?? b.data.dosya}</span>
                     <span class="ac">{b.data.baslik}</span>
                   </span>
                 </a>
-              ))}
-            </div>
-          ))
-        }
-      </div>
+              ))
+            }
+          </div>
+        </div>
 
-      <p class="mega-bos" data-mega-bos="araclar" hidden>Bu süzgece uyan araç yok.</p>
+        <p class="mega-bos" data-mega-bos="araclar" hidden>Bu aramaya uyan araç yok.</p>
+      </div>
     </div>
   </div>
 
@@ -471,19 +442,57 @@ const etkin = (p: string) => (yol === p || yol.startsWith(p + '/') ? 'page' : un
       if (uyar) gorunen++;
     });
 
-    // Tamamı gizlenen öbek başlığıyla birlikte kalkıyor
-    kap.querySelectorAll<HTMLElement>('[data-mega-obek]').forEach((obek) => {
-      const kalan = [...obek.querySelectorAll<HTMLElement>('[data-mega-oge]')].some((o) => !o.hidden);
-      obek.hidden = !kalan;
+    /* Arama varken tüm bölmeler açılıyor: eşleşme başka sekmedeyse kullanıcı
+       sekmeleri tek tek gezmek zorunda kalmasın. Arama temizlenince yalnızca
+       seçili sekme geri gelir. */
+    const bolmeler = [...kap.querySelectorAll<HTMLElement>('[data-ray-bolme]')];
+    bolmeler.forEach((b) => {
+      const kalan = [...b.querySelectorAll<HTMLElement>('[data-mega-oge]')].some((o) => !o.hidden);
+      b.hidden = q ? !kalan : b.dataset.rayBolme !== seciliBolme(ad);
     });
-
-    const sayac = document.querySelector<HTMLElement>(`[data-mega-sayac="${ad}"]`);
-    const toplam = kap.querySelectorAll('[data-mega-oge]').length;
-    if (sayac) sayac.textContent = q ? `${gorunen} / ${toplam}` : `${toplam} kayıt`;
 
     const bos = document.querySelector<HTMLElement>(`[data-mega-bos="${ad}"]`);
     if (bos) bos.hidden = gorunen > 0;
   }
+
+  /* --- sol ray: sekme geçişi ---------------------------------------------
+     Izgara düzeni küme başına 1 ile 6 arasında değişen konu sayısında ragged
+     ve yarısı boş bir panel üretiyordu. Ray düzeninde panel yüksekliği sabit:
+     solda kümeler, sağda yalnızca seçili kümenin içeriği. */
+  const seciliBolme = (ad: string) =>
+    document
+      .querySelector<HTMLElement>(`[data-mega-kap="${ad}"]`)
+      ?.closest('.mega')
+      ?.querySelector<HTMLElement>('[data-ray-hedef][aria-selected="true"]')?.dataset.rayHedef ?? '';
+
+  document.querySelectorAll<HTMLElement>('.mega-ray').forEach((panel) => {
+    const dugmeler = [...panel.querySelectorAll<HTMLButtonElement>('[data-ray-hedef]')];
+    const bolmeler = [...panel.querySelectorAll<HTMLElement>('[data-ray-bolme]')];
+    const suzgec = panel.querySelector<HTMLInputElement>('[data-mega-suzgec]');
+
+    const sec = (hedef: string) => {
+      dugmeler.forEach((d) => d.setAttribute('aria-selected', String(d.dataset.rayHedef === hedef)));
+      bolmeler.forEach((b) => (b.hidden = b.dataset.rayBolme !== hedef));
+    };
+
+    dugmeler.forEach((d) => {
+      // Fareyle üzerine gelince de geçiyor: mega menüde beklenen davranış
+      const gec = () => {
+        if (suzgec?.value) return; // arama açıkken sekme değiştirmek sonucu gizlerdi
+        sec(d.dataset.rayHedef!);
+      };
+      d.addEventListener('mouseenter', gec);
+      d.addEventListener('focus', gec);
+      d.addEventListener('click', () => {
+        // Tıklama aramayı da temizliyor: sekme seçtiyseniz artık aramada değilsiniz
+        if (suzgec) {
+          suzgec.value = '';
+          panelSuz(suzgec);
+        }
+        sec(d.dataset.rayHedef!);
+      });
+    });
+  });
 
   suzgecler.forEach((g) => {
     g.addEventListener('input', () => panelSuz(g));

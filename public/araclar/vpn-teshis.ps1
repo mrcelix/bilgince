@@ -1,4 +1,4 @@
-<#
+﻿<#
 .SYNOPSIS
     "VPN bağlandı ama iç kaynağa erişemiyorum" durumunu teşhis eder.
 

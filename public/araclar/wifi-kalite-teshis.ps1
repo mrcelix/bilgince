@@ -1,4 +1,4 @@
-<#
+﻿<#
 .SYNOPSIS
     "Wi-Fi bağlı ama sürekli kopuyor" durumunda sinyal, kanal, sürücü ve
     kopma geçmişini tek raporda toplar.

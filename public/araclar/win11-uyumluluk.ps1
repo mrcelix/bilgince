@@ -1,4 +1,4 @@
-<#
+﻿<#
 .SYNOPSIS
     Makinenin Windows 11 gereksinimlerini karşılayıp karşılamadığını, hangi
     maddede takıldığını ve maddenin düzeltilebilir olup olmadığını raporlar.

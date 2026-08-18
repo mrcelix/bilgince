@@ -1,4 +1,4 @@
-<#
+﻿<#
 .SYNOPSIS
     Dosya paylaşımlarının paylaşım ve NTFS izinlerini birlikte raporlar.
 

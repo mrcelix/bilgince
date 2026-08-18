@@ -1,4 +1,4 @@
-<#
+﻿<#
 .SYNOPSIS
     Windows Update hata veriyorsa önce teşhis, istenirse bileşen onarımı yapar.
 

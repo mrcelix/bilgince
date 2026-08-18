@@ -1,0 +1,23 @@
+---
+baslik: "Pod sürekli yeniden başlıyor"
+ozet: "CrashLoopBackOff bir sebep değil, sonuçtur. Çıkış kodu ve son olaylar gerçek sebebi söyler."
+konu: "kubernetes"
+etiketler: ["kubernetes", "tanilama", "pod"]
+belirtiler:
+  - "Pod durumu CrashLoopBackOff"
+  - "Restart sayısı sürekli artıyor"
+  - "Uygulama birkaç saniye çalışıp kapanıyor"
+  - "kubectl logs boş dönüyor"
+yayin: 2026-08-18
+sure: 5
+komut: |
+  kubectl describe pod <pod> -n <ad-alani> | Select-String -Pattern 'Reason|Exit Code|Last State' -Context 0,2
+dosya: "/araclar/k8s-pod-teshis.ps1"
+dosyaAdi: "k8s-pod-teshis.ps1"
+dosyaAciklama: "Sorunlu Kubernetes podlarını tek raporda toplar."
+platform: "genel"
+ilgiliRehberler: []
+sira: 60
+---
+
+Betik hiçbir şeyi değiştirmez; yalnızca rapor üretir. Çıktıyı okuyup kararı siz verirsiniz.

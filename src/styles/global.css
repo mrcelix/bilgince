@@ -3740,33 +3740,34 @@ pre code {
   }
 }
 
-/* ------------------------------------------------------- geniş mega menü
-   Eski panel sabit üç sütundu ve araç listesini beşe kırpıyordu. İçerik
-   büyüdükçe (23 konu, 25+ araç, 25+ betik) bu tutmuyor: panel artık hepsini
-   gösteriyor, üstünde bir süzgeç var ve kendi içinde kayıyor. */
-.mega-genis .mega-ust {
-  border-bottom: 1px solid var(--line);
-  background: var(--bg);
+/* --------------------------------------------------------- raylı mega menü
+   Izgara düzeni küme başına 1 ile 6 arasında değişen öğe sayısında ragged ve
+   yarısı boş bir panel üretiyordu. Ray düzeninde panel yüksekliği sabit:
+   solda kümeler, sağda yalnızca seçili kümenin içeriği. */
+.mega-ray-kap {
+  display: grid;
+  grid-template-columns: 250px minmax(0, 1fr);
+  gap: 0;
+  padding: 0;
 }
-.mega-genis .mega-ust .kap {
+.mega-ray-sol {
   display: flex;
-  align-items: center;
-  gap: 14px;
-  padding-top: 12px;
-  padding-bottom: 12px;
-  flex-wrap: wrap;
+  flex-direction: column;
+  gap: 2px;
+  padding: 16px 16px 16px 28px;
+  border-right: 1px solid var(--line);
+  background: var(--bg);
 }
 .mega-ara {
   display: flex;
   align-items: center;
-  gap: 9px;
-  flex: 1 1 300px;
-  min-width: 0;
+  gap: 8px;
   border: 1px solid var(--line);
   border-radius: var(--r-s);
   background: var(--paper);
-  padding: 0 12px;
+  padding: 0 10px;
   color: var(--muted);
+  margin-bottom: 10px;
 }
 .mega-ara:focus-within {
   border-color: var(--indigo-metin);
@@ -3777,80 +3778,100 @@ pre code {
   border: 0;
   background: none;
   font: inherit;
-  font-size: 14px;
+  font-size: 13px;
   color: var(--ink);
-  padding: 9px 0;
+  padding: 8px 0;
 }
 .mega-ara input:focus {
   outline: none;
 }
-.mega-sayac {
-  font-family: var(--mono);
-  font-size: 11.5px;
-  color: var(--muted);
-  white-space: nowrap;
+
+.mega-ray-dugme {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  font: inherit;
+  font-size: 13.5px;
+  font-weight: 700;
+  text-align: left;
+  border: 0;
+  background: none;
+  color: var(--ink-soft);
+  padding: 9px 11px;
+  border-radius: var(--r-s);
+  cursor: pointer;
 }
-.mega-genis .mega-ust .mega-tum {
-  margin-left: auto;
+.mega-ray-dugme:hover {
+  background: var(--tint);
+  color: var(--ink);
+}
+.mega-ray-dugme[aria-selected='true'] {
+  background: var(--indigo);
+  color: #fff;
+}
+.mega-ray-dugme .say {
+  font-family: var(--mono);
+  font-size: 11px;
+  font-weight: 700;
+  opacity: 0.7;
+}
+.mega-ray-alt {
+  margin-top: auto;
+  padding-top: 14px;
+  font-size: 12.5px;
+  font-weight: 700;
+  color: var(--indigo-metin);
 }
 
-.mega-govde {
-  /* Panel ekranı aşmasın: kendi içinde kayar, sayfa kaymaz */
-  max-height: min(64vh, 620px);
+.mega-ray-sag {
+  padding: 18px 28px 22px;
+  /* Panel ekranı aşmasın; uzun listeler kendi içinde kaysın */
+  max-height: min(62vh, 560px);
   overflow-y: auto;
   overscroll-behavior: contain;
-  padding-bottom: 18px;
 }
-.mega-izgara {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(min(240px, 100%), 1fr));
-  gap: 4px 26px;
-  padding-top: 16px;
-  align-items: start;
-}
-.mega-obek {
-  display: flex;
-  flex-direction: column;
-  gap: 1px;
-  padding-bottom: 14px;
-}
-.mega-obek-genis {
-  grid-column: span 2;
-}
-.mega-etiket.ikincil {
+.mega-bolme-ozet {
+  display: block;
+  font-size: 12px;
   color: var(--muted);
+  margin-bottom: 12px;
 }
-
-/* Tek satırlık, yoğun kayıt — iki satırlık eski biçim 25 öğede çok uzuyordu */
-.mega-sik {
+.mega-kartlar {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(min(260px, 100%), 1fr));
+  gap: 2px 18px;
+}
+.mega-kk {
   display: flex;
   align-items: center;
   gap: 11px;
-  padding: 7px 9px;
+  padding: 8px 10px;
   border-radius: var(--r-s);
-  margin-left: -9px;
+  margin-left: -10px;
 }
-.mega-sik:hover {
+.mega-kk:hover {
   background: var(--tint);
 }
-.mega-sik .ikon {
-  width: 28px;
-  height: 28px;
-  border-radius: 8px;
+.mega-kk .ikon {
+  width: 30px;
+  height: 30px;
+  border-radius: 9px;
   background: var(--tint);
   color: var(--indigo-metin);
   display: grid;
   place-items: center;
   flex: none;
 }
-.mega-sik:hover .ikon {
+.mega-kk:hover .ikon {
   background: var(--indigo);
   color: #fff;
 }
-.mega-sik .govde {
+.mega-kk .govde {
   min-width: 0;
+  flex: 1;
 }
-.mega-sik .ad {
+.mega-kk .ad {
   display: flex;
   align-items: center;
   gap: 7px;
@@ -3858,58 +3879,64 @@ pre code {
   font-weight: 700;
   line-height: 1.3;
 }
-.mega-sik .ad.kod {
+.mega-kk .ad.kod {
   font-family: var(--mono);
   font-size: 12.5px;
 }
-.mega-sik .ac {
+.mega-kk .ad .say {
+  font-family: var(--mono);
+  font-size: 10.5px;
+  font-weight: 700;
+  color: var(--indigo-d);
+  background: var(--tint);
+  border-radius: 999px;
+  padding: 1px 7px;
+}
+.mega-kk:hover .ad .say {
+  background: var(--paper);
+}
+.mega-kk .ac {
   display: block;
   font-size: 12px;
   color: var(--muted);
   line-height: 1.4;
-  /* Uzun özet satırı taşırmasın */
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
-.mega-sik.dar {
-  padding-top: 5px;
-  padding-bottom: 5px;
+/* İçeriği olmayan konu soluk: menüyü kirletmesin ama gizlenmesin de */
+.mega-kk[data-bos='evet'] .ad {
+  color: var(--muted);
 }
-
-.mega-alt-baslik {
-  border-top: 1px solid var(--line);
-  margin-top: 6px;
+.mega-kk-seri .ilerleme {
+  display: block;
+  height: 3px;
+  border-radius: 999px;
+  background: var(--line);
+  margin: 6px 0 4px;
+  overflow: hidden;
 }
-.mega-alt-baslik .kap {
-  display: flex;
-  align-items: baseline;
-  gap: 12px;
-  flex-wrap: wrap;
-  padding-top: 14px;
-}
-.mega-one-serit {
-  display: flex;
-  gap: 12px;
-  flex-wrap: wrap;
-  padding-top: 16px;
-}
-.mega-seriler {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(min(220px, 100%), 1fr));
-  gap: 10px;
+.mega-kk-seri .ilerleme span {
+  display: block;
+  height: 100%;
+  background: var(--indigo);
 }
 .mega-bos {
-  padding: 24px 28px;
+  padding: 30px 4px;
   font-size: 13.5px;
   color: var(--muted);
-  text-align: center;
   margin: 0;
 }
 
-@media (max-width: 900px) {
-  /* Mega menü zaten yalnızca masaüstünde açılıyor; yine de güvenli olsun */
-  .mega-govde {
-    max-height: 70vh;
+@media (max-width: 1040px) {
+  .mega-ray-kap {
+    grid-template-columns: 210px minmax(0, 1fr);
+  }
+  .mega-ray-sol {
+    padding-left: 18px;
+  }
+  .mega-ray-sag {
+    padding-left: 18px;
+    padding-right: 18px;
   }
 }

@@ -1,4 +1,4 @@
-<#
+﻿<#
 .SYNOPSIS
     Makinedeki sertifikaları, süresini ve IIS bağlamalarını tek raporda çıkarır.
 

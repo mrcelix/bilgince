@@ -1,0 +1,23 @@
+---
+baslik: "SQL Server yavaşladı, önce nereye bakılır?"
+ozet: "Bekleme istatistikleri sorunun türünü söyler: disk mi, kilit mi, CPU mu, bellek mi."
+konu: "veritabani"
+etiketler: ["sql-server", "performans"]
+belirtiler:
+  - "Uygulama zaman aşımı veriyor"
+  - "Aynı rapor dün 2 saniyeydi bugün 40 saniye"
+  - "CPU normal ama sorgular bekliyor"
+  - "Gece işleri sabaha sarkıyor"
+yayin: 2026-08-18
+sure: 5
+komut: |
+  SELECT TOP 5 wait_type, wait_time_ms/1000 AS sn FROM sys.dm_os_wait_stats WHERE wait_type NOT LIKE '%SLEEP%' ORDER BY wait_time_ms DESC;
+dosya: "/araclar/sql-saglik-kontrol.ps1"
+dosyaAdi: "sql-saglik-kontrol.ps1"
+dosyaAciklama: "SQL Server örneğinin operasyonel sağlığını denetler."
+platform: "windows"
+ilgiliRehberler: []
+sira: 64
+---
+
+Betik hiçbir şeyi değiştirmez; yalnızca rapor üretir. Çıktıyı okuyup kararı siz verirsiniz.

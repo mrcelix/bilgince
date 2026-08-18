@@ -1,4 +1,4 @@
-<#
+﻿<#
 .SYNOPSIS
     "C: doldu" durumunda yeri kimin kapladığını bulur ve güvenle geri
     kazanılabilecek alanı listeler.

@@ -1,0 +1,23 @@
+---
+baslik: "Linux diski doldu ama neyin doldurduğu belli değil"
+ozet: "du ile df farklı sonuç veriyorsa sebep genelde silinmiş ama açık tutulan dosyalardır."
+konu: "linux"
+etiketler: ["linux", "disk"]
+belirtiler:
+  - "No space left on device hatası"
+  - "df doluyor ama du toplamı tutmuyor"
+  - "Günlük dosyaları silindi, yer geri gelmedi"
+  - "Disk boş görünüyor ama yazılamıyor"
+yayin: 2026-08-18
+sure: 5
+komut: |
+  df -h; df -i; lsof +L1 2>/dev/null | head
+dosya: "/araclar/linux-disk-analiz.sh"
+dosyaAdi: "linux-disk-analiz.sh"
+dosyaAciklama: "Diski kimin doldurduğunu adım adım daraltır."
+platform: "linux"
+ilgiliRehberler: []
+sira: 63
+---
+
+Betik hiçbir şeyi değiştirmez; yalnızca rapor üretir. Çıktıyı okuyup kararı siz verirsiniz.

@@ -1,4 +1,4 @@
-<#
+﻿<#
 .SYNOPSIS
     Outlook'un sürekli parola sormasının sebebini kayıt defteri, kimlik
     deposu ve Autodiscover tarafında arar.
@@ -95,7 +95,7 @@ $alan = ($env:USERDNSDOMAIN)
 if ($alan) {
     Yaz "  DNS kaydı sınanıyor: autodiscover.$alan"
     $srv = Resolve-DnsName "autodiscover.$alan" -ErrorAction SilentlyContinue | Select-Object -First 1
-    if ($srv) { Yaz "  → $($srv.NameHost ?? $srv.IPAddress)" Iyi }
+    if ($srv) { Yaz "  → $(if ($srv.NameHost) { $srv.NameHost } else { $srv.IPAddress })" Iyi }
     else { Yaz '  → kayıt yok (Exchange Online kullanılıyorsa sorun değil)' Bilgi }
 }
 

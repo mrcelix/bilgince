@@ -1,0 +1,23 @@
+---
+baslik: "Yedekler alınıyor ama geri dönebilir miyiz?"
+ozet: "\"Başarılı\" mesajı dosyanın okunabildiğini kanıtlamaz. VERIFYONLY en ucuz doğrulama adımıdır."
+konu: "veritabani"
+etiketler: ["sql-server", "yedekleme", "dogrulama"]
+belirtiler:
+  - "Yedek işleri yeşil ama hiç geri dönüş denenmedi"
+  - "Yedek dosyaları taşındı, yol değişti"
+  - "Zincirde eksik günlük yedeği şüphesi"
+  - "Denetimde geri dönüş kanıtı isteniyor"
+yayin: 2026-08-18
+sure: 5
+komut: |
+  RESTORE VERIFYONLY FROM DISK = N'D:\Yedek\uretim.bak';
+dosya: "/araclar/sql-yedek-dogrulama.ps1"
+dosyaAdi: "sql-yedek-dogrulama.ps1"
+dosyaAciklama: "Yedeklerin varlığını değil, geri dönebilirliğini sınar."
+platform: "windows"
+ilgiliRehberler: []
+sira: 65
+---
+
+Betik hiçbir şeyi değiştirmez; yalnızca rapor üretir. Çıktıyı okuyup kararı siz verirsiniz.

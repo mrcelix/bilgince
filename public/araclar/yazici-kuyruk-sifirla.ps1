@@ -1,4 +1,4 @@
-<#
+﻿<#
 .SYNOPSIS
     Takılan yazdırma kuyruğunu temizler ve tekrarlıyorsa sebebini gösterir.
 

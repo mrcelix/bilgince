@@ -1,4 +1,4 @@
-<#
+﻿<#
 .SYNOPSIS
     "Sunucu yavaş" şikâyetinde darboğazın işlemci mi, bellek mi, disk mi yoksa
     ağ mı olduğunu ölçerek ayırır.

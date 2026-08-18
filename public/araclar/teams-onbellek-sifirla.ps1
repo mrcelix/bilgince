@@ -1,4 +1,4 @@
-<#
+﻿<#
 .SYNOPSIS
     Teams (yeni ve klasik istemci) önbelleğini analiz eder, istenirse sıfırlar.
 
@@ -92,7 +92,7 @@ Yaz "`n--- 3. Kamera ve mikrofon izinleri ---" Baslik
 foreach ($cihaz in 'webcam', 'microphone') {
     $yol = "HKCU:\Software\Microsoft\Windows\CurrentVersion\CapabilityAccessManager\ConsentStore\$cihaz"
     $genel = (Get-ItemProperty $yol -Name Value -ErrorAction SilentlyContinue).Value
-    Yaz ("  {0,-12} genel: {1}" -f $cihaz, ($genel ?? 'tanımsız')) $(if ($genel -eq 'Deny') { 'Hata' } else { 'Iyi' })
+    Yaz ("  {0,-12} genel: {1}" -f $cihaz, $(if ($genel) { $genel } else { 'tanımsız' })) $(if ($genel -eq 'Deny') { 'Hata' } else { 'Iyi' })
     $masaustu = (Get-ItemProperty "$yol\NonPackaged" -Name Value -ErrorAction SilentlyContinue).Value
     if ($masaustu) {
         Yaz ("  {0,-12} masaüstü uygulamaları: {1}" -f '', $masaustu) $(if ($masaustu -eq 'Deny') { 'Hata' } else { 'Iyi' })
