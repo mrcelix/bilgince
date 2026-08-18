@@ -1,0 +1,443 @@
+---
+/**
+ * Tanı sihirbazı. Panik anındaki insanı aramaya değil sonuca götürür:
+ * önce alan, sonra belirtiler, sonra sıralı çözümler.
+ *
+ * Veri hızlı çözümlerin `belirtiler` alanından geliyor ve sayfaya gömülüyor
+ * (25 kayıt, ~10 KB) — ağ gidiş dönüşü yok, çevrimdışı da çalışır.
+ */
+import Base from '../layouts/Base.astro';
+import { getCollection } from 'astro:content';
+import { SITE, KONULAR } from '../site.js';
+
+const cozumler = (await getCollection('cozumler')).filter((c) => c.data.belirtiler.length > 0);
+
+const konuAdi = (slug: string) => KONULAR.find((k) => k.slug === slug)?.ad ?? slug;
+
+const veri = cozumler.map((c) => ({
+  id: c.id,
+  baslik: c.data.baslik,
+  ozet: c.data.ozet,
+  konu: c.data.konu,
+  konuAdi: konuAdi(c.data.konu),
+  platform: c.data.platform,
+  belirtiler: c.data.belirtiler,
+  komut: c.data.komut ?? null,
+  dosya: c.data.dosya ?? null,
+  dosyaAdi: c.data.dosyaAdi ?? null,
+  adres: `/hizli-cozumler/${c.id}`,
+}));
+
+// Alan kartları: yalnızca çözümü olan konular, çözüm sayısıyla
+const alanlar = [...new Set(veri.map((v) => v.konu))]
+  .map((slug) => ({
+    slug,
+    ad: konuAdi(slug),
+    adet: veri.filter((v) => v.konu === slug).length,
+  }))
+  .sort((a, b) => b.adet - a.adet);
+
+const toplamBelirti = new Set(veri.flatMap((v) => v.belirtiler)).size;
+---
+
+<Base
+  baslik="Tanı sihirbazı"
+  aciklama={`Sorununuzu birkaç soruda daraltın. ${toplamBelirti} belirti, ${veri.length} çözüme bağlı: doğru komut, doğru betik ve doğru rehber tek ekranda.`}
+  kategori="Sayfa"
+  jsonLd={{
+    '@context': 'https://schema.org',
+    '@type': 'WebApplication',
+    name: 'Tanı sihirbazı',
+    url: `${SITE.url}/tani`,
+    applicationCategory: 'UtilitiesApplication',
+    operatingSystem: 'Web',
+    inLanguage: 'tr-TR',
+    isAccessibleForFree: true,
+    offers: { '@type': 'Offer', price: '0', priceCurrency: 'TRY' },
+  }}
+>
+  <div class="arama-bas">
+    <div class="kap">
+      <nav class="kirinti" aria-label="Kırıntı yolu" style="padding-top:0">
+        <a href="/">Ana sayfa</a><span class="ayrac">/</span><span aria-current="page">Tanı sihirbazı</span>
+      </nav>
+      <h1>Ne oluyor?</h1>
+      <p style="color:var(--muted);font-size:14px;margin-top:8px;max-width:66ch">
+        {toplamBelirti} belirti, {veri.length} çözüme bağlı. Yaşadığınız şeyi işaretleyin; eşleşen
+        çözümler aşağıda sıralanır. Aramayı bilmenize gerek yok — belirtiyi tanımanız yeter.
+      </p>
+    </div>
+  </div>
+
+  <div class="kap" style="padding-bottom:64px">
+    <div class="t-adim" id="t-adim1">
+      <span class="t-etiket">1. adım</span>
+      <h2>Sorun nerede?</h2>
+      <div class="t-alanlar">
+        {
+          alanlar.map((a) => (
+            <button type="button" class="t-alan" data-alan={a.slug}>
+              <b>{a.ad}</b>
+              <span>{a.adet} çözüm</span>
+            </button>
+          ))
+        }
+        <button type="button" class="t-alan t-alan-hepsi" data-alan="">
+          <b>Emin değilim</b>
+          <span>hepsini göster</span>
+        </button>
+      </div>
+    </div>
+
+    <div class="t-adim" id="t-adim2" hidden>
+      <span class="t-etiket">2. adım</span>
+      <h2>Hangisi size uyuyor?</h2>
+      <p class="t-ac">Birden fazla seçebilirsiniz; her seçim sonucu daraltır.</p>
+      <input
+        id="t-ara"
+        type="search"
+        placeholder="Belirtiyi yazarak da arayabilirsiniz: kilitleniyor, yavaş, bağlanamıyor…"
+        aria-label="Belirtilerde ara"
+        autocomplete="off"
+      />
+      <div class="t-belirtiler" id="t-belirtiler" role="group" aria-label="Belirtiler"></div>
+      <div class="t-dugmeler">
+        <button type="button" class="dg dg-hayalet" id="t-geri">← Alanı değiştir</button>
+        <button type="button" class="dg dg-hayalet" id="t-temizle">Seçimi temizle</button>
+      </div>
+    </div>
+
+    <div class="t-adim" id="t-adim3" hidden>
+      <span class="t-etiket">Sonuç</span>
+      <h2 id="t-sonuc-baslik">Eşleşen çözümler</h2>
+      <div class="t-sonuclar" id="t-sonuclar"></div>
+      <p class="t-yok" id="t-yok" hidden>
+        Bu belirtilerle eşleşen bir çözüm yok. Seçimi azaltmayı ya da
+        <a href="/ara">sitede aramayı</a> deneyin — bulamazsanız
+        <a href="/hakkimda#iletisim">yazın</a>, sık gelen sorunlar buraya ekleniyor.
+      </p>
+    </div>
+  </div>
+
+  <script type="application/json" id="t-veri" set:html={JSON.stringify(veri)}></script>
+
+  <script>
+    import { ekle, cikar, icindeMi } from '../scripts/canta.js';
+
+    (() => {
+      const el = (s) => document.querySelector(s);
+      const veri = JSON.parse(document.getElementById('t-veri').textContent);
+
+      const kacir = (m) =>
+        String(m ?? '').replace(/[<>&"]/g, (c) => ({ '<': '&lt;', '>': '&gt;', '&': '&amp;', '"': '&quot;' })[c]);
+
+      // Türkçe küçültme: "KİLİTLENİYOR" araması "kilitleniyor" ile eşleşsin
+      const kucult = (m) => String(m).toLocaleLowerCase('tr');
+
+      let alan = null;
+      const secili = new Set();
+
+      /* --- 1. adım --------------------------------------------------------- */
+      document.querySelectorAll('[data-alan]').forEach((d) =>
+        d.addEventListener('click', () => {
+          alan = d.dataset.alan || null;
+          secili.clear();
+          el('#t-adim1').hidden = true;
+          el('#t-adim2').hidden = false;
+          belirtileriCiz();
+          el('#t-ara').focus();
+          sonuclariCiz();
+        })
+      );
+
+      el('#t-geri').addEventListener('click', () => {
+        el('#t-adim1').hidden = false;
+        el('#t-adim2').hidden = true;
+        el('#t-adim3').hidden = true;
+        secili.clear();
+      });
+
+      el('#t-temizle').addEventListener('click', () => {
+        secili.clear();
+        belirtileriCiz();
+        sonuclariCiz();
+      });
+
+      /* --- 2. adım --------------------------------------------------------- */
+      function ilgiliCozumler() {
+        return alan ? veri.filter((v) => v.konu === alan) : veri;
+      }
+
+      function belirtileriCiz() {
+        const q = kucult(el('#t-ara').value.trim());
+        // Aynı belirti birden çok çözümde geçebilir; tekilleştiriliyor
+        const hepsi = [...new Set(ilgiliCozumler().flatMap((v) => v.belirtiler))]
+          .filter((b) => !q || kucult(b).includes(q))
+          .sort((a, b) => a.localeCompare(b, 'tr'));
+
+        el('#t-belirtiler').innerHTML = hepsi.length
+          ? hepsi
+              .map(
+                (b) =>
+                  `<button type="button" class="t-belirti" data-belirti="${kacir(b)}"
+                     aria-pressed="${secili.has(b)}">${kacir(b)}</button>`
+              )
+              .join('')
+          : '<p class="t-ac">Bu aramaya uyan belirti yok.</p>';
+      }
+
+      el('#t-belirtiler').addEventListener('click', (e) => {
+        const d = e.target.closest('[data-belirti]');
+        if (!d) return;
+        const b = d.dataset.belirti;
+        secili.has(b) ? secili.delete(b) : secili.add(b);
+        d.setAttribute('aria-pressed', String(secili.has(b)));
+        sonuclariCiz();
+      });
+
+      el('#t-ara').addEventListener('input', belirtileriCiz);
+
+      /* --- sonuçlar -------------------------------------------------------- */
+      function sonuclariCiz() {
+        const adim3 = el('#t-adim3');
+        if (!secili.size) {
+          adim3.hidden = true;
+          return;
+        }
+        adim3.hidden = false;
+
+        // Puan: kaç belirtisi seçimle örtüşüyor. Eşitlikte az belirtili olan
+        // önde — daha dar kapsamlı çözüm daha isabetli.
+        const sirali = ilgiliCozumler()
+          .map((v) => ({ v, puan: v.belirtiler.filter((b) => secili.has(b)).length }))
+          .filter((x) => x.puan > 0)
+          .sort((a, b) => b.puan - a.puan || a.v.belirtiler.length - b.v.belirtiler.length);
+
+        el('#t-yok').hidden = sirali.length > 0;
+        el('#t-sonuc-baslik').textContent =
+          sirali.length === 1 ? '1 çözüm eşleşti' : `${sirali.length} çözüm eşleşti`;
+
+        el('#t-sonuclar').innerHTML = sirali
+          .map(({ v, puan }) => {
+            const eslesen = v.belirtiler.filter((b) => secili.has(b));
+            const cantaKimlik = v.komut ? `cozum:${v.id}` : v.dosya ? `betik:${v.id}` : null;
+            return [
+              '<article class="t-kart">',
+              '  <div class="t-kart-ust">',
+              `    <span class="etiket">${kacir(v.konuAdi)}</span>`,
+              `    <span class="t-puan">${puan} belirti eşleşti</span>`,
+              '  </div>',
+              `  <h3><a href="${kacir(v.adres)}">${kacir(v.baslik)}</a></h3>`,
+              `  <p class="t-ozet">${kacir(v.ozet)}</p>`,
+              '  <ul class="t-eslesen">',
+              eslesen.map((b) => `<li>${kacir(b)}</li>`).join(''),
+              '  </ul>',
+              v.komut
+                ? `<pre class="kod"><code>${kacir(v.komut.trim())}</code></pre>`
+                : '',
+              '  <div class="t-kart-alt">',
+              `    <a class="dg" href="${kacir(v.adres)}">Çözüme git</a>`,
+              v.dosya
+                ? `<a class="dg dg-hayalet" href="${kacir(v.dosya)}" download>${kacir(v.dosyaAdi ?? 'Betiği indir')}</a>`
+                : '',
+              cantaKimlik
+                ? `<button type="button" class="dg dg-hayalet canta-ekle canta-ekle-duz"
+                     data-canta-ekle="${cantaKimlik}" aria-pressed="${icindeMi(cantaKimlik)}"
+                     data-durum="${icindeMi(cantaKimlik) ? 'ekli' : 'yok'}">
+                     <span aria-hidden="true">+</span>
+                     <span class="canta-yazi">${icindeMi(cantaKimlik) ? 'Çantada' : 'Çantaya ekle'}</span>
+                   </button>`
+                : '',
+              '  </div>',
+              '</article>',
+            ]
+              .filter(Boolean)
+              .join('\n');
+          })
+          .join('');
+      }
+    })();
+  </script>
+
+  <style>
+    .t-adim {
+      padding-top: 30px;
+    }
+    .t-etiket {
+      display: inline-block;
+      font-size: 11px;
+      font-weight: 800;
+      text-transform: uppercase;
+      letter-spacing: 0.07em;
+      color: var(--indigo-d);
+      background: var(--tint);
+      border-radius: 999px;
+      padding: 3px 10px;
+    }
+    .t-adim h2 {
+      font-size: 22px;
+      margin: 12px 0 4px;
+    }
+    .t-ac {
+      font-size: 13.5px;
+      color: var(--muted);
+      margin: 0 0 14px;
+    }
+
+    .t-alanlar {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(min(180px, 100%), 1fr));
+      gap: 12px;
+      margin-top: 16px;
+    }
+    .t-alan {
+      font: inherit;
+      text-align: left;
+      border: 1px solid var(--line);
+      border-radius: var(--r-m);
+      background: var(--paper);
+      color: var(--ink);
+      padding: 16px 18px;
+      cursor: pointer;
+      display: grid;
+      gap: 3px;
+    }
+    .t-alan:hover {
+      border-color: var(--indigo-metin);
+      background: var(--tint);
+    }
+    .t-alan b {
+      font-size: 15.5px;
+    }
+    .t-alan span {
+      font-size: 12.5px;
+      color: var(--muted);
+    }
+    .t-alan-hepsi {
+      border-style: dashed;
+    }
+
+    #t-ara {
+      width: 100%;
+      font: inherit;
+      /* 16 piksel: iOS Safari daha küçük yazıda sayfayı yakınlaştırıyor */
+      font-size: 16px;
+      padding: 12px 14px;
+      border: 1px solid var(--line);
+      border-radius: var(--r-s);
+      background: var(--paper);
+      color: var(--ink);
+      margin-bottom: 14px;
+    }
+    .t-belirtiler {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+    }
+    .t-belirti {
+      font: inherit;
+      font-size: 13.5px;
+      text-align: left;
+      padding: 9px 14px;
+      border-radius: 999px;
+      border: 1px solid var(--line);
+      background: var(--paper);
+      color: var(--ink-soft);
+      cursor: pointer;
+    }
+    .t-belirti:hover {
+      border-color: var(--indigo-metin);
+      color: var(--indigo-metin);
+    }
+    .t-belirti[aria-pressed='true'] {
+      background: var(--indigo);
+      border-color: var(--indigo);
+      color: #fff;
+      font-weight: 700;
+    }
+    .t-dugmeler {
+      display: flex;
+      gap: 10px;
+      flex-wrap: wrap;
+      margin-top: 18px;
+    }
+
+    .t-sonuclar {
+      display: grid;
+      /* `minmax(0, 1fr)`: varsayılan `auto` sütun uzun komut satırlarında
+         sayfayı yatay kaydırıyor. */
+      grid-template-columns: minmax(0, 1fr);
+      gap: 16px;
+      margin-top: 16px;
+    }
+    .t-kart {
+      border: 1px solid var(--line);
+      border-radius: var(--r-m);
+      background: var(--paper);
+      padding: 18px 20px;
+    }
+    .t-kart-ust {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      flex-wrap: wrap;
+    }
+    .t-puan {
+      font-family: var(--mono);
+      font-size: 11.5px;
+      color: var(--green-ink);
+      font-weight: 700;
+    }
+    .t-kart h3 {
+      font-size: 17.5px;
+      margin-top: 10px;
+      line-height: 1.25;
+    }
+    .t-kart h3 a:hover {
+      color: var(--indigo-metin);
+    }
+    .t-ozet {
+      font-size: 13.5px;
+      color: var(--muted);
+      margin: 6px 0 0;
+      line-height: 1.55;
+    }
+    .t-eslesen {
+      list-style: none;
+      margin: 12px 0 0;
+      padding: 0;
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+    }
+    .t-eslesen li {
+      font-size: 12px;
+      background: color-mix(in srgb, var(--green) 14%, var(--paper));
+      color: var(--green-ink);
+      border-radius: 999px;
+      padding: 3px 10px;
+      font-weight: 700;
+    }
+    .t-kart .kod {
+      margin-top: 12px;
+    }
+    .t-kart-alt {
+      display: flex;
+      gap: 10px;
+      flex-wrap: wrap;
+      margin-top: 14px;
+    }
+    .t-yok {
+      font-size: 14px;
+      color: var(--muted);
+      border: 1px dashed var(--line);
+      border-radius: var(--r-m);
+      padding: 22px;
+      margin-top: 16px;
+    }
+    .t-yok a {
+      color: var(--indigo-metin);
+      font-weight: 700;
+    }
+  </style>
+</Base>
