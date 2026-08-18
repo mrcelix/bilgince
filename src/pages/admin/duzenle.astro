@@ -194,6 +194,41 @@ if (ad) {
         return [...satirlar.slice(0, bas), ...satirlar.slice(son)].join('\n');
       };
 
+      /* Bazı liste alanları YAML blok biçiminde yazılmış:
+           belirtiler:
+             - "ilk"
+         Satır içi `[...]` bekleyen okuyucu bunları boş görüyordu; boş görünen
+         alanı kaydetmek de anahtarı silip madde satırlarını öksüz bırakıyor,
+         yani frontmatter'ı bozuyordu. İki biçim de destekleniyor ve dosya
+         hangi biçimdeyse o korunuyor. */
+      const blokListeOku = (yaml, anahtar) => {
+        const satirlar = yaml.split('\n');
+        const bas = satirlar.findIndex((s) => new RegExp(`^${anahtar}:[ \\t]*$`).test(s));
+        if (bas === -1) return null;
+        const ogeler = [];
+        for (let i = bas + 1; i < satirlar.length; i++) {
+          const e = satirlar[i].match(/^[ 	]+-[ 	]*(.*)$/);
+          if (!e) break;
+          ogeler.push(e[1].trim().replace(/^["']|["']$/g, ''));
+        }
+        return ogeler.length ? ogeler : null;
+      };
+
+      const blokListeYaz = (yaml, anahtar, ogeler) => {
+        const satirlar = yaml.split('\n');
+        const bas = satirlar.findIndex((s) => new RegExp(`^${anahtar}:[ \\t]*$`).test(s));
+        if (bas === -1) return yaml;
+        let son = bas + 1;
+        while (son < satirlar.length && /^[ 	]+-/.test(satirlar[son])) son++;
+        const yeni = ogeler.length
+          ? [`${anahtar}:`, ...ogeler.map((o) => `  - "${String(o).replace(/"/g, '\\"')}"`)]
+          : [];
+        return [...satirlar.slice(0, bas), ...yeni, ...satirlar.slice(son)].join('\n');
+      };
+
+      /** Alan dosyada blok liste olarak mı duruyor? */
+      const blokListeMi = (anahtar) => blokListeOku(yamlAlani.value, anahtar) !== null;
+
       const yamlDeger = (alan, girdi) => {
         const temiz = String(girdi).trim();
         if (alan.tur === 'onay') return temiz === 'true' ? 'true' : 'false';
@@ -201,7 +236,7 @@ if (ad) {
         if (alan.tur === 'sayi') return String(Number(temiz) || 0);
         if (alan.tur === 'tarih') return temiz;
         if (alan.tur === 'liste') {
-          const ogeler = temiz.split(',').map((s) => s.trim()).filter(Boolean).map(tirnakla);
+          const ogeler = temiz.split('\n').map((s) => s.trim()).filter(Boolean).map(tirnakla);
           return `[${ogeler.join(', ')}]`;
         }
         return tirnakla(temiz);
@@ -211,12 +246,19 @@ if (ad) {
         if (ham === null) return alan.tur === 'onay' ? 'false' : '';
         const temiz = ham.trim();
         if (alan.tur === 'liste') {
+          /* Tırnaklı öğeleri tek tek yakala: virgülle bölmek, içinde virgül
+             geçen bir öğeyi ("Eskiden hızlıydı, zamanla yavaşladı") ikiye
+             ayırıyordu. Tırnaksız yazılmış eski kayıtlar için virgül yedek. */
+          const ogeler = [...temiz.matchAll(/"((?:[^"\\]|\\.)*)"|'([^']*)'/g)].map((m) =>
+            (m[1] ?? m[2]).replace(/\\"/g, '"')
+          );
+          if (ogeler.length) return ogeler.join('\n');
           return temiz
             .replace(/^\[|\]$/g, '')
             .split(',')
-            .map((s) => s.trim().replace(/^["']|["']$/g, ''))
+            .map((s) => s.trim())
             .filter(Boolean)
-            .join(', ');
+            .join('\n');
         }
         return temiz.replace(/^["']|["']$/g, '');
       };
@@ -238,6 +280,13 @@ if (ad) {
           sarmal.innerHTML = `<label for="${kimlik}">${alan.etiket}</label>
             <textarea id="${kimlik}" rows="4" spellcheck="false"></textarea>
             ${alan.ipucu ? `<small>${alan.ipucu}</small>` : ''}`;
+        } else if (alan.tur === 'liste') {
+          /* Satır başına bir öğe. Virgülle ayırmak, içinde virgül geçen bir
+             öğeyi ("Eskiden hızlıydı, zamanla yavaşladı") gidiş-dönüşte ikiye
+             bölüyordu. */
+          sarmal.innerHTML = `<label for="${kimlik}">${alan.etiket}</label>
+            <textarea id="${kimlik}" rows="3" spellcheck="false" style="font-family:inherit;font-size:14px"></textarea>
+            <small>${alan.ipucu ? alan.ipucu + ' — ' : ''}her satıra bir öğe</small>`;
         } else if (alan.tur === 'uzunMetin') {
           sarmal.innerHTML = `<label for="${kimlik}">${alan.etiket}</label>
             <textarea id="${kimlik}" rows="2" style="font-family:inherit;font-size:14px"></textarea>
@@ -263,6 +312,13 @@ if (ad) {
             girdi.value = blokOku(yamlAlani.value, alan.anahtar) ?? '';
             continue;
           }
+          if (alan.tur === 'liste') {
+            const blok = blokListeOku(yamlAlani.value, alan.anahtar);
+            if (blok) {
+              girdi.value = blok.join('\n');
+              continue;
+            }
+          }
           const deger = paneleDeger(alan, alanOku(yamlAlani.value, alan.anahtar));
           if (alan.tur === 'onay') girdi.checked = deger === 'true';
           else girdi.value = deger;
@@ -276,6 +332,11 @@ if (ad) {
           yamlAlani.value = metin
             ? blokYaz(yamlAlani.value, anahtar, metin)
             : blokSil(yamlAlani.value, anahtar);
+          return;
+        }
+        if (alan.tur === 'liste' && blokListeMi(anahtar)) {
+          const ogeler = girdi.value.split('\n').map((s) => s.trim()).filter(Boolean);
+          yamlAlani.value = blokListeYaz(yamlAlani.value, anahtar, ogeler);
           return;
         }
         const ham = alan.tur === 'onay' ? String(girdi.checked) : girdi.value;
