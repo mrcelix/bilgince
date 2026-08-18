@@ -1,0 +1,13 @@
+---
+baslik: "Sürekli yeniden başlayan podları bul"
+ozet: "Küme genelinde restart sayısına göre sıralar; gürültünün kaynağını ilk bakışta gösterir."
+konu: "kubernetes"
+etiketler: ["kubernetes", "tanilama", "pod"]
+kod: |
+  kubectl get pods -A --sort-by='.status.containerStatuses[0].restartCount' \
+    -o custom-columns='AD:.metadata.name,AD ALANI:.metadata.namespace,RESTART:.status.containerStatuses[0].restartCount,DURUM:.status.phase' \
+    | tail -20
+dikkat: "Çok konteynerli podlarda yalnızca ilk konteynerin sayacını gösterir; şüpheli podu ayrıca `kubectl describe` ile açın."
+---
+
+Komutun ne yaptığını okumadan çalıştırmayın. Çıktıyı bir kez üretim dışı bir makinede görün, sonra sahada kullanın.

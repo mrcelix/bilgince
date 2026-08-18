@@ -1,0 +1,16 @@
+---
+baslik: "Birbirini bekleyen PostgreSQL sorguları"
+ozet: "Kilit zincirini, engelleyen ve engellenen sorguyla birlikte gösterir."
+konu: "veritabani"
+etiketler: ["postgresql", "tanilama"]
+kod: |
+  SELECT bekleyen.pid AS bekleyen_pid, bekleyen.query AS bekleyen_sorgu,
+         engelleyen.pid AS engelleyen_pid, engelleyen.query AS engelleyen_sorgu
+  FROM pg_stat_activity bekleyen
+  JOIN pg_stat_activity engelleyen
+    ON engelleyen.pid = ANY(pg_blocking_pids(bekleyen.pid))
+  WHERE cardinality(pg_blocking_pids(bekleyen.pid)) > 0;
+dikkat: "Engelleyeni sonlandırmadan önce ne yaptığına bakın; uzun süren bir bakım işi olabilir."
+---
+
+Komutun ne yaptığını okumadan çalıştırmayın. Çıktıyı bir kez üretim dışı bir makinede görün, sonra sahada kullanın.

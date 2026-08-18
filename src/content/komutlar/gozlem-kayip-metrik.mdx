@@ -1,0 +1,12 @@
+---
+baslik: "Veri göndermeyi bırakan hedefler"
+ozet: "Beş dakikadır örnek gelmeyen hedefleri listeler — sessizce ölen izleme budur."
+konu: "gozlemlenebilirlik"
+etiketler: ["izleme", "prometheus"]
+kod: |
+  curl -s "$PROM/api/v1/query?query=up==0" |
+    jq -r '.data.result[] | "\(.metric.job)\t\(.metric.instance)"'
+dikkat: "up==0 yalnızca kayıtlı hedefleri kapsar; hiç eklenmemiş bir sunucu burada da görünmez."
+---
+
+Komutun ne yaptığını okumadan çalıştırmayın. Çıktıyı bir kez üretim dışı bir makinede görün, sonra sahada kullanın.

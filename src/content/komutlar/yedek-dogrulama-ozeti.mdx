@@ -1,0 +1,16 @@
+---
+baslik: "Yedek işlerinin son durumu"
+ozet: "Windows Server Backup günlüğünden son yedek sonuçlarını çıkarır."
+konu: "yedekleme"
+etiketler: ["yedekleme", "dogrulama"]
+kod: |
+  Get-WinEvent -FilterHashtable @{
+    LogName = 'Microsoft-Windows-Backup'; Id = 4, 5, 8, 9, 17, 22, 49
+  } -MaxEvents 20 |
+    Select-Object TimeCreated, Id,
+      @{ n = 'Sonuc'; e = { if ($_.Id -in 4, 5) { 'Başarılı' } else { 'Hata' } } },
+      @{ n = 'Mesaj'; e = { $_.Message.Split("`n")[0] } }
+dikkat: "Yalnızca yerleşik yedekleme aracını kapsar. Üçüncü taraf çözümler kendi günlüklerini yazar; \"başarılı\" görmek geri dönüş testinin yerini tutmaz."
+---
+
+Komutun ne yaptığını okumadan çalıştırmayın. Çıktıyı bir kez üretim dışı bir makinede görün, sonra sahada kullanın.

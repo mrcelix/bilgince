@@ -1,0 +1,11 @@
+---
+baslik: "Diski dolduran dizini bul"
+ozet: "Kökten başlayıp en büyük on dizini tek geçişte listeler."
+konu: "linux"
+etiketler: ["linux", "disk", "tanilama"]
+kod: |
+  du -xh --max-depth=3 / 2>/dev/null | sort -rh | head -10
+dikkat: "`-x` bayrağı dosya sistemi sınırında durur; ağ bağlarını taramaz. Kaldırılmış ama açık tutulan dosyalar burada görünmez, onlar için `lsof +L1`."
+---
+
+Komutun ne yaptığını okumadan çalıştırmayın. Çıktıyı bir kez üretim dışı bir makinede görün, sonra sahada kullanın.

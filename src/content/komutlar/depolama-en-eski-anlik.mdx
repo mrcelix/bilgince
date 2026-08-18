@@ -1,0 +1,15 @@
+---
+baslik: "Unutulmuş anlık görüntüler"
+ozet: "Otuz günden eski anlık görüntüleri boyutuyla listeler — sessiz maliyet kalemi."
+konu: "depolama"
+etiketler: ["depolama", "maliyet", "sanallastirma"]
+kod: |
+  Get-VM | Get-VMSnapshot |
+    Where-Object { $_.CreationTime -lt (Get-Date).AddDays(-30) } |
+    Select-Object VMName, Name, CreationTime,
+      @{ n = 'BoyutGB'; e = { [math]::Round((Get-Item $_.Path).Length / 1GB, 2) } } |
+    Sort-Object CreationTime
+dikkat: "Uzun yaşayan anlık görüntü zinciri birleştirme sırasında uzun kesinti üretir; iş saatleri dışında silin."
+---
+
+Komutun ne yaptığını okumadan çalıştırmayın. Çıktıyı bir kez üretim dışı bir makinede görün, sonra sahada kullanın.

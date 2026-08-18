@@ -1,0 +1,18 @@
+---
+baslik: "Son yedek ne zaman alındı?"
+ozet: "Her veritabanının son tam ve günlük yedeğini tek tabloda verir."
+konu: "veritabani"
+etiketler: ["sql-server", "yedekleme"]
+kod: |
+  SELECT d.name AS veritabani,
+         MAX(CASE WHEN b.type = 'D' THEN b.backup_finish_date END) AS son_tam,
+         MAX(CASE WHEN b.type = 'L' THEN b.backup_finish_date END) AS son_gunluk
+  FROM sys.databases d
+  LEFT JOIN msdb.dbo.backupset b ON b.database_name = d.name
+  WHERE d.database_id > 4
+  GROUP BY d.name
+  ORDER BY son_tam;
+dikkat: "msdb geçmişi budanmışsa boş görünür — yedek alınmadığı anlamına gelmez. Yedek dosyalarını da doğrulayın."
+---
+
+Komutun ne yaptığını okumadan çalıştırmayın. Çıktıyı bir kez üretim dışı bir makinede görün, sonra sahada kullanın.

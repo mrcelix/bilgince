@@ -1,0 +1,16 @@
+---
+baslik: "Parolası hiç değişmeyen hesaplar"
+ozet: "Bir yıldan uzun süredir aynı parolayı taşıyan etkin hesapları listeler."
+konu: "guvenlik"
+etiketler: ["active-directory", "guvenlik", "parola"]
+kod: |
+  Search-ADAccount -AccountInactive -UsersOnly -TimeSpan 0 |
+    Out-Null  # önbelleği tazeler
+  Get-ADUser -Filter { Enabled -eq $true } -Properties PasswordLastSet |
+    Where-Object { $_.PasswordLastSet -lt (Get-Date).AddDays(-365) } |
+    Select-Object Name, SamAccountName, PasswordLastSet |
+    Sort-Object PasswordLastSet
+dikkat: "Hizmet hesapları bilerek uzun ömürlü olabilir; silmeden önce sahibini bulun. PasswordNeverExpires ayrı bir tarama ister."
+---
+
+Komutun ne yaptığını okumadan çalıştırmayın. Çıktıyı bir kez üretim dışı bir makinede görün, sonra sahada kullanın.

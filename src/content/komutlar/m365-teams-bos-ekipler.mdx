@@ -1,0 +1,16 @@
+---
+baslik: "Aylardır kullanılmayan Teams ekipleri"
+ozet: "Son etkinliğe göre sıralar; yönetişim temizliğinin başlangıç noktası."
+konu: "m365"
+etiketler: ["m365", "teams", "yonetisim"]
+kod: |
+  Connect-MgGraph -Scopes Reports.Read.All
+  Get-MgReportTeamActivityDetail -Period D90 -OutFile teams-90.csv
+  Import-Csv teams-90.csv |
+    Where-Object { [int]$_.'Active Users' -eq 0 } |
+    Select-Object 'Team Name', 'Last Activity Date' |
+    Sort-Object 'Last Activity Date'
+dikkat: "Rapor verisi anonimleştirilmiş olabilir: Microsoft 365 yönetim merkezinde \"gizlilik\" ayarını kapatmadan ad sütunu boş gelir."
+---
+
+Komutun ne yaptığını okumadan çalıştırmayın. Çıktıyı bir kez üretim dışı bir makinede görün, sonra sahada kullanın.

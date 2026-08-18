@@ -1,0 +1,12 @@
+---
+baslik: "Son 1 saatin uyarı olayları"
+ozet: "Küme olaylarını yalnızca Warning türüyle ve zamana göre sıralı verir."
+konu: "kubernetes"
+etiketler: ["kubernetes", "olay-gunlugu"]
+kod: |
+  kubectl get events -A --field-selector type=Warning \
+    --sort-by='.lastTimestamp' | tail -30
+dikkat: "Olaylar varsayılan olarak 1 saat sonra silinir; sorun eskiyse günlük toplayıcıya bakın."
+---
+
+Komutun ne yaptığını okumadan çalıştırmayın. Çıktıyı bir kez üretim dışı bir makinede görün, sonra sahada kullanın.

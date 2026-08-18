@@ -1,0 +1,16 @@
+---
+baslik: "Yeniden başlatma bekleyen sunucular"
+ozet: "Güncellemesi bitmiş ama yeniden başlatılmadığı için yarım kalan makineleri bulur."
+konu: "windows-server"
+etiketler: ["windows-server", "guncelleme"]
+kod: |
+  $sunucular = Get-ADComputer -Filter { OperatingSystem -like '*Server*' } |
+    Select-Object -ExpandProperty Name
+  Invoke-Command -ComputerName $sunucular -ErrorAction SilentlyContinue -ScriptBlock {
+    $b = Test-Path 'HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\WindowsUpdate\Auto Update\RebootRequired'
+    if ($b) { $env:COMPUTERNAME }
+  }
+dikkat: "WinRM kapalı sunucular sessizce atlanır; listeyi AD sayısıyla karşılaştırıp farkı ayrıca inceleyin."
+---
+
+Komutun ne yaptığını okumadan çalıştırmayın. Çıktıyı bir kez üretim dışı bir makinede görün, sonra sahada kullanın.

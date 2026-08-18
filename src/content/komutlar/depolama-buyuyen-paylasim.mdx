@@ -1,0 +1,26 @@
+---
+baslik: "En hızlı büyüyen paylaşımlar"
+ozet: "İki ölçüm arasındaki farkı alarak büyüme hızını bulur."
+konu: "depolama"
+etiketler: ["depolama", "kapasite"]
+kod: |
+  $dosya = "$env:TEMP\paylasim-olcum.csv"
+  $simdi = Get-SmbShare | Where-Object Special -eq $false | ForEach-Object {
+    [pscustomobject]@{
+      Ad = $_.Name
+      GB = [math]::Round((Get-ChildItem $_.Path -Recurse -File -EA 0 |
+            Measure-Object Length -Sum).Sum / 1GB, 2)
+    }
+  }
+  if (Test-Path $dosya) {
+    $onceki = Import-Csv $dosya
+    $simdi | ForEach-Object {
+      $e = $onceki | Where-Object Ad -eq $_.Ad
+      if ($e) { "{0}: +{1} GB" -f $_.Ad, [math]::Round($_.GB - [double]$e.GB, 2) }
+    }
+  }
+  $simdi | Export-Csv $dosya -NoTypeInformation
+dikkat: "İlk çalıştırma yalnızca ölçüm alır, fark ikinci çalıştırmada çıkar."
+---
+
+Komutun ne yaptığını okumadan çalıştırmayın. Çıktıyı bir kez üretim dışı bir makinede görün, sonra sahada kullanın.

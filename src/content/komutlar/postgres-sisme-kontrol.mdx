@@ -1,0 +1,17 @@
+---
+baslik: "PostgreSQL tablo şişmesi"
+ozet: "Ölü satır oranı yüksek tabloları bulur; autovacuum yetişemiyorsa buradan anlaşılır."
+konu: "veritabani"
+etiketler: ["postgresql", "bakim"]
+kod: |
+  SELECT schemaname, relname, n_live_tup, n_dead_tup,
+         round(n_dead_tup * 100.0 / NULLIF(n_live_tup + n_dead_tup, 0), 1) AS olu_yuzde,
+         last_autovacuum
+  FROM pg_stat_user_tables
+  WHERE n_dead_tup > 1000
+  ORDER BY olu_yuzde DESC NULLS LAST
+  LIMIT 20;
+dikkat: "Sayaçlar istatistik toplayıcıdan gelir; `pg_stat_reset()` sonrası sıfırlanır."
+---
+
+Komutun ne yaptığını okumadan çalıştırmayın. Çıktıyı bir kez üretim dışı bir makinede görün, sonra sahada kullanın.

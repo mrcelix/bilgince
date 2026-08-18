@@ -1,0 +1,16 @@
+---
+baslik: "Uzun süren SQL Server sorguları"
+ozet: "Beş saniyeden uzun çalışan oturumları, beklediği kaynakla birlikte gösterir."
+konu: "veritabani"
+etiketler: ["sql-server", "performans"]
+kod: |
+  SELECT r.session_id, r.status, r.wait_type, r.total_elapsed_time / 1000 AS saniye,
+         DB_NAME(r.database_id) AS veritabani, t.text AS sorgu
+  FROM sys.dm_exec_requests r
+  CROSS APPLY sys.dm_exec_sql_text(r.sql_handle) t
+  WHERE r.session_id > 50 AND r.total_elapsed_time > 5000
+  ORDER BY r.total_elapsed_time DESC;
+dikkat: "VIEW SERVER STATE izni ister. Sorguyu öldürmeden önce beklediği kaynağı not edin."
+---
+
+Komutun ne yaptığını okumadan çalıştırmayın. Çıktıyı bir kez üretim dışı bir makinede görün, sonra sahada kullanın.

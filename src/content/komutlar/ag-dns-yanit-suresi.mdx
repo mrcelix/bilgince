@@ -1,0 +1,15 @@
+---
+baslik: "DNS sunucularının yanıt süresi"
+ozet: "Yapılandırılmış her çözümleyiciyi aynı sorguyla ölçer; yavaş olanı ortaya çıkarır."
+konu: "ag"
+etiketler: ["dns", "performans"]
+kod: |
+  Get-DnsClientServerAddress -AddressFamily IPv4 |
+    Select-Object -ExpandProperty ServerAddresses -Unique | ForEach-Object {
+      $s = Measure-Command { Resolve-DnsName microsoft.com -Server $_ -EA 0 }
+      [pscustomobject]@{ Sunucu = $_; MS = [int]$s.TotalMilliseconds }
+    } | Sort-Object MS
+dikkat: "Önbelleğe alınmış yanıt hızlı görünür; ölçümü farklı alan adlarıyla tekrarlayın."
+---
+
+Komutun ne yaptığını okumadan çalıştırmayın. Çıktıyı bir kez üretim dışı bir makinede görün, sonra sahada kullanın.
