@@ -1,0 +1,23 @@
+---
+baslik: "Neyi arşivleyebiliriz, neye hâlâ dokunuluyor?"
+ozet: "Arşiv kararı toplam boyutla değil erişim yaşıyla verilir. Son erişim tarihi kapalıysa ölçüm yanıltır."
+konu: "depolama"
+etiketler: ["depolama", "arsiv", "kapasite"]
+belirtiler:
+  - "Paylaşım büyüdü ama neyin gerekli olduğu bilinmiyor"
+  - "Kullanıcılar \"hepsi lazım\" diyor"
+  - "Arşiv projesi veri yok diye başlamıyor"
+  - "Yedek penceresi uzuyor"
+yayin: 2026-08-18
+sure: 5
+komut: |
+  Get-ChildItem D:\Paylasim -Recurse -File | Where-Object { $_.LastAccessTime -lt (Get-Date).AddYears(-3) } | Measure-Object Length -Sum
+dosya: "/araclar/depolama-dosya-yasi-analizi.ps1"
+dosyaAdi: "depolama-dosya-yasi-analizi.ps1"
+dosyaAciklama: "Paylaşımdaki dosyaları yaşa ve türe göre sınıflandırır."
+platform: "windows"
+ilgiliRehberler: []
+sira: 82
+---
+
+Betik hiçbir şeyi değiştirmez; yalnızca rapor üretir. Çıktıyı okuyup kararı siz verirsiniz.

@@ -1,0 +1,23 @@
+---
+baslik: "Linux sunucuda kimin neye erişimi var?"
+ozet: "sudo kayıtları, SSH anahtarları ve docker grubu birlikte okunmadan erişim envanteri çıkmaz."
+konu: "linux"
+etiketler: ["linux", "guvenlik", "yetki"]
+belirtiler:
+  - "Sunucuya kimlerin eriştiği bilinmiyor"
+  - "Ayrılan çalışanın SSH anahtarı hâlâ duruyor olabilir"
+  - "NOPASSWD kuralları ne zaman eklendi belli değil"
+  - "Denetimde erişim listesi isteniyor"
+yayin: 2026-08-18
+sure: 5
+komut: |
+  grep -rhE 'NOPASSWD' /etc/sudoers /etc/sudoers.d/ 2>/dev/null; getent group docker
+dosya: "/araclar/linux-erisim-denetimi.sh"
+dosyaAdi: "linux-erisim-denetimi.sh"
+dosyaAciklama: "Kabuk sahibi hesapları, sudo yetkilerini, SSH anahtarlarını ve yetkili grup üyeliklerini raporlar."
+platform: "linux"
+ilgiliRehberler: []
+sira: 95
+---
+
+Betik hiçbir şeyi değiştirmez; yalnızca rapor üretir. Çıktıyı okuyup kararı siz verirsiniz.

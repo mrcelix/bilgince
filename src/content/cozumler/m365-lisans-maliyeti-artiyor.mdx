@@ -1,0 +1,23 @@
+---
+baslik: "Microsoft 365 lisans maliyeti sürekli artıyor"
+ozet: "Ayrılan çalışanın hesabı kapatılır ama lisansı sökülmez. Fatura büyür, kimse fark etmez."
+konu: "m365"
+etiketler: ["m365", "lisans", "maliyet"]
+belirtiler:
+  - "Fatura her ay biraz daha yüksek geliyor"
+  - "Kaç kişinin gerçekten kullandığı bilinmiyor"
+  - "Devre dışı hesapların lisansı hâlâ duruyor"
+  - "Yeni kullanıcı için lisans satın alınıyor ama boşta lisans var"
+yayin: 2026-08-18
+sure: 5
+komut: |
+  Get-MgSubscribedSku | Select-Object SkuPartNumber, ConsumedUnits, @{n='Alinan';e={$_.PrepaidUnits.Enabled}}
+dosya: "/araclar/m365-lisans-envanteri.ps1"
+dosyaAdi: "m365-lisans-envanteri.ps1"
+dosyaAciklama: "Atanmış ama kullanılmayan Microsoft 365 lisanslarını bulur."
+platform: "genel"
+ilgiliRehberler: []
+sira: 70
+---
+
+Betik hiçbir şeyi değiştirmez; yalnızca rapor üretir. Çıktıyı okuyup kararı siz verirsiniz.

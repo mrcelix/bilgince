@@ -1,0 +1,23 @@
+---
+baslik: "Yedek alınıyor ama geri dönüş hiç denenmedi"
+ozet: "Yedeğin çalıştığı ancak geri dönülerek bilinir. Tatbikat kanıtı olmayan strateji varsayımdır."
+konu: "yedekleme"
+etiketler: ["yedekleme", "dogrulama", "sureklilik"]
+belirtiler:
+  - "Yedek raporları yeşil ama geri dönüş denenmedi"
+  - "RTO ve RPO tahmini, ölçülmüş değil"
+  - "Denetimde tatbikat kanıtı isteniyor"
+  - "Kimse geri dönüş adımlarını bilmiyor"
+yayin: 2026-08-18
+sure: 5
+komut: |
+  Get-WinEvent -FilterHashtable @{LogName='Microsoft-Windows-Backup'} -MaxEvents 10 | Select-Object TimeCreated, Id
+dosya: "/araclar/yedek-geri-donus-tatbikati.ps1"
+dosyaAdi: "yedek-geri-donus-tatbikati.ps1"
+dosyaAciklama: "Geri dönüş tatbikatı için kanıt toplar ve kontrol listesi üretir."
+platform: "windows"
+ilgiliRehberler: []
+sira: 85
+---
+
+Betik hiçbir şeyi değiştirmez; yalnızca rapor üretir. Çıktıyı okuyup kararı siz verirsiniz.

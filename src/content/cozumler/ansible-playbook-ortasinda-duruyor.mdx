@@ -1,0 +1,23 @@
+---
+baslik: "Playbook yarısında düşüyor"
+ozet: "Sebep genelde görev değil envanterdir: erişilemeyen makine, yanlış grup, eksik değişken."
+konu: "otomasyon"
+etiketler: ["ansible", "iac"]
+belirtiler:
+  - "Playbook bazı makinelerde UNREACHABLE veriyor"
+  - "Aynı görev bir makinede çalışıp diğerinde çalışmıyor"
+  - "Grup değişkeni beklenen değeri taşımıyor"
+  - "Çalıştırma yarım kalıyor, ortam tutarsız"
+yayin: 2026-08-18
+sure: 5
+komut: |
+  ansible all -i envanter.ini -m ping -o | grep -v SUCCESS
+dosya: "/araclar/otomasyon-ansible-envanter-dogrula.sh"
+dosyaAdi: "otomasyon-ansible-envanter-dogrula.sh"
+dosyaAciklama: "Ansible envanterini ve erişilebilirliği uygulamadan önce doğrular."
+platform: "linux"
+ilgiliRehberler: []
+sira: 79
+---
+
+Betik hiçbir şeyi değiştirmez; yalnızca rapor üretir. Çıktıyı okuyup kararı siz verirsiniz.

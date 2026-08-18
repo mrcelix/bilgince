@@ -1,0 +1,23 @@
+---
+baslik: "Kimde yerel yönetici hakkı var, kimse bilmiyor"
+ozet: "Bir kez verilen hak geri alınmaz. Envanter çıkarmadan temizlik yapmak da işi durdurur."
+konu: "guvenlik"
+etiketler: ["guvenlik", "active-directory", "yetki"]
+belirtiler:
+  - "Kullanıcılar kendi makinelerine program kurabiliyor"
+  - "Eski destek personeli hâlâ yönetici görünüyor"
+  - "Denetimde ayrıcalıklı hesap listesi isteniyor"
+  - "Fidye yazılımı riski değerlendirmesi yapılıyor"
+yayin: 2026-08-18
+sure: 5
+komut: |
+  Get-LocalGroupMember -Group 'Administrators' | Select-Object Name, PrincipalSource
+dosya: "/araclar/win-yerel-yonetici-denetimi.ps1"
+dosyaAdi: "win-yerel-yonetici-denetimi.ps1"
+dosyaAciklama: "Makinelerdeki yerel yönetici üyeliklerini envanterler."
+platform: "windows"
+ilgiliRehberler: []
+sira: 74
+---
+
+Betik hiçbir şeyi değiştirmez; yalnızca rapor üretir. Çıktıyı okuyup kararı siz verirsiniz.

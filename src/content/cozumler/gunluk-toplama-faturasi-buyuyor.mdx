@@ -1,0 +1,23 @@
+---
+baslik: "Günlük toplama maliyeti kontrolden çıktı"
+ozet: "Hacmi genelde tek bir gürültücü bileşen üretir. Kaynak bazında saymadan filtre yazmak körlemesine olur."
+konu: "gozlemlenebilirlik"
+etiketler: ["izleme", "maliyet", "gunluk"]
+belirtiler:
+  - "Günlük toplama faturası her ay artıyor"
+  - "Saklama süresi maliyet yüzünden kısaltıldı"
+  - "Aynı olay saniyede defalarca yazılıyor"
+  - "Disk günlük dosyalarıyla doluyor"
+yayin: 2026-08-18
+sure: 5
+komut: |
+  Get-WinEvent -ListLog * | Sort-Object FileSize -Descending | Select-Object -First 5 LogName, FileSize, RecordCount
+dosya: "/araclar/gozlem-gunluk-hacim-raporu.ps1"
+dosyaAdi: "gozlem-gunluk-hacim-raporu.ps1"
+dosyaAciklama: "Günlük hacmini kaynak bazında raporlar; maliyeti kimin ürettiğini gösterir."
+platform: "windows"
+ilgiliRehberler: []
+sira: 77
+---
+
+Betik hiçbir şeyi değiştirmez; yalnızca rapor üretir. Çıktıyı okuyup kararı siz verirsiniz.

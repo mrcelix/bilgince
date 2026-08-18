@@ -1,0 +1,23 @@
+---
+baslik: "Dosyalar dışarıya nasıl açılmış, kimse bilmiyor"
+ozet: "Bir kez oluşturulan \"herkese açık bağlantı\" süresiz yaşar. Envanter çıkarmadan kapatmak da riskli."
+konu: "m365"
+etiketler: ["m365", "sharepoint", "guvenlik"]
+belirtiler:
+  - "Dış paylaşım politikası hiç gözden geçirilmemiş"
+  - "Eski proje siteleri hâlâ paylaşıma açık"
+  - "Anonim bağlantıların süresi yok"
+  - "Denetimde paylaşım envanteri isteniyor"
+yayin: 2026-08-18
+sure: 5
+komut: |
+  Get-SPOTenant | Select-Object SharingCapability, RequireAnonymousLinksExpireInDays
+dosya: "/araclar/m365-paylasim-denetimi.ps1"
+dosyaAdi: "m365-paylasim-denetimi.ps1"
+dosyaAciklama: "SharePoint ve OneDrive dış paylaşımlarını raporlar."
+platform: "genel"
+ilgiliRehberler: []
+sira: 72
+---
+
+Betik hiçbir şeyi değiştirmez; yalnızca rapor üretir. Çıktıyı okuyup kararı siz verirsiniz.

@@ -1,0 +1,23 @@
+---
+baslik: "Sunucuya bağlanamıyorum, hangi katmanda kırılıyor?"
+ozet: "Ad çözümleme, yönlendirme, güvenlik duvarı, TLS, vekil — sırayla elenmeden tahmin yürütülür."
+konu: "ag"
+etiketler: ["ag", "tanilama", "tls"]
+belirtiler:
+  - "Bazı makinelerden bağlanılıyor bazılarından bağlanılmıyor"
+  - "Ping çalışıyor ama uygulama açılmıyor"
+  - "Sertifika hatası alınıyor"
+  - "VPN üzerinden farklı davranıyor"
+yayin: 2026-08-18
+sure: 5
+komut: |
+  Test-NetConnection portal.sirket.com -Port 443 | Select-Object TcpTestSucceeded, RemoteAddress
+dosya: "/araclar/ag-baglanti-tanilama.ps1"
+dosyaAdi: "ag-baglanti-tanilama.ps1"
+dosyaAciklama: "Bir hedefe giden yolu katman katman sınar."
+platform: "windows"
+ilgiliRehberler: []
+sira: 84
+---
+
+Betik hiçbir şeyi değiştirmez; yalnızca rapor üretir. Çıktıyı okuyup kararı siz verirsiniz.

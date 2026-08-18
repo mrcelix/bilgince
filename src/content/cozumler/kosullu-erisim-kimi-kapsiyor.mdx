@@ -1,0 +1,23 @@
+---
+baslik: "Koşullu erişim ilkeleri kimi kapsıyor, kimi kapsamıyor?"
+ozet: "En tehlikeli hesap, hiçbir ilkenin kapsamadığı hesaptır. İstisnalar zamanla birikir ve unutulur."
+konu: "guvenlik"
+etiketler: ["entra-id", "guvenlik", "kosullu-erisim"]
+belirtiler:
+  - "MFA zorunlu deniyor ama bazı hesaplar sorulmadan giriyor"
+  - "İstisna listesi ne zaman ve neden eklendiği bilinmiyor"
+  - "Rapor kipindeki ilkeler aylardır öyle"
+  - "Denetimde kapsam kanıtı isteniyor"
+yayin: 2026-08-18
+sure: 5
+komut: |
+  Get-MgIdentityConditionalAccessPolicy -All | Select-Object DisplayName, State
+dosya: "/araclar/entra-kosullu-erisim-envanteri.ps1"
+dosyaAdi: "entra-kosullu-erisim-envanteri.ps1"
+dosyaAciklama: "Koşullu erişim ilkelerini ve kapsam boşluklarını çıkarır."
+platform: "genel"
+ilgiliRehberler: []
+sira: 73
+---
+
+Betik hiçbir şeyi değiştirmez; yalnızca rapor üretir. Çıktıyı okuyup kararı siz verirsiniz.

@@ -1,0 +1,23 @@
+---
+baslik: "Sertifika tarayıcıda geçerli, uygulamada değil"
+ozet: "Tarayıcılar eksik ara sertifikayı kendileri tamamlar; sunucular ve mobil istemciler tamamlamaz."
+konu: "guvenlik"
+etiketler: ["sertifika", "tls", "tanilama"]
+belirtiler:
+  - "Tarayıcıda kilit görünüyor ama API çağrısı sertifika hatası veriyor"
+  - "Mobil uygulama bağlanmıyor"
+  - "curl \"unable to get local issuer certificate\" diyor"
+  - "Bazı istemcilerde çalışıyor bazılarında çalışmıyor"
+yayin: 2026-08-18
+sure: 5
+komut: |
+  openssl s_client -connect portal.sirket.com:443 -showcerts </dev/null 2>/dev/null | grep -E 's:|i:'
+dosya: "/araclar/sertifika-zinciri-denetimi.ps1"
+dosyaAdi: "sertifika-zinciri-denetimi.ps1"
+dosyaAciklama: "Bir adresin sertifika zincirini ve süresini uçtan uca denetler."
+platform: "genel"
+ilgiliRehberler: []
+sira: 75
+---
+
+Betik hiçbir şeyi değiştirmez; yalnızca rapor üretir. Çıktıyı okuyup kararı siz verirsiniz.

@@ -1,0 +1,23 @@
+---
+baslik: "Kaç sunucumuz var, hangileri destek dışı?"
+ozet: "Envanter olmadan yenileme bütçesi de risk değerlendirmesi de tahminden ibaret kalır."
+konu: "windows-server"
+etiketler: ["envanter", "windows-server", "planlama"]
+belirtiler:
+  - "Sunucu sayısı kimsenin elinde net değil"
+  - "Destek dışı işletim sistemi olduğu söyleniyor ama hangileri belli değil"
+  - "Yenileme bütçesi gerekçelendirilemiyor"
+  - "Denetimde varlık envanteri isteniyor"
+yayin: 2026-08-18
+sure: 5
+komut: |
+  Get-ADComputer -Filter { OperatingSystem -like '*Server*' } -Properties OperatingSystem | Group-Object OperatingSystem | Select-Object Count, Name
+dosya: "/araclar/envanter-sunucu-raporu.ps1"
+dosyaAdi: "envanter-sunucu-raporu.ps1"
+dosyaAciklama: "Sunucu envanterini donanım, rol ve yaşam döngüsüyle çıkarır."
+platform: "windows"
+ilgiliRehberler: []
+sira: 86
+---
+
+Betik hiçbir şeyi değiştirmez; yalnızca rapor üretir. Çıktıyı okuyup kararı siz verirsiniz.

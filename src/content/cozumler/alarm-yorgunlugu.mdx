@@ -1,0 +1,23 @@
+---
+baslik: "Alarmlar o kadar çok çalıyor ki kimse bakmıyor"
+ozet: "Alarm yorgunluğu ölçülebilir: en çok çalan üç kural genelde bildirimlerin yarısını üretir."
+konu: "gozlemlenebilirlik"
+etiketler: ["izleme", "alarm", "operasyon"]
+belirtiler:
+  - "Bildirim kanalı sürekli akıyor"
+  - "Gerçek olay uyarı yığınının içinde kayboldu"
+  - "Ekip alarmları sessize aldı"
+  - "Aynı alarm her gece aynı saatte çalıyor"
+yayin: 2026-08-18
+sure: 5
+komut: |
+  curl -s "$PROM/api/v1/query?query=sort_desc(count_over_time(ALERTS{alertstate=\"firing\"}[30d]))" | head
+dosya: "/araclar/gozlem-alarm-envanteri.ps1"
+dosyaAdi: "gozlem-alarm-envanteri.ps1"
+dosyaAciklama: "Alarm kurallarını gürültü ve kapsam açısından değerlendirir."
+platform: "genel"
+ilgiliRehberler: []
+sira: 76
+---
+
+Betik hiçbir şeyi değiştirmez; yalnızca rapor üretir. Çıktıyı okuyup kararı siz verirsiniz.

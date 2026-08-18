@@ -1,0 +1,23 @@
+---
+baslik: "Disk ne zaman dolacak, kimse bilmiyor"
+ozet: "Kapasite planı doluluk yüzdesiyle değil büyüme hızıyla yapılır. İki ölçüm yeter."
+konu: "depolama"
+etiketler: ["depolama", "kapasite", "planlama"]
+belirtiler:
+  - "Disk aniden doluyor, uyarı geç geliyor"
+  - "Kapasite talebi gerekçelendirilemiyor"
+  - "Büyüme hızı ölçülmüyor"
+  - "Her seferinde acil temizlik yapılıyor"
+yayin: 2026-08-18
+sure: 5
+komut: |
+  Get-Volume | Where-Object DriveLetter | Select-Object DriveLetter, @{n='DoluYuzde';e={[math]::Round((1-$_.SizeRemaining/$_.Size)*100,1)}}
+dosya: "/araclar/depolama-buyume-raporu.ps1"
+dosyaAdi: "depolama-buyume-raporu.ps1"
+dosyaAciklama: "Paylaşımların büyüme hızını ölçüp doluluk tarihini tahmin eder."
+platform: "windows"
+ilgiliRehberler: []
+sira: 80
+---
+
+Betik hiçbir şeyi değiştirmez; yalnızca rapor üretir. Çıktıyı okuyup kararı siz verirsiniz.

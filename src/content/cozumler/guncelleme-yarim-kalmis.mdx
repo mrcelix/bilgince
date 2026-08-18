@@ -1,0 +1,23 @@
+---
+baslik: "Yama yüklü görünüyor ama koruma devrede değil"
+ozet: "Yeniden başlatılmamış bir güncelleme yüklü sayılır, çalışmaz. Raporlar yeşil, sistem açık kalır."
+konu: "windows-server"
+etiketler: ["windows-server", "guncelleme", "guvenlik"]
+belirtiler:
+  - "Yama raporu yeşil ama zafiyet taraması hâlâ açık diyor"
+  - "Sunucular aylardır yeniden başlatılmamış"
+  - "Güncelleme geçmişi \"beklemede\" gösteriyor"
+  - "Aynı yama tekrar tekrar yükleniyor"
+yayin: 2026-08-18
+sure: 5
+komut: |
+  Test-Path 'HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\WindowsUpdate\Auto Update\RebootRequired'
+dosya: "/araclar/win-yeniden-baslatma-bekleyenler.ps1"
+dosyaAdi: "win-yeniden-baslatma-bekleyenler.ps1"
+dosyaAciklama: "Güncellemesi bitmiş ama yeniden başlatılmamış makineleri bulur."
+platform: "windows"
+ilgiliRehberler: []
+sira: 83
+---
+
+Betik hiçbir şeyi değiştirmez; yalnızca rapor üretir. Çıktıyı okuyup kararı siz verirsiniz.

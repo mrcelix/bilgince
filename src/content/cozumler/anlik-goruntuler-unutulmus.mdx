@@ -1,0 +1,23 @@
+---
+baslik: "Anlık görüntüler unutulmuş, disk doluyor"
+ozet: "Geçici alınan anlık görüntü kalıcı olur. Uzun zincir hem yer yiyor hem birleştirmede uzun kesinti üretiyor."
+konu: "depolama"
+etiketler: ["sanallastirma", "depolama", "hyper-v"]
+belirtiler:
+  - "Sanallaştırma deposunda yer azalıyor"
+  - "Sanal makine beklenenden yavaş"
+  - "Bakım penceresinde alınan anlık görüntü hâlâ duruyor"
+  - "Anlık görüntü silinince uzun bir birleştirme başlıyor"
+yayin: 2026-08-18
+sure: 5
+komut: |
+  Get-VM | Get-VMSnapshot | Where-Object { $_.CreationTime -lt (Get-Date).AddDays(-7) } | Select-Object VMName, Name, CreationTime
+dosya: "/araclar/depolama-anlik-goruntu-denetimi.ps1"
+dosyaAdi: "depolama-anlik-goruntu-denetimi.ps1"
+dosyaAciklama: "Unutulmuş sanal makine anlık görüntülerini bulur."
+platform: "windows"
+ilgiliRehberler: []
+sira: 81
+---
+
+Betik hiçbir şeyi değiştirmez; yalnızca rapor üretir. Çıktıyı okuyup kararı siz verirsiniz.

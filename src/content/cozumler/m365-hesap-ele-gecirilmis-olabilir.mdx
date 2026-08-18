@@ -1,0 +1,23 @@
+---
+baslik: "Hesap ele geçirilmiş olabilir, nereye bakılır?"
+ozet: "Saldırgan parolayı değiştirmez; sessiz bir yönlendirme kuralı bırakır. İlk bakılacak yer orası."
+konu: "guvenlik"
+etiketler: ["m365", "guvenlik", "exchange"]
+belirtiler:
+  - "Kullanıcı gönderdiğini hatırlamadığı postalar olduğunu söylüyor"
+  - "Muhasebeye sahte fatura yönlendirme girişimi"
+  - "Gelen kutusunda beklenen posta görünmüyor"
+  - "Alışılmadık konumdan oturum açma uyarısı"
+yayin: 2026-08-18
+sure: 5
+komut: |
+  Get-InboxRule -Mailbox kullanici@sirket.com | Where-Object { $_.ForwardTo -or $_.RedirectTo -or $_.DeleteMessage }
+dosya: "/araclar/m365-posta-kural-denetimi.ps1"
+dosyaAdi: "m365-posta-kural-denetimi.ps1"
+dosyaAciklama: "Şüpheli posta yönlendirme ve gelen kutusu kurallarını tarar."
+platform: "genel"
+ilgiliRehberler: []
+sira: 71
+---
+
+Betik hiçbir şeyi değiştirmez; yalnızca rapor üretir. Çıktıyı okuyup kararı siz verirsiniz.

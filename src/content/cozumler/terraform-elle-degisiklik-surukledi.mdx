@@ -1,0 +1,23 @@
+---
+baslik: "Altyapı kodla uyuşmuyor: elle değişiklik yapılmış"
+ozet: "Sürükleme sessizdir. Bir sonraki apply ya değişikliği geri alır ya da beklenmedik bir yıkım üretir."
+konu: "otomasyon"
+etiketler: ["terraform", "iac"]
+belirtiler:
+  - "Plan beklenmedik değişiklikler gösteriyor"
+  - "Konsoldan yapılan ayar bir süre sonra kaybolmuş"
+  - "apply çalıştırmaya kimse cesaret edemiyor"
+  - "Durum dosyası ile gerçek ortam farklı"
+yayin: 2026-08-18
+sure: 5
+komut: |
+  terraform plan -refresh-only -detailed-exitcode -no-color | grep -E '^\s+[~+-]' | head -20
+dosya: "/araclar/otomasyon-terraform-surukleme.sh"
+dosyaAdi: "otomasyon-terraform-surukleme.sh"
+dosyaAciklama: "Terraform durumunun koddan sapmasını raporlar."
+platform: "genel"
+ilgiliRehberler: []
+sira: 78
+---
+
+Betik hiçbir şeyi değiştirmez; yalnızca rapor üretir. Çıktıyı okuyup kararı siz verirsiniz.
