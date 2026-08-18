@@ -5,7 +5,8 @@
     "ozet": "Kriptografik rastgelelikle parola ve Türkçe geçiş cümlesi; entropi ve kırılma süresi yanında.",
     "ikon": "kalkan",
     "etiket": "yeni",
-    "cevrimici": false
+    "cevrimici": false,
+    "grup": "Kimlik & Sertifika"
   },
   {
     "slug": "sizinti-kontrol",
@@ -13,7 +14,8 @@
     "ozet": "Parolanız sızıntı veri tabanında geçiyor mu? Yalnızca özetin ilk 5 hanesi sorulur.",
     "ikon": "kalkan",
     "etiket": "yeni",
-    "cevrimici": true
+    "cevrimici": true,
+    "grup": "Kimlik & Sertifika"
   },
   {
     "slug": "wifi-qr",
@@ -21,7 +23,8 @@
     "ozet": "Misafir ağı için taranabilir QR ve yazdırılabilir kart; QR tarayıcıda üretilir.",
     "ikon": "kure",
     "etiket": "yeni",
-    "cevrimici": false
+    "cevrimici": false,
+    "grup": "Üretim & Paylaşım"
   },
   {
     "slug": "alt-ag-hesaplayici",
@@ -29,7 +32,8 @@
     "ozet": "CIDR'den ağ, yayın, aralık ve host sayısı; ağı eşit alt ağlara böler.",
     "ikon": "dugum",
     "etiket": "yeni",
-    "cevrimici": false
+    "cevrimici": false,
+    "grup": "Ağ & DNS"
   },
   {
     "slug": "eposta-guvenlik-kayitlari",
@@ -37,7 +41,8 @@
     "ozet": "E-posta sahteciliğine karşı üç kaydı üretir; SPF sorgu sınırını sayar, politika sırasını önerir.",
     "ikon": "kalkan",
     "etiket": "yeni",
-    "cevrimici": false
+    "cevrimici": false,
+    "grup": "Ağ & DNS"
   },
   {
     "slug": "robocopy-uretec",
@@ -45,7 +50,8 @@
     "ozet": "Senaryoya göre komutu kurar, her anahtarı açıklar ve /MIR'in neyi sildiğini söyler.",
     "ikon": "terminal",
     "etiket": "yeni",
-    "cevrimici": false
+    "cevrimici": false,
+    "grup": "Windows & Operasyon"
   },
   {
     "slug": "cron-cozumleyici",
@@ -53,7 +59,8 @@
     "ozet": "İfadeyi Türkçeye çevirir, sonraki çalışma zamanlarını listeler, Zamanlanmış Görev karşılığını verir.",
     "ikon": "pencere",
     "etiket": "yeni",
-    "cevrimici": false
+    "cevrimici": false,
+    "grup": "Metin, Kod & Zaman"
   },
   {
     "slug": "sertifika-okuyucu",
@@ -61,7 +68,8 @@
     "ozet": "PEM içeriğini okur: süre, kapsanan adlar, anahtar boyu, imza algoritması ve zayıflık uyarıları.",
     "ikon": "kalkan",
     "etiket": "yeni",
-    "cevrimici": false
+    "cevrimici": false,
+    "grup": "Kimlik & Sertifika"
   },
   {
     "slug": "base64-jwt",
@@ -69,7 +77,8 @@
     "ozet": "Base64, URL kodu ve JWT belirteçlerini çözer; süre ve imza alanlarını ayrı gösterir.",
     "ikon": "terminal",
     "etiket": "yeni",
-    "cevrimici": false
+    "cevrimici": false,
+    "grup": "Metin, Kod & Zaman"
   },
   {
     "slug": "raid-hesaplayici",
@@ -77,7 +86,8 @@
     "ozet": "Kullanılabilir kapasite, tolere edilen arıza, yazma cezası ve yeniden yapılandırma süresi.",
     "ikon": "kutu",
     "etiket": "yeni",
-    "cevrimici": false
+    "cevrimici": false,
+    "grup": "Kapasite & Süre"
   },
   {
     "slug": "aktarim-suresi",
@@ -85,7 +95,8 @@
     "ozet": "Veri ve hat hızından gerçekçi süre; yedekleme penceresine sığıyor mu, sığmıyorsa hangi hat gerekir.",
     "ikon": "akis",
     "etiket": "yeni",
-    "cevrimici": false
+    "cevrimici": false,
+    "grup": "Kapasite & Süre"
   },
   {
     "slug": "zaman-cevirici",
@@ -93,7 +104,8 @@
     "ozet": "Unix, ISO 8601 ve yerel saat arasında çevirir; iki zaman arasındaki farkı hesaplar.",
     "ikon": "pencere",
     "etiket": "yeni",
-    "cevrimici": false
+    "cevrimici": false,
+    "grup": "Metin, Kod & Zaman"
   },
   {
     "slug": "hash-hesaplayici",
@@ -101,7 +113,8 @@
     "ozet": "Dosya ve metnin SHA-256/384/512 özeti; yayıncının verdiği özetle karşılaştırır.",
     "ikon": "kalkan",
     "etiket": "yeni",
-    "cevrimici": false
+    "cevrimici": false,
+    "grup": "Kimlik & Sertifika"
   },
   {
     "slug": "sla-hesaplayici",
@@ -109,7 +122,8 @@
     "ozet": "Yüzdeyi dakikaya çevirir; bileşen zinciri, MTBF/MTTR ve aylık kesinti bütçesi.",
     "ikon": "akis",
     "etiket": "yeni",
-    "cevrimici": false
+    "cevrimici": false,
+    "grup": "Kapasite & Süre"
   },
   {
     "slug": "windows-surum",
@@ -117,7 +131,8 @@
     "ozet": "Derleme numarasından sürüm adı ve destek bitiş tarihi; istemci ve sunucu bir arada.",
     "ikon": "pencere",
     "etiket": "yeni",
-    "cevrimici": false
+    "cevrimici": false,
+    "grup": "Windows & Operasyon"
   },
   {
     "slug": "olay-kimligi",
@@ -125,7 +140,8 @@
     "ozet": "4740, 7045, 6008 ne demek: en sık görülen Windows olayları ve sonraki adım.",
     "ikon": "sunucu",
     "etiket": "yeni",
-    "cevrimici": false
+    "cevrimici": false,
+    "grup": "Windows & Operasyon"
   },
   {
     "slug": "guvenlik-duvari-kurali",
@@ -133,7 +149,8 @@
     "ozet": "PowerShell ve netsh kuralını kurar, geri alma satırını verir, geniş kalan seçimlerde uyarır.",
     "ikon": "kalkan",
     "etiket": "yeni",
-    "cevrimici": false
+    "cevrimici": false,
+    "grup": "Ağ & DNS"
   },
   {
     "slug": "ad-standardi",
@@ -141,7 +158,8 @@
     "ozet": "Makine adı şeması kurar; NetBIOS 15 karakter sınırını ve geçersiz karakterleri denetler.",
     "ikon": "dugum",
     "etiket": "yeni",
-    "cevrimici": false
+    "cevrimici": false,
+    "grup": "Windows & Operasyon"
   },
   {
     "slug": "ip-plani",
@@ -149,7 +167,8 @@
     "ozet": "Ana ağı ihtiyaca göre alt ağlara böler (VLSM); ağ geçidi ve DHCP kapsamı önerir.",
     "ikon": "dugum",
     "etiket": "yeni",
-    "cevrimici": false
+    "cevrimici": false,
+    "grup": "Ağ & DNS"
   },
   {
     "slug": "csr-uretec",
@@ -157,7 +176,8 @@
     "ozet": "openssl komutu, yapılandırma dosyası ve Windows certreq INF içeriği; SAN denetimiyle.",
     "ikon": "kalkan",
     "etiket": "yeni",
-    "cevrimici": false
+    "cevrimici": false,
+    "grup": "Kimlik & Sertifika"
   },
   {
     "slug": "metin-farki",
@@ -165,7 +185,8 @@
     "ozet": "İki çıktıyı satır satır karşılaştırır: ne eklendi, ne silindi, ne değişmedi.",
     "ikon": "akis",
     "etiket": "yeni",
-    "cevrimici": false
+    "cevrimici": false,
+    "grup": "Metin, Kod & Zaman"
   },
   {
     "slug": "yedek-kapasite",
@@ -173,7 +194,8 @@
     "ozet": "Saklama politikasından gereken depolama; günlük, haftalık, aylık ve yıllık kopyaların payı.",
     "ikon": "kutu",
     "etiket": "yeni",
-    "cevrimici": false
+    "cevrimici": false,
+    "grup": "Kapasite & Süre"
   },
   {
     "slug": "guvenlik-basliklari",
@@ -181,7 +203,8 @@
     "ozet": "HSTS, CSP, nosniff ve diğerlerini puanlar; sürüm sızdıran başlıkları işaretler.",
     "ikon": "kalkan",
     "etiket": "yeni",
-    "cevrimici": true
+    "cevrimici": true,
+    "grup": "Kimlik & Sertifika"
   },
   {
     "slug": "dns-sorgula",
@@ -189,7 +212,8 @@
     "ozet": "A, MX, TXT, NS, SOA, CAA kayıtlarını DNS-over-HTTPS ile sorgular; eksikleri söyler.",
     "ikon": "kure",
     "etiket": "yeni",
-    "cevrimici": true
+    "cevrimici": true,
+    "grup": "Ağ & DNS"
   },
   {
     "slug": "paylasim-karti",
@@ -197,6 +221,7 @@
     "ozet": "Bir adresin temasını okuyup sosyal medya görselleri üretir; 14 stil, dört boyut.",
     "ikon": "kutu",
     "etiket": "",
-    "cevrimici": true
+    "cevrimici": true,
+    "grup": "Üretim & Paylaşım"
   }
 ]

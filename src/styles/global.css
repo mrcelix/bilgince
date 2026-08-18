@@ -3739,3 +3739,177 @@ pre code {
     margin-top: 8px;
   }
 }
+
+/* ------------------------------------------------------- geniş mega menü
+   Eski panel sabit üç sütundu ve araç listesini beşe kırpıyordu. İçerik
+   büyüdükçe (23 konu, 25+ araç, 25+ betik) bu tutmuyor: panel artık hepsini
+   gösteriyor, üstünde bir süzgeç var ve kendi içinde kayıyor. */
+.mega-genis .mega-ust {
+  border-bottom: 1px solid var(--line);
+  background: var(--bg);
+}
+.mega-genis .mega-ust .kap {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding-top: 12px;
+  padding-bottom: 12px;
+  flex-wrap: wrap;
+}
+.mega-ara {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  flex: 1 1 300px;
+  min-width: 0;
+  border: 1px solid var(--line);
+  border-radius: var(--r-s);
+  background: var(--paper);
+  padding: 0 12px;
+  color: var(--muted);
+}
+.mega-ara:focus-within {
+  border-color: var(--indigo-metin);
+}
+.mega-ara input {
+  flex: 1;
+  min-width: 0;
+  border: 0;
+  background: none;
+  font: inherit;
+  font-size: 14px;
+  color: var(--ink);
+  padding: 9px 0;
+}
+.mega-ara input:focus {
+  outline: none;
+}
+.mega-sayac {
+  font-family: var(--mono);
+  font-size: 11.5px;
+  color: var(--muted);
+  white-space: nowrap;
+}
+.mega-genis .mega-ust .mega-tum {
+  margin-left: auto;
+}
+
+.mega-govde {
+  /* Panel ekranı aşmasın: kendi içinde kayar, sayfa kaymaz */
+  max-height: min(64vh, 620px);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding-bottom: 18px;
+}
+.mega-izgara {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(min(240px, 100%), 1fr));
+  gap: 4px 26px;
+  padding-top: 16px;
+  align-items: start;
+}
+.mega-obek {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  padding-bottom: 14px;
+}
+.mega-obek-genis {
+  grid-column: span 2;
+}
+.mega-etiket.ikincil {
+  color: var(--muted);
+}
+
+/* Tek satırlık, yoğun kayıt — iki satırlık eski biçim 25 öğede çok uzuyordu */
+.mega-sik {
+  display: flex;
+  align-items: center;
+  gap: 11px;
+  padding: 7px 9px;
+  border-radius: var(--r-s);
+  margin-left: -9px;
+}
+.mega-sik:hover {
+  background: var(--tint);
+}
+.mega-sik .ikon {
+  width: 28px;
+  height: 28px;
+  border-radius: 8px;
+  background: var(--tint);
+  color: var(--indigo-metin);
+  display: grid;
+  place-items: center;
+  flex: none;
+}
+.mega-sik:hover .ikon {
+  background: var(--indigo);
+  color: #fff;
+}
+.mega-sik .govde {
+  min-width: 0;
+}
+.mega-sik .ad {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  font-size: 13.5px;
+  font-weight: 700;
+  line-height: 1.3;
+}
+.mega-sik .ad.kod {
+  font-family: var(--mono);
+  font-size: 12.5px;
+}
+.mega-sik .ac {
+  display: block;
+  font-size: 12px;
+  color: var(--muted);
+  line-height: 1.4;
+  /* Uzun özet satırı taşırmasın */
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.mega-sik.dar {
+  padding-top: 5px;
+  padding-bottom: 5px;
+}
+
+.mega-alt-baslik {
+  border-top: 1px solid var(--line);
+  margin-top: 6px;
+}
+.mega-alt-baslik .kap {
+  display: flex;
+  align-items: baseline;
+  gap: 12px;
+  flex-wrap: wrap;
+  padding-top: 14px;
+}
+.mega-one-serit {
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
+  padding-top: 16px;
+}
+.mega-seriler {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(min(220px, 100%), 1fr));
+  gap: 10px;
+}
+.mega-bos {
+  padding: 24px 28px;
+  font-size: 13.5px;
+  color: var(--muted);
+  text-align: center;
+  margin: 0;
+}
+
+@media (max-width: 900px) {
+  /* Mega menü zaten yalnızca masaüstünde açılıyor; yine de güvenli olsun */
+  .mega-govde {
+    max-height: 70vh;
+  }
+}
