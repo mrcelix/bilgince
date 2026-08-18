@@ -54,8 +54,8 @@ Pagefind'e hem süzgeç hem meta olarak yazılır. Arşiv, konu, etiket ve sayfa
 | `/ozgecmis/yazdir` | `src/pages/ozgecmis/yazdir.astro` | Yazdırma düzeni — tarayıcıdan "PDF olarak kaydet" |
 | `/portfolyo` | `src/pages/portfolyo/index.astro` | Proje listesi |
 | `/portfolyo/<slug>` | `src/pages/portfolyo/[...slug].astro` | Sorun → Yaklaşım → Sonuç, aşamalar, metrikler |
-| `/hakkimda` | `src/pages/hakkimda.astro` | Anlatı, SSS, iletişim kanalları |
-| `/ozgecmis` | `src/pages/ozgecmis.astro` | Zaman çizelgesi, yetenekler, sertifikalar, CV indirme |
+| `/hakkimda` | `src/pages/hakkimda.astro` | Anlatı, SSS, iletişim kanalları — metinler `sayfalar` koleksiyonundan |
+| `/ozgecmis` | `src/pages/ozgecmis.astro` | Zaman çizelgesi, yetenekler, sertifikalar, CV indirme — metinler `sayfalar` koleksiyonundan |
 | `/ara` | `src/pages/ara.astro` | Pagefind arayüzü |
 | `/404` | `src/pages/404.astro` | Öneri bağlantılı hata sayfası |
 | `/rss.xml` | `src/pages/rss.xml.ts` | RSS akışı: rehber, hızlı çözüm ve ipuçları |
@@ -72,11 +72,11 @@ depodaki bir dosyaya yazılır.
 | Ekran | Ne yönetir |
 | --- | --- |
 | `/admin` | Gösterge: sayaçlar, kurulum durumu, yayındaki derleme, hızlı işler |
-| `/admin/icerik/<koleksiyon>` | Rehber, ipucu, komut, çözüm, proje listesi — arama, konu süzgeci, taslak süzgeci |
+| `/admin/icerik/<koleksiyon>` | Rehber, ipucu, komut, çözüm, proje, sayfa metni listesi — arama, konu süzgeci, taslak süzgeci |
 | `/admin/duzenle` | Tek kayıt: hızlı alanlar + ham frontmatter + gövde |
 | `/admin/betikler` | `public/araclar/` altındaki indirilebilir betikler; hangi çözümün bağlı olduğunu gösterir |
 | `/admin/yorumlar` | Yorum onayı, reddi, yanıtı, silinmesi |
-| `/admin/veri` | `ayarlar.json`, `menu.json`, `araclar.json`, `sayfalar.json`, `ozgecmis.json`, `konu/*.json` + yeni konu |
+| `/admin/veri` | `ayarlar.json`, `menu.json`, `araclar.json`, `ozgecmis.json`, `konu/*.json` + yeni konu |
 
 **Panelin kapsamı.** Sitedeki her içerik türü panelden yönetilir:
 
@@ -85,13 +85,18 @@ depodaki bir dosyaya yazılır.
 | Rehber, ipucu, komut, hızlı çözüm, proje | `/admin/icerik/<koleksiyon>` — koleksiyon şemasındaki **tüm** alanlar hızlı alan olarak var |
 | İndirilebilir betikler | `/admin/betikler` |
 | Menü grupları, konular, araç kütüğü, site ayarları | `/admin/veri` |
-| Ana sayfa giriş yazısı (rozet, başlık, giriş, düğmeler) | `/admin/veri` → `sayfalar.json` |
+| Ana sayfa, hakkımda ve özgeçmiş metinleri | `/admin/icerik/sayfalar` — kısa yazılar hızlı alanda, anlatı gövde editöründe |
 | Özgeçmiş, sertifikalar, SSS | `/admin/veri` → `ozgecmis.json` |
 | Yorumlar | `/admin/yorumlar` |
 
-Panelin **dışında** kalan tek şey: `/hakkimda`, `/ozgecmis` ve `/portfolyo` gibi statik
-sayfaların uzun anlatı metinleri. Bunlar `.astro` dosyalarında duruyor; JSON dizesine
-çevirmek düzenlemeyi kolaylaştırmaz, zorlaştırırdı.
+Statik sayfaların metinleri `sayfalar` koleksiyonunda (`src/content/sayfalar/*.mdx`).
+Düzen kodda kalıyor — zaman çizelgesi, kanal kartları, sertifika listesi veriden çiziliyor;
+koleksiyondan yalnızca **yazılar** değişiyor. Uzun anlatı gövdede (markdown), kısa başlık ve
+düğme yazıları ön bilgide. Üçlü kutu, düğme dizisi ve bölüm başlıkları gibi iç içe yapılar
+ham YAML alanından düzenlenir — projelerin `metrikler`/`asamalar` alanlarıyla aynı yöntem.
+
+Ana sayfanın giriş cümlesi gövdede değil `giris` ön bilgi alanında: içindeki `%rehberSayisi%`
+güncel sayıyla doldurulduğu için düz metin olması gerekiyor.
 
 Kolaylaştıran dokunuşlar: listelerde arama (`/` tuşu odaklar), konu ve taslak süzgeci;
 editörde <kbd>Ctrl</kbd>+<kbd>S</kbd> ile kaydetme, kaydedilmemiş değişiklik uyarısı,

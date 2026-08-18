@@ -1,13 +1,28 @@
 ---
 import Base from '../layouts/Base.astro';
+import { getCollection, render } from 'astro:content';
 import { SITE } from '../site.js';
 import { SSS } from '../cv.js';
+
+/* Sayfanın yazıları `sayfalar` koleksiyonunda: kısa başlık ve düğme yazıları
+   ön bilgide, anlatı gövdede. Panelde gövde editörüyle düzenleniyor. */
+const sayfa = (await getCollection('sayfalar')).find((s) => s.id === 'hakkimda')!;
+const m = sayfa.data;
+const { Content } = await render(sayfa);
+
+/* Üçlü kutunun ikonları: metin panelden değişebilsin diye ayrı duruyorlar.
+   Kartların sırasıyla eşleşir. */
+const UC_IKON = [
+  '<svg width="17" height="17" viewBox="0 0 18 18" fill="none"><rect x="2.5" y="2.5" width="13" height="13" rx="2.4" stroke="currentColor" stroke-width="1.5"></rect><path d="M5.5 8L7.5 10l-2 2M10 12h3" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"></path></svg>',
+  '<svg width="17" height="17" viewBox="0 0 18 18" fill="none"><path d="M9 2.5l1.9 4 4.4.6-3.2 3.1.8 4.3L9 12.5l-3.9 2 .8-4.3L2.7 7.1l4.4-.6L9 2.5z" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"></path></svg>',
+  '<svg width="17" height="17" viewBox="0 0 18 18" fill="none"><circle cx="9" cy="9" r="6.5" stroke="currentColor" stroke-width="1.5"></circle><path d="M9 5.5v4l2.5 1.6" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"></path></svg>',
+];
 ---
 
 <Base
   kategori="Sayfa"
   baslik="Hakkımda"
-  aciklama="Eskişehir'de bir bilgi işlem masasında başladım, bugün 400 kullanıcılı bir altyapıdan sorumluyum. Bu blog neden var, nasıl çalışıyorum ve nasıl ulaşırsınız."
+  aciklama={m.ozet}
   tur="profile"
   ogGorsel="/og/sayfa-hakkimda.png"
   jsonLd={[
@@ -51,72 +66,37 @@ import { SSS } from '../cv.js';
       </div>
 
       <div>
-        <span class="rozet"><i></i>2014'ten beri sahada</span>
-        <h1>Sunucu odasında öğrendiklerimi saklamıyorum.</h1>
-        <p class="giris">
-          Eskişehir'de bir bilgi işlem masasında başladım. İlk yıllarda her sorunun cevabını forumlarda
-          aradım; bulduklarımın yarısı çalışmıyordu, çalışanların da neden çalıştığı yazmıyordu.
-          <strong>Bu blog o boşluğu kapatmak için var.</strong>
-        </p>
-        <p class="giris">
-          Bugün 400 kullanıcılı bir lojistik şirketinin altyapısından sorumluyum. Yazdığım her rehber önce
-          üretim ortamında çalıştı, sonra buraya geldi — tersi olmadı.
-        </p>
+        <span class="rozet"><i></i>{m.rozet}</span>
+        <h1>{m.baslik}</h1>
+        <div class="anlati"><Content /></div>
         <div class="eylemler" style="display:flex;gap:12px;margin-top:26px;flex-wrap:wrap">
-          <a class="dg" href="/ozgecmis">Özgeçmişi gör</a>
-          <a class="dg dg-hayalet" href="#iletisim">Bana yazın</a>
+          {
+            m.dugmeler.map((d) => (
+              <a class={d.ikincil ? 'dg dg-hayalet' : 'dg'} href={d.adres}>
+                {d.yazi}
+              </a>
+            ))
+          }
         </div>
       </div>
     </section>
 
     <section class="uc-kutu">
-      <div>
-        <span class="ikon" aria-hidden="true">
-          <svg width="17" height="17" viewBox="0 0 18 18" fill="none"
-            ><rect x="2.5" y="2.5" width="13" height="13" rx="2.4" stroke="currentColor" stroke-width="1.5"
-            ></rect><path d="M5.5 8L7.5 10l-2 2M10 12h3" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"
-            ></path></svg
-          >
-        </span>
-        <h3>Şu an ne yapıyorum</h3>
-        <p>
-          Entra ID geçişinin son bölümlerini yazıyorum ve komut kütüphanesini 200 girdiye çıkarmaya
-          çalışıyorum.
-        </p>
-      </div>
-      <div>
-        <span class="ikon" aria-hidden="true">
-          <svg width="17" height="17" viewBox="0 0 18 18" fill="none"
-            ><path
-              d="M9 2.5l1.9 4 4.4.6-3.2 3.1.8 4.3L9 12.5l-3.9 2 .8-4.3L2.7 7.1l4.4-.6L9 2.5z"
-              stroke="currentColor"
-              stroke-width="1.5"
-              stroke-linejoin="round"></path></svg
-          >
-        </span>
-        <h3>Neyi iyi yaparım</h3>
-        <p>
-          Dağınık bir altyapıyı envanterleyip belgelemek, tekrar eden işleri script'e çevirmek ve göçleri
-          kesintisiz planlamak.
-        </p>
-      </div>
-      <div>
-        <span class="ikon" aria-hidden="true">
-          <svg width="17" height="17" viewBox="0 0 18 18" fill="none"
-            ><circle cx="9" cy="9" r="6.5" stroke="currentColor" stroke-width="1.5"></circle><path
-              d="M9 5.5v4l2.5 1.6"
-              stroke="currentColor"
-              stroke-width="1.6"
-              stroke-linecap="round"></path></svg
-          >
-        </span>
-        <h3>Neye vakit ayırmam</h3>
-        <p>Ürün karşılaştırması ve "en iyi 10" listeleri. Kullanmadığım bir ürün hakkında yazmıyorum.</p>
-      </div>
+      {
+        /* İkonlar sabit; başlık ve metin ön bilgiden geliyor. Sıra kartların
+           sırasıyla eşleşiyor. */
+        m.kartlar.map((k, i) => (
+          <div>
+            <span class="ikon" aria-hidden="true" set:html={UC_IKON[i] ?? UC_IKON[0]} />
+            <h3>{k.baslik}</h3>
+            <p>{k.metin}</p>
+          </div>
+        ))
+      }
     </section>
 
     <section class="bolum">
-      <div class="bolum-bas"><div><h2>Sık sorulanlar</h2></div></div>
+      <div class="bolum-bas"><div><h2>{m.bolumBasliklari.sss}</h2></div></div>
       <div class="sss">
         {
           SSS.map((s) => (
@@ -132,8 +112,8 @@ import { SSS } from '../cv.js';
     <section class="bolum" id="iletisim">
       <div class="bolum-bas">
         <div>
-          <h2>Nasıl ulaşırsınız</h2>
-          <p>En hızlısı e-posta. Genelde iki iş günü içinde dönüyorum.</p>
+          <h2>{m.bolumBasliklari.iletisim}</h2>
+          <p>{m.bolumBasliklari.iletisimAciklama}</p>
         </div>
       </div>
       <div class="kanallar">
@@ -147,7 +127,7 @@ import { SSS } from '../cv.js';
           </span>
           <span>
             <span class="ad">E-posta</span>
-            <span class="ac">{SITE.author.email} · iki iş günü içinde yanıt</span>
+            <span class="ac">{SITE.author.email} · {m.kanalAciklamalari.eposta}</span>
           </span>
         </a>
         <a class="kanal" href={SITE.author.linkedin} rel="me noopener">
@@ -163,7 +143,7 @@ import { SSS } from '../cv.js';
           </span>
           <span>
             <span class="ad">LinkedIn</span>
-            <span class="ac">İş teklifleri ve danışmanlık için</span>
+            <span class="ac">{m.kanalAciklamalari.linkedin}</span>
           </span>
         </a>
         <a class="kanal" href={SITE.author.github} rel="me noopener">
@@ -175,7 +155,7 @@ import { SSS } from '../cv.js';
           </span>
           <span>
             <span class="ad">GitHub</span>
-            <span class="ac">Komut kütüphanesi ve script şablonları</span>
+            <span class="ac">{m.kanalAciklamalari.github}</span>
           </span>
         </a>
       </div>

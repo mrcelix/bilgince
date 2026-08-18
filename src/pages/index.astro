@@ -3,7 +3,7 @@ import Base from '../layouts/Base.astro';
 import Bulten from '../components/Bulten.astro';
 import KonuIkon from '../components/KonuIkon.astro';
 import { getCollection } from 'astro:content';
-import { SITE, KONULAR, SAYFALAR, vurguyaAyir, slugla, trKisaTarih, trTarih, sayi } from '../site.js';
+import { SITE, KONULAR, vurguyaAyir, slugla, trKisaTarih, trTarih, sayi } from '../site.js';
 
 const hepsi = (await getCollection('rehberler'))
   .filter((r) => !r.data.taslak)
@@ -31,11 +31,11 @@ const seriler = [...new Set(hepsi.map((r) => r.data.seri).filter(Boolean))].map(
   };
 });
 
-/* Giriş bloğunun yazıları panelden düzenleniyor (src/data/sayfalar.json).
-   {rehberSayisi} yer tutucusu burada sayıyla doldurulur; metni yazan kişinin
-   sayıyı elle güncellemesi gerekmesin. */
-const giris = SAYFALAR.anaSayfa;
-const girisMetni = giris.giris.replace('{rehberSayisi}', String(hepsi.length));
+/* Giriş bloğunun yazıları `sayfalar` koleksiyonundan geliyor; panelde gövde
+   editörüyle düzenleniyor. %rehberSayisi% yer tutucusu burada sayıyla
+   doldurulur — metni yazan kişi sayıyı elle güncellemesin. */
+const giris = (await getCollection('sayfalar')).find((s) => s.id === 'ana-sayfa')!.data;
+const girisMetni = (giris.giris ?? '').replace('%rehberSayisi%', String(hepsi.length));
 
 const renk = ['#3A45E0', '#EFA013', '#15A24A'];
 const enSonGuncelleme = hepsi
@@ -72,8 +72,13 @@ const enSonGuncelleme = hepsi
         </h1>
         <p class="giris">{girisMetni}</p>
         <div class="eylemler">
-          <a class="dg" href={giris.birinciDugme.adres}>{giris.birinciDugme.yazi}</a>
-          <a class="dg dg-hayalet" href={giris.ikinciDugme.adres}>{giris.ikinciDugme.yazi}</a>
+          {
+            giris.dugmeler.map((d) => (
+              <a class={d.ikincil ? 'dg dg-hayalet' : 'dg'} href={d.adres}>
+                {d.yazi}
+              </a>
+            ))
+          }
         </div>
         <p class="not">
           <i></i>Son güncelleme: {trTarih(enSonGuncelleme)}

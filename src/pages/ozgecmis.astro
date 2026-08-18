@@ -1,13 +1,19 @@
 ---
 import Base from '../layouts/Base.astro';
+import { getCollection, render } from 'astro:content';
 import { SITE } from '../site.js';
 import { DENEYIM, SERTIFIKALAR } from '../cv.js';
+
+/* Sayfanın yazıları `sayfalar` koleksiyonunda; panelde düzenleniyor. */
+const sayfa = (await getCollection('sayfalar')).find((s) => s.id === 'ozgecmis')!;
+const m = sayfa.data;
+const { Content } = await render(sayfa);
 ---
 
 <Base
   kategori="Sayfa"
   baslik="Özgeçmiş"
-  aciklama={`${SITE.author.name} — ${SITE.author.jobTitle}. 12 yıllık saha deneyimi, sertifikalar ve indirilebilir CV.`}
+  aciklama={m.ozet}
   tur="profile"
   ogGorsel="/og/sayfa-ozgecmis.png"
   jsonLd={{
@@ -43,12 +49,9 @@ import { DENEYIM, SERTIFIKALAR } from '../cv.js';
         <a href="/">Ana sayfa</a><span class="ayrac">/</span><span aria-current="page">Özgeçmiş</span>
       </nav>
       <div class="konu-bas" style="padding-top:8px">
-        <span class="etiket">Özgeçmiş</span>
-        <h1>12 yıllık saha deneyiminin özeti</h1>
-        <p class="ozet">
-          Aşağıdaki özet güncel tutuluyor. Yazdırılabilir sürümü tek tıkla PDF olarak kaydedebilir ya da
-          LinkedIn profiline bakabilirsiniz.
-        </p>
+        <span class="etiket">{m.rozet}</span>
+        <h1>{m.baslik}</h1>
+        <div class="ozet anlati"><Content /></div>
       </div>
     </div>
   </div>
@@ -56,7 +59,7 @@ import { DENEYIM, SERTIFIKALAR } from '../cv.js';
   <div class="kap">
     <div class="cv-duzen" style="padding-top:30px">
       <div class="cv-ana">
-        <span class="yan-etiket">Deneyim</span>
+        <span class="yan-etiket">{m.bolumBasliklari.deneyim}</span>
         <ol class="zaman-cizelgesi">
           {
             DENEYIM.map((d, i) => (
@@ -97,7 +100,7 @@ import { DENEYIM, SERTIFIKALAR } from '../cv.js';
           <span class="yetenekler">
             {SITE.author.knowsAbout.map((y) => <span>{y}</span>)}
           </span>
-          <a class="dg" href="/ozgecmis/yazdir">
+          <a class="dg" href={m.dugmeler[0]?.adres ?? '/ozgecmis/yazdir'}>
             <svg width="15" height="15" viewBox="0 0 16 16" fill="none" aria-hidden="true"
               ><path
                 d="M8 2v8m0 0L5 7m3 3l3-3M3 13h10"
@@ -106,13 +109,19 @@ import { DENEYIM, SERTIFIKALAR } from '../cv.js';
                 stroke-linecap="round"
                 stroke-linejoin="round"></path></svg
             >
-            CV'yi PDF olarak kaydet
+            {m.dugmeler[0]?.yazi}
           </a>
-          <a class="dg dg-hayalet" href="/hakkimda#iletisim">Benimle iletişime geç</a>
+          {
+            m.dugmeler[1] && (
+              <a class="dg dg-hayalet" href={m.dugmeler[1].adres}>
+                {m.dugmeler[1].yazi}
+              </a>
+            )
+          }
         </div>
 
         <div class="sertifikalar">
-          <span class="yan-etiket">Sertifikalar</span>
+          <span class="yan-etiket">{m.bolumBasliklari.sertifikalar}</span>
           {
             SERTIFIKALAR.map((s) => (
               <span class="sertifika">
@@ -132,10 +141,10 @@ import { DENEYIM, SERTIFIKALAR } from '../cv.js';
 
     <section class="bant">
       <div>
-        <h2>Kısa bir projeye mi ihtiyacınız var?</h2>
-        <p>Kimlik göçü, yedekleme stratejisi ve altyapı envanteri. İlk görüşme 30 dakika ve ücretsiz.</p>
+        <h2>{m.bant?.baslik}</h2>
+        <p>{m.bant?.metin}</p>
       </div>
-      <a class="dg dg-kehribar" href="/hakkimda#iletisim">İletişime geç</a>
+      <a class="dg dg-kehribar" href={m.bant?.adres}>{m.bant?.dugme}</a>
     </section>
   </div>
 </Base>

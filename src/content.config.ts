@@ -99,4 +99,34 @@ const cozumler = defineCollection({
   }),
 });
 
-export const collections = { rehberler, ipuclari, projeler, komutlar, cozumler };
+/* Statik sayfaların metinleri. Düzen (zaman çizelgesi, kanal kartları, sertifika
+   listesi) kodda kalıyor; değişen yazılar burada. Uzun anlatı gövdede, kısa
+   başlık ve düğme yazıları ön bilgide — böylece panelde gövde editörüyle
+   düzenleniyorlar. */
+const sayfalar = defineCollection({
+  loader: glob({ pattern: '**/*.{md,mdx}', base: './src/content/sayfalar' }),
+  schema: z.object({
+    // <h1> ve meta açıklama
+    baslik: z.string(),
+    ozet: z.string(),
+    // başlığın üstündeki küçük etiket
+    rozet: z.string().optional(),
+    // Tek satırlık giriş cümlesi. Ana sayfada kullanılıyor: içindeki
+    // %rehberSayisi% güncel sayıyla doldurulduğu için gövdede olamıyor.
+    giris: z.string().optional(),
+    dugmeler: z
+      .array(z.object({ yazi: z.string(), adres: z.string(), ikincil: z.boolean().default(false) }))
+      .default([]),
+    // hakkımda sayfasındaki üçlü kutu
+    kartlar: z.array(z.object({ baslik: z.string(), metin: z.string() })).default([]),
+    bolumBasliklari: z.record(z.string()).default({}),
+    // iletişim kanallarının altındaki açıklamalar (anahtar: eposta, linkedin, github)
+    kanalAciklamalari: z.record(z.string()).default({}),
+    // sayfa sonundaki çağrı bandı
+    bant: z
+      .object({ baslik: z.string(), metin: z.string(), dugme: z.string(), adres: z.string() })
+      .optional(),
+  }),
+});
+
+export const collections = { rehberler, ipuclari, projeler, komutlar, cozumler, sayfalar };

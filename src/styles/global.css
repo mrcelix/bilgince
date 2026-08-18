@@ -2436,6 +2436,12 @@ pre code {
   line-height: 1.1;
   margin-top: 10px;
 }
+.konu-bas .anlati p {
+  font-size: 16px;
+  color: var(--muted);
+  line-height: 1.6;
+  max-width: 58ch;
+}
 .konu-bas .ozet {
   font-size: 16px;
   color: var(--muted);
@@ -2845,17 +2851,20 @@ pre code {
   max-width: 18ch;
   margin-top: 18px;
 }
-.tanitim-duzen .giris {
+/* Anlatı metni artık `sayfalar` koleksiyonunun gövdesinden geliyor: sarmalayıcı
+   bir div ve içinde markdown'un ürettiği <p>'ler. Stil paragraflara veriliyor,
+   sarmalayıcıya değil. */
+.tanitim-duzen .anlati p {
   font-size: 16.5px;
   color: var(--muted);
   line-height: 1.65;
   margin-top: 18px;
   max-width: 52ch;
 }
-.tanitim-duzen .giris + .giris {
+.tanitim-duzen .anlati p + p {
   margin-top: 14px;
 }
-.tanitim-duzen .giris strong {
+.tanitim-duzen .anlati strong {
   color: var(--ink);
   font-weight: 800;
 }

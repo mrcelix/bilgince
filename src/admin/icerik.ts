@@ -183,6 +183,23 @@ export const KOLEKSIYONLAR: Koleksiyon[] = [
       { anahtar: 'sira', etiket: 'Sıra', tur: 'sayi' },
     ],
   },
+  {
+    slug: 'sayfalar',
+    ad: 'Sayfa metinleri',
+    tekil: 'sayfa metni',
+    dizin: 'src/content/sayfalar',
+    uzanti: '.mdx',
+    adres: (id) => (id === 'ana-sayfa' ? '/' : `/${id}`),
+    aciklama:
+      'Ana sayfa, hakkımda ve özgeçmiş sayfalarının yazıları. Düzen kodda; buradan yalnızca metinler değişir. Uzun anlatı gövdede, kısa yazılar hızlı alanlarda. Üçlü kutu, düğmeler ve bölüm başlıkları iç içe yapıdadır — ham YAML alanından düzenlenir.',
+    govdeVar: true,
+    alanlar: [
+      { anahtar: 'baslik', etiket: 'Başlık (h1)', tur: 'metin', ipucu: 'Ana sayfada *yıldız arasına* alınan kısım renkli vurgulanır.' },
+      { anahtar: 'ozet', etiket: 'Meta açıklama', tur: 'uzunMetin', ipucu: 'Arama sonucunda görünen açıklama — 155 karakteri geçmesin.' },
+      { anahtar: 'rozet', etiket: 'Rozet', tur: 'metin', ipucu: 'Başlığın üstündeki küçük etiket' },
+      { anahtar: 'giris', etiket: 'Giriş cümlesi', tur: 'uzunMetin', ipucu: 'Yalnızca ana sayfada. %rehberSayisi% güncel rehber sayısıyla doldurulur.' },
+    ],
+  },
 ];
 
 export const koleksiyonBul = (slug: string) => KOLEKSIYONLAR.find((k) => k.slug === slug);
