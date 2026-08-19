@@ -1,0 +1,193 @@
+---
+baslik: "PostgreSQL'de şişme ve autovacuum: tablo neden büyüyor da küçülmüyor"
+ozet: "Sildiğiniz satırlar diskten hemen gitmez. Autovacuum yetişemediğinde tablo şişer, sorgular yavaşlar ve en kötü durumda veritabanı yazmayı durdurur."
+konu: "veritabani"
+etiketler: ["veritabani", "postgresql", "performans", "linux"]
+yayin: 2026-08-16
+sure: 12
+---
+
+Bir tablodan 20 milyon satır silindi. Sorgu başarıyla döndü. Ama tablo boyutu hiç değişmedi — hatta indeksleriyle birlikte biraz daha büyüdü.
+
+Bu, PostgreSQL'in çok sürümlü eşzamanlılık denetiminin (MVCC) doğrudan sonucudur ve bir hata değildir: `DELETE` satırı yerinde bırakır, yalnızca ölü olarak işaretler. `UPDATE` de aynı şeyi yapar — eski satırı ölü işaretleyip yenisini ekler. Alanı geri kazanan mekanizma `VACUUM`'dur.
+
+Autovacuum yetişemediğinde ise sorun boyutta kalmaz: sorgular ölü satırların arasından geçmek zorunda kaldığı için yavaşlar, planlayıcı yanlış tahminler yapar ve en uçta veritabanı yazma kabul etmeyi bırakır.
+
+## Şişmeyi ölçün
+
+Önce gerçekten şişme var mı, ona bakın:
+
+```sql
+SELECT
+    schemaname, relname,
+    n_live_tup, n_dead_tup,
+    ROUND(n_dead_tup * 100.0 / NULLIF(n_live_tup + n_dead_tup, 0), 1) AS olu_yuzde,
+    last_autovacuum, last_autoanalyze,
+    autovacuum_count
+FROM pg_stat_user_tables
+WHERE n_dead_tup > 10000
+ORDER BY n_dead_tup DESC
+LIMIT 20;
+```
+
+`olu_yuzde` değeri %20'nin üzerindeyse ve `last_autovacuum` eski ya da boşsa, autovacuum o tabloya yetişemiyor demektir.
+
+Disk üzerindeki gerçek boyutu da görün:
+
+```sql
+SELECT
+    relname,
+    pg_size_pretty(pg_total_relation_size(relid)) AS toplam,
+    pg_size_pretty(pg_relation_size(relid))       AS tablo,
+    pg_size_pretty(pg_indexes_size(relid))        AS indeksler
+FROM pg_stat_user_tables
+ORDER BY pg_total_relation_size(relid) DESC
+LIMIT 15;
+```
+
+İndeksler tablodan büyükse indeks şişmesi de vardır — ve bu, tablo şişmesinden daha sık gözden kaçar.
+
+## Autovacuum neden yetişemez
+
+Öntanımlı eşik, büyük tablolarda çalışmaz:
+
+```
+autovacuum_vacuum_threshold      = 50
+autovacuum_vacuum_scale_factor   = 0.2
+```
+
+Tetikleme koşulu şudur: `ölü satır > 50 + 0,2 × toplam satır`. Yani **100 milyon satırlık bir tabloda autovacuum, 20 milyon ölü satır birikene kadar hiç çalışmaz.** O noktaya gelindiğinde tek bir vacuum işi saatler sürer, çok G/Ç üretir ve tam da yoğun saatte başlar.
+
+Büyük tablolarda ölçek çarpanını tablo bazında düşürün:
+
+```sql
+ALTER TABLE olaylar SET (
+    autovacuum_vacuum_scale_factor  = 0.02,
+    autovacuum_vacuum_threshold     = 5000,
+    autovacuum_analyze_scale_factor = 0.01
+);
+```
+
+Bu, vacuum'u daha sık ve daha kısa çalıştırır. Sık ve küçük her zaman seyrek ve devasa olandan iyidir.
+
+İkinci sık neden gecikme ayarıdır. Eski sürümlerin öntanımlısı autovacuum'u bilerek yavaşlatır:
+
+```sql
+SHOW autovacuum_vacuum_cost_delay;   -- eski sürümlerde 20ms
+SHOW autovacuum_max_workers;         -- öntanımlı 3
+```
+
+SSD üzerinde çalışan bir sunucuda `autovacuum_vacuum_cost_delay` değerini 2 ms'ye indirmek, vacuum'un iş yapabilmesini sağlar. İşçi sayısını artırmak da yardımcı olur — ama unutmayın: **maliyet bütçesi tüm işçiler arasında paylaşılır**, yani yalnızca işçi sayısını artırmak toplam hızı değiştirmez.
+
+## Vacuum'u engelleyen üç şey
+
+Autovacuum çalışsa bile alanı geri kazanamayabilir. `VACUUM`, yalnızca **en eski açık işlemden daha eski** ölü satırları temizleyebilir. Üç şey bu sınırı geriye çeker:
+
+**Uzun süren işlemler.** Saatlerdir açık duran bir raporlama sorgusu, o andan sonraki tüm ölü satırların temizlenmesini engeller.
+
+```sql
+SELECT pid, state, age(clock_timestamp(), xact_start) AS islem_yasi, query
+FROM pg_stat_activity
+WHERE state <> 'idle' AND xact_start IS NOT NULL
+ORDER BY xact_start
+LIMIT 10;
+```
+
+**`idle in transaction` bağlantıları.** En sinsisi budur: uygulama bir işlem açmış, sorguyu bitirmiş ama `COMMIT` göndermemiştir. Bağlantı boştadır, işlem açıktır.
+
+```sql
+SELECT pid, age(clock_timestamp(), state_change) AS sure, application_name
+FROM pg_stat_activity
+WHERE state = 'idle in transaction'
+ORDER BY state_change;
+```
+
+Bunu bir sunucu ayarıyla kesin:
+
+```
+idle_in_transaction_session_timeout = '10min'
+```
+
+**Çoğaltma yuvaları ve hazırlanmış işlemler.** Kullanılmayan bir çoğaltma yuvası (replication slot), sanki hâlâ okunacakmış gibi geçmişi tutar ve vacuum'u sonsuza kadar engeller.
+
+```sql
+SELECT slot_name, active, restart_lsn,
+       pg_size_pretty(pg_wal_lsn_diff(pg_current_wal_lsn(), restart_lsn)) AS geride
+FROM pg_replication_slots;
+
+SELECT gid, prepared, database FROM pg_prepared_xacts;
+```
+
+`active = false` olan bir yuva, terk edilmiş bir kopyadan kalmıştır. Silinmediği sürece hem WAL birikir hem vacuum çalışmaz — ve disk dolar. Şişme ve disk sorunlarında ilk bakılacak yerlerden biridir.
+
+## İşlem kimliği sarması: en tehlikeli senaryo
+
+PostgreSQL işlem kimliklerini 32 bitte tutar ve dairesel kullanır. Vacuum bu kimlikleri düzenli olarak "dondurmazsa" veritabanı sarmayı önlemek için **yazmayı tümüyle durdurur.**
+
+```sql
+SELECT datname, age(datfrozenxid) AS yas
+FROM pg_database
+ORDER BY yas DESC;
+```
+
+Öntanımlı olarak 200 milyonda dondurma vacuum'u başlar, 2 milyara yaklaşıldığında uyarılar çıkar ve sınırda veritabanı salt okunur duruma geçer. `age` değeri 1 milyarı geçiyorsa bu, ertelenebilir bir bakım değil, bir olaydır.
+
+Aynı sorguyu tablo düzeyinde çalıştırıp suçluyu bulabilirsiniz:
+
+```sql
+SELECT relname, age(relfrozenxid) AS yas
+FROM pg_class
+WHERE relkind = 'r'
+ORDER BY yas DESC
+LIMIT 10;
+```
+
+Genelde tek bir devasa tablo ya da vacuum'u engelleyen bir çoğaltma yuvası çıkar. Bu değeri izlemenize eklemek, PostgreSQL işleten her kurumda yapılması gereken birkaç şeyden biridir.
+
+## Alanı gerçekten geri vermek
+
+Sıradan `VACUUM` alanı tabloya geri kazandırır ama **işletim sistemine iade etmez**; tablo aynı boyutta kalır, içindeki boşluk yeniden kullanılır. Çoğu durumda istenen budur.
+
+Diski gerçekten boşaltmak gerekiyorsa iki yol var:
+
+```sql
+-- Tam kilit alır, tabloyu yeniden yazar, iki kat geçici alan ister
+VACUUM FULL olaylar;
+```
+
+`VACUUM FULL` üretimde neredeyse hiçbir zaman doğru seçim değildir: tabloyu tümüyle kilitler, okuma bile yapılamaz.
+
+Daha iyisi eşzamanlı yeniden düzenlemedir:
+
+```sql
+-- pg_repack eklentisiyle, kilitsize yakın
+-- pg_repack -d uygulama -t olaylar
+```
+
+İndeks şişmesi için ayrı ve daha kolay bir yol var:
+
+```sql
+REINDEX INDEX CONCURRENTLY olaylar_tarih_idx;
+```
+
+`CONCURRENTLY` yazma trafiğini engellemez; yalnızca daha uzun sürer ve başarısız olursa geçersiz bir indeks bırakır — sonrasında `pg_index.indisvalid` alanını denetleyip artığı temizlemek gerekir.
+
+## Şişmeyi baştan azaltmak
+
+Üç desen, sonradan temizlik ihtiyacını belirgin biçimde düşürür:
+
+**Toplu silme yerine bölümleme.** "90 günden eski kayıtları sil" işi, her gece milyonlarca ölü satır üretir. Tabloyu tarihe göre bölümlerseniz silme işlemi `DROP PARTITION` olur: anında biter, ölü satır bırakmaz, vacuum gerektirmez.
+
+**Sık güncellenen sütunları ayırmak.** Her `UPDATE` satırın tamamını kopyalar. Yüz sütunluk bir tabloda yalnızca bir sayacı güncelliyorsanız, o sayacı ayrı bir tabloya almak yazma maliyetini ve şişmeyi birden düşürür.
+
+**Doldurma çarpanı.** Sık güncellenen tablolarda sayfada boşluk bırakmak, HOT güncellemelerin aynı sayfada kalmasını sağlar ve indeks güncellemesini önler:
+
+```sql
+ALTER TABLE sayaclar SET (fillfactor = 80);
+```
+
+## İzlemeye eklenecek üç sorgu
+
+Şişme sorunlarının neredeyse tamamı, üç değerin düzenli izlenmesiyle önlenebilir: en büyük `n_dead_tup` değeri, en eski açık işlemin yaşı, ve `age(datfrozenxid)`.
+
+Bu üçü eşiği aştığında uyarı üreten bir kurulumda, PostgreSQL bakımı bir kriz değil bir rutin olur. Uyarıların gürültüye dönüşmemesi ayrı bir konu; [alarm neye bakmalı](/rehberler/gozlem-alarm-belirti-mi-neden-mi) rehberi oraya bakıyor.

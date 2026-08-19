@@ -1,0 +1,115 @@
+---
+baslik: "Alarm neye bakmalı: belirtiye mi, nedene mi?"
+ozet: "CPU yüzde 90'a çıktığında haber veren alarm çoğu gece gereksiz uyandırır. Kullanıcı hata alınca haber veren alarm, uyandırdığında haklıdır."
+konu: "gozlemlenebilirlik"
+etiketler: ["gozlemlenebilirlik", "izleme", "itsm", "nobet"]
+yayin: 2026-08-18
+sure: 11
+---
+
+Bir ekipte gece nöbeti dayanılmaz hâle gelmişti. Ayda ortalama 90 alarm geliyordu ve bunların üçü gerçek bir olaya karşılık geliyordu. Nöbetçiler alarmları sessize alıyor, sabah topluca bakıyorlardı — yani alarm sistemi fiilen kapalıydı.
+
+Alarmlara bakıldığında hepsi teknik olarak doğruydu: disk %85'i geçti, CPU on dakika %90'da kaldı, kuyruk uzunluğu 1000'i aştı, bir pod yeniden başladı. Hiçbiri yanlış ölçüm değildi.
+
+Sorun ölçümde değil, sorulan soruda: bu alarmların hepsi **neden** ölçüyordu. Hiçbiri "kullanıcı bundan etkilendi mi" sorusunu sormuyordu.
+
+## Belirti ile neden
+
+**Belirti (symptom)**, kullanıcının hissettiği şeydir: istekler hata dönüyor, sayfa açılmıyor, sipariş kaydedilemiyor, rapor gelmedi.
+
+**Neden (cause)**, o belirtiyi üretebilecek teknik durumdur: CPU dolu, disk yavaş, bağlantı havuzu tükendi, bir düğüm gitti.
+
+Aradaki ilişki tek yönlü ve gevşektir. Her neden belirtiye dönüşmez — CPU %95'te olup kullanıcı hiçbir şey hissetmeyebilir. Her belirtinin de önceden tanımlanmış bir nedeni yoktur; sistemler sizin listelemediğiniz biçimlerde bozulur.
+
+Buradan iki kural çıkar:
+
+**Uyandıran alarmlar belirtiye bakmalı.** Çünkü belirti varsa gerçekten bir sorun vardır ve müdahale gerekir.
+
+**Nedenler ölçülmeli ama uyandırmamalı.** Çünkü teşhis anında onlara ihtiyaç duyarsınız — ama tek başlarına müdahale gerektirmezler.
+
+## Dört altın sinyal
+
+Belirti tanımlarken sıfırdan başlamayın. Dört ölçü, kullanıcıya dönük hemen her servisi kapsar:
+
+**Gecikme.** İsteklerin ne kadar sürdüğü. Ortalamayı değil, yüzdelikleri ölçün — ortalama, kullanıcıların yarısının ne yaşadığını gizler. 95. ve 99. yüzdelik anlamlıdır.
+
+**Trafik.** Saniyedeki istek sayısı. Tek başına bir alarm değildir ama diğerlerini yorumlamak için gereklidir: gece trafiğin düşmesi normal, gündüz düşmesi bir olaydır.
+
+**Hata.** Başarısız istek oranı. Yalnızca 5xx değil; 200 dönüp yanlış içerik veren durumlar da buraya girer.
+
+**Doygunluk.** Sistemin kapasitesine ne kadar yaklaştığı. Bu, belirti ile neden arasında bir yerdedir; erken uyarı için değerlidir ama tek başına uyandırmamalıdır.
+
+Başarılı ve başarısız istekleri **ayrı ölçün.** Hata veren istekler genelde hızlı döner; ikisini birlikte ölçerseniz hata oranı arttıkça gecikme grafiği iyileşiyormuş gibi görünür.
+
+## Eşik değil, bütçe
+
+"Hata oranı %1'i geçerse uyar" kuralı iki yönden bozuktur: düşük trafikte tek bir hata eşiği aşar, yüksek trafikte saatlerce %0,9'da kalan bir bozulma hiç görünmez.
+
+Daha iyi bir yol, bir hedef belirleyip ondan sapmayı ölçmektir. Ayda %99,9 başarı hedefi, 30 günde yaklaşık 43 dakikalık hata bütçesi demektir. Alarm, bu bütçenin **tüketilme hızına** bakar:
+
+- Bütçenin %2'si bir saatte tükendiyse → hemen uyandır. Bu hızla bütçe iki günde biter.
+- Bütçenin %10'u altı saatte tükendiyse → mesai saatinde bir kayıt aç.
+
+Bu yaklaşım iki şeyi birden çözer: ani ve şiddetli bozulmalar hemen yakalanır, yavaş ve sürekli bozulmalar da gözden kaçmaz — ama gece uyandırmaz.
+
+Uygulaması sanıldığı kadar zor değildir:
+
+```
+# Hızlı tüketim: son 1 saatte hata oranı, bütçenin 14 katı hızda
+(
+  sum(rate(istek_toplam{durum=~"5.."}[1h]))
+  / sum(rate(istek_toplam[1h]))
+) > (14 * 0.001)
+```
+
+Çarpanı iki farklı pencereyle birleştirmek yanlış alarmı ayrıca azaltır: hem son 1 saatte hem son 5 dakikada eşik aşılmışsa uyar. Böylece tek bir dakikalık sıçrama nöbetçiyi uyandırmaz.
+
+## Her alarmın bir eylemi olmalı
+
+Bir alarmı yayına almadan önce tek soru: **bu geldiğinde ne yapılacak?**
+
+Yanıt "bakarım, genelde kendiliğinden düzeliyor" ise o bir alarm değil, bir gösterge panelidir. Yanıt "sabah bakılır" ise uyandırmamalı, bir kayıt oluşturmalıdır.
+
+Bu tek soru, alarm listesini genelde yarıya indirir.
+
+Kalan alarmlarda bildirim metni de eylemi taşımalı. "CPU yüksek" değil:
+
+```
+Ödeme servisinde hata oranı %4,2 (hedef %0,1) — son 15 dakika
+Etkilenen: kart ödemeleri, yaklaşık 300 istek/dk
+Yordam: /rehberler/itsm-buyuk-olay-sureci
+Panel: <bağlantı>
+Son değişiklik: 22:10'da ödeme-api v2.8.1 dağıtıldı
+```
+
+Son satır özellikle değerlidir. Olayların büyük bölümü bir değişiklikten sonra başlar; nöbetçiye bunu göstermek, teşhisin ilk adımını hazır verir.
+
+## Gürültüyü azaltan beş teknik
+
+**Süre koşulu.** Anlık sıçramalar için değil, sürüp giden durumlar için uyarın. "5 dakikadır bu durumda" koşulu, kısa dalgalanmaları eler.
+
+**Bağımlılık bastırma.** Veritabanı gittiğinde ona bağlı on servisin ayrı ayrı uyarması, on kat gürültüdür. Bağımlılık tanımlıysa yalnızca kök uyarı gönderilir.
+
+**Bakım pencereleri.** Planlı dağıtım ve bakım sırasında alarmları susturun — ama otomatik olarak, elle değil. Elle susturulan alarm açılmayı unutulur.
+
+**Gruplama.** Aynı nedenden doğan alarmlar tek bildirimde toplanmalı. Otuz pod'un aynı anda yeniden başlaması bir olaydır, otuz olay değil.
+
+**Ölü adam anahtarı.** İzleme sisteminin kendisi durduğunda hiçbir alarm gelmez ve bu sessizlik "her şey yolunda" gibi görünür. Sürekli tetiklenen ve **gelmediğinde** uyaran bir kontrol, bu kör noktayı kapatır.
+
+## Nedenleri ölçmeye devam edin
+
+Nedenlerin uyandırmaması, ölçülmemesi anlamına gelmez. Bir belirti alarmı geldiğinde nöbetçinin ihtiyacı olan şey tam olarak o nedenlerdir: CPU, bellek, disk, kuyruk uzunluğu, bağlantı havuzu, çoğaltma gecikmesi.
+
+Bunları panolarda tutun, eşiği aştıklarında **uyandırmayan** bir bildirim kanalına düşürün (bir sohbet kanalı, bir günlük kaydı). Kapasite konuları için de haftalık bir rapor, gece uyarısından çok daha uygundur.
+
+İstisna var: bazı nedenler kaçınılmaz olarak belirtiye dönüşür ve önceden müdahale gerektirir. Sertifikanın 7 gün sonra dolacak olması, diskin 2 gün içinde dolacak hızda büyümesi, işlem kimliği sarmasına yaklaşılması. Bunlar "eşik aşıldı" değil, **"tükenmeye şu kadar var"** biçiminde kurulur ve mesai saatinde iş üretir.
+
+## Ölçmesi kolay bir sağlık göstergesi
+
+Alarm kalitesini tek bir oranla izleyebilirsiniz: **gelen alarmların kaçı bir eyleme yol açtı.** Bu oran %50'nin altındaysa nöbetçiler alarmlara güvenmeyi bırakır — ve o noktadan sonra gerçek alarm da kaçırılır.
+
+Ayda bir, gelen tüm alarmları gözden geçirin ve üç kutuya ayırın: bir eyleme yol açtı, kendiliğinden düzeldi, hiç bakılmadı. İkinci ve üçüncü kutudaki her alarm ya eşiği değiştirilmeli, ya bir panoya indirilmeli, ya da silinmelidir.
+
+Silmek bir kayıp değildir. Kimsenin bakmadığı bir alarm zaten kapalıdır; farkı, kapalı olduğunu bilmenizdir.
+
+Nöbet düzeninin kendisi ayrı bir konu; [nöbet ve devir teslim](/rehberler/gozlem-nobet-ve-devir-teslim) rehberinde ele alınıyor.

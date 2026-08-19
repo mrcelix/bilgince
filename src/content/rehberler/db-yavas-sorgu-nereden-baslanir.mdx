@@ -1,0 +1,202 @@
+---
+baslik: "Yavaş sorgu: indeks eklemeden önce bakılacak yerler"
+ozet: "Yavaşlığın nedeni çoğu zaman eksik indeks değil, yanlış tahmin. Planı okumadan indeks eklemek sorunu taşır, çözmez."
+konu: "veritabani"
+etiketler: ["veritabani", "postgresql", "sql-server", "performans"]
+yayin: 2026-08-17
+sure: 12
+---
+
+Bir rapor sorgusu 40 saniye sürüyordu. Ekip filtrelenen sütuna indeks ekledi. Sorgu 38 saniyeye indi.
+
+Plana bakıldığında neden görüldü: sorgu zaten indeksi kullanabiliyordu, ama planlayıcı tabloda 200 satır olduğunu tahmin ediyor, gerçekte 4 milyon satır dönüyordu. Bu tahmin farkı yüzünden iç içe döngü birleştirmesi seçilmişti — 200 satır için doğru, 4 milyon satır için felaket bir seçim.
+
+İstatistikler güncellendiğinde planlayıcı karma birleştirmeye geçti ve sorgu 1,2 saniyeye indi. Eklenen indeksin katkısı yok denecek kadar azdı.
+
+Yavaş sorgularda ilk hamle indeks eklemek değil, **planlayıcının ne düşündüğünü okumak** olmalıdır.
+
+## Önce hangi sorgu
+
+Tek bir sorgu şikâyeti varsa doğrudan ona bakılır. "Veritabanı yavaş" şikâyetinde ise önce suçluyu bulmak gerekir.
+
+PostgreSQL'de:
+
+```sql
+-- pg_stat_statements eklentisi gerekir
+SELECT
+    calls,
+    ROUND(total_exec_time::numeric, 0)            AS toplam_ms,
+    ROUND(mean_exec_time::numeric, 1)             AS ortalama_ms,
+    rows,
+    LEFT(query, 90)                               AS sorgu
+FROM pg_stat_statements
+ORDER BY total_exec_time DESC
+LIMIT 15;
+```
+
+SQL Server'da:
+
+```sql
+SELECT TOP 15
+    qs.execution_count,
+    qs.total_elapsed_time / 1000               AS toplam_ms,
+    qs.total_elapsed_time / qs.execution_count / 1000 AS ortalama_ms,
+    qs.total_logical_reads / qs.execution_count       AS ortalama_okuma,
+    SUBSTRING(st.text, 1, 90)                  AS sorgu
+FROM sys.dm_exec_query_stats qs
+CROSS APPLY sys.dm_exec_sql_text(qs.sql_handle) st
+ORDER BY qs.total_elapsed_time DESC;
+```
+
+**Toplam süreye göre sıralayın, ortalamaya göre değil.** 30 saniyelik ama günde bir kez çalışan bir rapor, 40 milisaniyelik ama dakikada 5000 kez çalışan bir sorgudan daha az önemlidir. Sunucuyu yoran ikincisidir ve şikâyet ilkinden gelir.
+
+## Planı gerçek sayılarla okuyun
+
+Tahmini plan yeterli değildir; asıl bilgi tahmin ile gerçeğin farkındadır.
+
+```sql
+-- PostgreSQL
+EXPLAIN (ANALYZE, BUFFERS, FORMAT TEXT)
+SELECT ...;
+```
+
+```sql
+-- SQL Server
+SET STATISTICS IO, TIME ON;
+-- ve SSMS'te "Gerçek Yürütme Planını Dahil Et"
+```
+
+Planda üç şey aranır:
+
+**1. Tahmin ile gerçek satır sayısı arasındaki fark.** PostgreSQL çıktısında `rows=200` (tahmin) ile `actual rows=4000000` yan yana yazar. Aradaki fark on kattan büyükse, planın geri kalanı zaten yanlış varsayımlar üzerine kuruludur. Baştaki hikâye tam olarak budur.
+
+**2. En pahalı düğüm.** Toplam sürenin çoğunu tek bir işlem harcar. Sondan başa doğru okuyun; girintili en içteki düğümler önce çalışır.
+
+**3. Beklenmedik tarama türü.** `Seq Scan` (PostgreSQL) ya da `Clustered Index Scan` (SQL Server) her zaman kötü değildir — tablonun büyük bölümü okunacaksa doğru seçimdir. Kötü olan, birkaç satır dönerken tüm tabloyu taramaktır.
+
+## İndeksin kullanılmamasının beş nedeni
+
+İndeks var ama plan kullanmıyorsa, eklemek yerine nedenini bulun:
+
+**Sütun üzerinde işlem var.** `WHERE YEAR(tarih) = 2026` indeksi kullanılamaz hâle getirir. Aralık olarak yazın: `WHERE tarih >= '2026-01-01' AND tarih < '2027-01-01'`. Aynı şey `WHERE UPPER(ad) = 'X'` için de geçerli.
+
+**Tür dönüşümü var.** Sütun `varchar`, parametre `nvarchar` ise SQL Server örtük dönüşüm yapar ve indeksi bırakır. Plandaki `CONVERT_IMPLICIT` ifadesi bunu ele verir. Aynı sorun `bigint` sütuna metin parametre gönderildiğinde de olur.
+
+**Bileşik indeksin ilk sütunu sorguda yok.** `(musteri_id, tarih)` indeksi yalnızca `tarih` ile filtrelendiğinde verimli kullanılamaz. Sütun sırası indeks tasarımının en önemli kararıdır: en seçici ve eşitlikle filtrelenen sütun başa gelir.
+
+**Seçicilik düşük.** Tablonun %30'unu döndüren bir filtrede indeksle gitmek, tabloyu taramaktan pahalıdır — çünkü her eşleşme için tabloya geri dönmek gerekir. Planlayıcı bunu doğru hesaplar; "indeksi kullanmıyor" şikâyeti bazen planlayıcının haklı olduğu bir durumdur.
+
+**İstatistikler eski.** En sık ve en kolay çözülen neden.
+
+## İstatistikleri güncelleyin
+
+```sql
+-- PostgreSQL: tek tablo
+ANALYZE olaylar;
+
+-- kaç örnek alındığını artırmak (varsayılan 100)
+ALTER TABLE olaylar ALTER COLUMN musteri_id SET STATISTICS 500;
+ANALYZE olaylar;
+```
+
+```sql
+-- SQL Server
+UPDATE STATISTICS dbo.Olaylar WITH FULLSCAN;
+
+-- ne kadar eski?
+SELECT OBJECT_NAME(s.object_id) AS tablo, s.name,
+       sp.last_updated, sp.rows, sp.modification_counter
+FROM sys.stats s
+CROSS APPLY sys.dm_db_stats_properties(s.object_id, s.stats_id) sp
+WHERE sp.modification_counter > 10000
+ORDER BY sp.modification_counter DESC;
+```
+
+`modification_counter` yüksek ve `last_updated` eskiyse istatistik güncel değildir. Otomatik güncelleme eşiği büyük tablolarda geç tetiklenir — PostgreSQL'de autovacuum'un aynı sorunu için [şişme ve autovacuum](/rehberler/db-postgresql-vacuum-ve-sisme) rehberine bakabilirsiniz.
+
+PostgreSQL'de bir de ilişkili sütunlar sorunu vardır: planlayıcı sütunları bağımsız varsayar. `il = 'Ankara' AND ilce = 'Çankaya'` gibi ilişkili iki filtre, tahmini olduğundan çok düşük çıkarır.
+
+```sql
+CREATE STATISTICS adres_iliski (dependencies, ndistinct)
+ON il, ilce FROM adresler;
+ANALYZE adresler;
+```
+
+Bu tek nesne, ilişkili filtrelerin olduğu sorgularda plan seçimini belirgin biçimde düzeltir.
+
+## Parametre koklaması
+
+SQL Server'da klasik ve kafa karıştırıcı bir durum: aynı saklı yordam bazen hızlı, bazen yavaş çalışır. Kodda hiçbir şey değişmemiştir.
+
+Neden, planın **ilk çağrıdaki parametre değerine göre** derlenip önbelleğe alınmasıdır. O değer az satır döndüren bir müşteriye aitse iç içe döngü planı seçilir; sonra aynı plan, milyonlarca satırı olan bir müşteri için de kullanılır.
+
+Belirti: yordamı yeniden derlemek (`sp_recompile`) sorunu geçici olarak çözer, sonra geri gelir.
+
+Seçenekler:
+
+```sql
+-- her çağrıda yeniden derle: küçük yordamlarda uygun, sık çağrılanlarda pahalı
+OPTION (RECOMPILE)
+
+-- belirli bir değere göre optimize et
+OPTION (OPTIMIZE FOR (@musteri_id = 12345))
+
+-- ortalama dağılıma göre optimize et
+OPTION (OPTIMIZE FOR UNKNOWN)
+```
+
+SQL Server 2022 ve sonrasında parametre duyarlı plan optimizasyonu bu sorunu çoğu durumda kendiliğinden çözer; eski sürümlerde el ile karar gerekir.
+
+## İndeks eklemeye karar verdiğinizde
+
+Plan gerçekten eksik indeks gösteriyorsa, eklemeden önce iki şeye bakın.
+
+**Zaten benzeri var mı?** Çoğu veritabanında birbirinin alt kümesi olan indeksler birikir. `(a)` indeksi varken `(a, b)` eklerseniz ilkini silebilirsiniz — soldaki sütun ön eki aynı işi görür.
+
+```sql
+-- PostgreSQL: hiç kullanılmayan indeksler
+SELECT relname, indexrelname, idx_scan,
+       pg_size_pretty(pg_relation_size(indexrelid)) AS boyut
+FROM pg_stat_user_indexes
+WHERE idx_scan < 50
+ORDER BY pg_relation_size(indexrelid) DESC;
+```
+
+```sql
+-- SQL Server: yazma maliyeti okuma faydasından yüksek olanlar
+SELECT OBJECT_NAME(s.object_id) AS tablo, i.name,
+       s.user_seeks + s.user_scans AS okuma, s.user_updates AS yazma
+FROM sys.dm_db_index_usage_stats s
+JOIN sys.indexes i ON i.object_id = s.object_id AND i.index_id = s.index_id
+WHERE s.database_id = DB_ID() AND i.is_primary_key = 0
+ORDER BY s.user_updates - (s.user_seeks + s.user_scans) DESC;
+```
+
+Her indeks bir yazma maliyetidir: her `INSERT` ve `UPDATE` onu da güncellemek zorundadır. Okunmayan bir indeks yalnızca yer kaplamaz, yazma işlemlerini de yavaşlatır.
+
+**Kapsayıcı yapılabilir mi?** Sorgunun döndürdüğü sütunları indekse dahil ederseniz tabloya geri dönmek gerekmez:
+
+```sql
+-- SQL Server
+CREATE INDEX IX_Olaylar_Musteri ON dbo.Olaylar (musteri_id, tarih)
+INCLUDE (tutar, durum);
+
+-- PostgreSQL
+CREATE INDEX ON olaylar (musteri_id, tarih) INCLUDE (tutar, durum);
+```
+
+Bu, sık çalışan dar sorgularda en büyük tek kazançtır — ama indeksi büyütür, yani her sorguya uygulanacak bir şey değildir.
+
+Üretimde indeks oluştururken kilit almamaya dikkat edin: PostgreSQL'de `CREATE INDEX CONCURRENTLY`, SQL Server Enterprise'da `WITH (ONLINE = ON)`.
+
+## Sorguyu yazarken
+
+Bazı yavaşlıklar plan ya da indeksle değil, sorgunun kendisiyle çözülür: `SELECT *` yerine gereken sütunlar, `DISTINCT` ile gizlenen çoğaltan birleştirmeler, sayfalamada `OFFSET` yerine anahtar tabanlı ilerleme, ve `IN (alt sorgu)` yerine `EXISTS`.
+
+Yazım kalıplarını ve sık yapılan hataları tek tek görmek için [SQL denetleyici](/araclar/sql-denetleyici) aracına bakabilirsiniz.
+
+## Kısa liste
+
+Toplam süreye göre suçluyu bulun. Gerçek planı alın ve tahmin–gerçek farkına bakın. Fark büyükse önce istatistikleri güncelleyin. İndeks varsa neden kullanılmadığını bulun (işlem, tür dönüşümü, sütun sırası, seçicilik). İndeks ekleyecekseniz önce mevcutları ve yazma maliyetini denetleyin.
+
+Bu sırayla ilerlendiğinde eklenen indeks sayısı azalır, çözülen sorgu sayısı artar — ve veritabanı zamanla daha hafif olur, daha ağır değil.

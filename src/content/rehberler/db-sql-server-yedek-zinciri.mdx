@@ -1,0 +1,167 @@
+---
+baslik: "SQL Server yedek zinciri: kurtarma modeli, işlem günlüğü ve zincirin kopması"
+ozet: "Tam yedek almak veritabanını kurtarabilmek anlamına gelmez. Zincirin nerede koptuğunu bilmeden alınan yedekler, kurtarma anında beklenenden çok daha eski bir noktaya götürür."
+konu: "veritabani"
+etiketler: ["veritabani", "sql-server", "yedekleme", "windows-server"]
+yayin: 2026-08-15
+sure: 12
+---
+
+Bir sunucuda işlem günlüğü diski dolmuştu ve veritabanı yazma kabul etmiyordu. Ekip, günlüğü küçültmek için veritabanını basit kurtarma modeline aldı, küçülttü, sonra tekrar tam modele döndürdü. Sorun çözüldü.
+
+İki hafta sonra bir tabloyu geri almak gerekti. Öğle saatine dönmek istiyorlardı; ellerindeki en yakın nokta, o iki hafta önceki gecelik tam yedekti. Kurtarma modeli değiştirildiği anda günlük yedek zinciri kopmuş, o günden beri alınan günlük yedekleri kullanılamaz hâle gelmişti — ve yedekleme işi her gece "başarılı" raporu vermeye devam etmişti.
+
+## Kurtarma modeli neye karar verir
+
+Kurtarma modeli, işlem günlüğünün nasıl davranacağını belirler ve doğrudan RPO'nuzu tanımlar.
+
+| Model | Günlük yedeği | Zaman noktasına dönüş | Günlük büyümesi |
+| --- | --- | --- | --- |
+| `SIMPLE` | Alınamaz | Yok — yalnızca son tam/fark yedeği | Kendiliğinden geri kazanılır |
+| `FULL` | Zorunlu | Evet, saniye düzeyinde | Günlük yedeği alınana kadar büyür |
+| `BULK_LOGGED` | Alınabilir | Toplu işlem varsa kısıtlı | Toplu işlemlerde daha az |
+
+En sık yapılan yanlış, `FULL` modelde çalışıp günlük yedeği **almamaktır.** Bu durumda günlük dosyası sonsuza kadar büyür — ve bir gün disk dolar. Ekipler bunu genelde günlüğü küçülterek çözer, oysa asıl eksik olan şey günlük yedeğidir.
+
+```sql
+SELECT name, recovery_model_desc, log_reuse_wait_desc
+FROM sys.databases
+WHERE database_id > 4;
+```
+
+`log_reuse_wait_desc` sütunu, günlüğün neden geri kazanılamadığını doğrudan söyler:
+
+| Değer | Anlamı |
+| --- | --- |
+| `NOTHING` | Sorun yok |
+| `LOG_BACKUP` | Günlük yedeği bekleniyor — en yaygın |
+| `ACTIVE_TRANSACTION` | Açık kalmış uzun bir işlem var |
+| `AVAILABILITY_REPLICA` | İkincil kopya geride kalmış |
+| `REPLICATION` | Çoğaltma dağıtıcısı okumamış |
+| `CHECKPOINT` | Denetim noktası bekleniyor |
+
+Bu tek sorgu, "günlük neden büyüyor" sorusunun yanıtını çoğu zaman doğrudan verir. Küçültmeden önce buraya bakılmalıdır.
+
+## Zincir nasıl kurulur
+
+Zaman noktasına dönüş, üç yedek türünün birlikte çalışmasıyla olur:
+
+**Tam yedek** temeli oluşturur. Zinciri başlatmaz, sıfırlamaz — yalnızca bir başlangıç noktasıdır.
+
+**Fark yedeği** son tam yedekten bu yana değişen sayfaları alır. Geri yüklemede yalnızca **en son** fark yedeği gerekir; aradakiler atlanabilir.
+
+**Günlük yedeği** son günlük yedeğinden bu yana yapılan işlemleri alır ve günlüğün o bölümünü geri kazanılabilir kılar. Zincirin sürekliliğini sağlayan budur; **bir tanesi eksikse ondan sonrası uygulanamaz.**
+
+Tipik bir düzen: gecelik tam, altı saatte bir fark, on beş dakikada bir günlük. Bu, en fazla 15 dakikalık veri kaybı demektir.
+
+## Zinciri koparan altı şey
+
+**1. Kurtarma modelini `SIMPLE`'a almak.** Baştaki hikâye. Modele geri dönmek zinciri onarmaz; **yeni bir tam yedek** almadan günlük yedekleri işe yaramaz.
+
+**2. Zincir dışında tam yedek almak.** Bir yönetici elle `BACKUP DATABASE` çalıştırıp dosyayı başka bir yere koyarsa ve o dosya kaybolursa, o noktadan sonraki fark yedekleri temelsiz kalır. Bu yüzden elle alınan yedeklerde `COPY_ONLY` kullanılır:
+
+```sql
+BACKUP DATABASE [Uygulama] TO DISK = 'D:\gecici\uygulama.bak'
+WITH COPY_ONLY, CHECKSUM, COMPRESSION;
+```
+
+`COPY_ONLY`, fark yedeklerinin temelini değiştirmez ve günlük zincirini kesmez. Zamanlanmış işlerin dışındaki her yedekte bulunmalıdır.
+
+**3. Günlük dosyasını kesmek.** `WITH TRUNCATE_ONLY` artık yoktur ama eski betiklerde hâlâ görülür. Kestiği anda zincir kopar.
+
+**4. Veritabanını taşımak ya da yeniden oluşturmak.** Yeni veritabanı yeni bir zincirdir.
+
+**5. Yedek dosyasının kaybolması.** Zincir dosyalara dayanır; saklama süresi zincirden kısaysa eski günlükler silinir ve geriye dönüş penceresi sandığınızdan dardır.
+
+**6. Yedek doğrulanmadığı için bozuk olması.** Bu teknik olarak zinciri koparmaz ama kurtarma anında aynı sonucu verir.
+
+Zincir sürekliliğini denetlemek için:
+
+```sql
+SELECT TOP 20
+    bs.database_name,
+    bs.type,               -- D=tam, I=fark, L=günlük
+    bs.backup_start_date,
+    bs.first_lsn, bs.last_lsn,
+    bs.is_copy_only,
+    bmf.physical_device_name
+FROM msdb.dbo.backupset bs
+JOIN msdb.dbo.backupmediafamily bmf ON bs.media_set_id = bmf.media_set_id
+WHERE bs.database_name = 'Uygulama'
+ORDER BY bs.backup_start_date DESC;
+```
+
+Bir günlük yedeğinin `first_lsn` değeri, bir öncekinin `last_lsn` değerine eşit olmalıdır. Aradaki boşluk, zincirin koptuğu yerdir.
+
+## Doğrulanmamış yedek, yedek değildir
+
+`BACKUP` komutu başarıyla dönmesi, dosyanın okunabilir olduğu anlamına gelmez. En az iki adım gerekir:
+
+```sql
+-- yazarken sağlama toplamı üret
+BACKUP DATABASE [Uygulama] TO DISK = 'E:\yedek\uygulama_tam.bak'
+WITH CHECKSUM, COMPRESSION, INIT;
+
+-- dosyayı geri yüklemeden doğrula
+RESTORE VERIFYONLY FROM DISK = 'E:\yedek\uygulama_tam.bak' WITH CHECKSUM;
+```
+
+`RESTORE VERIFYONLY` sağlama toplamlarını denetler ve yapının okunabilir olduğunu söyler. Ama **veriyi kurtarabildiğinizi göstermez.** Bunun tek yolu gerçekten geri yüklemektir:
+
+```sql
+RESTORE DATABASE [Uygulama_Sinama]
+FROM DISK = 'E:\yedek\uygulama_tam.bak'
+WITH MOVE 'Uygulama'     TO 'F:\sinama\uygulama.mdf',
+     MOVE 'Uygulama_log' TO 'F:\sinama\uygulama_log.ldf',
+     NORECOVERY, REPLACE;
+
+RESTORE LOG [Uygulama_Sinama]
+FROM DISK = 'E:\yedek\uygulama_20260815_1400.trn'
+WITH STOPAT = '2026-08-15T14:23:00', RECOVERY;
+```
+
+`NORECOVERY`, sonraki yedekleri uygulayabilmek için veritabanını kurtarma durumunda bırakır. `RECOVERY` ile biten adımdan sonra başka yedek uygulanamaz — sıralamayı yanlış yapmak, kurtarmayı baştan başlatmak demektir.
+
+`STOPAT` zaman noktasına dönüşü sağlar; hatalı bir `UPDATE`'ten hemen önceki ana dönmenin yolu budur.
+
+Geri yükleme süresini gerçekten ölçmek gerekir; yalnızca dosya boyutuna bakan bir tahmin çoğu zaman iyimserdir. Bu ölçümün kurtarma hedeflerine nasıl bağlandığı [kurtarma hedefi planlayıcı](/araclar/kurtarma-hedefi) aracında ele alınıyor.
+
+## Sayfa düzeyinde kurtarma
+
+Az bilinen ama çok işe yarayan bir yetenek: bozuk sayfalar tespit edildiğinde veritabanının tamamını geri yüklemek gerekmez.
+
+```sql
+SELECT * FROM msdb.dbo.suspect_pages;
+
+RESTORE DATABASE [Uygulama] PAGE = '1:4832'
+FROM DISK = 'E:\yedek\uygulama_tam.bak' WITH NORECOVERY;
+-- ardından o noktadan sonraki tüm günlük yedekleri
+```
+
+Bu, terabaytlık bir veritabanında saatler yerine dakikalar demektir. Ama yalnızca `FULL` kurtarma modelinde ve kesintisiz bir günlük zinciriyle çalışır — zincirin değerini gösteren bir başka örnek.
+
+## Bozulmayı erken görmek
+
+Yedek zinciri sağlam olsa bile, bozulmuş veriyi yedeklemek işe yaramaz. Düzenli bütünlük denetimi bu yüzden yedeklemenin ayrılmaz parçasıdır:
+
+```sql
+DBCC CHECKDB ([Uygulama]) WITH NO_INFOMSGS, ALL_ERRORMSGS, DATA_PURITY;
+```
+
+Büyük veritabanlarında üretim üzerinde çalıştırmak pahalıdır. Yaygın ve doğru çözüm, geri yükleme sınamasıyla birleştirmektir: yedeği ayrı bir sunucuya geri yükleyin ve `CHECKDB`'yi orada çalıştırın. Böylece tek işlemde hem yedeğin kurtarılabilirliğini hem verinin bütünlüğünü doğrulamış olursunuz.
+
+`PAGE_VERIFY` ayarının `CHECKSUM` olduğundan emin olun; eski sürümlerden yükseltilen veritabanlarında bu ayar hâlâ `TORN_PAGE_DETECTION` ya da `NONE` olabilir:
+
+```sql
+SELECT name, page_verify_option_desc FROM sys.databases;
+```
+
+## Aynı disk, aynı sonuç
+
+Yedekleri veritabanının bulunduğu diske yazmak, disk arızasında ikisini birden kaybetmek demektir. Aynı şey ana makine için de geçerlidir: sanal makinenin diskiyle yedeğin aynı depolama biriminde durması, o birim gittiğinde her ikisini götürür.
+
+Ayrıca fidye yazılımı düşünüldüğünde, yedeklerin veritabanı hizmet hesabıyla yazılabilir olması bir zayıflıktır. En az bir kopya değiştirilemez (immutable) olmalıdır; ayrıntısı [fidye yazılımına hazırlık](/rehberler/guv-fidye-yazilimina-hazirlik) rehberinde.
+
+## Kısa liste
+
+Kurtarma modelini bilinçli seçin ve `FULL` seçtiyseniz günlük yedeğini kurun. Elle aldığınız her yedekte `COPY_ONLY` kullanın. Tüm yedeklerde `CHECKSUM` açık olsun. Zincirin sürekliliğini `backupset` tablosundan düzenli denetleyin. Ve en önemlisi: ayda bir gerçek geri yükleme yapıp süreyi ölçün — "yedekleme işi başarılı" satırı, kurtarabildiğinizin kanıtı değildir.

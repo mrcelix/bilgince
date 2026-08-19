@@ -1,0 +1,127 @@
+---
+baslik: "Günlük, metrik, iz: hangisi hangi soruyu yanıtlar"
+ozet: "Üçü de gözlemlenebilirlik denen şeyin parçası ama farklı sorulara bakar. Yanlış olanı büyütmek hem pahalıdır hem de aradığınızı bulmaz."
+konu: "gozlemlenebilirlik"
+etiketler: ["gozlemlenebilirlik", "izleme", "maliyet", "tanilama"]
+yayin: 2026-08-18
+sure: 11
+---
+
+Bir ekip, günlük hacmini iki katına çıkardı çünkü olayların nedenini bulamıyorlardı. Fatura yükseldi, arama yavaşladı, ama teşhis süresi değişmedi.
+
+Aradıkları şey günlüklerde değildi: "bu istek neden 8 saniye sürdü" sorusunun yanıtı, isteğin hangi serviste ne kadar beklediğiydi. Bu bilgi ancak dağıtık izlerde bulunur. Günlüğü büyütmek, yanlış aracı büyütmekti.
+
+Üç sinyal türü farklı sorulara bakar. Hangisinin hangi soruyu yanıtladığını bilmek, hem teşhis süresini hem faturayı belirler.
+
+## Üçünün işi
+
+**Metrik** sayısal ve zaman serisi hâlindedir: saniyedeki istek, hata oranı, gecikme yüzdelikleri, kuyruk uzunluğu. Ucuzdur, uzun süre saklanabilir, hızlı sorgulanır.
+
+Yanıtladığı soru: **"Bir sorun var mı, ne zaman başladı, ne kadar büyük?"**
+
+**Günlük** ayrık olaylardır: bir işlemin gerçekleştiği anın kaydı, bir hata, bir uyarı. Ayrıntı zengindir, pahalıdır, saklama süresi kısadır.
+
+Yanıtladığı soru: **"Tam olarak ne oldu, hangi girdiyle, hangi hatayı verdi?"**
+
+**İz (trace)** bir isteğin sistemdeki yolculuğudur: hangi servisten geçti, her adımda ne kadar bekledi, nerede hata aldı.
+
+Yanıtladığı soru: **"Süre nereye gitti, zincirin hangi halkası yavaşladı?"**
+
+Pratik sıra da budur: metrik sorunu **bulur**, iz sorunu **daraltır**, günlük sorunu **açıklar.**
+
+## Yanlış araçla arama
+
+Bu ayrımı bilmeden yapılan üç yaygın hata:
+
+**Metrikle olması gerekeni günlükle saymak.** "Kaç istek geldi" sorusunu günlük satırı sayarak yanıtlamak çalışır ama pahalıdır ve yavaştır. Sayılabilecek her şey metrik olmalıdır.
+
+**Günlükte olması gerekeni metriğe koymak.** Kullanıcı kimliğini ya da istek kimliğini metrik etiketi yapmak, kardinalite patlaması üretir — birazdan.
+
+**İzle çözülecek şeyi günlükte aramak.** Servisler arası gecikmeyi günlük zaman damgalarını karşılaştırarak bulmaya çalışmak, saatler alır ve saat senkronizasyonu hatalarına açıktır.
+
+## Kardinalite: metrik maliyetinin gerçek nedeni
+
+Metrik sistemleri, etiket kombinasyonlarının her biri için ayrı bir zaman serisi tutar. Seri sayısı çarpımsal büyür.
+
+`http_istek_toplam` metriğine şu etiketleri koyarsanız:
+
+- `servis` (20 değer)
+- `yol` (50 değer)
+- `yontem` (5 değer)
+- `durum` (10 değer)
+
+20 × 50 × 5 × 10 = **50.000 seri.** Yönetilebilir.
+
+Şimdi `kullanici_id` ekleyin (100.000 değer): 5 **milyar** seri. Sistem çöker ya da fatura patlar.
+
+Kural basittir: **etiket değerlerinin kümesi sınırlı ve öngörülebilir olmalıdır.** Şunlar metrik etiketi olmaz: kullanıcı kimliği, istek kimliği, oturum kimliği, e-posta, IP adresi, tam URL (yol parametreleriyle), hata mesajı metni.
+
+Yol etiketinde en sık yapılan hata budur: `/musteri/12345/siparis` yerine `/musteri/:id/siparis` yazılmalıdır. Ham yol kullanılırsa her müşteri yeni bir seri yaratır.
+
+Kardinaliteyi ölçün:
+
+```
+# En çok seriye sahip metrikler
+topk(10, count by (__name__)({__name__=~".+"}))
+
+# Bir metrikte etiketin kaç farklı değeri var
+count(count by (yol) (http_istek_toplam))
+```
+
+Bu iki sorguyu ayda bir çalıştırmak, faturanın neden büyüdüğünü sormaktan çok daha ucuzdur.
+
+## Günlüğü yapılandırılmış yazın
+
+Düz metin günlük, insan tarafından okunur ama makine tarafından güvenilir biçimde ayrıştırılamaz. Yapılandırılmış (JSON) günlük, aramayı alan bazlı yapar:
+
+```json
+{"zaman":"2026-08-18T09:14:22.481Z","duzey":"error","servis":"odeme-api",
+ "iz_id":"4bf92f3577b34da6a3ce929d0e0e4736","istek_id":"a1b2c3",
+ "musteri_id":"12345","mesaj":"kart saglayicisi zaman asimi","sure_ms":8021}
+```
+
+`iz_id` alanı burada en değerli olanıdır: günlük satırını ize bağlar. Bir izde yavaş bir adım gördüğünüzde, o adımın günlüklerine tek tıkla gidebilirsiniz. Üç sinyali birbirine bağlayan şey bu tek alandır ve eklenmesi genelde bir ara katman yazılımı satırı kadardır.
+
+Düzey seçimi de maliyeti doğrudan etkiler. `INFO` düzeyinde her isteği yazmak, hacmin çoğunu üretir ve bilgi katkısı azdır — çünkü aynı bilgi metrikte zaten var. Pratik bir düzen: hatalar ve uyarılar her zaman, başarılı istekler örneklenerek ya da hiç.
+
+## İzlemede örnekleme
+
+Her isteği izlemek pahalıdır ve gerekmez. Ama rastgele %1 örnekleme, tam da görmek istediğiniz nadir yavaş istekleri kaçırır.
+
+Doğru yaklaşım kuyruk tabanlı örneklemedir: iz tamamlandıktan sonra karar verilir. Kural şuna benzer:
+
+- Hata içeren izlerin **tamamını** sakla.
+- Belirli bir sürenin üstündeki izlerin tamamını sakla.
+- Kalan başarılı ve hızlı izlerin **%1'ini** sakla.
+
+Böylece hacim düşük kalır ama ilginç olan her şey elde tutulur. Baş tabanlı örnekleme (istek başında karar) daha ucuzdur ama bu ayrımı yapamaz.
+
+## Saklama süresi üç sinyalde farklı olmalı
+
+Aynı süreyi üçüne birden uygulamak, ya çok pahalı olur ya da yetersiz kalır:
+
+| Sinyal | Tipik saklama | Neden |
+| --- | --- | --- |
+| Metrik (ham) | 15 gün | Olay teşhisi için |
+| Metrik (özetlenmiş) | 13 ay | Kapasite planı, yıllık karşılaştırma |
+| Günlük (uygulama) | 7–30 gün | Teşhis penceresi |
+| Günlük (güvenlik/denetim) | 1 yıl ve üzeri | Yasal ve adli gereksinim |
+| İz | 3–7 gün | Neredeyse hep taze olayda kullanılır |
+
+Metrikleri özetleyerek (downsampling) uzun süre saklamak ucuzdur: saniyelik veriyi bir hafta sonra beş dakikalık ortalamalara indirmek, "geçen yıl bu ay ne kadar trafik vardı" sorusunu yanıtlamaya yeter.
+
+Güvenlik günlükleri ayrı bir mantığa tabidir; neyin ne kadar saklanacağı [günlük toplama: neyi saklamalı](/rehberler/guv-gunluk-toplama-neyi-saklamali) rehberinde ele alınıyor. Saklama maliyetini rakama dökmek için [günlük saklama hesaplayıcı](/araclar/gunluk-saklama) aracı var.
+
+## Nereden başlamalı
+
+Sıfırdan kuruyorsanız sıralama şu olmalı:
+
+**Önce metrik.** Dört altın sinyali (gecikme, trafik, hata, doygunluk) kullanıcıya dönük her servis için toplayın. Bu, sorunun varlığını görmenizi sağlar ve en ucuz katmandır.
+
+**Sonra yapılandırılmış günlük.** JSON biçimine geçin ve `iz_id` alanını ekleyin — izleme henüz yokken bile, çünkü sonradan eklemek her servise dokunmak demektir.
+
+**En son iz.** Servis sayısı ikiyi geçtiğinde değerlidir. Tek parçalı bir uygulamada iz, profil aracının yerini tutmaz.
+
+Bu sırayla gidildiğinde her adım bir öncekini kullanır. Ters sırada gidildiğinde — ki yaygın olan budur — elinizde çok veri, az yanıt olur.
+
+Alarmların bu sinyallerden hangisine bakması gerektiği ayrı bir karar; [alarm neye bakmalı](/rehberler/gozlem-alarm-belirti-mi-neden-mi) rehberi oraya bakıyor.

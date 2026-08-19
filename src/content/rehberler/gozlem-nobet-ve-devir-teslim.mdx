@@ -1,0 +1,118 @@
+---
+baslik: "Nöbet düzeni ve devir teslim: gece uyanan kişinin elinde ne olmalı"
+ozet: "Nöbet, sistemin değil ekibin dayanıklılığını sınar. Sürdürülebilir bir düzen, alarm sayısından çok devir teslimin kalitesine bağlıdır."
+konu: "gozlemlenebilirlik"
+etiketler: ["gozlemlenebilirlik", "itsm", "nobet", "surec"]
+yayin: 2026-08-19
+sure: 11
+---
+
+Bir ekipte nöbet, iki kişinin üzerindeydi. İkisi de sistemin her yerini biliyordu, bu yüzden hızlı çözüyorlardı. Bir yıl sonra biri ayrıldı, diğeri tükenmişti.
+
+Sorun nöbet sayısında değildi — ayda dört ciddi olay yaşanıyordu, bu makul bir sayı. Sorun, çözümün insanların kafasında olmasıydı. Yazılı bir yordam yoktu, çünkü "zaten biliyoruz" deniyordu.
+
+Nöbet düzeninin asıl testi, bir olayı **o sistemi yazmamış birinin** çözebilmesidir. Bu sağlanmıyorsa nöbet bir düzen değil, birkaç kişiye bağlı bir riskdir.
+
+## Sürdürülebilirlik için gereken taban
+
+**En az altı kişi.** Beşten az kişiyle döngü, ayda birden fazla nöbet haftası demektir ve uzun vadede tükenme üretir. Altı kişiyle herkes altı haftada bir nöbet tutar.
+
+**Birincil ve ikincil ayrımı.** İkincil, birincil yanıt vermezse devreye girer; ayrıca ilk otuz dakikada yardım gerekirse çağrılır. Tek kişilik nöbet, o kişi tünelde olduğunda kesintiye dönüşür.
+
+**Devir teslim toplantısı.** Haftada bir, on beş dakika. Sonraki nöbetçi, devam eden konuları ve bilinen kırılganlıkları öğrenir.
+
+**Nöbet sonrası telafi.** Gece kalkan kişinin ertesi gün geç başlaması ya da izin alması yazılı olmalı. Olmadığında insanlar alarmı görmezden gelmeye başlar — ve bu, alarm sisteminin sessizce kapanmasıdır.
+
+## Yordam, belge değildir
+
+Çoğu kurumda "runbook" denen şey, sistemin nasıl çalıştığını anlatan bir mimari belgesidir. Gece 3'te işe yaramaz.
+
+İşe yarayan yordam şu biçimdedir:
+
+```
+# Ödeme servisi hata oranı yüksek
+
+## Doğrula (2 dk)
+1. Panel: <bağlantı> — hata oranı gerçekten yükseliyor mu?
+2. Yalnızca kart mı, tüm ödemeler mi? Panelde "yöntem" kırılımına bak.
+
+## Hızlı eleme (5 dk)
+- Son 2 saatte dağıtım oldu mu?  <dağıtım geçmişi bağlantısı>
+  → Olduysa geri al: `./dagit.sh odeme-api --geri-al`
+- Sağlayıcı durum sayfası:  <bağlantı>
+  → Sağlayıcı kaynaklıysa: müşteri iletişimini tetikle, adım 4'e geç.
+- Bağlantı havuzu doldu mu?  <sorgu>
+
+## Azalt
+- Kart sağlayıcısı yavaşsa yedek sağlayıcıya geç:
+  `kubectl set env deploy/odeme-api SAGLAYICI=yedek -n odeme`
+  Uyarı: yedek sağlayıcı taksit desteklemiyor, iş birimini bilgilendir.
+
+## Tırmandır
+- 30 dakikada çözülmediyse: ödeme ekibi nöbetçisi <bağlantı>
+- Müşteri etkisi 15 dakikayı geçtiyse: büyük olay süreci
+  /rehberler/itsm-buyuk-olay-sureci
+```
+
+Farkı yaratan üç özellik: **komutlar kopyalanabilir hâlde yazılmış**, **her adımın süresi belirtilmiş**, ve **ne zaman vazgeçip tırmandırılacağı yazılmış.**
+
+Son madde en çok atlanan ve en değerli olandır. Yordamda tırmandırma eşiği yoksa nöbetçi, çözemediği bir sorunda saatlerce yalnız kalır — çünkü "biraz daha denesem çözerim" hissi hiç bitmez.
+
+## Alarmın kendisi yordamı taşımalı
+
+Nöbetçinin gece 3'te wiki'de arama yapmasını beklemeyin. Bildirimde bağlantı olsun:
+
+```yaml
+annotations:
+  summary: "Ödeme servisi hata oranı %{{ $value | humanizePercentage }}"
+  runbook_url: "https://ic.sirket.local/yordam/odeme-hata-orani"
+  dashboard_url: "https://panel.sirket.local/d/odeme"
+```
+
+Yordam bağlantısı olmayan bir alarm, yayına alınmaya hazır değildir. Bunu bir kural hâline getirmek, hem yordamların yazılmasını sağlar hem de gereksiz alarmların baştan elenmesini — çünkü yordamı yazılamayan alarm, çoğu zaman gerçekten gereksizdir.
+
+Alarmların neye bakması gerektiği ayrı bir konu; [alarm neye bakmalı](/rehberler/gozlem-alarm-belirti-mi-neden-mi) rehberinde ele alınıyor.
+
+## Devir teslimde konuşulacak dört şey
+
+Haftalık devir teslim on beş dakikayı geçmemeli ve şu dört başlığı kapsamalı:
+
+**Açık kalanlar.** Geçici bir çözümle kapatılmış ama kalıcı düzeltmesi bekleyen konular. Bunlar en sık tekrar eden olayların kaynağıdır.
+
+**Bilinen kırılganlıklar.** "Salı geceleri toplu iş çalışırken veritabanı gecikmesi artıyor, panik yapma." Bu bilgi yazılı değilse her yeni nöbetçi aynı yanlış alarmı bir kez yaşar.
+
+**Yaklaşan değişiklikler.** Bu hafta dağıtım var mı, bakım penceresi var mı, bir sağlayıcı göçü mü yapılıyor?
+
+**Geçen haftanın alarmları.** Kaç tanesi geldi, kaçı bir eyleme yol açtı? Eyleme yol açmayanlar için bir düzeltme kaydı açılmalı — eşiği değiştirmek, panoya indirmek ya da silmek.
+
+Son madde nöbet yükünü zamanla azaltan tek mekanizmadır. Yapılmadığında alarm listesi yalnızca büyür.
+
+## Olay sonrası: suçlu değil, sistem
+
+Ciddi bir olaydan sonra yapılan inceleme, kim hata yaptı sorusunu sormamalı. Sorulacak soru şudur: **bu hatanın bu kadar zarar vermesine ne izin verdi?**
+
+Fark somuttur. "Yanlış ortamda komut çalıştırıldı" bir suçlamadır ve tekrarı önlemez. "Üretim ve test ortamı komut satırında ayırt edilemiyor, ayrıca yıkıcı komut onay istemiyor" iki düzeltilebilir madde üretir.
+
+İnceleme çıktısı şu üç bölümden oluşmalı: zaman çizelgesi (ne zaman ne oldu, ne zaman fark edildi), katkı veren etkenler (tek "kök neden" nadiren vardır), ve **sahibi ve tarihi olan** eylem maddeleri. Sahipsiz bir eylem maddesi, yazılmamış sayılır.
+
+Olay sürecinin bütünü için [büyük olay süreci](/rehberler/itsm-buyuk-olay-sureci) ve [kök neden analizi](/rehberler/itsm-problem-yonetimi-kok-neden) rehberleri var.
+
+## Yükü ölçün
+
+Nöbetin sürdürülebilir olup olmadığını hisse bırakmayın. Üç sayı yeterlidir:
+
+**Mesai dışı uyandırma sayısı.** Nöbet haftası başına ikiden fazlaysa düzeltme gerekir.
+
+**Eyleme yol açan alarm oranı.** %50'nin altındaysa nöbetçiler alarmlara güvenmiyor demektir.
+
+**Tekrar eden olay sayısı.** Aynı yordamın ayda üç kez çalıştırılması, o sorunun kalıcı olarak düzeltilmediğini gösterir — ve otomatikleştirilecek ilk aday odur.
+
+Bu üç sayıyı üç ayda bir gözden geçirmek, nöbet yükünün sessizce artmasını engeller. Artış her zaman yavaştır: bir alarm eklenir, bir servis daha nöbete girer, bir düzeltme ertelenir. Ölçülmediğinde fark edildiği an, genelde birinin ayrıldığı andır.
+
+## Yeni katılana ilk hafta
+
+Nöbete yeni giren biri ilk haftasını **ikincil** olarak geçirmeli: bildirimleri alır, birincil ile birlikte bakar, ama sorumluluk onda değildir.
+
+Öncesinde üç şey verilmiş olmalı: erişimler (panel, günlük, üretim okuma yetkisi, tırmandırma listesi), yordamların bulunduğu yer, ve bir tatbikat. Tatbikat, geçmiş bir olayın kaydını okuyup "sen olsan ne yapardın" diye konuşmak kadar basit olabilir.
+
+Bu hazırlık yapılmadan nöbete verilen kişi, ilk gerçek olayında hem sorunu hem de aracı öğrenmeye çalışır. O gece iki şey birden öğrenilmez.
