@@ -1,0 +1,430 @@
+---
+import Base from '../../layouts/Base.astro';
+
+const eslesmeler = [
+  {
+    is: 'Dosya ve dizinleri listele',
+    linux: 'ls -la',
+    ps: 'Get-ChildItem -Force',
+    cmd: 'dir /a',
+    not: 'PowerShell\'de <code>ls</code> ve <code>dir</code> zaten <code>Get-ChildItem</code> takma adıdır — ama parametreler farklıdır.',
+  },
+  {
+    is: 'Dosya içeriğini göster',
+    linux: 'cat dosya.txt',
+    ps: 'Get-Content dosya.txt',
+    cmd: 'type dosya.txt',
+    not: 'Büyük dosyalarda <code>Get-Content -ReadCount 0</code> belirgin hızlanır.',
+  },
+  {
+    is: 'Son satırları izle',
+    linux: 'tail -f /var/log/uygulama.log',
+    ps: 'Get-Content uygulama.log -Wait -Tail 20',
+    cmd: '—',
+    not: 'Sorun giderirken en çok kullanılan komut. <code>-Tail</code> son N satırı gösterir.',
+  },
+  {
+    is: 'Metin ara',
+    linux: 'grep -ri "hata" /var/log',
+    ps: 'Select-String -Pattern "hata" -Path C:\\Kayit\\* -Recurse',
+    cmd: 'findstr /s /i "hata" C:\\Kayit\\*',
+    not: '<code>Select-String</code> nesne döndürür; <code>.LineNumber</code> ve <code>.Path</code> ile işlenebilir.',
+  },
+  {
+    is: 'Dosya ara',
+    linux: 'find /opt -name "*.conf" -mtime -7',
+    ps: 'Get-ChildItem C:\\opt -Filter *.conf -Recurse | Where-Object LastWriteTime -gt (Get-Date).AddDays(-7)',
+    cmd: 'dir /s /b C:\\opt\\*.conf',
+    not: 'PowerShell\'de <code>-Filter</code>, <code>-Include</code>\'dan çok daha hızlıdır.',
+  },
+  {
+    is: 'Çalışan süreçleri gör',
+    linux: 'ps aux | head -20',
+    ps: 'Get-Process | Sort-Object CPU -Descending | Select-Object -First 20',
+    cmd: 'tasklist',
+    not: 'Linux\'ta <code>top</code>, Windows\'ta <code>Get-Process</code> ile döngü ya da Kaynak İzleyici.',
+  },
+  {
+    is: 'Süreci sonlandır',
+    linux: 'kill -9 1234',
+    ps: 'Stop-Process -Id 1234 -Force',
+    cmd: 'taskkill /PID 1234 /F',
+    not: 'Önce nazik sonlandırmayı deneyin: Linux\'ta <code>kill 1234</code>, PowerShell\'de <code>-Force</code> vermeden.',
+  },
+  {
+    is: 'Servis durumunu gör',
+    linux: 'systemctl status nginx',
+    ps: 'Get-Service nginx | Format-List *',
+    cmd: 'sc query nginx',
+    not: '<code>systemctl status</code> son günlük satırlarını da gösterir; Windows\'ta bunun için olay günlüğüne bakmak gerekir.',
+  },
+  {
+    is: 'Servisi yeniden başlat',
+    linux: 'systemctl restart nginx',
+    ps: 'Restart-Service nginx',
+    cmd: 'net stop nginx && net start nginx',
+    not: 'Bağımlı servisler varsa <code>Restart-Service -Force</code> gerekir.',
+  },
+  {
+    is: 'Açık portları listele',
+    linux: 'ss -tulpn',
+    ps: 'Get-NetTCPConnection -State Listen | Select-Object LocalPort, OwningProcess',
+    cmd: 'netstat -ano | findstr LISTENING',
+    not: 'Süreç adını görmek için: <code>Get-NetTCPConnection -State Listen | ForEach-Object { [pscustomobject]@{ Port = $_.LocalPort; Surec = (Get-Process -Id $_.OwningProcess).Name } }</code>',
+  },
+  {
+    is: 'Disk kullanımı',
+    linux: 'df -h',
+    ps: 'Get-PSDrive -PSProvider FileSystem | Select-Object Name, @{n="BosGB";e={[math]::Round($_.Free/1GB,1)}}',
+    cmd: 'wmic logicaldisk get caption,freespace,size',
+    not: 'Daha ayrıntısı için: <code>Get-CimInstance Win32_LogicalDisk -Filter "DriveType=3"</code>',
+  },
+  {
+    is: 'Dizin boyutu',
+    linux: 'du -sh /var/log/*',
+    ps: 'Get-ChildItem C:\\Kayit -Recurse | Measure-Object Length -Sum',
+    cmd: '—',
+    not: 'Windows\'ta yerleşik hızlı karşılığı yoktur; büyük ağaçlarda bu komut yavaştır.',
+  },
+  {
+    is: 'Ortam değişkeni ayarla',
+    linux: 'export API_ANAHTARI=deger',
+    ps: '$env:API_ANAHTARI = "deger"',
+    cmd: 'set API_ANAHTARI=deger',
+    not: 'PowerShell\'de kalıcı yapmak için: <code>[Environment]::SetEnvironmentVariable("API_ANAHTARI","deger","Machine")</code>',
+  },
+  {
+    is: 'Dosya indir',
+    linux: 'curl -O https://ornek.com/dosya.zip',
+    ps: 'Invoke-WebRequest https://ornek.com/dosya.zip -OutFile dosya.zip',
+    cmd: 'curl.exe -O https://ornek.com/dosya.zip',
+    not: 'Büyük dosyalarda <code>Invoke-WebRequest</code> yavaştır; <code>curl.exe</code> Windows 10 sonrası yerleşiktir.',
+  },
+  {
+    is: 'Dizin ağacını kopyala',
+    linux: 'rsync -av --delete /kaynak/ /hedef/',
+    ps: 'robocopy C:\\Kaynak C:\\Hedef /MIR /R:2 /W:5',
+    cmd: 'xcopy C:\\Kaynak C:\\Hedef /E /I /Y',
+    not: '<code>/MIR</code> hedefte fazladan olanı siler — <code>rsync --delete</code> gibi. Dikkatli kullanın.',
+  },
+  {
+    is: 'Zamanlanmış iş listesi',
+    linux: 'crontab -l; systemctl list-timers',
+    ps: 'Get-ScheduledTask | Where-Object State -ne Disabled',
+    cmd: 'schtasks /query /fo LIST',
+    not: 'Windows\'ta görevlerin son çalışma sonucu: <code>Get-ScheduledTaskInfo</code>',
+  },
+  {
+    is: 'Kullanıcı ekle',
+    linux: 'useradd -m -s /bin/bash ahmet',
+    ps: 'New-LocalUser -Name ahmet -NoPassword',
+    cmd: 'net user ahmet /add',
+    not: 'Etki alanında <code>New-ADUser</code> kullanılır; yerel hesap yalnızca o makinede geçerlidir.',
+  },
+  {
+    is: 'Grup üyeliği ekle',
+    linux: 'usermod -aG sudo ahmet',
+    ps: 'Add-LocalGroupMember -Group Administrators -Member ahmet',
+    cmd: 'net localgroup Administrators ahmet /add',
+    not: 'Linux\'ta <code>-a</code> unutulursa kullanıcı diğer bütün gruplardan çıkarılır — sık yapılan ve acı veren bir hatadır.',
+  },
+  {
+    is: 'Ağ yapılandırmasını gör',
+    linux: 'ip addr show',
+    ps: 'Get-NetIPAddress | Where-Object AddressFamily -eq IPv4',
+    cmd: 'ipconfig /all',
+    not: 'Yönlendirme tablosu: Linux <code>ip route</code>, PowerShell <code>Get-NetRoute</code>',
+  },
+  {
+    is: 'DNS önbelleğini temizle',
+    linux: 'resolvectl flush-caches',
+    ps: 'Clear-DnsClientCache',
+    cmd: 'ipconfig /flushdns',
+    not: 'Tarayıcının kendi DNS önbelleği ayrıdır; sistem önbelleğini temizlemek onu etkilemez.',
+  },
+  {
+    is: 'Dosya izinlerini değiştir',
+    linux: 'chmod 644 dosya.conf',
+    ps: 'icacls dosya.conf /grant "Users:(R)"',
+    cmd: 'icacls dosya.conf /grant Users:R',
+    not: 'İki model temelden farklıdır; birebir karşılık yoktur. Ayrıntı için Linux izin hesaplayıcısına bakın.',
+  },
+  {
+    is: 'Sahipliği değiştir',
+    linux: 'chown ahmet:ekip dosya.txt',
+    ps: 'takeown /F dosya.txt /A',
+    cmd: 'takeown /F dosya.txt',
+    not: 'Windows\'ta sahiplik <i>alınır</i>, verilmez; başkasına devretmek için ayrıca <code>icacls /setowner</code> gerekir.',
+  },
+  {
+    is: 'Arşiv oluştur',
+    linux: 'tar -czf yedek.tar.gz /veri',
+    ps: 'Compress-Archive -Path C:\\Veri -DestinationPath yedek.zip',
+    cmd: 'tar -czf yedek.tar.gz C:\\Veri',
+    not: '<code>Compress-Archive</code> 2 GB üstünde sorun çıkarır; büyük arşivlerde <code>tar</code> (Windows 10+ yerleşik) tercih edin.',
+  },
+  {
+    is: 'Sistem günlüğünü oku',
+    linux: 'journalctl -u nginx --since "1 hour ago"',
+    ps: 'Get-WinEvent -FilterHashtable @{LogName="System"; StartTime=(Get-Date).AddHours(-1)}',
+    cmd: 'wevtutil qe System /c:50 /f:text',
+    not: 'Windows olay günlüğünü filtrelemek için Olay Filtresi Üreteci aracını kullanabilirsiniz.',
+  },
+  {
+    is: 'Komut geçmişi',
+    linux: 'history | tail -50',
+    ps: 'Get-History; Get-Content (Get-PSReadlineOption).HistorySavePath -Tail 50',
+    cmd: 'doskey /history',
+    not: '<code>Get-History</code> yalnızca o oturumu gösterir; kalıcı geçmiş PSReadLine dosyasındadır.',
+  },
+  {
+    is: 'Komutun yerini bul',
+    linux: 'which python3',
+    ps: '(Get-Command python).Source',
+    cmd: 'where python',
+    not: 'PowerShell\'de <code>where</code> yazmayın — o <code>Where-Object</code> takma adıdır; <code>where.exe</code> demek gerekir.',
+  },
+];
+---
+
+<Base
+  baslik="Linux ve PowerShell komut çevirici"
+  aciklama="Aynı işin Linux, PowerShell ve komut istemindeki karşılıkları yan yana; her satırda dikkat edilmesi gereken farkla birlikte."
+  aramaya={true}
+  kategori="Araç"
+>
+  <div class="arama-bas">
+    <div class="kap">
+      <nav class="kirinti" aria-label="Kırıntı yolu" style="padding-top:0">
+        <a href="/">Ana sayfa</a><span class="ayrac">/</span><a href="/araclar">Araçlar</a><span
+          class="ayrac">/</span
+        ><span aria-current="page">Komut çevirici</span>
+      </nav>
+      <h1>Linux ve PowerShell komut çevirici</h1>
+      <p style="color:var(--muted);font-size:14px;margin-top:8px;max-width:66ch">
+        İki dünya arasında gidip gelen herkesin kaybettiği zaman, komutu hatırlamaya çalışmak
+        değil; <b>karşılığının tam olarak aynı şeyi yapmadığını fark etmemektir</b>. Her satırda
+        farkın nerede olduğu da yazıyor.
+      </p>
+    </div>
+  </div>
+
+  <div class="kap arac-sayfa">
+    <section class="arac-blok">
+      <h2 class="arac-h2"><span class="arac-no">1</span> Ara</h2>
+      <div class="arac-alan">
+        <label for="c-ara">İş, komut ya da anahtar kelime</label>
+        <input id="c-ara" type="search" spellcheck="false" placeholder="günlük, servis, izin, port…" />
+      </div>
+      <p class="arac-durum" id="c-durum" role="status" aria-live="polite"></p>
+    </section>
+
+    <section class="arac-blok">
+      <h2 class="arac-h2"><span class="arac-no">2</span> Karşılıklar</h2>
+      <div class="c-liste" id="c-liste">
+        {
+          eslesmeler.map((e) => (
+            <article
+              class="c-kart"
+              data-arama={`${e.is} ${e.linux} ${e.ps} ${e.cmd}`.toLocaleLowerCase('tr')}
+            >
+              <h3>{e.is}</h3>
+              <div class="c-satir">
+                <span class="c-etiket">Linux</span>
+                <code>{e.linux}</code>
+                <button type="button" class="c-kop" data-komut={e.linux}>Kopyala</button>
+              </div>
+              <div class="c-satir">
+                <span class="c-etiket">PowerShell</span>
+                <code>{e.ps}</code>
+                <button type="button" class="c-kop" data-komut={e.ps}>Kopyala</button>
+              </div>
+              {e.cmd !== '—' && (
+                <div class="c-satir c-soluk">
+                  <span class="c-etiket">cmd</span>
+                  <code>{e.cmd}</code>
+                  <button type="button" class="c-kop" data-komut={e.cmd}>Kopyala</button>
+                </div>
+              )}
+              <p class="c-not" set:html={e.not} />
+            </article>
+          ))
+        }
+      </div>
+    </section>
+
+    <section class="arac-blok">
+      <h2 class="arac-h2"><span class="arac-no">3</span> İki dünyanın temel farkları</h2>
+      <ul class="c-ipuclari">
+        <li>
+          <b>PowerShell metin değil nesne taşır.</b> <code>ls | grep foo</code> alışkanlığı
+          PowerShell'de yanıltıcıdır; orada <code>Get-ChildItem | Where-Object Name -like
+          "*foo*"</code> yazarsınız ve sonuç hâlâ bir dosya nesnesidir. Bu yüzden çıktıyı
+          ayrıştırmanız gerekmez — özelliklere doğrudan erişirsiniz.
+        </li>
+        <li>
+          <b>Takma adlar tuzaktır.</b> <code>ls</code>, <code>cat</code>, <code>rm</code>,
+          <code>ps</code> PowerShell'de çalışır ama parametreleri Linux'takiyle aynı değildir.
+          <code>ls -la</code> hata verir. Betik yazarken takma ad kullanmayın; tam cmdlet adını
+          yazın.
+        </li>
+        <li>
+          <b>Çıkış kodu farklı yerlerdedir.</b> Linux'ta <code>$?</code> son komutun çıkış
+          kodudur. PowerShell'de <code>$?</code> doğru/yanlış döner; sayısal kod harici
+          programlar için <code>$LASTEXITCODE</code>'dadır. İkisini karıştırmak sessizce yanlış
+          davranan betikler üretir.
+        </li>
+        <li>
+          <b>Yol ayracı ve büyük harf duyarlılığı.</b> Linux dosya adlarında büyük/küçük harf
+          ayrımı yapar, Windows yapmaz. İki sistem arasında taşınan betiklerde bu, "benim
+          makinemde çalışıyordu" sınıfının klasik sebebidir.
+        </li>
+        <li>
+          <b>Satır sonu karakteri.</b> Windows'ta düzenlenen bir kabuk betiği CRLF ile
+          kaydedilirse Linux <code>bad interpreter: /bin/bash^M</code> der. Git ayarlarınızda
+          <code>core.autocrlf</code> ve düzenleyicinizin varsayılanına dikkat edin.
+        </li>
+        <li>
+          <b>Yönetici yükselmesi anlık değildir.</b> Linux'ta <code>sudo</code> tek komutu
+          yükseltir; Windows'ta ise oturumun tamamı ya yükseltilmiştir ya değildir. Bir betiğin
+          ortasında yönetici olamazsınız — <code>Start-Process -Verb RunAs</code> yeni bir
+          süreç başlatır ve değişkenleriniz taşınmaz.
+        </li>
+      </ul>
+    </section>
+  </div>
+
+  <script>
+    (() => {
+      const el = (s) => document.querySelector(s);
+      const kartlar = [...document.querySelectorAll('.c-kart')];
+
+      function suz() {
+        const q = el('#c-ara').value.trim().toLocaleLowerCase('tr');
+        let gorunen = 0;
+
+        for (const k of kartlar) {
+          const uyar = !q || k.dataset.arama.includes(q);
+          k.hidden = !uyar;
+          if (uyar) gorunen++;
+        }
+
+        const durum = el('#c-durum');
+        if (!q) {
+          durum.className = 'arac-durum';
+          durum.textContent = `${kartlar.length} karşılık listeleniyor.`;
+        } else if (gorunen) {
+          durum.className = 'arac-durum ok';
+          durum.textContent = `${gorunen} sonuç.`;
+        } else {
+          durum.className = 'arac-durum hata';
+          durum.textContent = 'Sonuç yok — daha kısa bir kelime deneyin.';
+        }
+      }
+
+      el('#c-ara').addEventListener('input', suz);
+
+      document.addEventListener('click', async (e) => {
+        const d = e.target.closest('.c-kop');
+        if (!d) return;
+        try {
+          await navigator.clipboard.writeText(d.dataset.komut);
+          d.textContent = 'Kopyalandı';
+          setTimeout(() => (d.textContent = 'Kopyala'), 1600);
+        } catch {
+          /* pano izni yoksa kullanıcı elle seçer */
+        }
+      });
+
+      suz();
+    })();
+  </script>
+
+  <style>
+    .c-liste {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr);
+      gap: 12px;
+    }
+    .c-kart {
+      border: 1px solid var(--line);
+      border-radius: 12px;
+      padding: 14px 16px;
+      background: var(--paper);
+    }
+    .c-kart h3 {
+      font-size: 14.5px;
+      margin: 0 0 10px;
+    }
+    .c-satir {
+      display: grid;
+      grid-template-columns: minmax(0, 82px) minmax(0, 1fr) auto;
+      gap: 10px;
+      align-items: center;
+      background: var(--tint);
+      border: 1px solid var(--line);
+      border-radius: 9px;
+      padding: 8px 10px;
+      margin-bottom: 7px;
+    }
+    @media (max-width: 560px) {
+      .c-satir {
+        grid-template-columns: minmax(0, 1fr) auto;
+      }
+      .c-satir code {
+        grid-column: 1 / -1;
+      }
+    }
+    .c-etiket {
+      font-size: 11px;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+      color: var(--muted);
+    }
+    .c-satir code {
+      font-size: 12.5px;
+      overflow-x: auto;
+      white-space: nowrap;
+      display: block;
+      min-width: 0;
+    }
+    .c-soluk {
+      opacity: 0.72;
+    }
+    .c-kop {
+      border: 1px solid var(--line);
+      background: var(--paper);
+      border-radius: 7px;
+      padding: 4px 10px;
+      font-size: 11.5px;
+      color: var(--muted);
+      cursor: pointer;
+      font-family: inherit;
+      white-space: nowrap;
+    }
+    .c-kop:hover {
+      border-color: var(--indigo);
+      color: var(--indigo-metin);
+    }
+    .c-not {
+      margin: 9px 0 0;
+      font-size: 12.5px;
+      line-height: 1.6;
+      color: var(--muted);
+    }
+    .c-ipuclari {
+      list-style: none;
+      margin: 0;
+      padding: 0;
+      display: grid;
+      gap: 12px;
+    }
+    .c-ipuclari li {
+      font-size: 13.5px;
+      line-height: 1.62;
+      color: var(--ink-soft);
+      border-left: 2px solid var(--line);
+      padding-left: 13px;
+    }
+  </style>
+</Base>

@@ -1,0 +1,664 @@
+---
+import Base from '../../layouts/Base.astro';
+---
+
+<Base
+  baslik="Sunucu geçişi kontrol listesi üreteci"
+  aciklama="Taşınacak servisi seçin: geçiş öncesi, geçiş anı ve sonrası için maddelenmiş, atlanması pahalıya patlayan adımları içeren bir kontrol listesi üretir."
+  aramaya={true}
+  kategori="Araç"
+>
+  <div class="arama-bas">
+    <div class="kap">
+      <nav class="kirinti" aria-label="Kırıntı yolu" style="padding-top:0">
+        <a href="/">Ana sayfa</a><span class="ayrac">/</span><a href="/araclar">Araçlar</a><span
+          class="ayrac">/</span
+        ><span aria-current="page">Geçiş kontrol listesi</span>
+      </nav>
+      <h1>Sunucu geçişi kontrol listesi üreteci</h1>
+      <p style="color:var(--muted);font-size:14px;margin-top:8px;max-width:66ch">
+        Geçişlerde işi bozan şey zor adımlar değil, unutulan küçük adımlardır: zamanlanmış
+        görev, sertifika, güvenlik duvarı kuralı, yedek işi. Ne taşıdığınızı seçin; listeyi
+        üzerinde çalışabileceğiniz hâlde alın.
+      </p>
+    </div>
+  </div>
+
+  <div class="kap arac-sayfa">
+    <section class="arac-blok">
+      <h2 class="arac-h2"><span class="arac-no">1</span> Ne taşınıyor?</h2>
+      <div class="g-turler">
+        {
+          [
+            ['dosya', 'Dosya sunucusu', 'Paylaşımlar, izinler, kotalar'],
+            ['web', 'Web / uygulama', 'IIS ya da nginx, sertifikalar'],
+            ['veritabani', 'Veri tabanı', 'SQL Server, PostgreSQL, MySQL'],
+            ['ad', 'Etki alanı denetleyicisi', 'AD DS, DNS, FSMO'],
+            ['posta', 'Posta sunucusu', 'Exchange ya da SMTP geçidi'],
+            ['yazdirma', 'Yazdırma sunucusu', 'Kuyruklar, sürücüler'],
+          ].map(([deger, ad, aciklama], i) => (
+            <label class="g-tur">
+              <input type="checkbox" data-tur={deger} checked={i === 0} />
+              <b>{ad}</b>
+              <span>{aciklama}</span>
+            </label>
+          ))
+        }
+      </div>
+
+      <div class="arac-alanlar" style="margin-top:16px">
+        <label class="arac-alan"
+          >Kaynak sunucu
+          <input id="g-kaynak" type="text" spellcheck="false" value="SRV-ESKI-01" />
+        </label>
+        <label class="arac-alan"
+          >Hedef sunucu
+          <input id="g-hedef" type="text" spellcheck="false" value="SRV-YENI-01" />
+        </label>
+        <label class="arac-alan"
+          >Geçiş tarihi
+          <input id="g-tarih" type="date" />
+        </label>
+      </div>
+
+      <div class="g-secenekler">
+        <label class="g-sec"
+          ><input type="checkbox" id="g-adDegisir" checked />
+          <span>Sunucu adı değişiyor <i>(istemci yapılandırmaları etkilenir)</i></span>
+        </label>
+        <label class="g-sec"
+          ><input type="checkbox" id="g-ipDegisir" checked />
+          <span>IP adresi değişiyor</span>
+        </label>
+        <label class="g-sec"
+          ><input type="checkbox" id="g-surumAtlama" />
+          <span>İşletim sistemi sürümü de yükseliyor</span>
+        </label>
+        <label class="g-sec"
+          ><input type="checkbox" id="g-geriAlma" checked />
+          <span>Eski sunucu bir süre açık kalacak <i>(geri dönüş mümkün)</i></span>
+        </label>
+      </div>
+      <p class="arac-durum" id="g-durum" role="status" aria-live="polite"></p>
+    </section>
+
+    <section class="arac-blok">
+      <h2 class="arac-h2"><span class="arac-no">2</span> Kontrol listesi</h2>
+      <div class="arac-olcum" id="g-olcum"></div>
+      <div id="g-liste"></div>
+    </section>
+
+    <section class="arac-blok">
+      <h2 class="arac-h2"><span class="arac-no">3</span> Markdown çıktısı</h2>
+      <div style="position:relative">
+        <pre class="kod g-cikti"><code id="g-markdown"></code></pre>
+        <button class="kopyala" type="button" data-kaynak="g-markdown">Kopyala</button>
+      </div>
+      <div class="arac-dugmeler">
+        <button type="button" class="dg dg-hayalet" id="g-indir">Markdown indir</button>
+      </div>
+    </section>
+
+    <section class="arac-blok">
+      <h2 class="arac-h2"><span class="arac-no">4</span> Geçişlerde öğrenilenler</h2>
+      <ul class="g-ipuclari">
+        <li>
+          <b>Geri dönüş planı, geçiş planının parçasıdır.</b> "Sorun çıkarsa eskiye döneriz"
+          cümlesi, eski sunucu kapatılmadıysa ve veriler tek yönlü taşınmadıysa doğrudur.
+          Yazılabilir bir servisi taşıdıktan sonra geri dönmek, arada yazılan verinin
+          kaybolması demektir — bu yüzden geri dönüş penceresini <i>saatle</i> sınırlayın ve
+          bitince kapatın.
+        </li>
+        <li>
+          <b>Kimsenin bilmediği bağımlılıklar vardır.</b> Bir dosya sunucusunda muhakkak
+          birinin Excel makrosu, bir başkasının zamanlanmış betiği o yolu sabit yazmıştır.
+          Geçişten önce erişim günlüklerini bir hafta izlemek, bu bağımlılıkları tahminden
+          çok daha iyi ortaya çıkarır.
+        </li>
+        <li>
+          <b>Sunucu adı değişikliği en pahalı karardır.</b> Mümkünse eski adı DNS takma adı
+          olarak yeni sunucuya yönlendirin. Adı değiştirmek; kısayolları, haritalanmış
+          sürücüleri, yazıcı bağlantılarını, betikleri ve kimsenin hatırlamadığı yapılandırma
+          dosyalarını aynı anda bozar.
+        </li>
+        <li>
+          <b>Sertifikayı taşımak, yenilemekten kolaydır ama her zaman doğru değildir.</b> Özel
+          anahtarı dışa aktarıp taşımak hızlıdır; yeni bir anahtar üretip yeni sertifika almak
+          ise anahtarın kaç kopyasının dolaştığı sorusunu ortadan kaldırır. Geçiş, anahtar
+          yenilemek için doğal bir fırsattır.
+        </li>
+        <li>
+          <b>Yedeklemeyi geçişten sonra doğrulayın.</b> Yedek işleri eski sunucu adına göre
+          yapılandırılmıştır ve yeni sunucuyu sessizce atlar. Geçişten sonraki ilk yedeğin
+          gerçekten alındığını ve geri yüklenebildiğini görmeden işi bitmiş saymayın —
+          fark edilmesi haftalar sürebilen bir boşluktur.
+        </li>
+      </ul>
+    </section>
+  </div>
+
+  <script>
+    (() => {
+      const el = (s) => document.querySelector(s);
+      const kacir = (s) =>
+        String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+
+      /* Her madde: [aşama, metin, önem]. Önem "kritik" olanlar atlandığında
+         geçiş geri dönülmez şekilde bozulur. */
+      const ORTAK = {
+        once: [
+          ['Hedef sunucuda işletim sistemi kurulumu ve güncellemeler tamamlandı', 'normal'],
+          ['Kaynak sunucunun tam yedeği alındı ve geri yüklenebilirliği sınandı', 'kritik'],
+          ['Kaynak sunucudaki zamanlanmış görevler listelendi (<code>Get-ScheduledTask</code>)', 'kritik'],
+          ['Yerel kullanıcı ve grup üyelikleri kaydedildi', 'normal'],
+          ['Kurulu yazılım envanteri ve lisans anahtarları çıkarıldı', 'normal'],
+          ['Güvenlik duvarı kuralları dışa aktarıldı (<code>Export-NetFirewallRule</code>)', 'normal'],
+          ['İzleme sisteminde hedef sunucu için denetimler tanımlandı', 'normal'],
+          ['Yedekleme işine hedef sunucu eklendi', 'kritik'],
+          ['Geri dönüş planı yazıldı ve ekipçe okundu', 'kritik'],
+          ['Bakım penceresi duyuruldu, iletişim kanalı belirlendi', 'normal'],
+        ],
+        an: [
+          ['Kaynak sunucuda ilgili servisler durduruldu', 'normal'],
+          ['Son artımlı veri kopyası alındı', 'kritik'],
+          ['Hedef sunucuda servisler başlatıldı ve durumları doğrulandı', 'normal'],
+          ['Temel işlevsellik testi yapıldı (gerçek kullanıcı senaryosu)', 'kritik'],
+        ],
+        sonra: [
+          ['İzleme uyarıları hedef sunucu için geliyor mu doğrulandı', 'normal'],
+          ['Geçiş sonrası ilk yedek alındı ve <b>geri yüklenebildiği</b> sınandı', 'kritik'],
+          ['Olay günlüklerinde beklenmedik hata var mı bakıldı', 'normal'],
+          ['Kaynak sunucudaki zamanlanmış görevler hedefte çalışıyor mu doğrulandı', 'kritik'],
+          ['Belgeler ve envanter kaydı güncellendi', 'normal'],
+        ],
+      };
+
+      const TURE_OZEL = {
+        dosya: {
+          ad: 'Dosya sunucusu',
+          once: [
+            ['Paylaşım listesi ve izinleri dışa aktarıldı (<code>Get-SmbShare</code>, <code>Get-SmbShareAccess</code>)', 'kritik'],
+            ['NTFS izinleri kaydedildi (<code>icacls ... /save</code>)', 'kritik'],
+            ['Disk kotaları ve dosya tarama kuralları not edildi', 'normal'],
+            ['Gölge kopya (önceki sürümler) ayarları kaydedildi', 'normal'],
+            ['Erişim günlüğü bir hafta izlendi; hangi istemciler bağlanıyor listelendi', 'normal'],
+          ],
+          an: [
+            ['Veri <code>robocopy /MIR /COPYALL /DCOPY:DAT</code> ile kopyalandı', 'kritik'],
+            ['NTFS izinleri geri yüklendi (<code>icacls ... /restore</code>)', 'kritik'],
+            ['Paylaşımlar hedefte oluşturuldu ve paylaşım izinleri verildi', 'kritik'],
+            ['Kaynak sunucudaki paylaşımlar salt okunur yapıldı', 'normal'],
+          ],
+          sonra: [
+            ['Bir kullanıcı gerçekten dosya açıp kaydedebiliyor mu sınandı', 'kritik'],
+            ['Gölge kopya zamanlaması hedefte kuruldu', 'normal'],
+            ['Kota ve dosya tarama kuralları yeniden uygulandı', 'normal'],
+          ],
+        },
+        web: {
+          ad: 'Web / uygulama sunucusu',
+          once: [
+            ['TLS sertifikaları ve özel anahtarları dışa aktarıldı ya da yenisi alındı', 'kritik'],
+            ['Uygulama havuzu kimlikleri ve bağlantı dizeleri kaydedildi', 'kritik'],
+            ['Bağlama (binding) yapılandırması ve ana bilgisayar adları listelendi', 'normal'],
+            ['Yeniden yazma kuralları ve özel HTTP başlıkları dışa aktarıldı', 'normal'],
+            ['Uygulamanın yazdığı dizinler ve izinleri belirlendi', 'kritik'],
+          ],
+          an: [
+            ['Uygulama dosyaları kopyalandı', 'normal'],
+            ['Sertifika hedefe kuruldu ve bağlamaya atandı', 'kritik'],
+            ['Uygulama havuzu kimliğine gereken izinler verildi', 'kritik'],
+            ['DNS ya da yük dengeleyici hedefe yönlendirildi', 'kritik'],
+          ],
+          sonra: [
+            ['HTTPS zinciri tam mı doğrulandı (<code>openssl s_client -showcerts</code>)', 'kritik'],
+            ['Uygulama günlüklerinde 500 hatası var mı bakıldı', 'normal'],
+            ['Sertifika süre takibi izlemeye eklendi', 'kritik'],
+          ],
+        },
+        veritabani: {
+          ad: 'Veri tabanı',
+          once: [
+            ['Veri tabanı sürüm ve uyumluluk düzeyi karşılaştırıldı', 'kritik'],
+            ['Oturum açma bilgileri ve parola karmaları taşınacak şekilde hazırlandı', 'kritik'],
+            ['Bağlantılı sunucular, işler ve uyarılar listelendi', 'normal'],
+            ['Bakım planları ve yedekleme işleri kaydedildi', 'kritik'],
+            ['Uygulamalardaki bağlantı dizeleri bulundu ve sahipleri belirlendi', 'kritik'],
+          ],
+          an: [
+            ['Tam yedek alındı, hedefte geri yüklendi', 'kritik'],
+            ['Son işlem günlüğü yedeği alınıp uygulandı', 'kritik'],
+            ['Yetim kullanıcılar düzeltildi (<code>ALTER USER ... WITH LOGIN</code>)', 'kritik'],
+            ['İstatistikler güncellendi, dizinler yeniden oluşturuldu', 'normal'],
+          ],
+          sonra: [
+            ['Uygulama bağlantı dizeleri güncellendi ve sınandı', 'kritik'],
+            ['Yedekleme işleri hedefte çalışıyor mu doğrulandı', 'kritik'],
+            ['Sorgu başarımı geçiş öncesiyle karşılaştırıldı', 'normal'],
+          ],
+        },
+        ad: {
+          ad: 'Etki alanı denetleyicisi',
+          once: [
+            ['Mevcut FSMO rol sahipleri kaydedildi (<code>netdom query fsmo</code>)', 'kritik'],
+            ['Çoğaltma sağlığı doğrulandı (<code>repadmin /replsummary</code>)', 'kritik'],
+            ['Orman ve etki alanı işlevsel düzeyleri kontrol edildi', 'kritik'],
+            ['DNS bölgeleri ve iletici yapılandırması kaydedildi', 'kritik'],
+            ['Sistem durumu yedeği alındı', 'kritik'],
+          ],
+          an: [
+            ['Yeni denetleyici yükseltildi ve çoğaltma tamamlandı', 'kritik'],
+            ['DNS sunucusu rolü kuruldu, bölgeler çoğaltıldı', 'kritik'],
+            ['FSMO rolleri devredildi (<code>Move-ADDirectoryServerOperationMasterRole</code>)', 'kritik'],
+            ['Genel katalog işaretlendi', 'kritik'],
+            ['İstemcilere dağıtılan DNS sunucusu adresi güncellendi (DHCP kapsamı)', 'kritik'],
+          ],
+          sonra: [
+            ['Çoğaltma hatasız mı doğrulandı (<code>dcdiag /v</code>)', 'kritik'],
+            ['Eski denetleyici düzgün şekilde indirgendi — <b>kapatılmadı</b>', 'kritik'],
+            ['Site bağlantıları ve alt ağ tanımları gözden geçirildi', 'normal'],
+          ],
+        },
+        posta: {
+          ad: 'Posta sunucusu',
+          once: [
+            ['MX, SPF, DKIM ve DMARC kayıtları not edildi', 'kritik'],
+            ['Aktarım kuralları ve bağlayıcılar dışa aktarıldı', 'normal'],
+            ['Posta kutusu boyutları ve kotaları listelendi', 'normal'],
+            ['İSS ya da bulut geçidindeki izin listeleri kontrol edildi', 'kritik'],
+          ],
+          an: [
+            ['Posta kutuları taşındı ve tamamlanma oranı doğrulandı', 'kritik'],
+            ['MX kaydı güncellendi (TTL önceden düşürülmüş olmalı)', 'kritik'],
+            ['SPF kaydına yeni sunucunun IP adresi eklendi', 'kritik'],
+            ['Eski sunucu gelen postayı yeni sunucuya iletir hâle getirildi', 'kritik'],
+          ],
+          sonra: [
+            ['Dışarıdan gelen ve dışarıya giden posta sınandı', 'kritik'],
+            ['Gönderilen postaların spam\'e düşmediği doğrulandı', 'kritik'],
+            ['Eski sunucu en az bir hafta açık ve iletir hâlde bırakıldı', 'kritik'],
+          ],
+        },
+        yazdirma: {
+          ad: 'Yazdırma sunucusu',
+          once: [
+            ['Yazıcı kuyrukları ve sürücüleri dışa aktarıldı (<code>printbrm -B</code>)', 'kritik'],
+            ['Yazıcı IP adresleri ve bağlantı noktaları listelendi', 'normal'],
+            ['Grup ilkesiyle dağıtılan yazıcılar belirlendi', 'kritik'],
+          ],
+          an: [
+            ['Kuyruklar hedefe içe aktarıldı (<code>printbrm -R</code>)', 'kritik'],
+            ['64 bit ve 32 bit sürücüler kuruldu', 'normal'],
+            ['Grup ilkesindeki yazıcı yolları güncellendi', 'kritik'],
+          ],
+          sonra: [
+            ['Her yazıcıdan gerçek bir test sayfası alındı', 'kritik'],
+            ['İstemcilerde eski yazıcı bağlantıları temizlendi', 'normal'],
+          ],
+        },
+      };
+
+      const ASAMA_ADI = {
+        once: 'Geçiş öncesi',
+        an: 'Geçiş anı',
+        sonra: 'Geçiş sonrası',
+      };
+
+      function listeUret() {
+        const secili = [...document.querySelectorAll('[data-tur]')]
+          .filter((k) => k.checked)
+          .map((k) => k.dataset.tur);
+
+        const adDegisir = el('#g-adDegisir').checked;
+        const ipDegisir = el('#g-ipDegisir').checked;
+        const surumAtlama = el('#g-surumAtlama').checked;
+        const geriAlma = el('#g-geriAlma').checked;
+
+        const asamalar = { once: [], an: [], sonra: [] };
+
+        for (const asama of ['once', 'an', 'sonra']) {
+          for (const [metin, onem] of ORTAK[asama]) {
+            asamalar[asama].push({ metin, onem, kaynak: 'Ortak' });
+          }
+          for (const tur of secili) {
+            for (const [metin, onem] of TURE_OZEL[tur][asama]) {
+              asamalar[asama].push({ metin, onem, kaynak: TURE_OZEL[tur].ad });
+            }
+          }
+        }
+
+        /* --- koşullu maddeler --- */
+        if (adDegisir) {
+          asamalar.once.push({
+            metin:
+              'Eski sunucu adı için DNS <b>CNAME</b> takma adı hazırlandı — ' +
+              'sabit kodlanmış yolları kırmamak için',
+            onem: 'kritik',
+            kaynak: 'Ad değişikliği',
+          });
+          asamalar.once.push({
+            metin:
+              'Kerberos için hizmet asıl adı (SPN) kaydı planlandı — ' +
+              'takma adla erişimde kimlik doğrulaması aksi hâlde başarısız olur',
+            onem: 'kritik',
+            kaynak: 'Ad değişikliği',
+          });
+          asamalar.sonra.push({
+            metin: 'Haritalanmış sürücüler, kısayollar ve betiklerdeki sunucu adı tarandı',
+            onem: 'normal',
+            kaynak: 'Ad değişikliği',
+          });
+        }
+
+        if (ipDegisir) {
+          asamalar.once.push({
+            metin: 'DNS kayıtlarının TTL değeri geçişten <b>en az bir TTL süresi önce</b> düşürüldü',
+            onem: 'kritik',
+            kaynak: 'IP değişikliği',
+          });
+          asamalar.once.push({
+            metin: 'Eski IP adresini içeren güvenlik duvarı ve erişim listesi kuralları bulundu',
+            onem: 'kritik',
+            kaynak: 'IP değişikliği',
+          });
+          asamalar.sonra.push({
+            metin: 'Eski IP adresine hâlâ trafik geliyor mu izlendi',
+            onem: 'normal',
+            kaynak: 'IP değişikliği',
+          });
+        }
+
+        if (surumAtlama) {
+          asamalar.once.push({
+            metin: 'Uygulama satıcısının yeni işletim sistemi sürümünü desteklediği doğrulandı',
+            onem: 'kritik',
+            kaynak: 'Sürüm yükseltme',
+          });
+          asamalar.once.push({
+            metin: 'Kullanımdan kaldırılan protokoller (SMB1, TLS 1.0) bağımlılığı kontrol edildi',
+            onem: 'kritik',
+            kaynak: 'Sürüm yükseltme',
+          });
+          asamalar.once.push({
+            metin: 'PowerShell sürüm farkı gözden geçirildi — 5.1 betikleri 7\'de aynı çalışmaz',
+            onem: 'normal',
+            kaynak: 'Sürüm yükseltme',
+          });
+        }
+
+        if (geriAlma) {
+          asamalar.an.push({
+            metin: 'Geri dönüş kararı için son saat belirlendi ve ekibe duyuruldu',
+            onem: 'kritik',
+            kaynak: 'Geri dönüş',
+          });
+          asamalar.sonra.push({
+            metin:
+              'Geri dönüş penceresi kapatıldı; eski sunucu <b>salt okunur</b> yapıldı ' +
+              '(iki tarafa da yazılması en tehlikeli durumdur)',
+            onem: 'kritik',
+            kaynak: 'Geri dönüş',
+          });
+          asamalar.sonra.push({
+            metin: 'Belirlenen bekleme süresi sonunda eski sunucu kapatıldı ve arşivlendi',
+            onem: 'normal',
+            kaynak: 'Geri dönüş',
+          });
+        } else {
+          asamalar.once.push({
+            metin:
+              '<b>Geri dönüş yok:</b> yedekten geri yükleme süresi ölçüldü ve kabul edilebilir olduğu onaylandı',
+            onem: 'kritik',
+            kaynak: 'Geri dönüş',
+          });
+        }
+
+        return { asamalar, secili };
+      }
+
+      function ciz() {
+        const { asamalar, secili } = listeUret();
+        const kaynak = el('#g-kaynak').value.trim() || 'KAYNAK';
+        const hedef = el('#g-hedef').value.trim() || 'HEDEF';
+        const tarih = el('#g-tarih').value;
+
+        const toplam = Object.values(asamalar).reduce((t, a) => t + a.length, 0);
+        const kritik = Object.values(asamalar)
+          .flat()
+          .filter((m) => m.onem === 'kritik').length;
+
+        el('#g-olcum').innerHTML =
+          `<span>Madde: <b>${toplam}</b></span>` +
+          `<span>Kritik: <b>${kritik}</b></span>` +
+          `<span>Servis: <b>${secili.length}</b></span>` +
+          `<span>Öncesi / anı / sonrası: <b>${asamalar.once.length} / ${asamalar.an.length} / ${asamalar.sonra.length}</b></span>`;
+
+        el('#g-liste').innerHTML = ['once', 'an', 'sonra']
+          .map(
+            (a) =>
+              `<div class="g-asama"><h3>${ASAMA_ADI[a]}</h3><ul class="g-maddeler">` +
+              asamalar[a]
+                .map(
+                  (m, i) =>
+                    `<li data-onem="${m.onem}">` +
+                    `<label><input type="checkbox" /> <span>${m.metin}</span></label>` +
+                    `<em>${m.kaynak}</em></li>`
+                )
+                .join('') +
+              `</ul></div>`
+          )
+          .join('');
+
+        /* --- Markdown --- */
+        const sadeMetin = (s) => s.replace(/<\/?(b|code|i)>/g, s.includes('<code>') ? '`' : '**');
+        const md = [
+          `# Geçiş kontrol listesi — ${kaynak} → ${hedef}`,
+          '',
+          tarih ? `**Planlanan tarih:** ${tarih}` : '**Planlanan tarih:** (doldurun)',
+          `**Kapsam:** ${secili.map((t) => TURE_OZEL[t].ad).join(', ') || '(servis seçilmedi)'}`,
+          `**Sorumlu:** (doldurun)`,
+          '',
+          '> Kritik işaretli maddeler atlandığında geçiş geri dönülmez şekilde bozulur.',
+          '',
+          ...['once', 'an', 'sonra'].flatMap((a) => [
+            `## ${ASAMA_ADI[a]}`,
+            '',
+            ...asamalar[a].map(
+              (m) =>
+                `- [ ] ${m.onem === 'kritik' ? '**[KRİTİK]** ' : ''}` +
+                m.metin.replace(/<code>/g, '`').replace(/<\/code>/g, '`').replace(/<\/?b>/g, '**')
+            ),
+            '',
+          ]),
+          '## Notlar',
+          '',
+          '| Saat | Ne yapıldı | Kim |',
+          '|---|---|---|',
+          '| | | |',
+        ];
+
+        el('#g-markdown').textContent = md.join('\n');
+
+        const durum = el('#g-durum');
+        if (!secili.length) {
+          durum.className = 'arac-durum hata';
+          durum.textContent = 'En az bir servis türü seçin.';
+        } else {
+          durum.className = 'arac-durum ok';
+          durum.textContent = `${toplam} maddelik liste hazır; ${kritik} tanesi kritik.`;
+        }
+      }
+
+      document
+        .querySelectorAll('[data-tur], #g-kaynak, #g-hedef, #g-tarih, #g-adDegisir, #g-ipDegisir, #g-surumAtlama, #g-geriAlma')
+        .forEach((g) => {
+          g.addEventListener('change', ciz);
+          g.addEventListener('input', ciz);
+        });
+
+      document.querySelectorAll('.kopyala').forEach((d) => {
+        d.addEventListener('click', async () => {
+          try {
+            await navigator.clipboard.writeText(el(`#${d.dataset.kaynak}`).textContent);
+            d.textContent = 'Kopyalandı';
+            setTimeout(() => (d.textContent = 'Kopyala'), 1600);
+          } catch {
+            /* pano izni yoksa kullanıcı elle seçer */
+          }
+        });
+      });
+
+      el('#g-indir').addEventListener('click', () => {
+        const b = new Blob([el('#g-markdown').textContent], {
+          type: 'text/markdown;charset=utf-8',
+        });
+        const a = document.createElement('a');
+        a.href = URL.createObjectURL(b);
+        a.download = 'gecis-kontrol-listesi.md';
+        a.click();
+        URL.revokeObjectURL(a.href);
+      });
+
+      // Öntanımlı tarih: iki hafta sonrası
+      const t = new Date();
+      t.setDate(t.getDate() + 14);
+      const iki = (n) => String(n).padStart(2, '0');
+      el('#g-tarih').value = `${t.getFullYear()}-${iki(t.getMonth() + 1)}-${iki(t.getDate())}`;
+
+      ciz();
+    })();
+  </script>
+
+  <style>
+    .g-turler {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(min(200px, 100%), 1fr));
+      gap: 10px;
+    }
+    .g-tur {
+      display: grid;
+      gap: 3px;
+      border: 1px solid var(--line);
+      border-radius: 11px;
+      padding: 12px 14px;
+      cursor: pointer;
+      background: var(--paper);
+      position: relative;
+    }
+    .g-tur input {
+      position: absolute;
+      opacity: 0;
+      pointer-events: none;
+    }
+    .g-tur b {
+      font-size: 13.5px;
+    }
+    .g-tur span {
+      font-size: 12px;
+      color: var(--muted);
+      line-height: 1.45;
+    }
+    .g-tur:has(input:checked) {
+      border-color: var(--indigo);
+      background: var(--tint);
+      box-shadow: 0 0 0 1px var(--indigo);
+    }
+    .g-secenekler {
+      display: grid;
+      gap: 9px;
+      margin-top: 14px;
+    }
+    .g-sec {
+      display: inline-flex;
+      align-items: baseline;
+      gap: 8px;
+      font-size: 13px;
+      color: var(--ink-soft);
+      cursor: pointer;
+      line-height: 1.5;
+    }
+    .g-sec i {
+      font-style: normal;
+      color: var(--muted);
+      font-size: 12px;
+    }
+    .g-asama {
+      margin-bottom: 22px;
+    }
+    .g-asama h3 {
+      font-size: 15px;
+      margin: 0 0 10px;
+      padding-bottom: 7px;
+      border-bottom: 1px solid var(--line);
+    }
+    .g-maddeler {
+      list-style: none;
+      margin: 0;
+      padding: 0;
+      display: grid;
+      gap: 6px;
+    }
+    .g-maddeler li {
+      display: flex;
+      align-items: flex-start;
+      gap: 10px;
+      border-left: 2px solid var(--line);
+      padding: 5px 0 5px 12px;
+    }
+    .g-maddeler li[data-onem='kritik'] {
+      border-left-color: light-dark(#dc2626, #f87171);
+    }
+    .g-maddeler label {
+      display: flex;
+      align-items: flex-start;
+      gap: 9px;
+      flex: 1;
+      cursor: pointer;
+      font-size: 13.5px;
+      line-height: 1.55;
+      color: var(--ink-soft);
+    }
+    .g-maddeler input {
+      margin-top: 3px;
+      flex: 0 0 auto;
+      width: 15px;
+      height: 15px;
+      cursor: pointer;
+    }
+    .g-maddeler label:has(input:checked) span {
+      text-decoration: line-through;
+      opacity: 0.55;
+    }
+    .g-maddeler em {
+      font-style: normal;
+      font-size: 11px;
+      color: var(--muted);
+      white-space: nowrap;
+      padding-top: 3px;
+    }
+    .g-cikti {
+      max-height: 420px;
+      overflow: auto;
+    }
+    .arac-dugmeler {
+      display: flex;
+      gap: 10px;
+      flex-wrap: wrap;
+      margin-top: 12px;
+    }
+    .g-ipuclari {
+      list-style: none;
+      margin: 0;
+      padding: 0;
+      display: grid;
+      gap: 12px;
+    }
+    .g-ipuclari li {
+      font-size: 13.5px;
+      line-height: 1.62;
+      color: var(--ink-soft);
+      border-left: 2px solid var(--line);
+      padding-left: 13px;
+    }
+  </style>
+</Base>

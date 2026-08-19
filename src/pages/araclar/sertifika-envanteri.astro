@@ -1,0 +1,510 @@
+---
+import Base from '../../layouts/Base.astro';
+---
+
+<Base
+  baslik="Sertifika süre takibi ve envanter"
+  aciklama="Sertifikalarınızı listeleyin: kalan gün, yenileme penceresi ve risk sıralaması. Otomatik toplayan izleme betiğiyle birlikte."
+  aramaya={true}
+  kategori="Araç"
+>
+  <div class="arama-bas">
+    <div class="kap">
+      <nav class="kirinti" aria-label="Kırıntı yolu" style="padding-top:0">
+        <a href="/">Ana sayfa</a><span class="ayrac">/</span><a href="/araclar">Araçlar</a><span
+          class="ayrac">/</span
+        ><span aria-current="page">Sertifika envanteri</span>
+      </nav>
+      <h1>Sertifika süre takibi ve envanter</h1>
+      <p style="color:var(--muted);font-size:14px;margin-top:8px;max-width:66ch">
+        Sertifika süresi dolmasından kaynaklanan kesintiler, önlenmesi en kolay kesintilerdir —
+        ve en sık yaşananlardandır. Sertifikalarınızı girin; kalan süreye göre sıralansın,
+        yenileme penceresi hesaplansın. Aşağıda bu listeyi otomatik toplayan betik de var.
+      </p>
+    </div>
+  </div>
+
+  <div class="kap arac-sayfa">
+    <section class="arac-blok">
+      <h2 class="arac-h2"><span class="arac-no">1</span> Sertifikalar</h2>
+      <div class="s-kayitlar" id="s-kayitlar"></div>
+      <div class="arac-dugmeler">
+        <button type="button" class="dg dg-hayalet" id="s-ekle">Sertifika ekle</button>
+        <button type="button" class="dg dg-hayalet" id="s-ornek">Örnek envanter</button>
+      </div>
+      <div class="arac-alanlar" style="margin-top:16px">
+        <label class="arac-alan"
+          >Uyarı eşiği (gün)
+          <input id="s-esik" type="number" min="1" max="365" value="30" />
+          <small>Bu süreden az kalanlar kritik sayılır.</small>
+        </label>
+        <label class="arac-alan"
+          >Yenileme hazırlık süresi (gün)
+          <input id="s-hazirlik" type="number" min="1" max="180" value="14" />
+          <small>Talep, doğrulama ve kurulum için gereken tipik süre.</small>
+        </label>
+      </div>
+      <p class="arac-durum" id="s-durum" role="status" aria-live="polite"></p>
+    </section>
+
+    <section class="arac-blok">
+      <h2 class="arac-h2"><span class="arac-no">2</span> Envanter</h2>
+      <div class="arac-olcum" id="s-olcum"></div>
+      <div class="s-kaydir">
+        <table class="s-tablo">
+          <thead>
+            <tr><th>Konu</th><th>Sunucu</th><th>Bitiş</th><th>Kalan</th><th>Yenilemeye başla</th><th>Durum</th></tr>
+          </thead>
+          <tbody id="s-tablo"></tbody>
+        </table>
+      </div>
+    </section>
+
+    <section class="arac-blok">
+      <h2 class="arac-h2"><span class="arac-no">3</span> Otomatik toplama betiği</h2>
+      <p class="arac-not" style="margin-top:0">
+        Envanteri elle tutmak sürdürülebilir değildir. Bu betik sunucu listesindeki her adrese
+        bağlanıp sertifika bilgisini kendisi toplar.
+      </p>
+      <div style="position:relative">
+        <pre class="kod s-cikti"><code id="s-betik"></code></pre>
+        <button class="kopyala" type="button" data-kaynak="s-betik">Kopyala</button>
+      </div>
+    </section>
+
+    <section class="arac-blok">
+      <h2 class="arac-h2"><span class="arac-no">4</span> Süre takibinde bilinmesi gerekenler</h2>
+      <ul class="s-ipuclari">
+        <li>
+          <b>Takvim hatırlatması yeterli değildir.</b> Sertifikayı yenileyen kişi işten
+          ayrılır, hatırlatma başkasına devredilmez ve kesinti bir cumartesi sabahı olur.
+          Süre takibi izleme sisteminde olmalı — bir kişide değil.
+        </li>
+        <li>
+          <b>Yenilemek yetmez, yüklemek gerekir.</b> Otomatik yenileme betikleri sertifikayı
+          diske yazar; servisi yeniden yüklemeyi unutan bir yapılandırma, dosyada yeni sertifika
+          dururken eskisiyle hizmet vermeye devam eder. Yenileme kancasına
+          <code>reload</code> koyduğunuzdan emin olun.
+        </li>
+        <li>
+          <b>Ara sertifikaların da süresi dolar.</b> Sunucu sertifikanız geçerliyken zincirdeki
+          ara sertifika süresi dolabilir ve bazı istemciler bağlanamaz. Zinciri de takip edin.
+        </li>
+        <li>
+          <b>Sertifika ömürleri kısalıyor.</b> Tarayıcılar kabul edilen azami süreyi kademeli
+          olarak düşürüyor. Yılda bir elle yenileme yapılabilirdi; iki ayda bir yapılamaz.
+          Otomasyon artık tercih değil, zorunluluk.
+        </li>
+        <li>
+          <b>Sertifika yalnızca web sunucusunda değildir.</b> Yük dengeleyici, posta sunucusu,
+          VPN ağ geçidi, LDAPS, RDP, kod imzalama, istemci sertifikaları, iç sertifika
+          otoritesinin kendi sertifikası… Envanteri yalnızca 443'e bakarak çıkarmak, listenin
+          yarısını atlamak demektir.
+        </li>
+        <li>
+          <b>İç sertifika otoritesinin kök sertifikası da biter.</b> Genelde on yıllıktır, bu
+          yüzden kimse hatırlamaz — ve bittiğinde onunla imzalanmış <i>her şey</i> aynı anda
+          geçersiz olur. Kök ve ara otorite sertifikalarını da bu listeye ekleyin.
+        </li>
+      </ul>
+    </section>
+  </div>
+
+  <script>
+    (() => {
+      const el = (s) => document.querySelector(s);
+      const kacir = (s) =>
+        String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+
+      let sayac = 0;
+      let kayitlar = [];
+
+      const iki = (n) => String(n).padStart(2, '0');
+      const tarihYaz = (t) => `${t.getFullYear()}-${iki(t.getMonth() + 1)}-${iki(t.getDate())}`;
+      const gunEkle = (gun) => {
+        const t = new Date();
+        t.setHours(0, 0, 0, 0);
+        t.setDate(t.getDate() + gun);
+        return tarihYaz(t);
+      };
+
+      function kayitEkle(on = {}) {
+        kayitlar.push({
+          kimlik: ++sayac,
+          konu: on.konu ?? 'ornek.com.tr',
+          sunucu: on.sunucu ?? 'SRV-WEB-01',
+          bitis: on.bitis ?? gunEkle(90),
+          tur: on.tur ?? 'web',
+        });
+        ciz();
+      }
+
+      const TURLER = [
+        ['web', 'Web sunucusu'],
+        ['yuk', 'Yük dengeleyici'],
+        ['posta', 'Posta sunucusu'],
+        ['vpn', 'VPN ağ geçidi'],
+        ['ldap', 'LDAPS'],
+        ['imza', 'Kod imzalama'],
+        ['istemci', 'İstemci sertifikası'],
+        ['ca', 'Sertifika otoritesi'],
+      ];
+
+      function ciz() {
+        el('#s-kayitlar').innerHTML = kayitlar
+          .map(
+            (k) =>
+              `<div class="s-kayit" data-kimlik="${k.kimlik}">` +
+              `<input type="text" class="s-konu" value="${k.konu.replace(/"/g, '&quot;')}" aria-label="Sertifika konusu" />` +
+              `<input type="text" class="s-sunucu" value="${k.sunucu.replace(/"/g, '&quot;')}" aria-label="Sunucu" />` +
+              `<input type="date" class="s-bitis" value="${k.bitis}" aria-label="Bitiş tarihi" />` +
+              `<select class="s-tur" aria-label="Sertifika türü">` +
+              TURLER.map(
+                ([d, a]) => `<option value="${d}"${d === k.tur ? ' selected' : ''}>${a}</option>`
+              ).join('') +
+              `</select>` +
+              `<button type="button" class="s-sil" aria-label="Kaydı sil">×</button>` +
+              `</div>`
+          )
+          .join('');
+        hesapla();
+      }
+
+      function hesapla() {
+        const esik = Number(el('#s-esik').value) || 30;
+        const hazirlik = Number(el('#s-hazirlik').value) || 14;
+        const bugun = new Date();
+        bugun.setHours(0, 0, 0, 0);
+
+        const satirlar = kayitlar
+          .map((k) => {
+            const bitis = new Date(k.bitis);
+            bitis.setHours(0, 0, 0, 0);
+            const kalan = Math.round((bitis - bugun) / 86400000);
+            const baslangic = new Date(bitis);
+            baslangic.setDate(baslangic.getDate() - hazirlik);
+
+            let durum;
+            if (kalan < 0) durum = 'gecmis';
+            else if (kalan <= esik) durum = 'kritik';
+            else if (kalan <= esik * 2) durum = 'yaklasiyor';
+            else durum = 'iyi';
+
+            return { ...k, bitis, kalan, baslangic, durum };
+          })
+          .sort((a, b) => a.kalan - b.kalan);
+
+        const turAdi = (t) => TURLER.find(([d]) => d === t)?.[1] ?? t;
+
+        el('#s-tablo').innerHTML = satirlar
+          .map(
+            (s) =>
+              `<tr data-durum="${s.durum}">` +
+              `<td><b>${kacir(s.konu)}</b><br><small>${kacir(turAdi(s.tur))}</small></td>` +
+              `<td>${kacir(s.sunucu)}</td>` +
+              `<td>${tarihYaz(s.bitis)}</td>` +
+              `<td class="s-kalan">${s.kalan < 0 ? `${-s.kalan} gün geçti` : `${s.kalan} gün`}</td>` +
+              `<td>${s.kalan < 0 ? '—' : tarihYaz(s.baslangic)}</td>` +
+              `<td class="s-durumHucre">${
+                s.durum === 'gecmis'
+                  ? 'Süresi dolmuş'
+                  : s.durum === 'kritik'
+                    ? 'Kritik'
+                    : s.durum === 'yaklasiyor'
+                      ? 'Yaklaşıyor'
+                      : 'İyi'
+              }</td>` +
+              `</tr>`
+          )
+          .join('');
+
+        const gecmis = satirlar.filter((s) => s.durum === 'gecmis').length;
+        const kritik = satirlar.filter((s) => s.durum === 'kritik').length;
+        const yaklasiyor = satirlar.filter((s) => s.durum === 'yaklasiyor').length;
+        const enYakin = satirlar[0];
+
+        el('#s-olcum').innerHTML =
+          `<span>Toplam: <b>${satirlar.length}</b></span>` +
+          `<span>Süresi dolmuş: <b>${gecmis}</b></span>` +
+          `<span>Kritik: <b>${kritik}</b></span>` +
+          `<span>Yaklaşan: <b>${yaklasiyor}</b></span>` +
+          (enYakin
+            ? `<span>En yakın: <b>${enYakin.kalan < 0 ? 'geçti' : enYakin.kalan + ' gün'}</b></span>`
+            : '');
+
+        const durum = el('#s-durum');
+        if (!satirlar.length) {
+          durum.className = 'arac-durum';
+          durum.textContent = 'Sertifika ekleyin.';
+        } else if (gecmis) {
+          durum.className = 'arac-durum hata';
+          durum.textContent = `${gecmis} sertifikanın süresi dolmuş — bunlar şu anda kesintiye yol açıyor olabilir.`;
+        } else if (kritik) {
+          durum.className = 'arac-durum hata';
+          durum.textContent =
+            `${kritik} sertifika ${esik} günden az kaldı. En yakını ${enYakin.kalan} gün — ` +
+            `yenileme hazırlığı ${hazirlik} gün sürüyorsa bugün başlanmalı.`;
+        } else {
+          durum.className = 'arac-durum ok';
+          durum.textContent = `En yakın bitiş ${enYakin.kalan} gün sonra; acil bir durum yok.`;
+        }
+
+        betikYaz(esik);
+      }
+
+      function betikYaz(esik) {
+        const sunucular = [...new Set(kayitlar.map((k) => k.sunucu))].filter(Boolean);
+        const adresler = [...new Set(kayitlar.map((k) => k.konu))].filter(Boolean);
+
+        el('#s-betik').textContent =
+          `# --- 1) Dışarıdan bakarak: TLS uç noktalarını tara ---------------------\n` +
+          `$adresler = @(\n` +
+          (adresler.length
+            ? adresler.map((a) => `    '${a}:443'`).join(',\n')
+            : `    'ornek.com.tr:443'`) +
+          `\n)\n\n` +
+          `$sonuclar = foreach ($hedef in $adresler) {\n` +
+          `    $ad, $port = $hedef -split ':'\n` +
+          `    try {\n` +
+          `        $istemci = [Net.Sockets.TcpClient]::new()\n` +
+          `        $istemci.Connect($ad, [int]$port)\n` +
+          `        $akis = [Net.Security.SslStream]::new($istemci.GetStream(), $false, { $true })\n` +
+          `        $akis.AuthenticateAsClient($ad)\n` +
+          `        $sertifika = $akis.RemoteCertificate\n` +
+          `        $bitis = [datetime]$sertifika.GetExpirationDateString()\n\n` +
+          `        [pscustomobject]@{\n` +
+          `            Adres    = $ad\n` +
+          `            Konu     = $sertifika.Subject\n` +
+          `            Veren    = $sertifika.Issuer\n` +
+          `            Bitis    = $bitis\n` +
+          `            KalanGun = [int]($bitis - (Get-Date)).TotalDays\n` +
+          `            Protokol = $akis.SslProtocol\n` +
+          `        }\n` +
+          `    } catch {\n` +
+          `        [pscustomobject]@{ Adres = $ad; Konu = 'BAGLANILAMADI'; KalanGun = -9999 }\n` +
+          `    } finally {\n` +
+          `        if ($akis) { $akis.Dispose() }\n` +
+          `        if ($istemci) { $istemci.Dispose() }\n` +
+          `    }\n` +
+          `}\n\n` +
+          `# --- 2) İçeriden: sunuculardaki sertifika deposunu tara -----------------\n` +
+          `$sunucular = @(${sunucular.length ? sunucular.map((s) => `'${s}'`).join(', ') : `'SRV-WEB-01'`})\n\n` +
+          `$yerel = Invoke-Command -ComputerName $sunucular -ScriptBlock {\n` +
+          `    # Kod imzalama ve istemci sertifikaları 443'ten görünmez; depoyu okumak şart\n` +
+          `    Get-ChildItem Cert:\\LocalMachine\\My |\n` +
+          `        Where-Object { $_.NotAfter -lt (Get-Date).AddDays(365) } |\n` +
+          `        Select-Object @{ n = 'Sunucu'; e = { $env:COMPUTERNAME } },\n` +
+          `            Subject, NotAfter,\n` +
+          `            @{ n = 'KalanGun'; e = { [int]($_.NotAfter - (Get-Date)).TotalDays } },\n` +
+          `            @{ n = 'OzelAnahtar'; e = { $_.HasPrivateKey } }\n` +
+          `} -ErrorAction SilentlyContinue\n\n` +
+          `# --- 3) Raporla ve uyar -------------------------------------------------\n` +
+          `$tumu = @($sonuclar) + @($yerel) | Sort-Object KalanGun\n` +
+          `$tumu | Format-Table -AutoSize\n\n` +
+          `$acil = $tumu | Where-Object { $_.KalanGun -lt ${esik} -and $_.KalanGun -gt -9999 }\n` +
+          `if ($acil) {\n` +
+          `    $govde = $acil | ConvertTo-Html -Fragment | Out-String\n` +
+          `    Send-MailMessage -To 'bt@sirket.com.tr' -From 'izleme@sirket.com.tr' \`\n` +
+          `        -Subject "Sertifika uyarisi: $($acil.Count) sertifika ${esik} gunden az" \`\n` +
+          `        -Body $govde -BodyAsHtml -SmtpServer 'posta.sirket.com.tr'\n` +
+          `    exit 1   # izleme sisteminin yakalaması için sıfırdan farklı çık\n` +
+          `}\n` +
+          `exit 0\n\n` +
+          `# --- Linux karşılığı ----------------------------------------------------\n` +
+          `# for h in ornek.com.tr posta.ornek.com.tr; do\n` +
+          `#   son=$(echo | openssl s_client -connect "$h:443" -servername "$h" 2>/dev/null |\n` +
+          `#     openssl x509 -noout -enddate | cut -d= -f2)\n` +
+          `#   kalan=$(( ($(date -d "$son" +%s) - $(date +%s)) / 86400 ))\n` +
+          `#   printf '%-30s %4s gun\\n' "$h" "$kalan"\n` +
+          `# done`;
+      }
+
+      /* --- olaylar --- */
+      document.addEventListener('input', (e) => {
+        const satir = e.target.closest('.s-kayit');
+        if (satir) {
+          const k = kayitlar.find((x) => x.kimlik === Number(satir.dataset.kimlik));
+          if (k) {
+            k.konu = satir.querySelector('.s-konu').value;
+            k.sunucu = satir.querySelector('.s-sunucu').value;
+            k.bitis = satir.querySelector('.s-bitis').value;
+            k.tur = satir.querySelector('.s-tur').value;
+          }
+          hesapla();
+          return;
+        }
+        if (e.target.closest('#s-esik, #s-hazirlik')) hesapla();
+      });
+
+      document.addEventListener('change', (e) => {
+        if (e.target.closest('.s-kayit')) hesapla();
+      });
+
+      document.addEventListener('click', (e) => {
+        if (e.target.closest('#s-ekle')) {
+          kayitEkle();
+          return;
+        }
+        const sil = e.target.closest('.s-sil');
+        if (sil) {
+          const satir = sil.closest('.s-kayit');
+          kayitlar = kayitlar.filter((x) => x.kimlik !== Number(satir.dataset.kimlik));
+          ciz();
+        }
+      });
+
+      el('#s-ornek').addEventListener('click', () => {
+        kayitlar = [];
+        sayac = 0;
+        kayitEkle({ konu: 'ornek.com.tr', sunucu: 'SRV-WEB-01', bitis: gunEkle(12), tur: 'web' });
+        kayitEkle({ konu: '*.ic.ornek.local', sunucu: 'SRV-YUK-01', bitis: gunEkle(48), tur: 'yuk' });
+        kayitEkle({ konu: 'posta.ornek.com.tr', sunucu: 'SRV-POSTA-01', bitis: gunEkle(-3), tur: 'posta' });
+        kayitEkle({ konu: 'vpn.ornek.com.tr', sunucu: 'FW-KENAR-01', bitis: gunEkle(210), tur: 'vpn' });
+        kayitEkle({ konu: 'dc01.ornek.local', sunucu: 'SRV-DC-01', bitis: gunEkle(95), tur: 'ldap' });
+        kayitEkle({ konu: 'Ornek A.S. Kod Imzalama', sunucu: 'SRV-DERLEME-01', bitis: gunEkle(26), tur: 'imza' });
+        kayitEkle({ konu: 'Ornek Kok CA', sunucu: 'SRV-CA-01', bitis: gunEkle(1400), tur: 'ca' });
+      });
+
+      document.querySelectorAll('.kopyala').forEach((d) => {
+        d.addEventListener('click', async () => {
+          try {
+            await navigator.clipboard.writeText(el(`#${d.dataset.kaynak}`).textContent);
+            d.textContent = 'Kopyalandı';
+            setTimeout(() => (d.textContent = 'Kopyala'), 1600);
+          } catch {
+            /* pano izni yoksa kullanıcı elle seçer */
+          }
+        });
+      });
+
+      kayitEkle({ konu: 'ornek.com.tr', sunucu: 'SRV-WEB-01', bitis: gunEkle(12), tur: 'web' });
+      kayitEkle({ konu: 'posta.ornek.com.tr', sunucu: 'SRV-POSTA-01', bitis: gunEkle(-3), tur: 'posta' });
+      kayitEkle({ konu: 'vpn.ornek.com.tr', sunucu: 'FW-KENAR-01', bitis: gunEkle(210), tur: 'vpn' });
+    })();
+  </script>
+
+  <style>
+    .s-kayitlar {
+      display: grid;
+      gap: 9px;
+      margin-bottom: 12px;
+    }
+    .s-kayit {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      gap: 9px;
+      border: 1px solid var(--line);
+      border-radius: 10px;
+      padding: 9px 11px;
+      background: var(--paper);
+    }
+    .s-konu {
+      flex: 1 1 180px;
+      min-width: 0;
+    }
+    .s-sunucu {
+      flex: 1 1 130px;
+      min-width: 0;
+    }
+    .s-kayit input,
+    .s-kayit select {
+      border: 1px solid var(--line);
+      border-radius: 7px;
+      padding: 6px 9px;
+      font: inherit;
+      font-size: 13px;
+      background: var(--bg);
+      color: var(--ink);
+    }
+    .s-sil {
+      margin-left: auto;
+      border: 1px solid var(--line);
+      background: transparent;
+      border-radius: 7px;
+      width: 28px;
+      height: 28px;
+      cursor: pointer;
+      color: var(--muted);
+      font-size: 16px;
+      line-height: 1;
+    }
+    .s-sil:hover {
+      border-color: light-dark(#dc2626, #f87171);
+      color: light-dark(#dc2626, #f87171);
+    }
+    .arac-dugmeler {
+      display: flex;
+      gap: 10px;
+      flex-wrap: wrap;
+    }
+    .s-kaydir {
+      overflow-x: auto;
+    }
+    .s-tablo {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 13px;
+      min-width: 640px;
+    }
+    .s-tablo th,
+    .s-tablo td {
+      text-align: left;
+      padding: 10px 12px;
+      border-bottom: 1px solid var(--line);
+      vertical-align: top;
+    }
+    .s-tablo th {
+      color: var(--muted);
+      font-size: 11.5px;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+    }
+    .s-tablo small {
+      color: var(--muted);
+      font-size: 11.5px;
+    }
+    .s-kalan,
+    .s-tablo td:nth-child(3),
+    .s-tablo td:nth-child(5) {
+      font-family: var(--mono, ui-monospace, monospace);
+      white-space: nowrap;
+    }
+    .s-durumHucre {
+      font-weight: 600;
+      white-space: nowrap;
+    }
+    .s-tablo tr[data-durum='gecmis'] {
+      background: light-dark(#fef2f2, #2a1616);
+    }
+    .s-tablo tr[data-durum='gecmis'] .s-durumHucre,
+    .s-tablo tr[data-durum='gecmis'] .s-kalan {
+      color: light-dark(#991b1b, #fca5a5);
+    }
+    .s-tablo tr[data-durum='kritik'] .s-durumHucre,
+    .s-tablo tr[data-durum='kritik'] .s-kalan {
+      color: light-dark(#b45309, #fbbf24);
+    }
+    .s-tablo tr[data-durum='iyi'] .s-durumHucre {
+      color: light-dark(#166534, #6ee7b7);
+    }
+    .s-cikti {
+      max-height: 460px;
+      overflow: auto;
+    }
+    .s-ipuclari {
+      list-style: none;
+      margin: 0;
+      padding: 0;
+      display: grid;
+      gap: 12px;
+    }
+    .s-ipuclari li {
+      font-size: 13.5px;
+      line-height: 1.62;
+      color: var(--ink-soft);
+      border-left: 2px solid var(--line);
+      padding-left: 13px;
+    }
+  </style>
+</Base>

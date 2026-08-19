@@ -1,0 +1,347 @@
+---
+import Base from '../../layouts/Base.astro';
+
+const portlar = [
+  { p: 20, t: 'TCP', ad: 'FTP veri', risk: 'yuksek', not: 'Şifresiz. SFTP ya da FTPS kullanın.' },
+  { p: 21, t: 'TCP', ad: 'FTP denetim', risk: 'yuksek', not: 'Parola açık gider. İnternete asla açmayın.' },
+  { p: 22, t: 'TCP', ad: 'SSH / SFTP', risk: 'orta', not: 'Anahtar tabanlı kimlik doğrulama şart; parola girişini kapatın.' },
+  { p: 23, t: 'TCP', ad: 'Telnet', risk: 'yuksek', not: 'Her şey açık metin. Açıksa kapatın; istisnası yok.' },
+  { p: 25, t: 'TCP', ad: 'SMTP', risk: 'orta', not: 'Sunucular arası posta. İSS\'ler genelde engeller; gönderim için 587 kullanın.' },
+  { p: 53, t: 'TCP/UDP', ad: 'DNS', risk: 'orta', not: 'İnternete açık özyinelemeli çözümleyici, yansıtmalı saldırıda kullanılır.' },
+  { p: 67, t: 'UDP', ad: 'DHCP sunucu', risk: 'dusuk', not: 'Yerel ağ. Yetkisiz DHCP sunucusu ağı bir anda çökertir.' },
+  { p: 80, t: 'TCP', ad: 'HTTP', risk: 'orta', not: 'Şifresiz. Yalnızca 443\'e yönlendirme için açık tutun.' },
+  { p: 88, t: 'TCP/UDP', ad: 'Kerberos', risk: 'orta', not: 'Etki alanı kimlik doğrulaması. Saat farkı 5 dakikayı geçerse çalışmaz.' },
+  { p: 110, t: 'TCP', ad: 'POP3', risk: 'yuksek', not: 'Şifresiz. Yerine 995 (POP3S) kullanın.' },
+  { p: 123, t: 'UDP', ad: 'NTP', risk: 'orta', not: 'Saat eşitleme. Kerberos ve sertifika doğrulaması buna bağlıdır.' },
+  { p: 135, t: 'TCP', ad: 'RPC uç nokta eşleyici', risk: 'yuksek', not: 'Windows RPC. İnternete açık olması ciddi bir bulgudur.' },
+  { p: 137, t: 'UDP', ad: 'NetBIOS ad', risk: 'yuksek', not: 'Eski protokol; kimlik bilgisi sızdırma saldırılarında kullanılır.' },
+  { p: 139, t: 'TCP', ad: 'NetBIOS oturum', risk: 'yuksek', not: 'SMB1 ile birlikte gelir. Kapatın.' },
+  { p: 143, t: 'TCP', ad: 'IMAP', risk: 'yuksek', not: 'Şifresiz. Yerine 993 (IMAPS) kullanın.' },
+  { p: 161, t: 'UDP', ad: 'SNMP', risk: 'yuksek', not: 'v1 ve v2c topluluk adını açık gönderir. v3 kullanın; "public" asla.' },
+  { p: 389, t: 'TCP/UDP', ad: 'LDAP', risk: 'yuksek', not: 'Şifresiz dizin sorgusu. LDAPS (636) ya da STARTTLS zorunlu kılın.' },
+  { p: 443, t: 'TCP', ad: 'HTTPS', risk: 'dusuk', not: 'Standart güvenli web. QUIC kullanılıyorsa UDP 443 de gerekir.' },
+  { p: 445, t: 'TCP', ad: 'SMB / CIFS', risk: 'yuksek', not: 'Dosya paylaşımı. İnternete açık SMB, fidye yazılımının bir numaralı giriş kapısıdır.' },
+  { p: 465, t: 'TCP', ad: 'SMTPS', risk: 'dusuk', not: 'Örtük TLS ile posta gönderimi.' },
+  { p: 514, t: 'UDP', ad: 'Syslog', risk: 'orta', not: 'Şifresiz ve doğrulamasız. Günlükleri TLS ile taşımak daha doğrudur.' },
+  { p: 587, t: 'TCP', ad: 'SMTP gönderim', risk: 'dusuk', not: 'İstemciden gönderim için doğru port. STARTTLS ve kimlik doğrulama zorunlu.' },
+  { p: 636, t: 'TCP', ad: 'LDAPS', risk: 'dusuk', not: 'TLS ile dizin sorgusu.' },
+  { p: 993, t: 'TCP', ad: 'IMAPS', risk: 'dusuk', not: 'TLS ile posta okuma.' },
+  { p: 995, t: 'TCP', ad: 'POP3S', risk: 'dusuk', not: 'TLS ile posta indirme.' },
+  { p: 1433, t: 'TCP', ad: 'SQL Server', risk: 'yuksek', not: 'Veri tabanı asla internete açılmaz. Adlandırılmış örneklerde UDP 1434 de kullanılır.' },
+  { p: 1521, t: 'TCP', ad: 'Oracle dinleyici', risk: 'yuksek', not: 'Veri tabanı. Yalnızca uygulama sunucularından erişime izin verin.' },
+  { p: 1723, t: 'TCP', ad: 'PPTP', risk: 'yuksek', not: 'Kırılmış VPN protokolü. Kullanımdan kaldırın.' },
+  { p: 2049, t: 'TCP', ad: 'NFS', risk: 'yuksek', not: 'Ağ dosya sistemi. Kimlik doğrulaması zayıftır; yalnızca güvenilir ağda.' },
+  { p: 3306, t: 'TCP', ad: 'MySQL / MariaDB', risk: 'yuksek', not: 'Veri tabanı. Bulut sunucularda en çok taranan portlardan biri.' },
+  { p: 3389, t: 'TCP', ad: 'RDP', risk: 'yuksek', not: 'Uzak masaüstü. İnternete açık RDP, fidye yazılımı olaylarının en sık başlangıç noktasıdır. VPN arkasına alın.' },
+  { p: 5432, t: 'TCP', ad: 'PostgreSQL', risk: 'yuksek', not: 'Veri tabanı. <code>listen_addresses</code> ayarını kontrol edin.' },
+  { p: 5985, t: 'TCP', ad: 'WinRM HTTP', risk: 'yuksek', not: 'PowerShell uzaktan yönetim, şifresiz. 5986 (HTTPS) tercih edin.' },
+  { p: 5986, t: 'TCP', ad: 'WinRM HTTPS', risk: 'orta', not: 'TLS ile uzaktan yönetim. Yalnızca yönetim ağından açın.' },
+  { p: 6379, t: 'TCP', ad: 'Redis', risk: 'yuksek', not: 'Öntanımlı olarak kimlik doğrulamasız gelir. İnternete açık Redis örnekleri düzenli olarak ele geçirilir.' },
+  { p: 8080, t: 'TCP', ad: 'HTTP alternatif', risk: 'orta', not: 'Uygulama sunucusu ya da vekil. Ters vekil arkasına alın.' },
+  { p: 9100, t: 'TCP', ad: 'Yazıcı ham baskı', risk: 'orta', not: 'JetDirect. Kimlik doğrulaması yoktur; yazıcı ağını ayırın.' },
+  { p: 27017, t: 'TCP', ad: 'MongoDB', risk: 'yuksek', not: 'Eski sürümler kimlik doğrulamasız dinlerdi; internete açık binlerce örnek ele geçirildi.' },
+];
+---
+
+<Base
+  baslik="Ağ portu sözlüğü"
+  aciklama="Hangi port hangi servise ait, internete açık olması ne kadar riskli, karşılığında hangi güvenli port kullanılmalı."
+  aramaya={true}
+  kategori="Araç"
+>
+  <div class="arama-bas">
+    <div class="kap">
+      <nav class="kirinti" aria-label="Kırıntı yolu" style="padding-top:0">
+        <a href="/">Ana sayfa</a><span class="ayrac">/</span><a href="/araclar">Araçlar</a><span
+          class="ayrac">/</span
+        ><span aria-current="page">Port sözlüğü</span>
+      </nav>
+      <h1>Ağ portu sözlüğü</h1>
+      <p style="color:var(--muted);font-size:14px;margin-top:8px;max-width:66ch">
+        Güvenlik duvarı kuralına bakarken ya da tarama sonucunu okurken: bu port neydi, açık
+        olması sorun mu? Port numarası ya da servis adıyla arayın.
+      </p>
+    </div>
+  </div>
+
+  <div class="kap arac-sayfa">
+    <section class="arac-blok">
+      <h2 class="arac-h2"><span class="arac-no">1</span> Ara</h2>
+      <div class="arac-alan">
+        <label for="t-ara">Port numarası ya da servis adı</label>
+        <input id="t-ara" type="search" spellcheck="false" placeholder="3389, rdp, veri tabanı…" />
+      </div>
+      <div class="t-suzgecler">
+        {
+          [
+            ['hepsi', 'Hepsi'],
+            ['yuksek', 'Yüksek risk'],
+            ['orta', 'Orta risk'],
+            ['dusuk', 'Düşük risk'],
+          ].map(([deger, ad], i) => (
+            <label class="t-radyo">
+              <input type="radio" name="t-risk" value={deger} checked={i === 0} />
+              <span>{ad}</span>
+            </label>
+          ))
+        }
+      </div>
+      <p class="arac-durum" id="t-durum" role="status" aria-live="polite"></p>
+    </section>
+
+    <section class="arac-blok">
+      <h2 class="arac-h2"><span class="arac-no">2</span> Portlar</h2>
+      <div class="t-liste" id="t-liste">
+        {
+          portlar.map((p) => (
+            <article
+              class="t-kart"
+              data-risk={p.risk}
+              data-arama={`${p.p} ${p.ad} ${p.t} ${p.not}`.toLocaleLowerCase('tr')}
+            >
+              <div class="t-ust">
+                <b class="t-no">{p.p}</b>
+                <span class="t-tur">{p.t}</span>
+                <span class="t-ad">{p.ad}</span>
+                <span class="t-risk" data-risk={p.risk}>
+                  {p.risk === 'yuksek' ? 'yüksek risk' : p.risk === 'orta' ? 'orta risk' : 'düşük risk'}
+                </span>
+              </div>
+              <p class="t-not" set:html={p.not} />
+            </article>
+          ))
+        }
+      </div>
+    </section>
+
+    <section class="arac-blok">
+      <h2 class="arac-h2"><span class="arac-no">3</span> Portu denetleme komutları</h2>
+      <div style="position:relative">
+        <pre class="kod"><code>{`# Bu makinede hangi portlar dinleniyor ve hangi süreç?
+Get-NetTCPConnection -State Listen | ForEach-Object {
+    [pscustomobject]@{
+        Port   = $_.LocalPort
+        Adres  = $_.LocalAddress
+        Surec  = (Get-Process -Id $_.OwningProcess -ErrorAction SilentlyContinue).ProcessName
+    }
+} | Sort-Object Port | Format-Table -AutoSize
+
+# Linux karşılığı
+ss -tulpn
+
+# Uzak bir portun açık olup olmadığını sına
+Test-NetConnection -ComputerName srv-vt-01 -Port 1433
+nc -zv srv-vt-01 1433              # Linux
+
+# Bir portu hangi güvenlik duvarı kuralı açıyor?
+Get-NetFirewallPortFilter | Where-Object LocalPort -eq 3389 |
+    Get-NetFirewallRule | Select-Object DisplayName, Enabled, Direction, Profile
+
+# Dışarıdan gerçekten açık mı? (kendi ağınızda, izinli olarak)
+Test-NetConnection -ComputerName dis-ip-adresiniz -Port 3389`}</code></pre>
+        <button class="kopyala" type="button" id="t-kopyala">Kopyala</button>
+      </div>
+    </section>
+
+    <section class="arac-blok">
+      <h2 class="arac-h2"><span class="arac-no">4</span> Port açarken</h2>
+      <ul class="t-ipuclari">
+        <li>
+          <b>"Yüksek risk" portun kötü olduğu anlamına gelmez.</b> RDP ve SMB günlük işin
+          parçasıdır; risk, <i>internete açık olmalarındadır</i>. Aynı port yönetim ağında
+          tamamen normaldir. Bu listedeki risk sütunu "dışarıya açılırsa" varsayımıyla yazılmıştır.
+        </li>
+        <li>
+          <b>Kaynağı daraltmak, portu kapatmaktan çoğu zaman daha uygulanabilirdir.</b> Kuralı
+          "herkes" yerine belirli bir adres bloğuna bağlamak riski neredeyse tamamen kaldırır
+          ve kimsenin işini bozmaz.
+        </li>
+        <li>
+          <b>Standart dışı port bir güvenlik önlemi değildir.</b> RDP'yi 3389 yerine 33890'da
+          çalıştırmak otomatik taramaları azaltır ama hedefli bir saldırıyı beş saniye bile
+          yavaşlatmaz. Gerçek çözüm VPN ya da sıfır güven ağ geçididir.
+        </li>
+        <li>
+          <b>Dinleme adresine bakın.</b> <code>0.0.0.0</code> her arayüzden dinliyor demektir;
+          <code>127.0.0.1</code> yalnızca makinenin kendisinden. Veri tabanları için ikincisi
+          çoğu zaman doğru ayardır ve güvenlik duvarı kuralına bile gerek bırakmaz.
+        </li>
+        <li>
+          <b>UDP portları taramada görünmez.</b> Kapalı UDP portu genelde hiç yanıt vermez, bu
+          yüzden "filtrelenmiş" görünür. UDP servislerini (DNS, SNMP, syslog) ayrıca denetlemek
+          gerekir; TCP taraması onları atlar.
+        </li>
+      </ul>
+    </section>
+  </div>
+
+  <script>
+    (() => {
+      const el = (s) => document.querySelector(s);
+      const kartlar = [...document.querySelectorAll('.t-kart')];
+
+      function suz() {
+        const q = el('#t-ara').value.trim().toLocaleLowerCase('tr');
+        const risk = document.querySelector('input[name="t-risk"]:checked').value;
+        let gorunen = 0;
+
+        for (const k of kartlar) {
+          const metinUyar = !q || k.dataset.arama.includes(q);
+          const riskUyar = risk === 'hepsi' || k.dataset.risk === risk;
+          const uyar = metinUyar && riskUyar;
+          k.hidden = !uyar;
+          if (uyar) gorunen++;
+        }
+
+        const durum = el('#t-durum');
+        if (gorunen === kartlar.length) {
+          durum.className = 'arac-durum';
+          durum.textContent = `${kartlar.length} port listeleniyor.`;
+        } else if (gorunen) {
+          durum.className = 'arac-durum ok';
+          durum.textContent = `${gorunen} sonuç.`;
+        } else {
+          durum.className = 'arac-durum hata';
+          durum.textContent = 'Sonuç yok. Bu liste yaygın portları kapsar, tamamını değil.';
+        }
+      }
+
+      el('#t-ara').addEventListener('input', suz);
+      document.querySelectorAll('input[name="t-risk"]').forEach((r) =>
+        r.addEventListener('change', suz)
+      );
+
+      el('#t-kopyala').addEventListener('click', async (e) => {
+        try {
+          await navigator.clipboard.writeText(
+            e.currentTarget.previousElementSibling.textContent
+          );
+          e.currentTarget.textContent = 'Kopyalandı';
+          setTimeout(() => (e.currentTarget.textContent = 'Kopyala'), 1600);
+        } catch {
+          /* pano izni yoksa kullanıcı elle seçer */
+        }
+      });
+
+      suz();
+    })();
+  </script>
+
+  <style>
+    .t-suzgecler {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      margin-top: 12px;
+    }
+    .t-radyo {
+      display: inline-flex;
+      align-items: center;
+      border: 1px solid var(--line);
+      border-radius: 999px;
+      padding: 6px 14px;
+      font-size: 12.5px;
+      color: var(--muted);
+      cursor: pointer;
+      background: var(--paper);
+    }
+    .t-radyo input {
+      position: absolute;
+      opacity: 0;
+      pointer-events: none;
+    }
+    .t-radyo:has(input:checked) {
+      border-color: var(--indigo);
+      color: var(--indigo-metin);
+      background: var(--tint);
+    }
+    .t-liste {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr);
+      gap: 9px;
+    }
+    .t-kart {
+      border: 1px solid var(--line);
+      border-left: 3px solid var(--line);
+      border-radius: 10px;
+      padding: 11px 13px;
+      background: var(--paper);
+    }
+    .t-kart[data-risk='yuksek'] {
+      border-left-color: light-dark(#dc2626, #f87171);
+    }
+    .t-kart[data-risk='orta'] {
+      border-left-color: light-dark(#f0c33c, #a97f1c);
+    }
+    .t-kart[data-risk='dusuk'] {
+      border-left-color: light-dark(#16a34a, #4ade80);
+    }
+    .t-ust {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: baseline;
+      gap: 8px 12px;
+      margin-bottom: 5px;
+    }
+    .t-no {
+      font-family: var(--mono, ui-monospace, monospace);
+      font-size: 18px;
+      color: var(--indigo-metin);
+      min-width: 2.6em;
+    }
+    .t-tur {
+      font-size: 10.5px;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      border: 1px solid var(--line);
+      border-radius: 999px;
+      padding: 2px 8px;
+      color: var(--muted);
+    }
+    .t-ad {
+      font-size: 14px;
+      font-weight: 600;
+      flex: 1 1 auto;
+    }
+    .t-risk {
+      font-size: 10.5px;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      border-radius: 999px;
+      padding: 2px 9px;
+      white-space: nowrap;
+    }
+    .t-risk[data-risk='yuksek'] {
+      background: light-dark(#fef2f2, #3b1d1d);
+      color: light-dark(#991b1b, #fca5a5);
+    }
+    .t-risk[data-risk='orta'] {
+      background: light-dark(#fffbeb, #2e2410);
+      color: light-dark(#92400e, #fbbf24);
+    }
+    .t-risk[data-risk='dusuk'] {
+      background: light-dark(#ecfdf5, #06301f);
+      color: light-dark(#065f46, #6ee7b7);
+    }
+    .t-not {
+      margin: 0;
+      font-size: 13px;
+      line-height: 1.6;
+      color: var(--ink-soft);
+    }
+    .t-ipuclari {
+      list-style: none;
+      margin: 0;
+      padding: 0;
+      display: grid;
+      gap: 12px;
+    }
+    .t-ipuclari li {
+      font-size: 13.5px;
+      line-height: 1.62;
+      color: var(--ink-soft);
+      border-left: 2px solid var(--line);
+      padding-left: 13px;
+    }
+  </style>
+</Base>

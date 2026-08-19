@@ -466,5 +466,59 @@
     "etiket": "yeni",
     "cevrimici": false,
     "grup": "Windows & Operasyon"
+  },
+  {
+    "slug": "linux-izin",
+    "ad": "Linux izin ve umask hesaplayıcı",
+    "ozet": "chmod sayısı ile rwx gösterimini karşılıklı çevirir; umask sonucunu ve özel bitleri açıklar.",
+    "ikon": "terminal",
+    "etiket": "yeni",
+    "cevrimici": false,
+    "grup": "Windows & Operasyon"
+  },
+  {
+    "slug": "gpo-cakisma",
+    "ad": "Grup ilkesi çakışma çözümleyici",
+    "ozet": "Aynı ayarı birden çok GPO tanımlıyorsa hangisi kazanır? LSDOU, zorlama ve geri döngüyle birlikte.",
+    "ikon": "pencere",
+    "etiket": "yeni",
+    "cevrimici": false,
+    "grup": "Windows & Operasyon"
+  },
+  {
+    "slug": "komut-cevirici",
+    "ad": "Linux ve PowerShell komut çevirici",
+    "ozet": "Aynı işin üç kabuktaki karşılığı, her satırda dikkat edilmesi gereken farkla birlikte.",
+    "ikon": "terminal",
+    "etiket": "yeni",
+    "cevrimici": false,
+    "grup": "Metin, Kod & Zaman"
+  },
+  {
+    "slug": "port-sozlugu",
+    "ad": "Ağ portu sözlüğü",
+    "ozet": "Hangi port hangi servis, dışarıya açık olması ne kadar riskli, güvenli karşılığı hangisi.",
+    "ikon": "dugum",
+    "etiket": "yeni",
+    "cevrimici": false,
+    "grup": "Ağ & DNS"
+  },
+  {
+    "slug": "gecis-listesi",
+    "ad": "Sunucu geçişi kontrol listesi üreteci",
+    "ozet": "Taşınan servise göre öncesi, anı ve sonrası için maddelenmiş liste; kritik adımlar işaretli.",
+    "ikon": "kutu",
+    "etiket": "yeni",
+    "cevrimici": false,
+    "grup": "Üretim & Paylaşım"
+  },
+  {
+    "slug": "sertifika-envanteri",
+    "ad": "Sertifika süre takibi ve envanter",
+    "ozet": "Kalan gün, yenileme penceresi ve risk sıralaması; envanteri otomatik toplayan betikle.",
+    "ikon": "kalkan",
+    "etiket": "yeni",
+    "cevrimici": false,
+    "grup": "Kimlik & Sertifika"
   }
 ]

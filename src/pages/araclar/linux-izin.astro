@@ -1,0 +1,635 @@
+---
+import Base from '../../layouts/Base.astro';
+---
+
+<Base
+  baslik="Linux izin ve umask hesaplayıcı"
+  aciklama="chmod sayısını simgesel gösterimle karşılıklı çevirir, umask sonucunu hesaplar, setuid ve sticky bitlerini açıklar."
+  aramaya={true}
+  kategori="Araç"
+>
+  <div class="arama-bas">
+    <div class="kap">
+      <nav class="kirinti" aria-label="Kırıntı yolu" style="padding-top:0">
+        <a href="/">Ana sayfa</a><span class="ayrac">/</span><a href="/araclar">Araçlar</a><span
+          class="ayrac">/</span
+        ><span aria-current="page">Linux izinleri</span>
+      </nav>
+      <h1>Linux izin ve umask hesaplayıcı</h1>
+      <p style="color:var(--muted);font-size:14px;margin-top:8px;max-width:66ch">
+        <code>755</code> mi <code>750</code> mi, <code>644</code> neden yazılamıyor, umask
+        <code>022</code> yeni dosyayı ne yapar? Kutucukları işaretleyin; sayı, simgesel gösterim
+        ve komut aynı anda güncellensin.
+      </p>
+    </div>
+  </div>
+
+  <div class="kap arac-sayfa">
+    <section class="arac-blok">
+      <h2 class="arac-h2"><span class="arac-no">1</span> İzinler</h2>
+      <div class="l-kaydir">
+        <table class="l-tablo">
+          <thead>
+            <tr><th>Kim</th><th>Okuma (4)</th><th>Yazma (2)</th><th>Çalıştırma (1)</th><th>Sayı</th></tr>
+          </thead>
+          <tbody>
+            {
+              [
+                ['sahip', 'Sahip'],
+                ['grup', 'Grup'],
+                ['diger', 'Diğerleri'],
+              ].map(([kod, ad]) => (
+                <tr>
+                  <th scope="row">{ad}</th>
+                  <td><input type="checkbox" data-kim={kod} data-bit="4" aria-label={`${ad} okuma`} /></td>
+                  <td><input type="checkbox" data-kim={kod} data-bit="2" aria-label={`${ad} yazma`} /></td>
+                  <td><input type="checkbox" data-kim={kod} data-bit="1" aria-label={`${ad} çalıştırma`} /></td>
+                  <td class="l-hane" id={`l-hane-${kod}`}>0</td>
+                </tr>
+              ))
+            }
+          </tbody>
+        </table>
+      </div>
+
+      <span class="yan-etiket" style="margin-top:16px;display:block">Özel bitler</span>
+      <div class="l-ozel">
+        <label class="l-sec"
+          ><input type="checkbox" id="l-setuid" />
+          <span>setuid (4000) <i>— dosya sahibinin yetkisiyle çalışır</i></span>
+        </label>
+        <label class="l-sec"
+          ><input type="checkbox" id="l-setgid" />
+          <span>setgid (2000) <i>— dizinde: yeni dosyalar dizinin grubunu alır</i></span>
+        </label>
+        <label class="l-sec"
+          ><input type="checkbox" id="l-sticky" />
+          <span>sticky (1000) <i>— dizinde: herkes yazar ama kendi dosyasını siler</i></span>
+        </label>
+        <label class="l-sec"
+          ><input type="checkbox" id="l-dizin" />
+          <span>Bu bir dizin</span>
+        </label>
+      </div>
+
+      <div class="arac-alanlar" style="margin-top:16px">
+        <label class="arac-alan"
+          >Sayısal gösterim
+          <input id="l-sayi" type="text" spellcheck="false" value="644" />
+        </label>
+        <label class="arac-alan"
+          >Simgesel gösterim
+          <input id="l-simge" type="text" spellcheck="false" value="rw-r--r--" />
+        </label>
+        <label class="arac-alan"
+          >Dosya yolu
+          <input id="l-yol" type="text" spellcheck="false" value="/opt/uygulama/ayar.conf" />
+        </label>
+      </div>
+      <div class="arac-dugmeler">
+        {
+          [
+            ['644', 'Yapılandırma dosyası'],
+            ['600', 'Özel anahtar'],
+            ['755', 'Betik / dizin'],
+            ['750', 'Grup içi dizin'],
+            ['1777', 'Ortak geçici dizin'],
+            ['2775', 'Paylaşılan proje dizini'],
+          ].map(([deger, ad]) => (
+            <button type="button" class="dg dg-hayalet" data-hazir={deger}>
+              {ad} ({deger})
+            </button>
+          ))
+        }
+      </div>
+      <p class="arac-durum" id="l-durum" role="status" aria-live="polite"></p>
+    </section>
+
+    <section class="arac-blok">
+      <h2 class="arac-h2"><span class="arac-no">2</span> Sonuç</h2>
+      <div class="l-buyuk" id="l-buyuk"></div>
+      <div id="l-notlar"></div>
+      <div style="position:relative;margin-top:16px">
+        <pre class="kod"><code id="l-komut"></code></pre>
+        <button class="kopyala" type="button" data-kaynak="l-komut">Kopyala</button>
+      </div>
+    </section>
+
+    <section class="arac-blok">
+      <h2 class="arac-h2"><span class="arac-no">3</span> umask</h2>
+      <p class="arac-not" style="margin-top:0">
+        umask, yeni oluşturulan dosyalardan <b>çıkarılacak</b> izinleri gösterir. Dosyalar
+        <code>666</code>, dizinler <code>777</code> temelinden başlar.
+      </p>
+      <div class="arac-alanlar">
+        <label class="arac-alan"
+          >umask değeri
+          <input id="l-umask" type="text" spellcheck="false" value="022" />
+        </label>
+      </div>
+      <div class="l-umask" id="l-umaskSonuc"></div>
+    </section>
+
+    <section class="arac-blok">
+      <h2 class="arac-h2"><span class="arac-no">4</span> Bilinmesi gerekenler</h2>
+      <ul class="l-ipuclari">
+        <li>
+          <b>Dizinde çalıştırma biti, "içine girebilme" demektir.</b> Okuma biti dizindeki
+          adları listelemenizi sağlar; çalıştırma biti ise içindeki bir dosyaya erişmenizi.
+          Bu yüzden <code>644</code> bir dizinde neredeyse işe yaramaz — <code>ls</code> çalışır
+          ama hiçbir dosya açılamaz.
+        </li>
+        <li>
+          <b>Silme yetkisi dosyada değil, dizindedir.</b> Bir dosyayı silebilmek için o
+          dosyada değil, <i>bulunduğu dizinde</i> yazma yetkiniz olmalıdır. Salt okunur bir
+          dosyayı, dizine yazabiliyorsanız silebilirsiniz. Sticky bit tam olarak bunu
+          sınırlamak için vardır.
+        </li>
+        <li>
+          <b>setuid betiklerde çalışmaz.</b> Linux çekirdeği güvenlik gereği kabuk betiklerinde
+          setuid bitini yok sayar. Yetki yükseltmesi gerekiyorsa <code>sudo</code> kuralı
+          yazın; setuid'i derlenmiş ikili dosyalar dışında kullanmayın.
+        </li>
+        <li>
+          <b>Özel anahtar 600 olmalı.</b> SSH, izinleri geniş olan özel anahtarı kullanmayı
+          reddeder ve "UNPROTECTED PRIVATE KEY FILE" hatası verir. Aynı şey
+          <code>~/.ssh</code> dizini için de geçerlidir: <code>700</code> olmalı.
+        </li>
+        <li>
+          <b>ACL varsa <code>ls</code> yanıltır.</b> İzin dizisinin sonunda <code>+</code>
+          görüyorsanız dosyada genişletilmiş erişim listesi vardır ve gerçek yetkiler
+          <code>getfacl</code> ile görülür. Sadece <code>chmod</code> ile bakmak eksik bilgi verir.
+        </li>
+        <li>
+          <b>umask kalıcı değildir.</b> Kabukta verdiğiniz umask yalnızca o oturumda geçerlidir.
+          Servisler için doğru yer <code>systemd</code> birim dosyasındaki
+          <code>UMask=</code> satırıdır; <code>.bashrc</code> servisleri etkilemez.
+        </li>
+      </ul>
+    </section>
+  </div>
+
+  <script>
+    (() => {
+      const el = (s) => document.querySelector(s);
+      const KIMLER = ['sahip', 'grup', 'diger'];
+
+      /** Kutucuklardan üç haneli sayıyı ve özel bitleri okur. */
+      function kutulardanOku() {
+        const haneler = KIMLER.map((kim) =>
+          [...document.querySelectorAll(`[data-kim="${kim}"]`)]
+            .filter((k) => k.checked)
+            .reduce((t, k) => t + Number(k.dataset.bit), 0)
+        );
+        const ozel =
+          (el('#l-setuid').checked ? 4 : 0) +
+          (el('#l-setgid').checked ? 2 : 0) +
+          (el('#l-sticky').checked ? 1 : 0);
+        return { haneler, ozel };
+      }
+
+      function kutularaYaz(haneler, ozel) {
+        KIMLER.forEach((kim, i) => {
+          document.querySelectorAll(`[data-kim="${kim}"]`).forEach((k) => {
+            k.checked = (haneler[i] & Number(k.dataset.bit)) !== 0;
+          });
+        });
+        el('#l-setuid').checked = (ozel & 4) !== 0;
+        el('#l-setgid').checked = (ozel & 2) !== 0;
+        el('#l-sticky').checked = (ozel & 1) !== 0;
+      }
+
+      /** Üç haneyi ve özel bitleri rwx dizisine çevirir. */
+      function simgeselYaz(haneler, ozel, dizinMi) {
+        const parcalar = haneler.map((h, i) => {
+          const r = h & 4 ? 'r' : '-';
+          const w = h & 2 ? 'w' : '-';
+          let x = h & 1 ? 'x' : '-';
+          // setuid/setgid/sticky, çalıştırma bitinin yerine harf koyar
+          if (i === 0 && ozel & 4) x = h & 1 ? 's' : 'S';
+          if (i === 1 && ozel & 2) x = h & 1 ? 's' : 'S';
+          if (i === 2 && ozel & 1) x = h & 1 ? 't' : 'T';
+          return r + w + x;
+        });
+        return (dizinMi ? 'd' : '-') + parcalar.join('');
+      }
+
+      /** rwx dizisini hanelere çevirir; setuid/sticky harflerini de tanır. */
+      function simgeselOku(metin) {
+        let s = metin.trim().replace(/^[dlbcps-]/, '');
+        if (s.length !== 9) return null;
+        const haneler = [];
+        let ozel = 0;
+        for (let i = 0; i < 3; i++) {
+          const p = s.slice(i * 3, i * 3 + 3);
+          let h = 0;
+          if (p[0] === 'r') h += 4;
+          else if (p[0] !== '-') return null;
+          if (p[1] === 'w') h += 2;
+          else if (p[1] !== '-') return null;
+
+          const u = p[2];
+          if (u === 'x') h += 1;
+          else if (u === 's' || u === 't') {
+            h += 1;
+            ozel += i === 0 ? 4 : i === 1 ? 2 : 1;
+          } else if (u === 'S' || u === 'T') {
+            ozel += i === 0 ? 4 : i === 1 ? 2 : 1;
+          } else if (u !== '-') return null;
+
+          haneler.push(h);
+        }
+        return { haneler, ozel };
+      }
+
+      const ADLAR = ['Sahip', 'Grup', 'Diğerleri'];
+
+      function guncelle(kaynak) {
+        const dizinMi = el('#l-dizin').checked;
+        let haneler;
+        let ozel;
+
+        if (kaynak === 'sayi') {
+          const ham = el('#l-sayi').value.trim();
+          if (!/^[0-7]{3,4}$/.test(ham)) {
+            el('#l-durum').className = 'arac-durum hata';
+            el('#l-durum').textContent = 'Sayı üç ya da dört haneli olmalı ve her hane 0-7 arası.';
+            return;
+          }
+          const dolu = ham.padStart(4, '0');
+          ozel = Number(dolu[0]);
+          haneler = [Number(dolu[1]), Number(dolu[2]), Number(dolu[3])];
+          kutularaYaz(haneler, ozel);
+        } else if (kaynak === 'simge') {
+          const c = simgeselOku(el('#l-simge').value);
+          if (!c) {
+            el('#l-durum').className = 'arac-durum hata';
+            el('#l-durum').textContent =
+              'Simgesel gösterim dokuz karakter olmalı: rwxrwxrwx biçiminde.';
+            return;
+          }
+          haneler = c.haneler;
+          ozel = c.ozel;
+          kutularaYaz(haneler, ozel);
+        } else {
+          const c = kutulardanOku();
+          haneler = c.haneler;
+          ozel = c.ozel;
+        }
+
+        const sayi = (ozel ? String(ozel) : '') + haneler.join('');
+        const tamSayi = String(ozel) + haneler.join('');
+        const simge = simgeselYaz(haneler, ozel, dizinMi);
+
+        if (kaynak !== 'sayi') el('#l-sayi').value = sayi;
+        if (kaynak !== 'simge') el('#l-simge').value = simge.slice(1);
+        KIMLER.forEach((kim, i) => {
+          el(`#l-hane-${kim}`).textContent = String(haneler[i]);
+        });
+
+        /* --- büyük gösterim --- */
+        el('#l-buyuk').innerHTML =
+          `<div class="l-kutu"><span>Sayısal</span><b>${sayi}</b></div>` +
+          `<div class="l-kutu"><span>Tam sayısal</span><b>${tamSayi}</b></div>` +
+          `<div class="l-kutu"><span>ls çıktısı</span><b class="l-simgesel">${simge}</b></div>`;
+
+        /* --- notlar --- */
+        const notlar = [];
+        const yazabilir = (h) => (h & 2) !== 0;
+        const calistirabilir = (h) => (h & 1) !== 0;
+
+        notlar.push([
+          'ok',
+          ADLAR.map((ad, i) => {
+            const h = haneler[i];
+            const yapabilir = [];
+            if (h & 4) yapabilir.push(dizinMi ? 'listeleyebilir' : 'okuyabilir');
+            if (h & 2) yapabilir.push(dizinMi ? 'dosya ekleyip silebilir' : 'yazabilir');
+            if (h & 1) yapabilir.push(dizinMi ? 'içine girebilir' : 'çalıştırabilir');
+            return `<b>${ad}:</b> ${yapabilir.length ? yapabilir.join(', ') : 'hiçbir şey yapamaz'}`;
+          }).join('<br>'),
+        ]);
+
+        if (dizinMi && haneler.some((h) => (h & 4) && !(h & 1))) {
+          notlar.push([
+            'hata',
+            '<b>Dizinde okuma var ama çalıştırma yok.</b> Bu kombinasyon neredeyse her zaman ' +
+              'hatadır: <code>ls</code> dosya adlarını gösterir ama hiçbiri açılamaz. Dizinlerde ' +
+              'okuma verdiğiniz her yere çalıştırma da verin.',
+          ]);
+        }
+
+        if (!dizinMi && yazabilir(haneler[2])) {
+          notlar.push([
+            'hata',
+            '<b>Herkes yazabiliyor.</b> Dünyaya açık yazma izni, dosyanın içeriğinin herhangi ' +
+              'bir kullanıcı tarafından değiştirilebilmesi demektir. Bir betikse bu doğrudan ' +
+              'kod çalıştırma yetkisidir.',
+          ]);
+        }
+
+        if (dizinMi && yazabilir(haneler[2]) && !(ozel & 1)) {
+          notlar.push([
+            'hata',
+            '<b>Herkesin yazabildiği dizinde sticky bit yok.</b> Bu dizinde herkes ' +
+              '<i>başkasının</i> dosyasını silebilir. <code>/tmp</code> gibi ortak dizinlerde ' +
+              'mutlaka sticky bit (<code>1777</code>) kullanın.',
+          ]);
+        }
+
+        if (ozel & 4) {
+          notlar.push([
+            'uyari',
+            '<b>setuid açık.</b> Dosya, çalıştıran kullanıcının değil <i>sahibinin</i> ' +
+              'yetkisiyle çalışır. Sahibi root ise bu, herkese root yetkisi veren bir kapıdır. ' +
+              'Kabuk betiklerinde çekirdek bu biti zaten yok sayar; derlenmiş ikililerde ise ' +
+              'gerçekten gerekli olduğundan emin olun.',
+          ]);
+        }
+
+        if (ozel & 2 && dizinMi) {
+          notlar.push([
+            'ok',
+            '<b>setgid dizinde doğru kullanım.</b> Bu dizinde oluşturulan her dosya, ' +
+              'oluşturanın birincil grubunu değil dizinin grubunu alır. Paylaşılan proje ' +
+              'dizinlerinde tam olarak istenen davranış budur.',
+          ]);
+        }
+
+        if (!dizinMi && calistirabilir(haneler[0]) && sayi.endsWith('777')) {
+          notlar.push([
+            'hata',
+            '<b>777 asla doğru cevap değildir.</b> "İzin sorunu" bir şekilde çözülür ama ' +
+              'dosya artık herkes tarafından değiştirilebilir ve çalıştırılabilir. Gerçek ' +
+              'sorun genelde sahiplik ya da dizin izinleridir; <code>chown</code> ile çözün.',
+          ]);
+        }
+
+        const yol = el('#l-yol').value.trim();
+        if (/\.(key|pem|p12|pfx)$/i.test(yol) || /id_(rsa|ed25519|ecdsa)$/.test(yol)) {
+          const uygun = sayi === '600' || sayi === '400';
+          notlar.push([
+            uygun ? 'ok' : 'hata',
+            uygun
+              ? '<b>Özel anahtar için doğru izin.</b> SSH bundan geniş izinli anahtarı ' +
+                'kullanmayı reddeder.'
+              : `<b>Özel anahtar dosyası için ${sayi} çok geniş.</b> SSH "UNPROTECTED PRIVATE ` +
+                `KEY FILE" diyerek anahtarı reddeder. <code>600</code> kullanın.`,
+          ]);
+        }
+
+        el('#l-notlar').innerHTML =
+          '<ul class="l-liste">' +
+          notlar.map(([tip, m]) => `<li data-tip="${tip}">${m}</li>`).join('') +
+          '</ul>';
+
+        /* --- komutlar --- */
+        const hedef = yol || '/yol/dosya';
+        el('#l-komut').textContent =
+          `# Sayısal biçim\n` +
+          `chmod ${sayi} ${hedef}\n\n` +
+          `# Simgesel biçim (mevcut izinleri korumak için + ve - kullanın)\n` +
+          `chmod u=${simge.slice(1, 4).replace(/-/g, '')},g=${simge.slice(4, 7).replace(/-/g, '')},o=${simge.slice(7).replace(/-/g, '')} ${hedef}\n\n` +
+          (dizinMi
+            ? `# Dizin ağacına uygula — dosyalara ve dizinlere ayrı izin\n` +
+              `find ${hedef} -type d -exec chmod ${sayi} {} +\n` +
+              `find ${hedef} -type f -exec chmod ${haneler.map((h) => h & ~1).join('')} {} +\n\n`
+            : '') +
+          `# Mevcut izinleri gör\n` +
+          `stat -c '%a %A %U:%G %n' ${hedef}\n\n` +
+          `# Genişletilmiş erişim listesi var mı? (ls çıktısında + varsa)\n` +
+          `getfacl ${hedef}\n\n` +
+          `# Windows tarafından bakıyorsanız (WSL)\n` +
+          `wsl stat -c '%a %A' ${hedef}`;
+
+        const hataSayisi = notlar.filter(([t]) => t === 'hata').length;
+        el('#l-durum').className = 'arac-durum ' + (hataSayisi ? 'hata' : 'ok');
+        el('#l-durum').textContent = hataSayisi
+          ? `${sayi} — ${hataSayisi} sorun var, aşağıya bakın.`
+          : `${sayi} (${simge})`;
+
+        umaskHesapla();
+      }
+
+      /* --- umask --------------------------------------------------------- */
+      function umaskHesapla() {
+        const ham = el('#l-umask').value.trim();
+        if (!/^[0-7]{3,4}$/.test(ham)) {
+          el('#l-umaskSonuc').innerHTML =
+            '<p class="arac-durum hata" style="margin:0">umask üç haneli sekizlik bir sayı olmalı.</p>';
+          return;
+        }
+        const maske = ham.slice(-3).split('').map(Number);
+        // Dosya 666, dizin 777 temelinden maske çıkarılır
+        const dosya = maske.map((m, i) => 6 & ~m & 7);
+        const dizin = maske.map((m, i) => 7 & ~m & 7);
+
+        el('#l-umaskSonuc').innerHTML =
+          `<div class="l-umaskKart"><span>Yeni dosya</span><b>${dosya.join('')}</b>` +
+          `<em>${simgeselYaz(dosya, 0, false).slice(1)}</em></div>` +
+          `<div class="l-umaskKart"><span>Yeni dizin</span><b>${dizin.join('')}</b>` +
+          `<em>${simgeselYaz(dizin, 0, true).slice(1)}</em></div>` +
+          `<div class="l-umaskKart"><span>umask</span><b>${ham}</b>` +
+          `<em>çıkarılan izinler</em></div>` +
+          `<p class="l-umaskNot">` +
+          (ham.slice(-3) === '022'
+            ? 'En yaygın değer. Sahip tam, diğerleri salt okunur — çoğu sunucu için doğru varsayılan.'
+            : ham.slice(-3) === '077'
+              ? 'Katı değer: yeni dosyaları yalnızca sahibi görebilir. Paylaşımlı dizinlerde işleri zorlaştırır ama gizlilik gereken yerde doğrudur.'
+              : ham.slice(-3) === '002'
+                ? 'Grup yazabilir. setgid\'li paylaşılan proje dizinleriyle birlikte kullanılır; aksi hâlde gereğinden geniştir.'
+                : dosya[2] >= 2
+                  ? '<b>Dikkat:</b> bu umask ile yeni dosyalara herkes yazabilir. Neredeyse her zaman hatalıdır.'
+                  : 'Bu değer standart dışı; ekipteki herkesin aynı umask ile çalıştığından emin olun.') +
+          `</p>`;
+      }
+
+      /* --- olaylar ------------------------------------------------------- */
+      document
+        .querySelectorAll('[data-kim], #l-setuid, #l-setgid, #l-sticky, #l-dizin')
+        .forEach((k) => k.addEventListener('change', () => guncelle('kutu')));
+
+      el('#l-sayi').addEventListener('input', () => guncelle('sayi'));
+      el('#l-simge').addEventListener('input', () => guncelle('simge'));
+      el('#l-yol').addEventListener('input', () => guncelle('kutu'));
+      el('#l-umask').addEventListener('input', umaskHesapla);
+
+      document.querySelectorAll('[data-hazir]').forEach((d) => {
+        d.addEventListener('click', () => {
+          const deger = d.dataset.hazir;
+          el('#l-sayi').value = deger;
+          // Dizin varsayımı: çalıştırma biti olan ya da özel bit taşıyan hazırlar
+          el('#l-dizin').checked = deger.length === 4 || deger === '755' || deger === '750';
+          guncelle('sayi');
+        });
+      });
+
+      document.querySelectorAll('.kopyala').forEach((d) => {
+        d.addEventListener('click', async () => {
+          try {
+            await navigator.clipboard.writeText(el(`#${d.dataset.kaynak}`).textContent);
+            d.textContent = 'Kopyalandı';
+            setTimeout(() => (d.textContent = 'Kopyala'), 1600);
+          } catch {
+            /* pano izni yoksa kullanıcı elle seçer */
+          }
+        });
+      });
+
+      guncelle('sayi');
+    })();
+  </script>
+
+  <style>
+    .l-kaydir {
+      overflow-x: auto;
+    }
+    .l-tablo {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 13px;
+      min-width: 440px;
+    }
+    .l-tablo th,
+    .l-tablo td {
+      text-align: left;
+      padding: 10px 12px;
+      border-bottom: 1px solid var(--line);
+    }
+    .l-tablo thead th {
+      color: var(--muted);
+      font-size: 11.5px;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+    }
+    .l-tablo tbody th {
+      font-weight: 600;
+    }
+    .l-tablo input {
+      width: 17px;
+      height: 17px;
+      cursor: pointer;
+    }
+    .l-hane {
+      font-family: var(--mono, ui-monospace, monospace);
+      font-size: 16px;
+      color: var(--indigo-metin);
+      font-weight: 700;
+    }
+    .l-ozel {
+      display: grid;
+      gap: 9px;
+    }
+    .l-sec {
+      display: inline-flex;
+      align-items: baseline;
+      gap: 8px;
+      font-size: 13px;
+      color: var(--ink-soft);
+      cursor: pointer;
+      line-height: 1.5;
+    }
+    .l-sec i {
+      font-style: normal;
+      color: var(--muted);
+      font-size: 12px;
+    }
+    .arac-dugmeler {
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+      margin-top: 14px;
+    }
+    .l-buyuk {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(min(150px, 100%), 1fr));
+      gap: 10px;
+      margin-bottom: 16px;
+    }
+    .l-kutu {
+      border: 1px solid var(--line);
+      border-radius: 11px;
+      padding: 13px 15px;
+      display: grid;
+      gap: 3px;
+      background: var(--paper);
+    }
+    .l-kutu span {
+      font-size: 11.5px;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+      color: var(--muted);
+    }
+    .l-kutu b {
+      font-size: 25px;
+      font-family: var(--mono, ui-monospace, monospace);
+      letter-spacing: -0.01em;
+      color: var(--indigo-metin);
+    }
+    .l-simgesel {
+      font-size: 19px !important;
+      letter-spacing: 0.06em !important;
+    }
+    .l-umask {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(min(150px, 100%), 1fr));
+      gap: 10px;
+      margin-top: 12px;
+    }
+    .l-umaskKart {
+      border: 1px solid var(--line);
+      border-radius: 11px;
+      padding: 12px 14px;
+      display: grid;
+      gap: 2px;
+    }
+    .l-umaskKart span {
+      font-size: 11.5px;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+      color: var(--muted);
+    }
+    .l-umaskKart b {
+      font-size: 21px;
+      font-family: var(--mono, ui-monospace, monospace);
+    }
+    .l-umaskKart em {
+      font-style: normal;
+      font-size: 12px;
+      color: var(--muted);
+      font-family: var(--mono, ui-monospace, monospace);
+    }
+    .l-umaskNot {
+      grid-column: 1 / -1;
+      font-size: 13px;
+      line-height: 1.6;
+      color: var(--ink-soft);
+      margin: 4px 0 0;
+    }
+    .l-liste,
+    .l-ipuclari {
+      list-style: none;
+      margin: 0;
+      padding: 0;
+      display: grid;
+      gap: 12px;
+    }
+    .l-liste li,
+    .l-ipuclari li {
+      font-size: 13.5px;
+      line-height: 1.62;
+      color: var(--ink-soft);
+      border-left: 2px solid var(--line);
+      padding-left: 13px;
+    }
+    .l-liste li[data-tip='hata'] {
+      border-left-color: light-dark(#dc2626, #f87171);
+    }
+    .l-liste li[data-tip='uyari'] {
+      border-left-color: light-dark(#f0c33c, #a97f1c);
+    }
+    .l-liste li[data-tip='ok'] {
+      border-left-color: light-dark(#16a34a, #4ade80);
+    }
+  </style>
+</Base>

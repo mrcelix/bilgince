@@ -1,0 +1,577 @@
+---
+import Base from '../../layouts/Base.astro';
+---
+
+<Base
+  baslik="Grup ilkesi çakışma çözümleyici"
+  aciklama="Aynı ayarı birden çok GPO tanımlıyorsa hangisi kazanır? LSDOU sırasını, zorlamayı, devralma engelini ve geri döngü kipini hesaba katarak gösterir."
+  aramaya={true}
+  kategori="Araç"
+>
+  <div class="arama-bas">
+    <div class="kap">
+      <nav class="kirinti" aria-label="Kırıntı yolu" style="padding-top:0">
+        <a href="/">Ana sayfa</a><span class="ayrac">/</span><a href="/araclar">Araçlar</a><span
+          class="ayrac">/</span
+        ><span aria-current="page">GPO çakışması</span>
+      </nav>
+      <h1>Grup ilkesi çakışma çözümleyici</h1>
+      <p style="color:var(--muted);font-size:14px;margin-top:8px;max-width:66ch">
+        "Ayarı yaptım ama uygulanmıyor." Grup ilkesinde bunun cevabı neredeyse her zaman
+        önceliktedir: hangi GPO en son işlenirse o kazanır — <b>zorlanmış bir ilke yoksa</b>.
+        İlkelerinizi sıralayın, kazananı ve nedenini görün.
+      </p>
+    </div>
+  </div>
+
+  <div class="kap arac-sayfa">
+    <section class="arac-blok">
+      <h2 class="arac-h2"><span class="arac-no">1</span> İlkeler</h2>
+      <p class="arac-not" style="margin-top:0">
+        Bağlantı düzeyini seçin. İşlenme sırası <b>yerel → site → etki alanı → OU</b> (LSDOU)
+        şeklindedir; aynı düzeydeki ilkelerde bağlantı sırası küçük olan sonra işlenir ve kazanır.
+      </p>
+      <div class="p-kurallar" id="p-kurallar"></div>
+      <div class="arac-dugmeler">
+        <button type="button" class="dg dg-hayalet" id="p-ekle">İlke ekle</button>
+        <button type="button" class="dg dg-hayalet" id="p-ornek">Klasik senaryo</button>
+      </div>
+    </section>
+
+    <section class="arac-blok">
+      <h2 class="arac-h2"><span class="arac-no">2</span> Ortam</h2>
+      <div class="p-secenekler">
+        <label class="p-sec"
+          ><input type="checkbox" id="p-engel" />
+          <span
+            >Hedef OU'da devralma engellendi
+            <i>(üst düzeylerden gelen ilkeler uygulanmasın)</i></span
+          >
+        </label>
+        <label class="p-sec"
+          ><input type="checkbox" id="p-geri" />
+          <span
+            >Geri döngü kipi açık <i>(kullanıcı ayarları bilgisayarın OU'suna göre işlensin)</i></span
+          >
+        </label>
+      </div>
+      <div class="arac-alanlar" style="margin-top:14px">
+        <label class="arac-alan" id="p-geriKip-alan" hidden
+          >Geri döngü kipi
+          <select id="p-geriKip">
+            <option value="birlestir">Birleştir (merge)</option>
+            <option value="degistir">Değiştir (replace)</option>
+          </select>
+        </label>
+        <label class="arac-alan"
+          >Çakışan ayar
+          <input id="p-ayar" type="text" spellcheck="false" value="Ekran koruyucu zaman aşımı" />
+        </label>
+      </div>
+      <p class="arac-durum" id="p-durum" role="status" aria-live="polite"></p>
+    </section>
+
+    <section class="arac-blok">
+      <h2 class="arac-h2"><span class="arac-no">3</span> İşlenme sırası</h2>
+      <ol class="p-sira" id="p-sira"></ol>
+      <div class="p-kazanan" id="p-kazanan"></div>
+    </section>
+
+    <section class="arac-blok">
+      <h2 class="arac-h2"><span class="arac-no">4</span> Teşhis komutları</h2>
+      <div style="position:relative">
+        <pre class="kod"><code id="p-komut"></code></pre>
+        <button class="kopyala" type="button" data-kaynak="p-komut">Kopyala</button>
+      </div>
+    </section>
+
+    <section class="arac-blok">
+      <h2 class="arac-h2"><span class="arac-no">5</span> Öncelik kuralları</h2>
+      <ul class="p-ipuclari">
+        <li>
+          <b>Son işlenen kazanır.</b> Sıra yerel ilkeyle başlar, siteyle devam eder, etki alanına
+          geçer ve en içteki OU ile biter. Bu yüzden hedefe en yakın OU'daki ayar, etki alanı
+          düzeyindekini ezer. Sezgiye aykırı görünen çoğu durum aslında bu kuraldır.
+        </li>
+        <li>
+          <b>Zorlama (enforced) sırayı tersine çevirir.</b> Bir bağlantı zorlanmışsa artık en
+          son işlenmiş sayılır ve alttaki hiçbir ilke onu ezemez. Birden çok zorlanmış ilke
+          varsa <i>en üstteki</i> kazanır — normal sıranın tam tersi. Zorlamayı yalnızca
+          gerçekten pazarlık edilemez ayarlar için kullanın.
+        </li>
+        <li>
+          <b>Devralma engeli, zorlanmış ilkeyi durduramaz.</b> OU üzerinde "devralmayı engelle"
+          işaretlemek üst düzeylerden gelen ilkeleri keser — ama zorlanmış olanlar bu engeli
+          delip geçer. İkisi karşılaştığında her zaman zorlama kazanır.
+        </li>
+        <li>
+          <b>Güvenlik süzgeci sessizce çalışır.</b> Bir GPO doğru yere bağlı olsa bile hedef
+          nesnenin "Grup İlkesi Uygula" yetkisi yoksa uygulanmaz ve hiçbir hata görmezsiniz.
+          "Bağlı ama uygulanmıyor" şikâyetlerinin bir numaralı sebebi budur.
+        </li>
+        <li>
+          <b>Geri döngü, kullanıcı ayarlarını bilgisayara bağlar.</b> Ortak kullanılan
+          makinelerde (terminal sunucu, kiosk, laboratuvar) kullanıcının kendi OU'sundaki
+          ayarlar yerine bilgisayarın OU'sundakiler uygulanır. <i>Birleştir</i> ikisini de
+          işler ve bilgisayarınki kazanır; <i>Değiştir</i> kullanıcının ayarlarını tamamen yok
+          sayar.
+        </li>
+        <li>
+          <b>Uygulanma anı gecikmelidir.</b> Bilgisayar ayarları açılışta, kullanıcı ayarları
+          oturum açarken işlenir; arka planda yenileme 90 dakikada bir (rastgele 30 dakikaya
+          kadar sapmayla) olur. Etki alanı denetleyicilerinde bu süre 5 dakikadır. Test
+          ederken <code>gpupdate /force</code> demeden sonuç çıkarmayın.
+        </li>
+      </ul>
+    </section>
+  </div>
+
+  <script>
+    (() => {
+      const el = (s) => document.querySelector(s);
+      const kacir = (s) =>
+        String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+
+      /* Düzey numarası işlenme sırasını belirler: küçük olan önce işlenir,
+         sonra işlenen üstüne yazar. */
+      const DUZEYLER = [
+        { kod: 'yerel', ad: 'Yerel ilke', sira: 0 },
+        { kod: 'site', ad: 'Site', sira: 1 },
+        { kod: 'alan', ad: 'Etki alanı', sira: 2 },
+        { kod: 'ou1', ad: 'Üst OU', sira: 3 },
+        { kod: 'ou2', ad: 'Alt OU', sira: 4 },
+      ];
+
+      let sayac = 0;
+      let ilkeler = [];
+
+      function ilkeEkle(on = {}) {
+        ilkeler.push({
+          kimlik: ++sayac,
+          ad: on.ad ?? 'Yeni İlke',
+          duzey: on.duzey ?? 'alan',
+          deger: on.deger ?? '15 dakika',
+          zorla: on.zorla ?? false,
+          suzgec: on.suzgec ?? true,
+          bagSira: on.bagSira ?? 1,
+        });
+        ciz();
+      }
+
+      function ciz() {
+        el('#p-kurallar').innerHTML = ilkeler
+          .map(
+            (i) =>
+              `<div class="p-kural" data-kimlik="${i.kimlik}">` +
+              `<input type="text" class="p-ad" value="${i.ad.replace(/"/g, '&quot;')}" aria-label="İlke adı" />` +
+              `<select class="p-duzey" aria-label="Bağlantı düzeyi">` +
+              DUZEYLER.map(
+                (d) => `<option value="${d.kod}"${d.kod === i.duzey ? ' selected' : ''}>${d.ad}</option>`
+              ).join('') +
+              `</select>` +
+              `<input type="text" class="p-deger" value="${i.deger.replace(/"/g, '&quot;')}" aria-label="Ayarın değeri" />` +
+              `<label class="p-etiket"><input type="checkbox" class="p-zorla"${i.zorla ? ' checked' : ''} /> Zorla</label>` +
+              `<label class="p-etiket"><input type="checkbox" class="p-suzgec"${i.suzgec ? ' checked' : ''} /> Süzgeç geçiyor</label>` +
+              `<button type="button" class="p-sil" aria-label="İlkeyi sil">×</button>` +
+              `</div>`
+          )
+          .join('');
+        hesapla();
+      }
+
+      function hesapla() {
+        const engel = el('#p-engel').checked;
+        const geri = el('#p-geri').checked;
+        const geriKip = el('#p-geriKip').value;
+        const ayar = el('#p-ayar').value.trim() || 'Çakışan ayar';
+
+        el('#p-geriKip-alan').hidden = !geri;
+
+        const duzeyBilgi = (kod) => DUZEYLER.find((d) => d.kod === kod);
+
+        /* --- işlenme sırası -------------------------------------------------
+           Normal sırada düzey numarası artar. Zorlanmış bağlantılar en sona
+           alınır ama kendi aralarında ters sıralanır: en üstteki kazanır. */
+        const normal = ilkeler
+          .filter((i) => !i.zorla)
+          .sort((a, b) => duzeyBilgi(a.duzey).sira - duzeyBilgi(b.duzey).sira || b.bagSira - a.bagSira);
+
+        const zorlanmis = ilkeler
+          .filter((i) => i.zorla)
+          .sort((a, b) => duzeyBilgi(b.duzey).sira - duzeyBilgi(a.duzey).sira);
+
+        const sirali = [...normal, ...zorlanmis];
+
+        /* --- her ilke için uygulanıp uygulanmadığı --- */
+        const degerlendirilmis = sirali.map((i) => {
+          const d = duzeyBilgi(i.duzey);
+          const sebepler = [];
+          let uygulanir = true;
+
+          if (!i.suzgec) {
+            uygulanir = false;
+            sebepler.push('güvenlik süzgeci geçmiyor — hedefe "Grup İlkesi Uygula" yetkisi verilmemiş');
+          }
+
+          // Devralma engeli: hedef OU'nun üstündeki düzeyleri keser, zorlanmışları kesemez
+          if (uygulanir && engel && d.sira < 4 && !i.zorla) {
+            uygulanir = false;
+            sebepler.push('devralma engellendiği için üst düzeyden gelen bu ilke uygulanmıyor');
+          }
+
+          if (uygulanir && geri && geriKip === 'degistir' && d.sira < 3) {
+            uygulanir = false;
+            sebepler.push('geri döngü "değiştir" kipinde kullanıcının kendi ilkeleri yok sayılıyor');
+          }
+
+          if (uygulanir && i.zorla) {
+            sebepler.push('zorlanmış — devralma engelini deler ve alttaki ilkeler ezemez');
+          }
+
+          return { ...i, duzeyAd: d.ad, uygulanir, sebepler };
+        });
+
+        const uygulananlar = degerlendirilmis.filter((i) => i.uygulanir);
+        const kazanan = uygulananlar[uygulananlar.length - 1] ?? null;
+
+        /* --- sıra listesi --- */
+        el('#p-sira').innerHTML = degerlendirilmis
+          .map((i, n) => {
+            const kazandiMi = kazanan && i.kimlik === kazanan.kimlik;
+            return (
+              `<li class="p-adim" data-uygulanir="${i.uygulanir}"${kazandiMi ? ' data-kazanan="evet"' : ''}>` +
+              `<div class="p-adim-ust">` +
+              `<b>${n + 1}. ${kacir(i.ad)}</b>` +
+              `<span class="p-rozet">${kacir(i.duzeyAd)}</span>` +
+              (i.zorla ? '<span class="p-rozet p-zorlandi">zorlanmış</span>' : '') +
+              (kazandiMi ? '<span class="p-rozet p-kazandi">kazanan</span>' : '') +
+              `</div>` +
+              `<div class="p-adim-alt">` +
+              `<span>${kacir(ayar)} = <b>${kacir(i.deger)}</b></span>` +
+              (i.sebepler.length ? `<span class="p-sebep">${i.sebepler.join('; ')}</span>` : '') +
+              (i.uygulanir && !kazandiMi && !i.sebepler.length
+                ? '<span class="p-sebep">uygulandı ama sonraki bir ilke üzerine yazdı</span>'
+                : '') +
+              `</div></li>`
+            );
+          })
+          .join('');
+
+        /* --- kazanan kutusu --- */
+        if (!ilkeler.length) {
+          el('#p-kazanan').innerHTML = '';
+          el('#p-durum').textContent = 'İlke ekleyin.';
+          el('#p-durum').className = 'arac-durum';
+        } else if (!kazanan) {
+          el('#p-kazanan').innerHTML =
+            `<div class="p-sonuc" data-bos="evet"><span>Etkin değer</span>` +
+            `<b>Hiçbiri uygulanmıyor</b>` +
+            `<em>Bütün ilkeler süzgeç, devralma engeli ya da geri döngü yüzünden elendi — ` +
+            `ayar yerel varsayılanında kalır.</em></div>`;
+          el('#p-durum').className = 'arac-durum hata';
+          el('#p-durum').textContent = 'Hiçbir ilke uygulanmıyor.';
+        } else {
+          const elenen = degerlendirilmis.filter((i) => !i.uygulanir).length;
+          const ezilen = uygulananlar.length - 1;
+          el('#p-kazanan').innerHTML =
+            `<div class="p-sonuc"><span>Etkin değer</span>` +
+            `<b>${kacir(kazanan.deger)}</b>` +
+            `<em>${kacir(kazanan.ad)} — ${kacir(kazanan.duzeyAd)} düzeyinde` +
+            (kazanan.zorla
+              ? ', zorlanmış olduğu için en son işlendi'
+              : ', en son işlenen ilke olduğu için') +
+            `</em></div>`;
+          el('#p-durum').className = 'arac-durum ok';
+          el('#p-durum').textContent =
+            `${kacir(kazanan.ad)} kazanıyor.` +
+            (ezilen ? ` ${ezilen} ilke üzerine yazıldı.` : '') +
+            (elenen ? ` ${elenen} ilke hiç uygulanmadı.` : '');
+        }
+
+        /* --- komutlar --- */
+        el('#p-komut').textContent =
+          `# Bu makinede hangi ilkeler uygulandı, hangileri neden uygulanmadı?\n` +
+          `gpresult /h C:\\Kayit\\gpo-raporu.html /f\n` +
+          `# Raporda "Reddedilen GPO'lar" bölümü sebebi yazar — önce oraya bakın.\n\n` +
+          `# Belirli bir kullanıcı ve bilgisayar için özet\n` +
+          `gpresult /r /scope:computer\n` +
+          `gpresult /r /scope:user\n\n` +
+          `# İlkeleri hemen yenile (arka plan yenilemesini beklemeden)\n` +
+          `gpupdate /force\n` +
+          `# Bilgisayar ayarlarının bir kısmı yalnızca açılışta uygulanır:\n` +
+          `gpupdate /force /boot /logoff\n\n` +
+          `# Uzaktan modelleme: X kullanıcısı Y bilgisayarında oturum açsa ne olur?\n` +
+          `Get-GPResultantSetOfPolicy -User SIRKET\\mcelik -Computer PC-MUHASEBE-07 \\\n` +
+          `    -ReportType Html -Path C:\\Kayit\\modelleme.html\n\n` +
+          `# Bir ayarı hangi GPO tanımlıyor? Bütün ilkeleri tarayın\n` +
+          `Get-GPO -All | ForEach-Object {\n` +
+          `    $x = Get-GPOReport -Guid $_.Id -ReportType Xml\n` +
+          `    if ($x -match 'Ekran koruyucu') { $_.DisplayName }\n` +
+          `}\n\n` +
+          `# Bağlantı sırası ve zorlama durumu\n` +
+          `Get-GPInheritance -Target 'OU=Muhasebe,DC=sirket,DC=local' |\n` +
+          `    Select-Object -ExpandProperty GpoLinks |\n` +
+          `    Format-Table DisplayName, Order, Enforced, Enabled\n\n` +
+          `# Olay günlüğünde ilke işleme kayıtları\n` +
+          `Get-WinEvent -LogName 'Microsoft-Windows-GroupPolicy/Operational' -MaxEvents 50`;
+      }
+
+      /* --- olaylar --- */
+      document.addEventListener('input', (e) => {
+        const satir = e.target.closest('.p-kural');
+        if (satir) {
+          const i = ilkeler.find((x) => x.kimlik === Number(satir.dataset.kimlik));
+          if (i) {
+            i.ad = satir.querySelector('.p-ad').value;
+            i.duzey = satir.querySelector('.p-duzey').value;
+            i.deger = satir.querySelector('.p-deger').value;
+            i.zorla = satir.querySelector('.p-zorla').checked;
+            i.suzgec = satir.querySelector('.p-suzgec').checked;
+          }
+          hesapla();
+          return;
+        }
+        if (e.target.closest('#p-ayar, #p-engel, #p-geri, #p-geriKip')) hesapla();
+      });
+
+      document.addEventListener('change', (e) => {
+        if (e.target.closest('.p-kural, #p-engel, #p-geri, #p-geriKip')) hesapla();
+      });
+
+      document.addEventListener('click', (e) => {
+        if (e.target.closest('#p-ekle')) {
+          ilkeEkle();
+          return;
+        }
+        const sil = e.target.closest('.p-sil');
+        if (sil) {
+          const satir = sil.closest('.p-kural');
+          ilkeler = ilkeler.filter((x) => x.kimlik !== Number(satir.dataset.kimlik));
+          ciz();
+        }
+      });
+
+      el('#p-ornek').addEventListener('click', () => {
+        ilkeler = [];
+        sayac = 0;
+        el('#p-engel').checked = false;
+        el('#p-geri').checked = false;
+        ilkeEkle({ ad: 'Varsayılan Etki Alanı İlkesi', duzey: 'alan', deger: '15 dakika' });
+        ilkeEkle({ ad: 'Kurumsal Güvenlik', duzey: 'alan', deger: '5 dakika', zorla: true });
+        ilkeEkle({ ad: 'Muhasebe OU İlkesi', duzey: 'ou1', deger: '30 dakika' });
+        ilkeEkle({ ad: 'Muhasebe Kioskları', duzey: 'ou2', deger: '2 dakika' });
+        ilkeEkle({ ad: 'Yöneticiler İstisnası', duzey: 'ou2', deger: '60 dakika', suzgec: false });
+      });
+
+      document.querySelectorAll('.kopyala').forEach((d) => {
+        d.addEventListener('click', async () => {
+          try {
+            await navigator.clipboard.writeText(el(`#${d.dataset.kaynak}`).textContent);
+            d.textContent = 'Kopyalandı';
+            setTimeout(() => (d.textContent = 'Kopyala'), 1600);
+          } catch {
+            /* pano izni yoksa kullanıcı elle seçer */
+          }
+        });
+      });
+
+      ilkeEkle({ ad: 'Varsayılan Etki Alanı İlkesi', duzey: 'alan', deger: '15 dakika' });
+      ilkeEkle({ ad: 'Muhasebe OU İlkesi', duzey: 'ou1', deger: '30 dakika' });
+      ilkeEkle({ ad: 'Kurumsal Güvenlik', duzey: 'alan', deger: '5 dakika', zorla: true });
+    })();
+  </script>
+
+  <style>
+    .p-kurallar {
+      display: grid;
+      gap: 9px;
+      margin-bottom: 12px;
+    }
+    .p-kural {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      gap: 9px;
+      border: 1px solid var(--line);
+      border-radius: 10px;
+      padding: 9px 11px;
+      background: var(--paper);
+    }
+    .p-ad {
+      flex: 1 1 170px;
+      min-width: 0;
+    }
+    .p-deger {
+      flex: 0 1 120px;
+      min-width: 0;
+    }
+    .p-kural input[type='text'],
+    .p-kural select {
+      border: 1px solid var(--line);
+      border-radius: 7px;
+      padding: 6px 9px;
+      font: inherit;
+      font-size: 13px;
+      background: var(--bg);
+      color: var(--ink);
+    }
+    .p-etiket {
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
+      font-size: 12.5px;
+      color: var(--muted);
+      cursor: pointer;
+      white-space: nowrap;
+    }
+    .p-kural:has(.p-zorla:checked) {
+      border-color: var(--indigo);
+      background: var(--tint);
+    }
+    .p-kural:has(.p-suzgec:not(:checked)) {
+      opacity: 0.62;
+    }
+    .p-sil {
+      margin-left: auto;
+      border: 1px solid var(--line);
+      background: transparent;
+      border-radius: 7px;
+      width: 28px;
+      height: 28px;
+      cursor: pointer;
+      color: var(--muted);
+      font-size: 16px;
+      line-height: 1;
+    }
+    .p-sil:hover {
+      border-color: light-dark(#dc2626, #f87171);
+      color: light-dark(#dc2626, #f87171);
+    }
+    .arac-dugmeler {
+      display: flex;
+      gap: 10px;
+      flex-wrap: wrap;
+    }
+    .p-secenekler {
+      display: grid;
+      gap: 9px;
+    }
+    .p-sec {
+      display: inline-flex;
+      align-items: baseline;
+      gap: 8px;
+      font-size: 13px;
+      color: var(--ink-soft);
+      cursor: pointer;
+      line-height: 1.5;
+    }
+    .p-sec i {
+      font-style: normal;
+      color: var(--muted);
+      font-size: 12px;
+    }
+    .p-sira {
+      list-style: none;
+      margin: 0 0 18px;
+      padding: 0;
+      display: grid;
+      gap: 8px;
+    }
+    .p-adim {
+      border: 1px solid var(--line);
+      border-left: 3px solid var(--line);
+      border-radius: 10px;
+      padding: 11px 13px;
+      background: var(--paper);
+    }
+    .p-adim[data-uygulanir='false'] {
+      opacity: 0.6;
+      border-left-color: light-dark(#dc2626, #f87171);
+    }
+    .p-adim[data-kazanan] {
+      border-left-color: var(--indigo);
+      background: var(--tint);
+    }
+    .p-adim-ust {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      gap: 8px;
+      margin-bottom: 5px;
+    }
+    .p-adim-ust b {
+      font-size: 13.5px;
+    }
+    .p-rozet {
+      font-size: 10.5px;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      border: 1px solid var(--line);
+      border-radius: 999px;
+      padding: 2px 8px;
+      color: var(--muted);
+    }
+    .p-zorlandi {
+      border-color: light-dark(#f0c33c, #a97f1c);
+      color: light-dark(#92400e, #fbbf24);
+    }
+    .p-kazandi {
+      background: var(--indigo);
+      border-color: var(--indigo);
+      color: #fff;
+    }
+    .p-adim-alt {
+      display: grid;
+      gap: 3px;
+      font-size: 12.5px;
+      color: var(--ink-soft);
+    }
+    .p-sebep {
+      color: var(--muted);
+      font-size: 12px;
+      line-height: 1.5;
+    }
+    .p-sonuc {
+      border: 1px solid var(--indigo);
+      border-radius: 12px;
+      padding: 18px 20px;
+      display: grid;
+      gap: 3px;
+      background: var(--tint);
+    }
+    .p-sonuc[data-bos] {
+      border-color: light-dark(#fecaca, #7f2b2b);
+      background: light-dark(#fef2f2, #2a1616);
+    }
+    .p-sonuc span {
+      font-size: 11.5px;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      color: var(--muted);
+    }
+    .p-sonuc b {
+      font-size: 25px;
+      letter-spacing: -0.02em;
+    }
+    .p-sonuc em {
+      font-style: normal;
+      font-size: 12.5px;
+      color: var(--muted);
+      line-height: 1.5;
+    }
+    .p-ipuclari {
+      list-style: none;
+      margin: 0;
+      padding: 0;
+      display: grid;
+      gap: 12px;
+    }
+    .p-ipuclari li {
+      font-size: 13.5px;
+      line-height: 1.62;
+      color: var(--ink-soft);
+      border-left: 2px solid var(--line);
+      padding-left: 13px;
+    }
+  </style>
+</Base>
