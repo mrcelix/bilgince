@@ -1,0 +1,166 @@
+---
+baslik: "Disk doldu ama boş görünüyor: df ile du neden aynı şeyi söylemez"
+ozet: "df yüzde 100 diyor, du toplamı yarısını buluyor. Aradaki fark altı nedenden birinden gelir ve hepsinin çözümü farklıdır."
+konu: "linux"
+etiketler: ["linux", "depolama", "tanilama", "kapasite"]
+yayin: 2026-08-06
+sure: 11
+---
+
+Bir uygulama sunucusunda `/var` doluydu. `df -h` yüzde 100 gösteriyordu. `du -sh /var` ise 9 GB diyordu — bölüm 40 GB'tı.
+
+Kayıp 31 GB, silinmiş ama hâlâ açık bir günlük dosyasındaydı. Birisi `rm` ile 31 GB'lık bir dosyayı silmişti, ama o dosyayı yazan süreç çalışmayı sürdürdüğü için çekirdek alanı boşaltmamıştı. `du` dosyayı göremez, çünkü dizin ağacında artık yok. `df` görür, çünkü alan hâlâ ayrılmış.
+
+Bu, altı olası nedenden yalnızca biri. Aralarındaki farkı bilmek, doğru komutu ilk denemede çalıştırmayı sağlar.
+
+## Önce ölçün, sonra tahmin edin
+
+```bash
+df -h /var
+df -i /var
+du -x -h --max-depth=1 /var 2>/dev/null | sort -h
+```
+
+Üç komut üç ayrı soruyu yanıtlar: blok doluluğu, inode doluluğu, ve dizin bazında dağılım.
+
+`du` çağrısındaki `-x` önemlidir: alt bağlama noktalarına inmeyi engeller. Yoksa `/var` sayarken içine bağlanmış başka bir birimi de sayar ve toplam yanıltır.
+
+## Neden 1: silinmiş ama hâlâ açık dosyalar
+
+En sık karşılaşılan durum. Belirti nettir: `df` büyük, `du` küçük.
+
+```bash
+lsof +L1 2>/dev/null | head -20
+```
+
+`+L1`, bağlantı sayısı birden küçük olan — yani silinmiş ama açık — dosyaları listeler. Çıktıdaki `SIZE/OFF` sütunu kaybolan alanı gösterir.
+
+Çözüm, dosyayı tutan süreci yeniden başlatmaktır:
+
+```bash
+systemctl restart uygulama.service
+```
+
+Yeniden başlatamayacağınız bir süreçse alanı yerinde boşaltabilirsiniz:
+
+```bash
+# lsof çıktısındaki PID ve FD numarasıyla
+: > /proc/4211/fd/3
+```
+
+Bu, dosyayı sıfır bayta indirir; süreç yazmayı sürdürür ama alan geri gelir. `rm` ile silmeye çalışmak işe yaramaz — dosya zaten silinmiş durumdadır.
+
+**Asıl önlem:** büyüyen bir günlük dosyasını `rm` ile silmeyin. `logrotate` kullanın ya da `copytruncate` davranışını tercih edin; ikisi de dosyayı süreçten koparmadan boşaltır.
+
+## Neden 2: inode tükenmesi
+
+Belirti farklıdır: disk doluluğu düşük görünür ama yazma "No space left on device" hatası verir.
+
+```bash
+df -i /var
+```
+
+`IUse%` yüzde 100'e yakınsa alan değil, dosya sayısı bitmiştir. Neden genelde milyonlarca küçük dosyadır: oturum dosyaları, önbellek, kuyruk dizinleri, teslim edilemeyen e-postalar.
+
+Suçluyu bulmak:
+
+```bash
+for d in /var/*; do
+  printf "%8s  %s\n" "$(find "$d" -xdev -type f 2>/dev/null | wc -l)" "$d"
+done | sort -rn | head
+```
+
+Bu komut yavaştır ama doğru yanıtı verir. inode sayısı dosya sistemi oluşturulurken sabitlenir; ext4'te sonradan artırılamaz. Yani gerçek çözüm ya dosyaları temizlemek ya da bölümü yeniden oluşturmaktır. XFS bu konuda esnektir, dinamik olarak inode ayırır.
+
+## Neden 3: kök için ayrılmış bloklar
+
+ext2/3/4 dosya sistemlerinde alanın öntanımlı olarak **%5'i** kök kullanıcıya ayrılır. Sıradan bir kullanıcı ya da servis hesabı, disk gerçekte %95'teyken "dolu" hatası alır.
+
+```bash
+tune2fs -l /dev/mapper/vg0-var | grep -i "reserved block count"
+```
+
+40 GB'lık bir bölümde bu 2 GB demektir. Kök bölümünde bu ayırma anlamlıdır — sistem tamamen dolduğunda yöneticinin hâlâ giriş yapıp müdahale edebilmesini sağlar. Ama yalnızca veri tutan bir bölümde israftır:
+
+```bash
+# yalnızca veri bölümlerinde, kök bölümünde değil
+tune2fs -m 1 /dev/mapper/vg0-veri
+```
+
+## Neden 4: bağlama noktasının altında kalan dosyalar
+
+Bir dizine önce dosya yazılır, sonra o dizinin üzerine bir birim bağlanırsa alttaki dosyalar görünmez olur ama yer kaplamayı sürdürür. Genelde şöyle olur: yeni disk eklenmeden önce uygulama zaten `/var/veri` altına yazmaya başlamıştır.
+
+```bash
+mkdir -p /mnt/kontrol
+mount --bind / /mnt/kontrol
+du -sh /mnt/kontrol/var/veri
+umount /mnt/kontrol
+```
+
+`--bind` ile kök dosya sistemini başka bir noktaya bağlamak, üzerine bağlanmış birimlerin gizlediği dosyaları görünür kılar. Fark varsa gizli dosyalar oradadır.
+
+## Neden 5: anlık görüntüler ve ince sağlama
+
+LVM, ZFS ya da btrfs kullanıyorsanız silinen veri anlık görüntüde yaşamaya devam eder. Dosya sistemi seviyesinde temizlik yapmak havuzda yer açmaz.
+
+```bash
+lvs -o lv_name,lv_size,data_percent,snap_percent
+zfs list -t snapshot -o name,used -s used | tail
+btrfs subvolume list /
+```
+
+Sanallaştırılmış ortamlarda bunun bir üst katmanı vardır: konuk sistemde dosya silinir ama sanal disk küçülmez, çünkü ana makine bloğun boşaldığını bilmez. Bunu bildirmek gerekir:
+
+```bash
+fstrim -av
+```
+
+Bu komutun etki edebilmesi için disk yolunun `discard` desteklemesi gerekir (sanal disk `unmap` özellikli bir denetleyiciye bağlı olmalı). Haftalık `fstrim.timer` çoğu dağıtımda vardır; etkin olduğundan emin olun:
+
+```bash
+systemctl status fstrim.timer
+```
+
+## Neden 6: konteyner katmanları ve derlemeler
+
+Docker ya da containerd çalışan bir makinede alan çoğu zaman `/var/lib/docker` altındadır ve `du` ile bakınca dağınık görünür.
+
+```bash
+docker system df -v
+```
+
+Bu çıktı imajları, konteynerleri, birimleri ve derleme önbelleğini ayrı ayrı gösterir. Genelde en büyük kalem derleme önbelleğidir.
+
+```bash
+# kullanılmayanları temizle — çalışan konteynerlere dokunmaz
+docker system prune -a --volumes --filter "until=168h"
+```
+
+`--volumes` bayrağını bilerek yazın: birim silmek veri silmektir. Adsız (dangling) birimlerde sorun yoktur, ama adlandırılmış birimlerde veritabanı verisi olabilir. Emin değilseniz `--volumes` olmadan çalıştırın.
+
+## Büyüğü bulmak
+
+Kaybın nerede olduğu belli değilse:
+
+```bash
+# dizin bazında, bağlama noktalarına inmeden
+du -x -h --max-depth=2 / 2>/dev/null | sort -h | tail -20
+
+# tek tek büyük dosyalar
+find / -xdev -type f -size +500M -exec ls -lh {} \; 2>/dev/null | awk '{print $5, $9}'
+```
+
+Etkileşimli çalışmak daha hızlıysa `ncdu -x /` iyi bir araçtır; ok tuşlarıyla ağaçta gezip en büyük dalı takip etmenizi sağlar.
+
+## Bir daha yaşamamak için
+
+Üç önlem, bu rehberdeki altı nedenin beşini baştan keser.
+
+**Ayrı bölüm.** `/var`, `/var/log` ve konteyner dizini kök bölümünden ayrılırsa dolan bölüm yalnızca kendi işini durdurur; makine yönetilebilir kalır.
+
+**Sınır ve döndürme.** `logrotate` yapılandırmasında boyut sınırı olmayan bir kural bırakmayın. journald için `SystemMaxUse` tanımlayın — ayrıntısı [journalctl ile arıza bulmak](/rehberler/linux-journalctl-ariza-bulma) rehberinde.
+
+**%80'de uyarı.** %95'te uyarı veren bir izleme, müdahale için zaman bırakmaz. Eşiği %80'e çekin ve büyüme hızını da ölçün: bir hafta içinde %60'tan %80'e çıkan bir bölüm, sabit %85'te duran bölümden daha aciledir.
+
+Kapasite planını rakama dökmek için [depolama büyüme raporu](/araclar) araçlarına bakabilirsiniz; ama asıl kazanç, dolmadan önce bakmayı alışkanlık hâline getirmektir.

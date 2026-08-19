@@ -1,0 +1,222 @@
+---
+baslik: "systemd servisini doğru yazmak: unit dosyasında sık yapılan hatalar"
+ozet: "Betiğiniz elle çalışıyor ama servis olarak açılmıyorsa sorun genelde betikte değil, unit dosyasındaki üç varsayımda."
+konu: "linux"
+etiketler: ["systemd", "linux", "servis", "otomasyon"]
+yayin: 2026-08-04
+sure: 11
+---
+
+Bir izleme betiği yazdım, terminalde sorunsuz çalıştı, servise dönüştürdüm ve açılmadı. `systemctl status` şunu diyordu: `status=203/EXEC`. Betik oradaydı, çalıştırma izni vardı, elle çağırınca çalışıyordu.
+
+Sorun şuydu: `ExecStart` satırında `python3 izle.py` yazmıştım. systemd komutu bir kabuk üzerinden çalıştırmaz; `python3` diye bir dosyayı çalışma dizininde arar ve bulamaz. Doğrusu `/usr/bin/python3 /opt/izle/izle.py`.
+
+Bu, unit dosyalarında zaman kaybettiren hataların en tipik örneği: systemd'nin ne yaptığı değil, **ne yapmadığı** bilinmiyor.
+
+## Kabuk yoktur
+
+`ExecStart` bir kabuk satırı değildir. Şunların hiçbiri çalışmaz:
+
+```ini
+# hepsi yanlış
+ExecStart=python3 izle.py
+ExecStart=/opt/izle/*.sh
+ExecStart=/usr/bin/cat a.log | grep hata
+ExecStart=/usr/bin/betik.sh > /var/log/cikti.log
+```
+
+Sırasıyla: göreli yol çözülmez, joker karakter genişletilmez, boru hattı kurulmaz, yönlendirme yapılmaz. Gerçekten kabuk gerekiyorsa açıkça çağırın:
+
+```ini
+ExecStart=/bin/sh -c '/usr/bin/cat /var/log/a.log | /usr/bin/grep hata'
+```
+
+Ama çoğu durumda gerekmez. Çıktı yönlendirmesi yerine `StandardOutput=` kullanın; günlükler zaten journald'ye gider.
+
+## Type= değeri süreç davranışına uymalı
+
+Bu, ikinci büyük hata kaynağıdır. systemd servisin "başladı" sayılacağı anı `Type=` değerinden öğrenir.
+
+| Type | Ne zaman kullanılır | "Başladı" sayıldığı an |
+| --- | --- | --- |
+| `simple` | Süreç ön planda kalır | `ExecStart` çalıştırıldığı an |
+| `exec` | Süreç ön planda kalır | Süreç gerçekten çalıştırıldıktan sonra |
+| `forking` | Süreç kendini arka plana atar | Ana süreç sonlandığında |
+| `notify` | Süreç hazır olduğunu bildirir | `sd_notify` çağrısı geldiğinde |
+| `oneshot` | Çalışır ve biter | Süreç sonlandığında |
+
+En sık yapılan yanlış: kendini arka plana atan (daemonize eden) bir programı `Type=simple` ile tanımlamak. systemd ana süreci izler, o süreç hemen sonlanır ve systemd servisin çöktüğünü sanıp yeniden başlatır. Sonuçta bir başlatma döngüsü oluşur.
+
+Tersi de olur: ön planda kalan bir programı `Type=forking` ile tanımlarsanız systemd ana sürecin bitmesini bekler, hiç bitmez ve başlatma zaman aşımına uğrar.
+
+`simple` ile `exec` arasındaki fark küçük ama işe yarar: `simple`, çalıştırma başarısız olsa bile servisi "başladı" sayar. `exec` başarısızlığı hemen bildirir. Yeni yazdığınız servislerde `exec` kullanın.
+
+Bir kerelik işler için `oneshot` gerekir, ayrıca `RemainAfterExit=yes` eklenirse servis "etkin" görünmeyi sürdürür — yapılandırma uygulayan betiklerde istenen davranış budur.
+
+## After= bağımlılık değildir
+
+```ini
+[Unit]
+After=postgresql.service
+```
+
+Bu satır yalnızca **sıra** belirtir: PostgreSQL başlatılıyorsa önce o başlatılır. Ama PostgreSQL hiç etkin değilse servisiniz yine de başlar. Gerçek bağımlılık için `Requires=` ya da `Wants=` gerekir:
+
+```ini
+[Unit]
+Wants=postgresql.service
+After=postgresql.service
+```
+
+`Requires=` daha katıdır: bağımlılık başarısız olursa servisiniz de durdurulur. `Wants=` gevşektir: bağımlılık başarısız olsa da servisiniz denenir. Çoğu durumda `Wants=` + `After=` ikilisi doğru seçimdir.
+
+Bir uyarı: `Requires=` tek başına yazıldığında sıra garanti etmez. İkisi neredeyse her zaman birlikte kullanılır.
+
+## network.target ile network-online.target aynı şey değil
+
+Ağ üzerinden bağlanan servislerde en sinsi tuzak budur.
+
+`network.target` ağ **yönetiminin** başladığını söyler — bir IP adresi alındığını değil. Servisiniz açılışta bir veritabanına bağlanmaya çalışıyorsa `After=network.target` yeterli olmaz; makine yeniden başladığında bağlantı reddedilir, elle başlattığınızda çalışır. Bu "yalnızca yeniden başlatmada bozuluyor" davranışının klasik nedenidir.
+
+```ini
+[Unit]
+Wants=network-online.target
+After=network-online.target
+```
+
+Dikkat: `network-online.target` kendiliğinden gelmez. `systemd-networkd-wait-online` ya da `NetworkManager-wait-online` servisinin etkin olması gerekir. Etkin değilse hedef hiç ulaşılmaz duruma gelir ve servisiniz açılışta beklemeye takılır.
+
+Asıl doğru çözüm ise şudur: **uygulamanın kendisine yeniden bağlanma mantığı koymak.** Ağ, açılıştan sonra da kopar; unit dosyası bunu çözemez.
+
+## Restart= ve neden bir süre sonra denemeyi bırakır
+
+```ini
+[Service]
+Restart=on-failure
+RestartSec=5s
+```
+
+Bu, çoğu servis için doğru başlangıçtır. `Restart=always` ise elle durdurduğunuzda bile yeniden başlatır — bakım sırasında şaşırtır.
+
+Ama şu ayarı bilmeden yazarsanız bir gün "servis yeniden başlamayı bıraktı" dersiniz:
+
+```ini
+StartLimitIntervalSec=10s
+StartLimitBurst=5
+```
+
+Öntanımlı olarak 10 saniye içinde 5 başlatma denemesi yapılırsa systemd servisi tamamen durdurur ve bir daha denemez. Sürekli çöken bir serviste bu koruma doğrudur — makineyi kurtarır — ama `RestartSec` çok kısaysa sağlıklı bir servis de bu sınıra takılabilir. `RestartSec=5s` bu yüzden yazılıdır.
+
+Sınıra takılan servisi elle serbest bırakmak gerekir:
+
+```bash
+systemctl reset-failed izle.service
+systemctl start izle.service
+```
+
+## Dosyayı nereye koymalı
+
+`/lib/systemd/system/` ya da `/usr/lib/systemd/system/` altındaki dosyaları **düzenlemeyin**. Paket güncellemesi üzerine yazar ve değişikliğiniz sessizce kaybolur.
+
+Kendi servisiniz `/etc/systemd/system/ad.service` altına gelir. Var olan bir servisin yalnızca bir ayarını değiştirecekseniz üzerine yazmak yerine parça dosya kullanın:
+
+```bash
+systemctl edit postgresql.service
+```
+
+Bu, `/etc/systemd/system/postgresql.service.d/override.conf` dosyasını açar. Yalnızca değiştirdiğiniz satırlar orada durur, gerisi paketten gelmeye devam eder.
+
+Bir ayrıntı: listeler eklenerek birleşir. `ExecStart` gibi tek değerli bir ayarı parça dosyada değiştirmek için önce boşaltmanız gerekir:
+
+```ini
+[Service]
+ExecStart=
+ExecStart=/usr/bin/yeni-komut
+```
+
+İlk satır olmadan iki `ExecStart` tanımlanmış olur ve servis başlamaz.
+
+Her düzenlemeden sonra:
+
+```bash
+systemctl daemon-reload
+```
+
+Bu unutulduğunda systemd eski dosyayı kullanmayı sürdürür ve "değişikliğim uygulanmıyor" denir.
+
+## Yalıtım: birkaç satırla ciddi kazanç
+
+systemd, servisi çekirdek düzeyinde kısıtlayabilir. Bu satırlar çoğu servise dokunmadan eklenebilir:
+
+```ini
+[Service]
+User=izle
+Group=izle
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/var/lib/izle
+ProtectKernelTunables=true
+ProtectControlGroups=true
+RestrictAddressFamilies=AF_INET AF_INET6
+```
+
+`ProtectSystem=strict` tüm dosya sistemini salt okunur yapar; servisin yazması gereken yerler `ReadWritePaths` ile açılır. Bu ikisi birlikte, ele geçirilen bir servisin sisteme yazmasını engeller.
+
+Ne kadar sıkı olduğunu ölçebilirsiniz:
+
+```bash
+systemd-analyze security izle.service
+```
+
+Çıktı 0–10 arası bir puan verir ve hangi ayarın eksik olduğunu satır satır listeler. Puanı 9'un altına indirmek çoğu serviste yarım saatlik iştir.
+
+## cron yerine timer
+
+Zamanlanmış işler için ayrı bir cron girdisi yerine timer kullanmak üç şey kazandırır: günlükler journald'ye gider, iş bir servis olduğu için `systemctl status` ile durumu görülür, kaçırılan çalışmalar telafi edilebilir.
+
+```ini
+# /etc/systemd/system/temizlik.timer
+[Unit]
+Description=Gecelik temizlik
+
+[Timer]
+OnCalendar=*-*-* 03:00:00
+Persistent=true
+RandomizedDelaySec=900
+
+[Install]
+WantedBy=timers.target
+```
+
+`Persistent=true`, makine o saatte kapalıysa açılışta işi çalıştırır — cron'un yapmadığı şey budur. `RandomizedDelaySec` ise onlarca makinenin aynı saniyede aynı sunucuya yüklenmesini engeller.
+
+```bash
+systemctl list-timers --all
+```
+
+## Yazmadan önce doğrula
+
+Servisi başlatmadan önce sözdizimini denetleyin:
+
+```bash
+systemd-analyze verify /etc/systemd/system/izle.service
+```
+
+Eksik dosya, tanınmayan ayar ve yanlış bağımlılık burada görünür.
+
+Başlattıktan sonra da tek bir çıktıya bakın:
+
+```bash
+systemctl status izle.service --no-pager
+journalctl -u izle.service -b --no-pager
+```
+
+`status` satırındaki hata kodu doğrudan nedeni söyler: `203/EXEC` yol yanlış, `200/CHDIR` `WorkingDirectory` yok, `226/NAMESPACE` yalıtım ayarlarından biri erişimi kesmiş, `1/FAILURE` uygulamanın kendisi hata vermiş. Bu ayrımı bilmek, günlüklere dalmadan önce nereye bakacağınızı söyler.
+
+## Kısa liste
+
+Yeni bir unit yazarken şu beş soruya yanıt verin: komut mutlak yolla mı yazıldı, `Type=` süreç davranışına uyuyor mu, ağ gerektiren bir servis için `network-online.target` beklendi mi, dosya `/etc/systemd/system` altında mı, `daemon-reload` çalıştırıldı mı.
+
+Bu beşi geçen bir unit dosyasında kalan sorunlar artık uygulamanın kendisindedir — ki asıl bakmak istediğiniz yer de orasıdır.

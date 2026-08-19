@@ -1,0 +1,97 @@
+---
+baslik: "Blok, dosya, nesne: hangi depolama hangi iş için"
+ozet: "Üçü de veri saklar ama farklı sözleşmeler sunar. Yanlış seçim genelde çalışır — sonra bir gün, tam yük altındayken çalışmaz."
+konu: "depolama"
+etiketler: ["depolama", "mimari", "bulut", "kapasite"]
+yayin: 2026-08-07
+sure: 11
+---
+
+Bir ekip, nesne depolamayı dosya sistemi gibi bağlamış ve uygulamanın veri dizinini oraya taşımıştı. Aylarca sorun çıkmadı. Sonra iki kopya aynı anda çalıştırıldı ve dosyalar bozulmaya başladı.
+
+Neden basitti: nesne depolamada dosya kilidi yoktur. Yerel dosya sisteminde iki sürecin aynı dosyaya yazmasını engelleyen mekanizma, o katmanda mevcut değildir. Bağlama aracı bunu taklit eder ama garanti edemez.
+
+Üç depolama türü arasındaki fark kapasite ya da hız değil, **sundukları sözleşme**. Seçim de buradan yapılmalı.
+
+## Üçünün sözleşmesi
+
+**Blok depolama** size numaralı bloklar verir; üzerine ne yazacağınız sizin işinizdir. Dosya sistemi siz oluşturursunuz. Bir blok aygıtı normalde tek bir makineye bağlanır — küme dosya sistemi kullanmadıkça ikinci makineye bağlamak veriyi bozar. En düşük gecikme burada elde edilir.
+
+Kullanım yeri: sanal makine diskleri, veritabanı veri dosyaları, gecikmeye duyarlı her şey.
+
+**Dosya depolama** size dizinler, dosyalar ve POSIX ya da SMB anlambilimi verir: izinler, kilitler, yerinde değiştirme, atomik yeniden adlandırma. Aynı anda birçok istemci bağlanabilir ve tutarlılık protokol tarafından yönetilir.
+
+Kullanım yeri: kullanıcı paylaşımları, ortak proje dizinleri, birden çok sunucunun aynı dosyaları görmesi gereken uygulamalar.
+
+**Nesne depolama** size anahtar–değer çiftleri verir. Bir nesneyi yazarsınız, okursunuz, silersiniz. Değiştiremezsiniz — yeniden yazarsınız. Dizin yoktur; `/` yalnızca anahtar adının bir parçasıdır. Erişim HTTP üzerindendir. Ölçek pratikte sınırsızdır.
+
+Kullanım yeri: yedekler, arşiv, günlük depoları, medya dosyaları, statik site içerikleri, veri gölü.
+
+## Karar tablosu
+
+| Soru | Blok | Dosya | Nesne |
+| --- | --- | --- | --- |
+| Aynı anda çok yazıcı | Hayır | Evet | Dikkatli evet |
+| Dosya kilidi | Dosya sistemi verir | Evet | Yok |
+| Yerinde değiştirme | Evet | Evet | Hayır |
+| Atomik yeniden adlandırma | Evet | Evet | Hayır |
+| Tipik gecikme | En düşük | Orta | En yüksek |
+| Ölçek sınırı | Birim boyutu | Sunucu kapasitesi | Pratikte yok |
+| Sürüm geçmişi | Anlık görüntüyle | Anlık görüntüyle | Yerleşik |
+| Ücret modeli | Ayrılan alan | Ayrılan alan | Saklanan + istek + çıkış |
+
+Son satır, bulutta en çok şaşırtan yerdir. Blok depolamada 1 TB ayırıp 100 GB kullanırsanız 1 TB ödersiniz. Nesne depolamada 100 GB için 100 GB ödersiniz — ama her `LIST`, `GET` ve `PUT` çağrısı ayrıca ücretlendirilir ve veriyi dışarı çıkarmak ayrı bir kalemdir. Milyonlarca küçük nesneye sık erişen bir iş yükünde istek ücreti, saklama ücretini geçebilir.
+
+## Nesne depolamayı dosya sistemi gibi kullanmak
+
+`s3fs`, `rclone mount`, `blobfuse` gibi araçlar nesne depolamayı bir dizin gibi gösterir. Bu, birkaç dosyayı elle taşımak için kullanışlıdır. Uygulama verisi için değildir. Nedenleri şunlar:
+
+**Yeniden adlandırma atomik değildir.** Nesne depolamada `mv` diye bir işlem yoktur; bağlama aracı bunu kopyala-sonra-sil olarak yapar. Ortada kesilirse iki kopya ya da hiç kopya kalır. Atomik yeniden adlandırmaya güvenen her şey — kuyruk dizinleri, kilit dosyaları, günlük döndürme — sessizce bozulur.
+
+**Yerinde değiştirme yoktur.** Bir dosyanın ortasındaki 10 baytı değiştirmek, dosyanın tamamını yeniden yazmak demektir. Veritabanı dosyaları bunu saniyede binlerce kez yapar.
+
+**Kilit yoktur.** Aynı anda iki yazıcı olduğunda hangisinin kazanacağını protokol tanımlamaz.
+
+**Dizin listeleme pahalıdır.** `ls` bir dizin okuma değil, bir API sorgusudur; binlerce nesne içeren bir ön ekte saniyeler sürer ve ücretlendirilir.
+
+Uygulamanız nesne depolama kullanacaksa **doğrudan API ile** kullanmalıdır. Dosya sistemi gibi bağlamak, sözleşmeyi taklit etmek olur — ve taklit tam yük altında bozulur.
+
+## Dayanıklılık ile erişilebilirlik ayrı şeylerdir
+
+Nesne depolama sağlayıcıları genelde "on bir dokuz dayanıklılık" der. Bu, verinin kaybolma olasılığıdır — hizmetin erişilebilir olma olasılığı değil. Erişilebilirlik taahhüdü genelde çok daha düşüktür (yüzde 99,9 gibi), yani yılda saatlerce erişilemeyebilir.
+
+Bunun pratik sonucu: kurtarma planınız yalnızca nesne depolamaya dayanıyorsa, sağlayıcı erişilemez olduğunda kurtarma da yapılamaz. Ayrıca dayanıklılık, sizin yanlışlıkla sildiğiniz veriyi korumaz — o yüzden sürümleme ve nesne kilidi ayrı ayrı açılmalıdır.
+
+Bu ayrımın kurtarma hedeflerine nasıl yansıdığını [kurtarma hedefi planlayıcı](/araclar/kurtarma-hedefi) ile sayıya dökebilirsiniz.
+
+## Performansı doğru terimle konuşmak
+
+Üç ölçüt vardır ve birbirinin yerine kullanılamaz:
+
+**IOPS** saniyedeki işlem sayısıdır. Küçük ve rastgele erişimde belirleyicidir — veritabanı indeksleri, sanal makine disk erişimi.
+
+**Verim (MB/s)** birim zamanda taşınan veridir. Büyük ve sıralı erişimde belirleyicidir — yedek alma, video işleme, toplu kopyalama.
+
+**Gecikme (ms)** tek bir işlemin tamamlanma süresidir. Kullanıcının hissettiği şey çoğunlukla budur.
+
+Bir depolama "1 GB/s verim" veriyor olabilir ama 4 KB'lık rastgele okumada beklediğiniz IOPS'u vermeyebilir. Bulut sağlayıcılarında bu iki değer genelde ayrı ayrı ve birbirine bağlı olarak ücretlendirilir; ayrıca birim boyutu büyüdükçe IOPS tavanının da yükseldiği modeller yaygındır — 100 GB'lık bir disk, ihtiyacınız olan IOPS'u vermediği için 500 GB'a çıkarılır ve fazladan alan boşa yatar.
+
+Kendi iş yükünüz için hangisinin belirleyici olduğunu [IOPS hesaplayıcı](/araclar/iops-hesaplayici) ile çıkarabilirsiniz.
+
+## Gerçek dünyada karışım
+
+Çoğu sistem üçünü birlikte kullanır, üstelik doğrusu da budur:
+
+Bir web uygulamasında **veritabanı blok** üzerinde durur (düşük gecikme, tek yazıcı), **kullanıcıların yüklediği dosyalar nesne** depolamaya gider (ölçek, sürümleme, ucuz saklama), **birden çok sunucunun paylaştığı yapılandırma ya da ortak dizin dosya** depolamada tutulur (kilit, POSIX izinleri).
+
+Yanlış olan, birini diğerinin işini yapmaya zorlamaktır: veritabanını nesne depolamaya koymak, terabaytlarca arşivi pahalı blok diskte tutmak, ya da yalnızca tek bir sunucunun kullandığı veriyi ağ dosya paylaşımına koyup gereksiz bir ağ bağımlılığı yaratmak.
+
+## Seçerken sorulacak beş soru
+
+1. **Kaç yazıcı var?** Birden çoksa blok elenir.
+2. **Yerinde değiştirme gerekiyor mu?** Gerekiyorsa nesne elenir.
+3. **Gecikme ne kadar önemli?** Milisaniye altı gerekiyorsa blok kalır.
+4. **Ne kadar büyüyecek?** Onlarca terabayttan sonra dosya depolama işletmesi zorlaşır.
+5. **Erişim sıklığı nedir?** Nadiren okunan veri, nesne depolamanın soğuk katmanlarına aittir — ama o katmanların erken silme ve geri getirme ücretleri vardır; ayrıntısı [depolama katmanları ve yaşam döngüsü](/rehberler/dep-katman-ve-yasam-dongusu) rehberinde.
+
+Bu beş soruyu yanıtladıktan sonra seçim çoğu zaman kendiliğinden çıkar. Çıkmıyorsa, muhtemelen tek bir depolama türüyle çözülmeyecek bir iş yüküyle karşı karşıyasınız demektir — ve bu da bilinmesi gereken bir yanıttır.

@@ -1,0 +1,190 @@
+---
+baslik: "journalctl ile arıza bulmak: makine yeniden başladıktan sonra iş işten geçmesin"
+ozet: "Günlükler öntanımlı olarak bellekte tutulur ve yeniden başlatmada silinir. Önce bunu düzeltin, sonra günlüğü okumayı öğrenin."
+konu: "linux"
+etiketler: ["systemd", "linux", "gunluk", "tanilama"]
+yayin: 2026-08-05
+sure: 10
+---
+
+Bir sunucu gece kendiliğinden yeniden başlamıştı. Sabah bakmaya gittiğimde `journalctl -b -1` komutu şunu döndürdü: `Specifying boot ID or boot offset has no effect, no persistent journal was found`.
+
+Yani önceki açılışın günlüğü yoktu. Sunucu neden yeniden başladığını anlatabilecek tek kayıt, yeniden başlarken silinmişti.
+
+Bu, birçok dağıtımda öntanımlı davranıştır ve bir kez başınıza geldikten sonra unutulmaz. Bu yüzden bu rehber okumayla değil, kalıcılıkla başlıyor.
+
+## Önce günlüğü kalıcı yapın
+
+journald, `/var/log/journal` dizini **varsa** diske yazar, yoksa `/run/log/journal` altında bellekte tutar. Yani tek satırlık bir düzeltmedir:
+
+```bash
+# hangi durumda?
+journalctl --disk-usage
+ls -ld /var/log/journal 2>/dev/null || echo "kalıcı günlük yok"
+```
+
+Açmak için:
+
+```bash
+mkdir -p /var/log/journal
+systemd-tmpfiles --create --prefix /var/log/journal
+systemctl restart systemd-journald
+```
+
+Ya da açıkça yapılandırın — sunucularda tercih edilmesi gereken yol budur:
+
+```ini
+# /etc/systemd/journald.conf
+[Journal]
+Storage=persistent
+SystemMaxUse=2G
+SystemKeepFree=1G
+MaxRetentionSec=30day
+```
+
+`SystemMaxUse` sınırı koymadan açmayın. Gürültülü tek bir servis günlük bölümünü doldurur ve doldurduğu bölüm `/var` ise makinedeki her şey durur. `SystemKeepFree` ise diskte her hâlükârda bırakılacak boşluğu belirtir; ikisinden hangisi daha kısıtlayıcıysa o uygulanır.
+
+Sınırları sonradan uygulamak için:
+
+```bash
+journalctl --vacuum-size=2G
+journalctl --vacuum-time=30d
+```
+
+## Bir olayı bulmanın sırası
+
+Elinizde "dün gece bir şey oldu" bilgisi varsa sıralama şudur: hangi açılış, hangi zaman aralığı, hangi önem düzeyi, hangi birim.
+
+```bash
+# 1) açılışları listele — hangi satırdan sonrası "yeni açılış"?
+journalctl --list-boots
+
+# 2) bir önceki açılışın tamamı
+journalctl -b -1 --no-pager
+
+# 3) yalnızca hata ve üstü
+journalctl -b -1 -p err --no-pager
+
+# 4) zaman aralığı
+journalctl --since "2026-08-04 22:00" --until "2026-08-05 02:00"
+
+# 5) tek bir birim
+journalctl -u nginx.service -b -1
+```
+
+`-p` değeri syslog önem düzeyidir: `emerg`, `alert`, `crit`, `err`, `warning`, `notice`, `info`, `debug`. `-p err` yazmak "err ve daha kritik olanlar" demektir — yani üç düzeyi birden kapsar.
+
+Zaman ifadeleri esnektir ve pratikte en çok bunlar kullanılır:
+
+```bash
+journalctl --since "10 min ago"
+journalctl --since yesterday --until today
+journalctl -u api.service --since "1 hour ago" -f
+```
+
+## Yeniden başlatmanın nedenini bulmak
+
+Beklenmedik bir yeniden başlatmada üç olasılık vardır: düzgün kapatma (birisi ya da bir şey `reboot` çağırdı), çekirdek paniği, ya da elektrik/donanım kaynaklı ani kesinti.
+
+Ayrım şuradan çıkar: **önceki açılışın son satırları.**
+
+```bash
+journalctl -b -1 -n 40 --no-pager
+```
+
+Düzgün kapatmada `Stopping ...`, `Unmounting ...`, `Reached target Shutdown` satırlarını görürsünüz. Kimin başlattığını da bulabilirsiniz:
+
+```bash
+journalctl -b -1 | grep -Ei "shutdown|reboot|systemd-logind.*power|Started Reboot"
+```
+
+Bu satırların **hiçbiri yoksa** ve günlük cümlenin ortasında kesiliyorsa, kapatma düzgün olmamıştır: güç kesintisi, donanım arızası ya da izlenmemiş bir kilitlenme. Bellek hatası ya da OOM katili aranacak yer:
+
+```bash
+journalctl -b -1 -k | tail -60
+journalctl -b -1 | grep -i "out of memory\|oom-killer\|killed process"
+```
+
+`-k` yalnızca çekirdek iletilerini gösterir — `dmesg` karşılığıdır, ama önceki açılışlara da erişebilirsiniz. `dmesg`'in yapamadığı şey budur.
+
+## Servis çöküyorsa: kod önce, günlük sonra
+
+Bir servis başlamıyorsa günlüğe dalmadan önce durum satırına bakın:
+
+```bash
+systemctl status api.service --no-pager -l
+```
+
+Sondaki `Main process exited, code=exited, status=203/EXEC` gibi bir satır, aramayı doğrudan daraltır:
+
+| Kod | Anlamı |
+| --- | --- |
+| `203/EXEC` | `ExecStart` yolu yanlış ya da çalıştırma izni yok |
+| `200/CHDIR` | `WorkingDirectory` yok |
+| `209/STDOUT` | Çıktı yönlendirmesi kurulamadı |
+| `226/NAMESPACE` | Yalıtım ayarlarından biri (`ProtectSystem`, `ReadWritePaths`) erişimi kesmiş |
+| `217/USER` | `User=` ile verilen hesap yok |
+| `1/FAILURE` | Uygulamanın kendisi hata döndürmüş |
+
+İlk beşi unit dosyasında düzeltilir, sonuncusunda asıl günlüğe bakmak gerekir. Bu ayrımı yapmadan günlük okumak, çoğu zaman yanlış yerde yarım saat harcamak demektir.
+
+Servis yapılandırmasının kendisi için [systemd servisini doğru yazmak](/rehberler/linux-systemd-servis-yazma) rehberine bakabilirsiniz.
+
+## Alan bazlı arama
+
+journald yalnızca metin tutmaz; her satırın yapılandırılmış alanları vardır. Bu, `grep`'in yapamadığını yapar:
+
+```bash
+# tek bir süreç kimliğinin bıraktığı her şey
+journalctl _PID=4211
+
+# komut adına göre
+journalctl _COMM=sshd --since today
+
+# belirli bir kullanıcının oturumu
+journalctl _UID=1000 -b
+
+# bir satırın tüm alanlarını gör
+journalctl -u api.service -n 1 -o verbose
+```
+
+`-o verbose` çıktısı, hangi alanlara göre filtreleyebileceğinizi gösterir. Bir olayı incelerken önce bir satırı bu biçimde okuyup sonra alan bazlı daraltmak, metin araması yapmaktan hem hızlı hem güvenilirdir.
+
+Makine tarafından işlenecekse:
+
+```bash
+journalctl -u api.service --since "1 hour ago" -o json | jq -r '.MESSAGE'
+```
+
+## İki kez saklamayın
+
+Birçok sunucuda hem journald hem rsyslog çalışır ve aynı iletiler iki yere yazılır: `/var/log/journal` ve `/var/log/messages`. Disk iki kat tüketilir, arama iki yerde yapılır, saklama süreleri birbirini tutmaz.
+
+Karar verin: ya rsyslog'u yalnızca merkezî günlük sunucusuna iletme görevinde bırakın (yerele yazmasın), ya da journald'yi bellek kipinde tutup kalıcılığı rsyslog'a bırakın. İkisinin de yerele yazması nadiren istenen bir şeydir.
+
+Kimin ne kadar yer tuttuğunu görmek için:
+
+```bash
+journalctl --disk-usage
+du -sh /var/log/* 2>/dev/null | sort -h | tail
+```
+
+Neyin saklanacağı ve ne kadar süreyle saklanacağı ayrı bir karardır; [günlük toplama: neyi saklamalı](/rehberler/guv-gunluk-toplama-neyi-saklamali) rehberi bu tarafa bakıyor.
+
+## Bozulma denetimi
+
+Ani kapanmalarda günlük dosyaları bozulabilir. journald bozuk dosyayı kullanmayı sürdürmez ama sessizce atlar; sonuç, "o saatlerde hiç kayıt yok" görüntüsüdür.
+
+```bash
+journalctl --verify
+```
+
+Çıktıda `FAIL` görünen dosyalar okunamıyordur. Kayıp bir zaman aralığı ararken bu denetimi yapmadan "kayıt yok" sonucuna varmayın.
+
+## Kısa liste
+
+Sunucu kurulumunda üç adım: `/var/log/journal` var mı, `SystemMaxUse` tanımlı mı, rsyslog aynı şeyi ikinci kez yazıyor mu.
+
+Arıza anında üç komut: `journalctl --list-boots` ile hangi açılış, `systemctl status` ile hata kodu, `journalctl -b -1 -p err` ile o açılışın hataları.
+
+İlk üçü kurulumda bir kez yapılır ve ikinci üçünün işe yaramasını sağlar. Kalıcı günlük olmadan diğerleri yalnızca "şu an" hakkında bilgi verir — arıza ise çoğu zaman dünden kalmıştır.

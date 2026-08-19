@@ -1,0 +1,113 @@
+---
+baslik: "Depolama katmanları ve yaşam döngüsü: ucuza taşımanın gizli maliyeti"
+ozet: "Arşiv katmanı gigabayt başına on kat ucuz görünür. Küçük dosya cezası, en az saklama süresi ve geri getirme ücretiyle birlikte hesaplanmadıkça bu rakam yanıltır."
+konu: "depolama"
+etiketler: ["depolama", "bulut", "maliyet", "yedekleme"]
+yayin: 2026-08-08
+sure: 11
+---
+
+Bir ekip, üç yıllık günlük arşivini soğuk katmana taşıdı. Aylık depolama faturası gerçekten düştü. Ama o ay gelen faturada yeni bir kalem vardı ve tasarrufun tamamını yiyordu: geçiş isteği ücreti.
+
+Taşınan şey 4 milyon küçük dosyaydı. Her biri için bir yaşam döngüsü geçiş isteği ücretlendirilmişti. Üstelik dosyaların çoğu birkaç kilobayttı ve soğuk katmanın **en az faturalanabilir nesne boyutu** 128 KB'tı; yani 3 KB'lık bir dosya için 128 KB ödeniyordu.
+
+Katman geçişi bir depolama kararı gibi görünür ama aslında bir maliyet modeli kararıdır. Modeli bilmeden yapılan geçiş, çoğu zaman tasarruf etmez.
+
+## Katmanlar neyi değiştirir
+
+Sağlayıcılar arasında adlar değişse de yapı aynıdır:
+
+| Katman | Erişim | Geri getirme | Tipik en az süre |
+| --- | --- | --- | --- |
+| Sıcak | Anında | Ücretsiz | Yok |
+| Seyrek | Anında | Ücretli | 30 gün |
+| Soğuk | Anında ya da dakikalar | Daha pahalı | 90 gün |
+| Arşiv | Saatler | En pahalı | 180 gün |
+
+Katman aşağı indikçe **saklama ucuzlar, erişim pahalılaşır.** Bu takas, verinin ne sıklıkla okunacağına bağlıdır — ve çoğu ekip bu sıklığı ölçmeden tahmin eder.
+
+## Dört gizli maliyet
+
+**En az saklama süresi.** Soğuk katmana koyduğunuz bir nesneyi 10 gün sonra silerseniz, kalan 80 günün ücretini yine ödersiniz. Bu "erken silme ücreti" faturada ayrı bir satır olarak görünmez; depolama kalemine karışır ve "neden düşmedi" sorusuna yol açar. Sık değişen veriyi soğuk katmana koymak bu yüzden zarar ettirir.
+
+**Küçük nesne cezası.** Soğuk ve arşiv katmanlarında nesne başına en az faturalanabilir boyut vardır (yaygın değer 128 KB). Ayrıca nesne başına birkaç on kilobaytlık meta veri yükü ayrı olarak faturalanabilir. Ortalama dosya boyutunuz 128 KB'ın altındaysa katman değiştirmek maliyeti **artırır**.
+
+**Geçiş isteği ücreti.** Yaşam döngüsü kuralı her nesne için bir istek üretir. Milyonlarca nesnede bu tek seferlik bir maliyet olarak görünür ama kural sürekli çalıştığı için her yeni nesne de aynı ücreti doğurur.
+
+**Geri getirme ücreti ve süresi.** Arşivden okuma iki kalem üretir: veri miktarı başına geri getirme ücreti ve — bulut sağlayıcısından internete çıkıyorsa — çıkış ücreti. Süre de vardır: standart geri getirme saatler alır, hızlandırılmış olan dakikalar alır ve belirgin biçimde pahalıdır.
+
+## Geri getirme süresi bir kurtarma sorunudur
+
+Bu, teknik olmaktan çok işletimsel bir konu. Yedeklerinizi arşiv katmanına koyduysanız kurtarma süreniz artık "veriyi diske yazma süresi" değil; önce **geri getirme kuyruğunda bekleme süresi**, sonra aktarım süresidir.
+
+Dört saatlik bir kurtarma hedefiniz varsa ve arşivden geri getirme tipik olarak üç ilâ beş saat sürüyorsa, hedefi tutmanız mümkün değildir — yedekleme "başarılı" görünse bile.
+
+Pratik düzen şudur: **son yedekler sıcak ya da seyrek katmanda, eski yedekler arşivde.** Kurtarmaların ezici çoğunluğu son birkaç güne yapılır; arşiv, denetim ve yasal saklama içindir.
+
+Bu ayrımın rakama nasıl döküldüğünü [kurtarma hedefi planlayıcı](/araclar/kurtarma-hedefi) ile görebilirsiniz; saklama süresi tarafı için [yedekleme kapasitesi](/araclar/yedek-kapasite) aracı var.
+
+## Sürümleme ile yaşam döngüsü birlikte kurulmalı
+
+Faturayı sessizce büyüten en yaygın yapılandırma hatası budur.
+
+Sürümleme açıkken bir nesneyi silmek onu gerçekten silmez; bir silme işaretçisi koyar ve eski sürüm saklanmaya devam eder. Üzerine yazmak da eskisini saklar. Yaşam döngüsü kuralınız yalnızca **güncel** sürümlere bakıyorsa, eski sürümler sonsuza kadar sıcak katmanda birikir.
+
+Kural her iki tarafı da kapsamalıdır:
+
+```json
+{
+  "Rules": [
+    {
+      "ID": "gunlukler",
+      "Filter": { "Prefix": "gunlukler/" },
+      "Status": "Enabled",
+      "Transitions": [
+        { "Days": 30, "StorageClass": "STANDARD_IA" },
+        { "Days": 90, "StorageClass": "GLACIER_IR" }
+      ],
+      "Expiration": { "Days": 730 },
+      "NoncurrentVersionTransitions": [
+        { "NoncurrentDays": 7, "StorageClass": "STANDARD_IA" }
+      ],
+      "NoncurrentVersionExpiration": { "NoncurrentDays": 90 },
+      "AbortIncompleteMultipartUpload": { "DaysAfterInitiation": 7 }
+    }
+  ]
+}
+```
+
+Son satır ayrıca önemlidir: yarım kalan çok parçalı yüklemeler hiçbir listelemede görünmez ama yer kaplar ve ücretlendirilir. Kural olmadan bunlar yıllarca birikir. Kovanın gerçek boyutu ile listelenen nesnelerin toplamı tutmuyorsa ilk bakılacak yer burasıdır.
+
+## Değiştirilemezlik ayrı bir karardır
+
+Nesne kilidi (object lock, immutability) fidye yazılımına karşı gerçek bir savunmadır: kilitli bir nesne, yönetici hesabı ele geçirilse bile saklama süresi dolana kadar silinemez.
+
+Ama yaşam döngüsüyle çakışır. Kilitli nesneleri süresi dolmadan silen bir kural çalışmaz; kural sessizce başarısız olur ve nesneler birikir. İkisini birlikte tasarlayın: kilit süresi, yaşam döngüsünün silme gününden kısa olmalı.
+
+Ayrıca kilit yalnızca kova oluşturulurken etkinleştirilebilir — sonradan açılamaz. Yedek kovalarınızda bu düğmeyi baştan açık kurmak, sonradan taşınmak zorunda kalmaktan iyidir. Konunun bütünü için [fidye yazılımına hazırlık](/rehberler/guv-fidye-yazilimina-hazirlik) rehberine bakabilirsiniz.
+
+## Taşımadan önce ölçün
+
+Katman kararı üç sayıya dayanmalı: nesne sayısı, ortalama nesne boyutu, ve son 90 günde okunan nesnelerin oranı.
+
+```bash
+# nesne sayısı ve toplam boyut
+aws s3 ls s3://kova/gunlukler/ --recursive --summarize | tail -3
+
+# ortalama boyut hesabı: toplam / adet
+# 128 KB'ın altındaysa soğuk katman maliyeti ARTIRIR
+```
+
+Erişim sıklığını tahmin etmeyin; sağlayıcının erişim analizi özelliğini bir ay çalıştırın. Çoğu ekip "bu veriye kimse bakmıyor" der ve raporda günlük okumalar görünür — genelde bir rapor işi ya da unutulmuş bir betik yüzünden.
+
+Bir yaşam döngüsü kuralını yayına almadan önce dar bir ön ekte deneyin ve bir fatura dönemi bekleyin. Kuralın etkisi, kuralın kendisinden daha karmaşıktır.
+
+## Basit karar özeti
+
+**Sıcak katman:** son 30 günün verisi, aktif yedekler, sık okunan her şey.
+
+**Seyrek erişim:** 30–90 gün arası, ortalama nesne boyutu 128 KB üstündeyse.
+
+**Arşiv:** yasal saklama, denetim kayıtları, geri getirme süresi saatlerce olabilecek her şey. Küçük dosyaları önce arşiv dosyasına (tar, zip) toplayıp öyle taşıyın — küçük nesne cezasından kurtulmanın en pratik yolu budur.
+
+**Hiç taşımayın:** aylık maliyeti birkaç yüz liranın altında olan kovalar. Kuralın kendisi de bir bakım yüküdür ve o yükün karşılığını çıkarmayan bir tasarruf, tasarruf değildir.
