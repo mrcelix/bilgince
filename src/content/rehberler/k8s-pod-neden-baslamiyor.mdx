@@ -1,0 +1,167 @@
+---
+baslik: "Pod başlamıyor: Pending, ImagePullBackOff ve CrashLoopBackOff'u ayırmak"
+ozet: "Üç durumun üç ayrı nedeni ve üç ayrı bakılacak yeri var. Doğru sırayla bakıldığında teşhis birkaç dakika sürer."
+konu: "kubernetes"
+etiketler: ["kubernetes", "konteyner", "tanilama"]
+yayin: 2026-08-09
+sure: 11
+---
+
+Bir uygulama dağıtıldı ve ayağa kalkmadı. Ekipten biri `kubectl logs` çalıştırdı, çıktı boştu. "Günlük yok, uygulama hiç başlamamış" dedi ve konteyner imajını incelemeye başladı.
+
+Oysa pod `Pending` durumundaydı — yani hiçbir düğüme yerleştirilememişti. Konteyner hiç oluşturulmadığı için günlük de yoktu. Sorun imajda değil, kaynak isteklerindeydi: hiçbir düğümde istenen belleği verecek yer kalmamıştı.
+
+Kubernetes'te "başlamıyor" tek bir durum değil. Üç ayrı durumdur ve üçünde bakılacak yer farklıdır.
+
+## Önce durumu okuyun
+
+```bash
+kubectl get pods -n uygulama -o wide
+kubectl describe pod api-7d9f8-x2k4l -n uygulama
+```
+
+`describe` çıktısının **en altındaki `Events` bölümü** bu işin can damarıdır. Neredeyse her teşhis oradaki son üç satırda yazılıdır ve çoğu kişi çıktının başındaki uzun etiket listesine bakıp orayı kaçırır.
+
+Duruma göre yön:
+
+| Durum | Ne oldu | Nereye bakılır |
+| --- | --- | --- |
+| `Pending` | Pod bir düğüme yerleştirilemedi | Zamanlayıcı olayları, kaynak, taint, birim |
+| `ContainerCreating` | Yerleşti ama konteyner kurulamıyor | Birim bağlama, gizli anahtar, CNI |
+| `ImagePullBackOff` | İmaj indirilemedi | İmaj adı, etiket, kayıt defteri kimlik bilgisi |
+| `CrashLoopBackOff` | Konteyner başladı ve çıktı | Uygulama günlüğü, çıkış kodu, sağlık yoklaması |
+| `Error` / `OOMKilled` | Süreç öldürüldü | Bellek sınırı, çıkış kodu |
+| `Running` ama hazır değil | Yoklamalar geçmiyor | readiness probe tanımı |
+
+## Pending: zamanlayıcı yer bulamıyor
+
+`Events` bölümünde `FailedScheduling` görürsünüz ve mesaj nedeni açıkça yazar. Dört tipik neden:
+
+**Kaynak yetersiz.** `0/5 nodes are available: 5 Insufficient memory`. İstenen kaynak, düğümlerin **ayrılabilir** kapasitesini aşıyor. Dikkat: düğümün toplam belleği değil, `Allocatable` değeri belirleyicidir; sistem bileşenleri ve kubelet için bir bölüm rezerve edilmiştir.
+
+```bash
+kubectl describe node dugum-03 | sed -n '/Allocatable/,/Allocated resources/p'
+```
+
+Bu çıktı hem ayrılabilir kapasiteyi hem de o an ne kadarının istendiğini gösterir. Kritik ayrım: **istekler (requests) toplamı** doluluk yaratır, gerçek kullanım değil. Düğümler boş görünürken pod yerleşmiyorsa neredeyse her zaman bu yüzdendir.
+
+**Taint ve tolerasyon.** `node(s) had untolerated taint {dedicated: gpu}`. Düğüm belirli iş yükleri için ayrılmış; pod'un tolerasyonu yok.
+
+**Düğüm seçici.** `node(s) didn't match Pod's node affinity/selector`. `nodeSelector` ya da `affinity` kuralı hiçbir düğümle eşleşmiyor — genelde etiket yazımı yanlıştır.
+
+**Birim bağlanamıyor.** `pod has unbound immediate PersistentVolumeClaims`. PVC bir PV bulamamış. Depolama sınıfı yanlış ya da dinamik sağlama çalışmıyor.
+
+```bash
+kubectl get pvc -n uygulama
+kubectl get events -n uygulama --sort-by=.lastTimestamp | tail -20
+```
+
+## ImagePullBackOff: imaj gelmiyor
+
+Mesaj neredeyse her zaman kesin nedeni söyler:
+
+- `manifest unknown` ya da `not found` → etiket yok. En sık: imaj yeniden oluşturulmuş ama etiket dağıtımda güncellenmemiş, ya da tam tersi.
+- `unauthorized` / `authentication required` → özel kayıt defteri, `imagePullSecrets` eksik ya da yanlış ad alanında.
+- `dial tcp ... i/o timeout` → düğümden kayıt defterine ağ erişimi yok. Özel ağlarda kayıt defteri uç noktası ya da güvenlik duvarı kuralı eksiktir.
+
+Gizli anahtarın doğru yerde olup olmadığı sık atlanır: `imagePullSecrets` **pod ile aynı ad alanında** bulunmalıdır. Başka bir ad alanındaki gizli anahtar görünmez.
+
+```bash
+kubectl get secret -n uygulama
+kubectl get sa varsayilan -n uygulama -o yaml | grep -A3 imagePullSecrets
+```
+
+Bir de sessiz olan var: `imagePullPolicy: IfNotPresent` ile `latest` etiketi birlikte kullanıldığında düğüm eski bir kopyayı kullanır ve yeni sürüm hiç indirilmez. "Dağıttım ama eski kod çalışıyor" şikâyetinin klasik nedeni budur — ve `latest` kullanmamak için bir neden daha.
+
+## CrashLoopBackOff: başlıyor ve ölüyor
+
+Burada konteyner gerçekten çalışmıştır, o yüzden günlük vardır — ama **bir önceki denemenin** günlüğü gerekir:
+
+```bash
+kubectl logs api-7d9f8-x2k4l -n uygulama --previous
+```
+
+`--previous` olmadan çalışan komut, henüz hiçbir şey yazmamış olan yeni denemeyi gösterir ve boş döner. Bu tek bayrak, bu durumdaki teşhis süresinin yarısını kısaltır.
+
+Çıkış koduna bakın:
+
+```bash
+kubectl get pod api-7d9f8-x2k4l -n uygulama -o jsonpath='{.status.containerStatuses[0].lastState.terminated}' | jq
+```
+
+| Çıkış kodu | Anlamı |
+| --- | --- |
+| `0` | Süreç düzgün bitti — ama Deployment sürekli çalışan bir süreç bekler. Muhtemelen yanlış iş türü; Job kullanılmalı. |
+| `1` | Uygulama hata verdi. Yapılandırma, eksik ortam değişkeni, erişilemeyen bağımlılık. |
+| `137` | SIGKILL. Neredeyse her zaman bellek sınırı aşıldı (`OOMKilled`). |
+| `139` | Segmentasyon hatası. |
+| `143` | SIGTERM ile sonlandırıldı. |
+
+`137` görüyorsanız sorun kodda değil sınırdadır; ayrıntısı [kaynak istekleri ve sınırlar](/rehberler/k8s-kaynak-istekleri-ve-sinirlar) rehberinde.
+
+Bir başka yaygın neden: **canlılık yoklaması (liveness probe) çok erken başlıyor.** Uygulama 40 saniyede açılıyorsa ve yoklama 10. saniyede sormaya başlıyorsa, kubelet uygulamayı açılırken öldürür ve sonsuza kadar döner. Belirti CrashLoopBackOff'tur ama neden uygulamada değildir.
+
+```yaml
+startupProbe:
+  httpGet: { path: /saglik, port: 8080 }
+  failureThreshold: 30
+  periodSeconds: 5      # 30 × 5 = 150 saniyeye kadar izin
+livenessProbe:
+  httpGet: { path: /saglik, port: 8080 }
+  periodSeconds: 10
+```
+
+`startupProbe` tanımlıyken canlılık yoklaması başlangıç bitene kadar hiç çalışmaz. Yavaş açılan uygulamalarda doğru çözüm budur; `initialDelaySeconds` değerini büyütmek, ilk açılışı kurtarır ama sonraki gerçek donmaları geç fark etmenize yol açar.
+
+## Running ama Ready değil
+
+Pod çalışıyor, `READY` sütunu `0/1`. Bu, hazırlık yoklamasının (readiness probe) geçmediği anlamına gelir ve pod'a hiç trafik gitmez.
+
+```bash
+kubectl describe pod api-7d9f8-x2k4l -n uygulama | grep -A5 Readiness
+kubectl exec -it api-7d9f8-x2k4l -n uygulama -- wget -qO- localhost:8080/saglik
+```
+
+Sık görülen üç hata: yoklama yanlış portu soruyor, uç nokta kimlik doğrulaması istiyor ve 401 dönüyor, ya da sağlık uç noktası veritabanına bağlanmayı deniyor ve veritabanı hazır değil.
+
+Sonuncusu bir tasarım sorusudur: hazırlık yoklaması **bu pod trafik alabilir mi** sorusunu yanıtlamalı, bağımlılıkların durumunu değil. Bağımlılığı da yoklamaya katarsanız veritabanının kısa bir kesintisi tüm pod'ları aynı anda trafikten düşürür ve kesintiyi büyütür.
+
+## Ad alanı ve kota
+
+Bazen sorun pod'da değil, ad alanındadır:
+
+```bash
+kubectl get resourcequota -n uygulama
+kubectl get limitrange -n uygulama -o yaml
+```
+
+Kota dolduğunda yeni pod hiç oluşturulmaz — Deployment "istenen kopya sayısına ulaşılamıyor" der ama pod listesinde hiçbir şey görünmez. Bu durumda pod'a değil, ReplicaSet olaylarına bakmak gerekir:
+
+```bash
+kubectl describe replicaset -n uygulama | grep -A10 Events
+```
+
+`LimitRange` ise sessizce iş yapar: pod'a istek belirtmediyseniz oradan öntanımlı bir değer basılır. "Ben limit koymadım ama pod'da limit var" durumunun nedeni budur.
+
+## Teşhis sırası
+
+Sıralamayı ezberlemek yerine tek bir alışkanlık edinin: **önce `describe`, sonra `Events`, sonra duruma göre günlük.**
+
+```bash
+# 1) durum ve olaylar
+kubectl describe pod <ad> -n <ad-alani>
+
+# 2) crash ise bir önceki denemenin günlüğü
+kubectl logs <ad> -n <ad-alani> --previous
+
+# 3) ad alanındaki son olaylar (kota, zamanlayıcı, birim)
+kubectl get events -n <ad-alani> --sort-by=.lastTimestamp | tail -20
+
+# 4) düğüm tarafı
+kubectl get nodes
+kubectl describe node <dugum> | sed -n '/Allocated resources/,$p'
+```
+
+Bu dört komut, pod başlamama vakalarının büyük çoğunluğunu birkaç dakikada bitirir. Bitirmediklerinde de en azından sorunun zamanlayıcıda mı, kubelet'te mi, yoksa uygulamada mı olduğunu kesinleştirirler — asıl zaman kazandıran şey de budur.
+
+Manifest'i yazarken sık atlanan alanları önceden görmek için [Kubernetes manifest üreteci](/araclar/k8s-manifest) aracına bakabilirsiniz.

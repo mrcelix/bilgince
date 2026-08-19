@@ -1,0 +1,176 @@
+---
+baslik: "Kubernetes'te istek ve sınır: CPU kısıtlaması ile OOMKilled arasındaki fark"
+ozet: "CPU sınırını aşan konteyner yavaşlar, bellek sınırını aşan öldürülür. Bu asimetri, istek ve sınır değerlerinin nasıl seçileceğini baştan belirler."
+konu: "kubernetes"
+etiketler: ["kubernetes", "kapasite", "performans", "konteyner"]
+yayin: 2026-08-10
+sure: 12
+---
+
+Bir servis üretimde ara ara yanıt vermiyordu. Bellek kullanımı sınırın çok altındaydı, CPU kullanımı da öyle görünüyordu. İzleme grafikleri sakindi.
+
+Sorun CPU **kısıtlamasıydı** (throttling). Konteynerin CPU sınırı 500m'di ve uygulama saniyede kısa süreli tepe yapıyordu. Ortalama kullanım %20 görünüyordu ama her 100 milisaniyelik pencerede kotasını ilk 20 milisaniyede tüketip kalan 80 milisaniye bekletiliyordu. Grafikte görünmeyen şey, isteklerin o beklemede birikmesiydi.
+
+CPU ile bellek Kubernetes'te temelde farklı davranır. Bu farkı bilmeden konulan sınırlar, çözmeyi umdukları sorunları üretir.
+
+## İstek ile sınır ayrı işler yapar
+
+**İstek (request)** zamanlayıcıya söylenen sayıdır: "bu pod'u yerleştirirken bu kadar yer ayır." Düğüm doluluğu isteklerin toplamına göre hesaplanır, gerçek kullanıma göre değil. Bu yüzden düğümler boş görünürken pod yerleşmeyebilir.
+
+**Sınır (limit)** çalışma anında uygulanan tavandır. Ve burada iki kaynak ayrışır:
+
+| | CPU | Bellek |
+| --- | --- | --- |
+| Sınır aşılınca | Süreç yavaşlatılır | Süreç öldürülür |
+| Sıkıştırılabilir mi | Evet | Hayır |
+| Belirti | Gecikme artışı, zaman aşımı | `OOMKilled`, çıkış kodu 137 |
+| Fark edilmesi | Zor — grafikte görünmez | Kolay — pod yeniden başlar |
+
+Bu asimetri pratik bir sonuç doğurur: **bellek sınırı koymak zorunludur, CPU sınırı koymak çoğu zaman zararlıdır.**
+
+## Neden CPU sınırı zararlı olabilir
+
+CPU kotası CFS zamanlayıcı üzerinden, 100 milisaniyelik pencerelerle uygulanır. `limits.cpu: 500m` demek, her 100 ms'de en fazla 50 ms CPU süresi demektir.
+
+Kısa tepe yapan bir uygulama — ki web servislerinin çoğu böyledir — kotasını pencerenin başında tüketir ve kalan sürede hiç çalışmaz. Ortalama kullanım düşük görünür, gecikme ise yükselir. Üstelik çok çekirdekli bir süreçte kota tüm iş parçacıklarına paylaştırılır; dört iş parçacığı 500m kotayı 12,5 ms'de bitirir.
+
+Ölçmek için:
+
+```bash
+kubectl exec -it api-7d9f8 -n uygulama -- cat /sys/fs/cgroup/cpu.stat
+```
+
+`nr_throttled` ve `throttled_usec` değerleri artıyorsa kısıtlama vardır. Prometheus kullanıyorsanız aynı bilgi şu sorguyla gelir:
+
+```
+rate(container_cpu_cfs_throttled_periods_total[5m])
+  / rate(container_cpu_cfs_periods_total[5m])
+```
+
+Bu oran %5'in üzerindeyse sınırı gözden geçirin. %25'in üzerindeyse sınır, uygulamanın işini yapmasını engelliyor demektir.
+
+**Öneri:** CPU için istek koyun, sınır koymayın. İstek, düğüm sıkışınca alacağınız payı garantiler (CFS payları isteklerle orantılı dağıtılır); sınır ise sıkışma olmadığında bile sizi kısıtlar. Sınır yalnızca çok kiracılı kümelerde, komşunun kaynağını tüketmesini engellemek için — ve o zaman da bolca — konur.
+
+Bellekte durum tersidir: sınır yoksa sızıntı yapan tek bir konteyner düğümün belleğini tüketir, kubelet düğümü baskı altına alır ve **başka pod'lar** tahliye edilir. Suçlu ayakta kalır, masumlar ölür.
+
+## QoS sınıfı sessizce belirlenir
+
+Kubernetes her pod'a bir hizmet kalitesi sınıfı atar ve bu sınıf, düğüm bellek baskısı altındayken kimin önce öldürüleceğini belirler.
+
+| Sınıf | Koşul | Tahliye sırası |
+| --- | --- | --- |
+| `Guaranteed` | Her konteynerde CPU ve belleğin **hem isteği hem sınırı** var ve **eşit** | En son |
+| `Burstable` | En az bir istek var ama Guaranteed koşulu sağlanmıyor | Ortada |
+| `BestEffort` | Hiç istek ya da sınır yok | İlk |
+
+En sık yanlış anlaşılan nokta: `Guaranteed` için isteğin sınıra eşit olması **her iki kaynakta da** gerekir. CPU'da istek 400m sınır 700m yazarsanız pod `Burstable` olur — bellek değerleri eşit olsa bile.
+
+Bu, yukarıdaki "CPU sınırı koymayın" önerisiyle çelişir gibi görünür ve gerçekten bir takas vardır: kritik iş yükleri için `Guaranteed` sınıfı isteniyorsa CPU sınırı da konmak zorundadır. O zaman sınırı isteğin gerçek tepe değerine göre, bolca seçin.
+
+```bash
+kubectl get pod api-7d9f8 -n uygulama -o jsonpath='{.status.qosClass}'
+```
+
+QoS bileşimini denemeden görmek için [Kubernetes kaynak planlayıcı](/araclar/k8s-kaynak-planlayici) aracını kullanabilirsiniz.
+
+## Değerleri nereden bulmalı
+
+Tahminle başlamayın; ölçün. Sırayla:
+
+**1. Gerçek kullanımı görün.**
+
+```bash
+kubectl top pods -n uygulama --containers
+```
+
+Bu anlık bir görüntüdür. Karar için en az bir haftalık veri gerekir; metrik deponuzda 95. yüzdelik değeri okuyun.
+
+**2. İsteği tipik kullanıma, sınırı tepe kullanıma göre seçin.**
+
+Bellek isteği: kararlı hâldeki kullanımın biraz üstü. Bellek sınırı: gözlenen tepenin %25–50 üstü. Aradaki boşluk, beklenmedik yükler içindir.
+
+CPU isteği: 95. yüzdelik kullanım. Bu, sıkışma anında alacağınız payı belirler.
+
+**3. JVM ve .NET için ayrıca ayar gerekir.**
+
+Bu, konteynerleştirilmiş uygulamalarda en sık atlanan konudur. Eski çalışma zamanları düğümün toplam belleğini görür, konteynerin sınırını değil; yığını (heap) ona göre büyütür ve sınırı aşıp öldürülür.
+
+Modern sürümler cgroup sınırını okur ama oran öntanımlı olarak muhafazakârdır:
+
+```yaml
+env:
+  - name: JAVA_TOOL_OPTIONS
+    value: "-XX:MaxRAMPercentage=75.0 -XX:InitialRAMPercentage=50.0"
+```
+
+Kalan %25, yığın dışı bellek içindir: iş parçacığı yığınları, sınıf meta verisi, doğrudan tamponlar. Yığını sınıra eşitlerseniz uygulama "yığın doldu" hatası vermeden, sessizce `OOMKilled` olur — ve günlükte hiçbir şey bulamazsınız.
+
+## OOMKilled teşhisi
+
+```bash
+kubectl get pod api-7d9f8 -n uygulama \
+  -o jsonpath='{.status.containerStatuses[0].lastState.terminated.reason}'
+kubectl describe pod api-7d9f8 -n uygulama | grep -i -A3 "Last State"
+```
+
+`Reason: OOMKilled` ve çıkış kodu `137` görürsünüz. İki olasılık vardır ve ayırt etmek gerekir:
+
+**Sızıntı varsa** bellek kullanımı zamanla düzgün biçimde tırmanır ve her seferinde aynı noktada ölür. Sınırı büyütmek yalnızca ölüm saatini erteler.
+
+**Tepe varsa** kullanım normalde düşüktür ve belirli bir işlemde sıçrar. Burada sınır gerçekten düşüktür.
+
+İzleme grafiğinde bellek eğrisinin biçimi bu ayrımı hemen verir. Sınırı büyütmeden önce bu grafiğe bakmak, aynı olayı üç kez yaşamaktan kurtarır.
+
+Ayrıca konteyner içindeki tüm süreçler aynı cgroup'tadır: yan araç (sidecar) konteyner varsa onun belleği ayrı sayılır ama `initContainer` ve yardımcı süreçler ana konteynerin bütçesindedir.
+
+## Ad alanı düzeyinde zorlamak
+
+Ekipler istek yazmayı unutur ve `BestEffort` pod'lar kümede birikir. İki nesne bunu engeller:
+
+```yaml
+apiVersion: v1
+kind: LimitRange
+metadata:
+  name: varsayilan-sinirlar
+  namespace: uygulama
+spec:
+  limits:
+    - type: Container
+      default:              # sınır yazılmamışsa
+        memory: 512Mi
+      defaultRequest:       # istek yazılmamışsa
+        cpu: 100m
+        memory: 256Mi
+      max:
+        memory: 4Gi
+```
+
+`LimitRange` eksikleri tamamlar. `ResourceQuota` ise ad alanının toplam bütçesini sınırlar:
+
+```yaml
+apiVersion: v1
+kind: ResourceQuota
+metadata:
+  name: uygulama-kota
+  namespace: uygulama
+spec:
+  hard:
+    requests.cpu: "20"
+    requests.memory: 40Gi
+    limits.memory: 80Gi
+    pods: "50"
+```
+
+Bir uyarı: `ResourceQuota` tanımlı bir ad alanında **her** pod istek belirtmek zorundadır. Belirtmeyen pod hiç oluşturulmaz ve hata pod listesinde değil, ReplicaSet olaylarında görünür. `LimitRange` ile birlikte kullanmak bu tuzağı kapatır.
+
+## Otomatik ölçekleme ile ilişkisi
+
+Yatay pod otomatik ölçekleyici (HPA) CPU'ya göre ölçeklerken **isteğin yüzdesini** kullanır, sınırın değil. `requests.cpu: 100m` ve hedef %70 ise, ortalama 70m kullanımda yeni kopya açılır.
+
+Bu şu sonucu doğurur: isteği gereğinden büyük yazarsanız HPA hiç tetiklenmez, çünkü yüzde hep düşük kalır. İsteği gereğinden küçük yazarsanız HPA sürekli tetiklenir ve kopya sayısı salınır.
+
+İstek değerleri bu yüzden yalnızca bir yerleştirme ayarı değil, ölçekleme davranışının da girdisidir. HPA kullanan servislerde istekleri değiştirdiğinizde ölçekleme eşiğini de gözden geçirin.
+
+## Kısa liste
+
+Belleğe **hem istek hem sınır** koyun; sınır, gözlenen tepenin %25–50 üstünde olsun. CPU'ya **istek koyun**, çok kiracılı bir küme değilse sınır koymayın. JVM ve .NET uygulamalarında yığın oranını açıkça ayarlayın. `LimitRange` ile ad alanına taban değerler basın. Ve en önemlisi: kısıtlama oranını ölçün — CPU sınırının zarar verdiği tek yer, kimsenin bakmadığı o metriktir.

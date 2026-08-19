@@ -1,0 +1,145 @@
+---
+baslik: "Kod olarak altyapıya nereden başlanır: durum dosyası, sürüklenme ve ilk kapsam"
+ozet: "Var olan altyapıyı bir gecede koda çevirmeye çalışmak neredeyse her zaman yarım kalır. Doğru başlangıç, koda geçirilecek şeyi değil, sırasını seçmektir."
+konu: "otomasyon"
+etiketler: ["otomasyon", "terraform", "bulut", "mimari"]
+yayin: 2026-08-12
+sure: 12
+---
+
+Bir ekip Terraform'a geçmeye karar verdi ve mevcut ortamın tamamını içe aktarmakla başladı. Üç hafta sonra yüzlerce kaynak koda alınmıştı ama hiçbir şey uygulanamıyordu: her `plan` çalıştırıldığında elle yapılmış onlarca küçük değişiklik yüzünden dev bir fark listesi çıkıyordu ve kimse listedeki değişikliklerin hangisinin zararsız, hangisinin yıkıcı olduğunu bilemiyordu.
+
+Sonunda proje terk edildi ve "Terraform bize uymadı" denildi. Oysa uymayan şey Terraform değil, başlama sırasıydı.
+
+## Neyi çözdüğünü netleştirin
+
+Kod olarak altyapı üç ayrı sorunu çözer ve hepsini aynı anda çözmek zorunda değilsiniz:
+
+**Yeniden üretilebilirlik.** Aynı ortamı ikinci kez, aynı biçimde kurabilmek. Test ortamının üretimle aynı olmasını sağlayan şey budur.
+
+**Denetlenebilirlik.** Kim, ne zaman, neyi değiştirdi. Bulut denetim günlüğü de bunu söyler ama "neden" sorusunun yanıtı yalnızca kod deposundadır: değişiklik bir inceleme kaydına, o da bir talebe bağlıdır.
+
+**Sürüklenme denetimi.** Gerçek durumun, olması gereken durumdan ne kadar saptığını görebilmek.
+
+Hangisinin sizin için acil olduğunu bilmek, ilk kapsamı seçmenizi sağlar. Üçünü birden hedefleyen bir başlangıç, yukarıdaki hikâyeye çıkar.
+
+## İlk kapsam: yeni olan, kritik olmayan
+
+Var olan üretim ortamını içe aktararak başlamayın. Sırası şu:
+
+1. **Yeni kurulan bir şey.** Bir sonraki proje, yeni bir ortam, yeni bir hesap. Sıfırdan yazılır, içe aktarma derdi yoktur.
+2. **Sık değişen ama düşük riskli kaynaklar.** DNS kayıtları, güvenlik grubu kuralları, etiketler, izleme uyarıları. Değişiklik sıklığı yüksek olduğu için kazanç hemen görünür.
+3. **Ortam iskeleti.** Ağ, alt ağlar, temel kimlik rolleri. Nadiren değişir ama yeniden kurulabilmesi en değerli olan katman budur.
+4. **En son: durum tutan kritik kaynaklar.** Veritabanları, kalıcı diskler. Bunlar en son gelir çünkü yanlış bir `plan` uygulaması geri dönülemez.
+
+Kritik kaynaklar koda alındığında silinmeye karşı kilitleyin:
+
+```hcl
+resource "aws_db_instance" "birincil" {
+  # ...
+  lifecycle {
+    prevent_destroy = true
+  }
+}
+```
+
+Bu satır, `terraform destroy` ya da kaynağı yeniden oluşturacak bir değişiklik denendiğinde planı hata ile durdurur. Üretim veritabanlarında istisnasız bulunmalıdır.
+
+## Durum dosyası altyapının kendisi kadar kritiktir
+
+Terraform'un durum dosyası, kodun tanımladığı kaynaklarla gerçek kaynaklar arasındaki eşlemedir. Kaybolursa Terraform, sizin yönettiğiniz kaynakları tanımaz — ve bir sonraki `apply` hepsini yeniden oluşturmaya kalkar.
+
+Dört kural:
+
+**Yerelde tutmayın.** Uzak arka uç (S3, Azure Storage, GCS, Terraform Cloud) zorunludur. Yerel dosya, o dizini silen kişiye altyapıyı silme yetkisi verir.
+
+**Kilitleyin.** İki kişi aynı anda `apply` çalıştırırsa durum bozulur. S3 arka ucunda bu artık yerleşiktir; eski yapılandırmalarda DynamoDB tablosu gerekir.
+
+**Sürümleyin.** Arka uç kovasında sürümleme açık olmalı. Bozulan bir duruma geri dönmenin tek yolu budur.
+
+**Sır olarak davranın.** Durum dosyası, kaynakların tüm özelliklerini düz metin tutar — veritabanı parolaları dahil. Kova genel erişime kapalı ve şifreli olmalı, erişimi de dar bir gruba verilmelidir.
+
+```hcl
+terraform {
+  backend "s3" {
+    bucket       = "sirket-tfstate"
+    key          = "uretim/ag/terraform.tfstate"
+    region       = "eu-central-1"
+    encrypt      = true
+    use_lockfile = true
+  }
+}
+```
+
+`key` alanındaki yol, durumun nasıl bölüneceğini belirler — ve bu, ileride en çok pişman olunacak karardır.
+
+## Tek büyük durum yerine bölünmüş durum
+
+Her şeyi tek bir durum dosyasında tutmak başta kolaydır. Sonra şu olur: küçük bir DNS değişikliği için çalıştırılan `plan`, 400 kaynağı sorgulamak zorunda kalır ve dakikalarca sürer. Daha kötüsü, o plandaki bir hata tüm altyapıyı riske atar.
+
+Bölme ölçütü **değişim hızı ve sahiplik**tir:
+
+```
+altyapi/
+  ag/            # nadiren değişir, ağ ekibi
+  kimlik/        # nadiren değişir, güvenlik ekibi
+  veri/          # dikkatli değişir, veritabanı ekibi
+  uygulama-a/    # sık değişir, ürün ekibi
+  uygulama-b/
+```
+
+Aralarındaki bağ, çıktılar üzerinden kurulur — ama doğrudan `remote_state` okumak yerine sağlayıcının veri kaynaklarını kullanmak daha esnektir; böylece bir modül, diğerinin durum dosyasına bağımlı olmaz.
+
+## Sürüklenme sessizce birikir
+
+Kod ile gerçek arasındaki fark bir günde oluşmaz. Bir gece olayında biri konsoldan bir kural ekler, düzeltmeyi koda taşımayı unutur, üç ay sonra kimse o kuralın neden orada olduğunu bilmez.
+
+Bunun çözümü disiplin değil, **düzenli ölçüm**:
+
+```bash
+terraform plan -detailed-exitcode
+# 0 = değişiklik yok, 1 = hata, 2 = değişiklik var
+```
+
+Bu çıkış kodu, sürüklenme denetimini bir zamanlanmış işe dönüştürmenizi sağlar. Gecelik çalışır, çıkış kodu 2 ise bildirim gönderir. Fark küçükken görüldüğünde iki dakikada çözülür; üç ay biriktiğinde kimse dokunmaya cesaret edemez.
+
+Konsoldan yapılan acil değişiklikleri yasaklamak gerçekçi değil — gece yarısı hizmeti ayağa kaldırmak önceliklidir. Gerçekçi olan, ertesi gün koda taşınmasını bir görev hâline getirmek ve sürüklenme raporuyla takip etmektir.
+
+## Sırlar koda girmez
+
+Bu, kod olarak altyapıya geçerken en sık yapılan hatadır: parolayı `variables.tf` içine yazmak ya da `terraform.tfvars` dosyasını depoya eklemek.
+
+Üç düzey vardır ve üçü de gereklidir:
+
+**Depoda sır olmasın.** `.gitignore` içine `*.tfvars` ve `.terraform/` girsin. Sırların depoya kaçmadığını bir kanca (pre-commit) ile denetleyin — insan gözü bunu güvenilir biçimde yakalamaz.
+
+**Değerler bir sır deposundan gelsin.** Sağlayıcının sır yöneticisinden veri kaynağı olarak okuyun ya da CI ortam değişkeni olarak enjekte edin.
+
+**Durum dosyası şifreli olsun.** Sır depodan gelse bile Terraform onu duruma yazar. Şifreleme ve dar erişim bu yüzden zorunludur.
+
+CI tarafındaki kimlik bilgisi yönetimi ayrı bir konu; [boru hattı güvenliği ve sırlar](/rehberler/oto-boru-hatti-guvenligi-sirlar) rehberinde ele alınıyor.
+
+## Modül yazmak için acele etmeyin
+
+Yaygın bir tuzak: ilk günden "her şey yeniden kullanılabilir modül olsun" demek. Sonuç, on parametreli, hiçbir yerde tam oturmayan, okunması zor soyutlamalar olur.
+
+Pratik kural: **aynı yapıyı üçüncü kez yazana kadar modül çıkarmayın.** İki örnek, ortak olanın ne olduğunu göstermeye yetmez. Üçüncüde desen netleşir.
+
+Modül yazdığınızda sürümleyin ve kullanan yerde sürümü sabitleyin:
+
+```hcl
+module "vpc" {
+  source  = "git::https://github.com/sirket/tf-moduller.git//vpc?ref=v1.4.0"
+  # ...
+}
+```
+
+`ref` olmadan `main` dalı kullanılır ve modülde yapılan bir değişiklik, hiçbir şey değiştirmediğiniz bir ortamda beklenmedik bir plan üretir.
+
+## İlk ay için gerçekçi hedef
+
+Bir aylık makul bir sonuç şudur: yeni bir ortam tümüyle kodla kurulmuş, DNS ve güvenlik grupları koda alınmış, durum uzak arka uçta ve kilitli, gecelik sürüklenme denetimi çalışıyor, `plan` çıktısı birleştirme isteğinde inceleniyor.
+
+Bu listede "tüm üretim koda alındı" yok — bilerek. O hedef ikinci altı ayın işidir ve yukarıdaki temel kurulmadan denendiğinde, baştaki hikâyeye çıkar.
+
+Yapılandırmanın kendisinin idempotan olması ayrı bir konudur; [yapılandırma yönetimi ve idempotans](/rehberler/oto-yapilandirma-yonetimi-idempotans) rehberi oraya bakıyor.

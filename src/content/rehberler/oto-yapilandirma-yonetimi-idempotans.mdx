@@ -1,0 +1,166 @@
+---
+baslik: "Yapılandırma yönetiminde idempotans: iki kez çalışan betik neden bozar"
+ozet: "Betiğiniz bir kez çalıştığında doğru sonucu veriyor olabilir. Asıl soru, ikinci kez çalıştığında ne olduğu."
+konu: "otomasyon"
+etiketler: ["otomasyon", "ansible", "powershell", "linux"]
+yayin: 2026-08-13
+sure: 11
+---
+
+Bir kurulum betiği, yapılandırma dosyasına bir satır eklemek için şunu yapıyordu:
+
+```bash
+echo "MaxSessions 4" >> /etc/ssh/sshd_config
+```
+
+Betik yüz makinede çalıştı, her şey yolunda gitti. Bir ay sonra betik yeniden çalıştırıldı — bu kez satır iki kez yazıldı. Üç ay sonra bazı makinelerde beş kopya vardı.
+
+sshd bu durumda ilk değeri kullanır, o yüzden kimse fark etmedi. Ama aynı desen `sysctl.conf` ya da bir uygulama yapılandırmasında kullanıldığında sonuç farklı olur ve nedeni bulunması saatler alır.
+
+İdempotans, bir işlemin bir kez ya da yüz kez çalıştırılmasının aynı sonucu vermesidir. Yapılandırma yönetiminin tamamı bu tek özelliğin üzerine kuruludur.
+
+## Neden bu kadar önemli
+
+Otomasyon araçları betikleri **tekrar tekrar** çalıştırmak üzere tasarlanmıştır. Ansible her `playbook` çağrısında tüm görevleri değerlendirir. DSC ve Puppet düzenli aralıklarla durumu yeniden uygular. Bu tasarımın amacı sürüklenmeyi düzeltmektir: biri elle bir ayarı bozarsa bir sonraki çalıştırma geri alır.
+
+Ama bu ancak görevler idempotan ise işe yarar. Değilse her çalıştırma yeni bir kalıntı bırakır ve makineler zamanla birbirinden ayrışır — hem de otomasyon "başarılı" raporu vererek.
+
+## Emir kipinden bildirim kipine
+
+Fark, komutun ne söylediğindedir:
+
+**Emir kipi (imperative):** "Şunu yap." — `useradd`, `echo >>`, `sed -i`
+**Bildirim kipi (declarative):** "Şu durumda olsun." — "kullanıcı var olsun", "satır tam olarak şu olsun"
+
+Bildirim kipindeki bir araç önce mevcut durumu okur, hedefle karşılaştırır ve **yalnızca fark varsa** işlem yapar. Bu, hem idempotansı hem de "kaç şey değişti" raporunu getirir.
+
+```yaml
+# emir kipi — iki kez çalışırsa iki satır
+- name: Ayar ekle
+  shell: echo "MaxSessions 4" >> /etc/ssh/sshd_config
+
+# bildirim kipi — satır varsa dokunmaz, farklıysa düzeltir
+- name: Ayar tanımlı olsun
+  lineinfile:
+    path: /etc/ssh/sshd_config
+    regexp: '^\s*MaxSessions\s'
+    line: 'MaxSessions 4'
+    validate: '/usr/sbin/sshd -t -f %s'
+  notify: sshd yeniden yükle
+```
+
+`regexp` alanı burada kritiktir: satırı **bulup değiştirmenin** anahtarıdır. Yazılmazsa modül tam eşleşme arar, bulamaz ve her seferinde yeni satır ekler — yani `echo >>` ile aynı sorunu bildirim kipi kılığında üretirsiniz.
+
+`validate` ise dosyayı yerine koymadan önce sözdizimini denetler. SSH yapılandırmasında bu satır, kendinizi sunucudan dışarıda bırakmanızı engelleyen şeydir; konunun bütünü [SSH sertleştirme aracında](/araclar/ssh-sertlestirme) ele alınıyor.
+
+## Kabuk komutu gerektiğinde koşul yazın
+
+Her şey modülle yapılamaz. Kabuk komutu kullanmak zorunda kaldığınızda idempotansı kendiniz sağlarsınız:
+
+```yaml
+- name: Lisans etkinleştir
+  command: /opt/uygulama/lisansla --anahtar "{{ lisans }}"
+  args:
+    creates: /opt/uygulama/.lisansli     # bu dosya varsa hiç çalıştırma
+```
+
+`creates` ve `removes` argümanları, komutun çalışıp çalışmayacağını dosya varlığına bağlar. Daha karmaşık durumlarda önce durumu okuyup sonuca göre karar verin:
+
+```yaml
+- name: Mevcut sürümü oku
+  command: /opt/uygulama/bin --version
+  register: surum
+  changed_when: false        # okuma işlemi "değişiklik" sayılmaz
+
+- name: Gerekiyorsa yükselt
+  command: /opt/uygulama/yukselt.sh
+  when: surum.stdout is not search('2\.4\.')
+```
+
+`changed_when: false` satırı görünüşte kozmetiktir ama önemlidir: yalnızca okuma yapan görevler "değişti" diye raporlanırsa, "hiçbir şey değişmedi" çıktısını bir daha asla göremezsiniz — ve o çıktı, sürüklenmeyi görmenin tek yoludur.
+
+## PowerShell tarafında aynı disiplin
+
+Windows'ta da mesele aynıdır, araçlar farklıdır:
+
+```powershell
+# emir kipi — ikinci çalıştırmada hata
+New-LocalUser -Name 'izleyici' -NoPassword
+
+# bildirim kipi
+if (-not (Get-LocalUser -Name 'izleyici' -ErrorAction SilentlyContinue)) {
+    New-LocalUser -Name 'izleyici' -NoPassword
+}
+```
+
+Kayıt defteri ayarlarında yaygın bir hata `New-Item -Force` kullanmaktır: var olan anahtarın **içeriğini siler**. Doğrusu varlığı denetleyip yalnızca değeri yazmaktır:
+
+```powershell
+$yol = 'HKLM:\SOFTWARE\Sirket\Ajan'
+if (-not (Test-Path $yol)) { New-Item -Path $yol -Force | Out-Null }
+Set-ItemProperty -Path $yol -Name 'Aralik' -Value 300 -Type DWord
+```
+
+`Set-ItemProperty` zaten idempotandır: aynı değeri ikinci kez yazmak bir şeyi bozmaz. Tehlikeli olan, yolu oluşturan satırdır.
+
+Betiklerinizde `-WhatIf` desteği varsa değişikliği uygulamadan görebilirsiniz; ayrıntısı [WhatIf ve Confirm ile güvenli otomasyon](/rehberler/ps-whatif-confirm-guvenli-otomasyon) rehberinde.
+
+## Değişiklik raporu bir ölçüdür
+
+İdempotan bir kurulumda ikinci çalıştırma şunu vermelidir:
+
+```
+PLAY RECAP
+sunucu01 : ok=42  changed=0  unreachable=0  failed=0
+```
+
+`changed=0` hedeftir. Sıfır değilse iki olasılık vardır: ya gerçekten bir sürüklenme düzeltildi — ki bu iyi haberdir — ya da bir göreviniz her çalıştığında "değişti" diyor.
+
+İkincisini ayıklamak için aynı playbook'u art arda iki kez çalıştırın. İkinci koşuda hâlâ `changed` olan görevler idempotan değildir. Bu, yeni yazılmış her rol için yapılması gereken tek satırlık bir sınamadır ve sonradan haftalarca sürecek teşhisleri baştan keser.
+
+```bash
+ansible-playbook site.yml --check --diff
+```
+
+`--check` kipi hiçbir değişiklik yapmadan neyin değişeceğini söyler, `--diff` de dosya farkını gösterir. Ansible'ın `terraform plan` karşılığıdır — ama tüm modüller bu kipi doğru desteklemez; `shell` ve `command` görevleri denetim kipinde atlanır ve o yüzden sonuç eksik olabilir.
+
+## Sıralama bir bağımlılık değildir
+
+İdempotan görevler bile yanlış sırada çalışırsa istenmeyen sonuç verir. Ama sırayı görev listesindeki konumla değil, açık bağımlılıkla ifade edin:
+
+```yaml
+- name: Yapılandırmayı yaz
+  template:
+    src: uygulama.conf.j2
+    dest: /etc/uygulama/uygulama.conf
+  notify: uygulamayı yeniden yükle
+
+handlers:
+  - name: uygulamayı yeniden yükle
+    systemd:
+      name: uygulama
+      state: reloaded
+```
+
+`notify`/`handler` yapısı iki şey kazandırır: servis yalnızca dosya **gerçekten değiştiyse** yeniden yüklenir, ve birden çok görev aynı işleyiciyi tetiklese bile yeniden yükleme bir kez yapılır.
+
+Bunun karşıtı — her koşuda servisi yeniden başlatan bir görev — hem idempotansı bozar hem de gereksiz kesinti üretir. Yüz sunucuda her gece yeniden başlatılan bir servis, otomasyonun kendisini bir kullanılabilirlik sorununa dönüştürür.
+
+## Silme de bildirim kipindedir
+
+En sık atlanan taraf budur. Bir rol bir dosya ya da kullanıcı ekliyorsa, o öğe artık istenmediğinde ne olacağı da tanımlanmalıdır. Aksi hâlde kaldırılan bir ayar makinelerde yaşamaya devam eder ve yeni kurulan makinelerle eski makineler ayrışır.
+
+```yaml
+- name: Eski izleme ajanı kaldırıldı
+  package:
+    name: eski-ajan
+    state: absent
+```
+
+`state: absent` görevleri, temizlik borcunu koda yazmanın yoludur. Bir ayarı kullanmayı bıraktığınızda görevi silmek yetmez; kaldıran bir görev eklemek gerekir. Bu ayrım, "yeni sunucular neden farklı davranıyor" sorusunun en yaygın yanıtıdır.
+
+## Kısa liste
+
+Yeni bir rol yazdığınızda dört soru: aynı playbook iki kez çalıştığında `changed=0` veriyor mu, kabuk görevlerinin bir koşulu var mı, yalnızca okuma yapan görevlerde `changed_when: false` yazılmış mı, kaldırılan ayarlar için `absent` görevi var mı.
+
+Dördü de sağlanıyorsa otomasyonunuz artık bir kurulum betiği değil, sürekli uygulanabilen bir durum tanımıdır — ve asıl istenen de budur.

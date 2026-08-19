@@ -1,0 +1,146 @@
+---
+baslik: "Boru hattı güvenliği: uzun ömürlü anahtardan kurtulmak"
+ozet: "CI sisteminizde duran bir bulut anahtarı, deponuza erişebilen herkesin eline geçmiş sayılır. Kısa ömürlü kimlik doğrulama bunu tümüyle ortadan kaldırır."
+konu: "otomasyon"
+etiketler: ["otomasyon", "guvenlik", "ci-cd", "bulut"]
+yayin: 2026-08-14
+sure: 11
+---
+
+Bir ekibin CI sisteminde üretim ortamına yazma yetkisi olan bir bulut anahtarı duruyordu. Anahtar üç yaşındaydı, kimin oluşturduğu bilinmiyordu ve döndürülmemişti — çünkü hangi işlerin kullandığı belli değildi, döndürmek bir şeyleri bozabilirdi.
+
+Bu, kendi kendini besleyen bir sarmal: anahtar ne kadar uzun süre kalırsa bağımlılıkları o kadar belirsizleşir, belirsizlik arttıkça dokunmak o kadar riskli olur.
+
+Çözüm anahtarı daha sık döndürmek değil. Anahtarı tümüyle ortadan kaldırmak.
+
+## Uzun ömürlü anahtar neden bu kadar riskli
+
+Bir CI değişkeninde duran kimlik bilgisi şu yüzeye açıktır:
+
+- Depoya yazma yetkisi olan herkes, bir iş tanımı ekleyip anahtarı dışarı sızdırabilir.
+- Çatallanmış (fork) depodan gelen bir katkı isteği, yanlış yapılandırılmış bir tetikleyicide sırlara erişebilir.
+- Yapı günlükleri kaza eseri değeri basar; günlükler genelde daha geniş bir kitleye açıktır.
+- Bir bağımlılık paketi, derleme sırasında ortam değişkenlerini okuyabilir.
+
+Bu yüzeylerin hiçbiri "anahtarı üç ayda bir döndürerek" kapanmaz. Sızan anahtar, döndürme gününe kadar geçerlidir.
+
+## Kısa ömürlü kimlik: OIDC
+
+Modern CI sistemleri her iş için imzalı bir kimlik belirteci üretir. Bulut sağlayıcısı bu belirtece güvenecek biçimde yapılandırılır ve karşılığında dakikalar ömürlü bir kimlik verir. Depoda saklanan hiçbir sır kalmaz.
+
+```yaml
+# GitHub Actions — AWS'ye anahtarsız erişim
+permissions:
+  id-token: write        # OIDC belirteci üretmek için gerekli
+  contents: read
+
+jobs:
+  dagit:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: arn:aws:iam::123456789012:role/ci-dagitim
+          aws-region: eu-central-1
+```
+
+Kritik nokta bulut tarafındaki güven koşulundadır. Yalnızca sağlayıcıya güvenmek yetmez — **hangi depo ve hangi dal** olduğu da koşula yazılmalıdır:
+
+```json
+{
+  "Condition": {
+    "StringEquals": {
+      "token.actions.githubusercontent.com:aud": "sts.amazonaws.com",
+      "token.actions.githubusercontent.com:sub": "repo:sirket/altyapi:ref:refs/heads/main"
+    }
+  }
+}
+```
+
+`sub` koşulu yazılmazsa **GitHub'daki herhangi bir depo** o rolü üstlenebilir. Bu, anahtarsız kuruluma geçerken en sık yapılan hatadır ve sonucu, düzeltmeye çalıştığınız sorundan daha kötüdür.
+
+Joker karakter kullanacaksanız da dikkatli olun: `repo:sirket/*` tüm kuruluş depolarına izin verir; `ref:refs/heads/*` her dala izin verir — yani bir katkı dalı da üretime dağıtabilir.
+
+Azure ve Google Cloud'da mekanizma aynıdır: Azure'da federe kimlik bilgisi, Google Cloud'da iş yükü kimlik federasyonu. Google tarafındaki ayrıntı için [anahtarsız kimlik doğrulama](/rehberler/gcp-workload-identity-anahtarsiz) rehberi var.
+
+## Kaçınılmaz sırlar için
+
+Her şey OIDC ile çözülmez: üçüncü taraf bir API anahtarı, bir imzalama sertifikası, bir veritabanı parolası kalabilir. Bunlar için üç kural:
+
+**Ortam bazlı ayırın.** Üretim sırları yalnızca üretim ortamına bağlı işlerde görünsün. GitHub'da bu `environment`, GitLab'da korumalı değişken ile yapılır — ve korumalı değişkenler yalnızca korumalı dallarda görünür.
+
+**Onay koyun.** Üretim ortamına bir zorunlu gözden geçirici ekleyin. Böylece bir işin sırra erişmesi için bir insanın onaylaması gerekir; kötü niyetli ya da hatalı bir iş tanımı tek başına dağıtım yapamaz.
+
+**Ömrünü kısaltın.** Sır bir kasadan dinamik olarak üretilebiliyorsa (veritabanı kimlik bilgileri gibi) statik değer tutmayın; iş sırasında üretin, iş bitince süresi dolsun.
+
+## Çatallanmış depodan gelen istekler
+
+Açık kaynak ya da geniş katılımlı iç depolarda en tehlikeli tetikleyici budur. Bir katkı isteği yabancı kod çalıştırır; o kodun sırlara erişimi olmamalıdır.
+
+GitHub'da `pull_request` tetikleyicisi çatallanmış depolar için sırları vermez — bu güvenli öntanımlıdır. Tehlikeli olan `pull_request_target`'tır: temel dalın bağlamında çalışır, **sırlara erişebilir**, ama katkı isteğindeki kodu çıkarırsanız o kod sırlarla birlikte çalışır.
+
+```yaml
+# TEHLİKELİ — yabancı kodu sırlarla çalıştırır
+on: pull_request_target
+jobs:
+  sina:
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}   # yabancı kod
+      - run: npm test                                       # sırlar ortamda
+```
+
+Kural: `pull_request_target` yalnızca depo kodunu çalıştıran, katkıdaki kodu **çıkarmayan** işler için kullanılır (etiket ekleme, yorum yazma gibi). Katkı kodunu sınamak gerekiyorsa sırsız bir işte yapılır.
+
+## Eylem ve imaj sürümlerini sabitleyin
+
+Boru hattınız üçüncü taraf eylemler çalıştırır ve bunlar sizin ortamınızda, sizin izinlerinizle çalışır. Etiketle sabitlemek yeterli değildir: bir etiket taşınabilir.
+
+```yaml
+# etiket taşınabilir — dünkü v4 ile bugünkü v4 aynı olmayabilir
+- uses: actions/checkout@v4
+
+# işleme özetiyle sabit
+- uses: actions/checkout@b4ffde65f46336ab88eb53be808477a3936bae11  # v4.1.1
+```
+
+Aynı mantık konteyner imajları için de geçerlidir; `latest` yerine özet kullanmanın gerekçesi [Compose denetleyici](/araclar/compose-denetleyici) aracında da anlatılıyor.
+
+Bağımlılık güncellemesini bir bota bırakırsanız (Dependabot, Renovate) sabitleme bir bakım yükü olmaktan çıkar: bot özeti günceller, siz gözden geçirirsiniz.
+
+## İzinleri işe göre daraltın
+
+CI sisteminin kendi belirtecinin öntanımlı izinleri genelde geniştir. Depo düzeyinde daraltıp iş bazında açın:
+
+```yaml
+permissions:
+  contents: read          # tüm iş akışı için taban
+
+jobs:
+  yayinla:
+    permissions:
+      contents: read
+      packages: write     # yalnızca bu iş yazabilir
+```
+
+Aynı ilke bulut rolünde de geçerlidir: dağıtım rolü, dağıttığı kaynaklara yazabilmeli; kimlik yönetimine ya da denetim günlüklerine dokunamamalı. Rol tanımını yazarken "ne gerekiyorsa o" ile başlayın, `*` ile değil.
+
+## Günlüklerde sır sızıntısı
+
+CI sistemleri bilinen sır değerlerini günlükte maskeler. Ama maskeleme tam eşleşmeye dayanır: sırrı base64'e çevirir ya da bir JSON içine gömerseniz maskeleme çalışmaz.
+
+Pratikte üç önlem:
+
+- Hata ayıklama kipini (`set -x`, `ACTIONS_STEP_DEBUG`) üretim işlerinde açık bırakmayın.
+- Sırları komut satırı argümanı olarak geçmeyin; süreç listesinde ve bazen günlükte görünür. Ortam değişkeni ya da dosya kullanın.
+- Depoya sır kaçmasını bir tarayıcıyla denetleyin. İnsan gözü bunu güvenilir biçimde yakalamaz; bir kanca ya da CI adımı yakalar.
+
+## Kısa liste
+
+Bulut erişimi için OIDC kurun ve güven koşuluna depo **ve** dalı yazın. Kalan sırları ortama bağlayın, üretim ortamına onay koyun. `pull_request_target` kullanan işlerde katkı kodunu çıkarmayın. Üçüncü taraf eylemleri özetle sabitleyin. Belirteç izinlerini taban olarak `read` yapın.
+
+Bu beşini uygulayan bir boru hattında, deponuza erişen birinin elde edebileceği en değerli şey kaynak kodun kendisi olur — üretim ortamınızın anahtarı değil.
+
+Kod olarak altyapının kendisine nereden başlanacağı ayrı bir konu; [kod olarak altyapıya nereden başlanır](/rehberler/oto-kod-olarak-altyapi-nereden-baslanir) rehberinde ele alınıyor.

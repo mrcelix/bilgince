@@ -1,0 +1,176 @@
+---
+baslik: "Kubernetes'te trafik nereden geçiyor: Service, Ingress ve NetworkPolicy"
+ozet: "Pod'a erişilemiyorsa sorun dört katmandan birindedir. Katmanları tek tek elemek, tahmin etmekten hem hızlı hem kesindir."
+konu: "kubernetes"
+etiketler: ["kubernetes", "ag", "tanilama", "guvenlik"]
+yayin: 2026-08-11
+sure: 12
+---
+
+Bir servise tarayıcıdan erişilemiyordu. Pod çalışıyordu, günlükler temizdi. Ekip Ingress denetleyicisini yeniden başlattı, DNS'i kontrol etti, güvenlik duvarına baktı.
+
+Sorun Service tanımındaydı: `selector` alanında `app: api` yazıyordu, pod'ların etiketi ise `app: api-servisi`. Service hiçbir pod'u seçmiyordu, dolayısıyla arkasında hiç uç nokta yoktu. Bu tek satır, `kubectl get endpoints` çıktısına bakılsaydı iki saniyede görülecekti.
+
+Kubernetes'te ağ erişimi dört katmandan geçer. Erişim yoksa, hangi katmanda koptuğunu bulmak teşhisin tamamıdır.
+
+## Dört katman
+
+1. **Pod ayakta ve dinliyor mu?** Konteyner doğru portta gerçekten dinliyor mu?
+2. **Service pod'u buluyor mu?** Etiket seçici eşleşiyor mu, uç nokta listesi dolu mu?
+3. **Dışarıdan giriş var mı?** Ingress kuralı, sınıfı, sertifikası doğru mu?
+4. **Ağ politikası izin veriyor mu?** NetworkPolicy trafiği sessizce düşürüyor olabilir mi?
+
+Sırayla ve içeriden dışarıya doğru gidin. Tersi yönde gitmek, çoğu zaman ilk üç katmandaki basit bir hatayı en sona bırakır.
+
+## Katman 1: pod gerçekten dinliyor mu
+
+```bash
+# pod'un içinden kendine sor
+kubectl exec -it api-7d9f8 -n uygulama -- wget -qO- localhost:8080/saglik
+
+# hangi portlar dinleniyor
+kubectl exec -it api-7d9f8 -n uygulama -- ss -ltnp 2>/dev/null || \
+kubectl exec -it api-7d9f8 -n uygulama -- netstat -ltn
+```
+
+Burada en sık görülen hata `0.0.0.0` yerine `127.0.0.1` dinlemektir. Uygulama yalnızca geri döngü arayüzüne bağlanmışsa pod içinden erişilir ama Service üzerinden erişilemez. Belirti tam olarak budur: "konteynerin içinde çalışıyor, dışarıdan çalışmıyor."
+
+Konteynerde kabuk yoksa geçici bir teşhis konteyneri iliştirin:
+
+```bash
+kubectl debug -it api-7d9f8 -n uygulama --image=nicolaka/netshoot --target=api
+```
+
+`--target` sayesinde aynı süreç ve ağ ad alanını paylaşır; yani hedef konteynerin gördüğü ağı görür.
+
+## Katman 2: Service uç noktası
+
+Bu, en çok zaman kazandıran tek komuttur:
+
+```bash
+kubectl get endpoints api -n uygulama
+kubectl get endpointslice -n uygulama -l kubernetes.io/service-name=api
+```
+
+Uç nokta listesi **boşsa** Service hiçbir pod bulamıyor demektir. Üç neden:
+
+**Seçici eşleşmiyor.** En yaygın. Karşılaştırın:
+
+```bash
+kubectl get svc api -n uygulama -o jsonpath='{.spec.selector}'
+kubectl get pods -n uygulama --show-labels
+```
+
+**Pod hazır değil.** Hazırlık yoklaması geçmeyen pod uç nokta listesine alınmaz. `kubectl get pods` çıktısında `READY 0/1` görüyorsanız neden budur; ayrıntısı [pod başlamıyor](/rehberler/k8s-pod-neden-baslamiyor) rehberinde.
+
+**Port adı tutmuyor.** Service `targetPort: http` diyorsa, pod tanımında o adı taşıyan bir `containerPort` olmalıdır. Ad yanlışsa uç nokta oluşur ama trafik gitmez.
+
+Uç noktalar doluysa Service üzerinden deneyin:
+
+```bash
+kubectl run gecici --rm -it --image=nicolaka/netshoot --restart=Never -n uygulama -- \
+  curl -sS -m 5 http://api:8080/saglik
+```
+
+Bu çalışmıyorsa küme içi DNS'e bakın:
+
+```bash
+kubectl run gecici --rm -it --image=nicolaka/netshoot --restart=Never -n uygulama -- \
+  nslookup api.uygulama.svc.cluster.local
+```
+
+Ad çözülmüyorsa CoreDNS tarafına bakılır. Çözülüyor ama bağlantı kurulmuyorsa 4. katmana — ağ politikasına — geçin.
+
+## Service türleri: hangisi ne yapar
+
+| Tür | Erişim | Ne zaman |
+| --- | --- | --- |
+| `ClusterIP` | Yalnızca küme içi | Öntanımlı; iç servisler |
+| `NodePort` | Her düğümde bir port | Geçici test, dış yük dengeleyici arkası |
+| `LoadBalancer` | Bulut yük dengeleyici | Dışa açık tekil servisler |
+| `ExternalName` | DNS CNAME | Küme dışı bir adı içeriden çözmek |
+| Başlıksız (`clusterIP: None`) | Doğrudan pod IP'leri | StatefulSet, kendi keşfini yapan istemciler |
+
+`LoadBalancer` her servis için ayrı bir bulut yük dengeleyici — ve ayrı bir fatura kalemi — yaratır. Onlarca servisi dışa açacaksanız tek bir Ingress denetleyicisi arkasında toplamak hem ucuz hem yönetilebilir olur.
+
+Bir ayrıntı: `externalTrafficPolicy: Local` ayarı istemci IP'sini korur ama trafiği yalnızca o düğümdeki pod'lara yönlendirir. Düğümde pod yoksa sağlık denetimi başarısız olur. İstemci IP'si gerekiyorsa bu ayarı pod dağılımıyla birlikte planlayın.
+
+## Katman 3: Ingress
+
+```bash
+kubectl get ingress -n uygulama
+kubectl describe ingress api -n uygulama
+kubectl logs -n ingress-nginx deploy/ingress-nginx-controller --tail=50
+```
+
+Dört sık hata:
+
+**`ingressClassName` eksik.** Denetleyici kaynağı hiç almaz. `describe` çıktısında olay yoktur — kaynak sessizce durur. Kümede birden çok denetleyici varsa bu daha da sinsidir.
+
+**Ingress ile Service farklı ad alanlarında.** Ingress yalnızca kendi ad alanındaki Service'e yönlendirebilir. Farklı ad alanına yönlendirmek için ayrı bir mekanizma gerekir.
+
+**Yol yeniden yazma yanlış.** `/api` yolunu alıp uygulamaya `/api` olarak iletiyorsanız ama uygulama kökten servis ediyorsa 404 alırsınız. NGINX denetleyicisinde bu `nginx.ingress.kubernetes.io/rewrite-target` ile yapılır ve yakalama grubu sözdizimi gerektirir.
+
+**Sertifika hazır değil.** cert-manager kullanıyorsanız sertifika verilene kadar TLS çalışmaz:
+
+```bash
+kubectl get certificate,certificaterequest,order,challenge -n uygulama
+```
+
+Bu dört nesne zinciridir ve hangi halkada takıldığı doğrudan görünür. En sık takılan yer `challenge`'dır: HTTP-01 doğrulaması için `/.well-known/acme-challenge/` yolunun dışarıdan erişilebilir olması gerekir.
+
+## Katman 4: NetworkPolicy
+
+Bu katmanın en zor yanı, reddedilen trafiğin **hiçbir yerde günlüklenmemesidir**. Paket sessizce düşer; istemci zaman aşımı görür.
+
+Bilinmesi gereken kural: bir pod'a **herhangi bir** NetworkPolicy uygulandığı anda, o pod için "her şeye izin var" durumu biter. O politikada açıkça izin verilmeyen her şey reddedilir.
+
+```bash
+kubectl get networkpolicy -n uygulama
+kubectl describe networkpolicy -n uygulama
+```
+
+Hangi politikaların bir pod'u kapsadığını görmek için politikanın `podSelector` alanını pod etiketleriyle karşılaştırın.
+
+En sık atlanan iki şey:
+
+**DNS çıkışı.** Egress politikası yazıp DNS'e izin vermezseniz pod hiçbir adı çözemez. Belirti "ağ yok" gibi görünür ama IP ile erişim çalışır.
+
+```yaml
+egress:
+  - to:
+      - namespaceSelector:
+          matchLabels: { kubernetes.io/metadata.name: kube-system }
+        podSelector:
+          matchLabels: { k8s-app: kube-dns }
+    ports:
+      - { protocol: UDP, port: 53 }
+      - { protocol: TCP, port: 53 }
+```
+
+**Sağlık yoklamaları.** Kubelet düğümden yoklar. Giriş politikanız yalnızca belirli pod'lara izin veriyorsa düğüm IP'sinden gelen yoklama düşer ve pod hiç `Ready` olmaz.
+
+Bir de temel gerçek: **CNI eklentiniz NetworkPolicy desteklemiyorsa politika hiçbir şey yapmaz.** Nesne oluşturulur, `kubectl get` ile görünür, hiçbir uyarı çıkmaz ve trafik serbestçe akar. Flannel'in öntanımlı kurulumu bunun klasik örneğidir. Politikaya güvenmeden önce eklentinin desteklediğini doğrulayın ve bir reddedilme senaryosunu bilerek deneyin.
+
+## Hızlı eleme
+
+```bash
+# 1) uç nokta var mı? (en çok bunu unutuyoruz)
+kubectl get endpoints <servis> -n <ad-alani>
+
+# 2) küme içinden erişiliyor mu?
+kubectl run t --rm -it --image=nicolaka/netshoot --restart=Never -n <ad-alani> -- \
+  curl -sS -m 5 http://<servis>:<port>/
+
+# 3) DNS çözülüyor mu?
+kubectl run t --rm -it --image=nicolaka/netshoot --restart=Never -n <ad-alani> -- \
+  nslookup <servis>.<ad-alani>.svc.cluster.local
+
+# 4) politika var mı?
+kubectl get networkpolicy -n <ad-alani>
+
+# 5) Ingress denetleyicisi ne diyor?
+kubectl logs -n ingress-nginx deploy/ingress-nginx-controller --tail=50
+```
+
+İlk komut vakaların önemli bir bölümünü kapatır. Uç nokta listesi boş bir Service, arkasında hiçbir şey olmayan bir isimdir — ve o durumda Ingress'e, DNS'e ya da güvenlik duvarına bakmanın hiçbir anlamı yoktur.
