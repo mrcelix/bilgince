@@ -1,0 +1,581 @@
+---
+import Base from '../../layouts/Base.astro';
+---
+
+<Base
+  baslik="HTML erişilebilirlik denetleyici"
+  aciklama="İç portal ya da rapor sayfanızın HTML'ini yapıştırın: eksik alternatif metin, etiketsiz form alanı, atlanan başlık düzeyi ve klavye tuzaklarını bulur."
+  aramaya={true}
+  kategori="Araç"
+>
+  <div class="arama-bas">
+    <div class="kap">
+      <nav class="kirinti" aria-label="Kırıntı yolu" style="padding-top:0">
+        <a href="/">Ana sayfa</a><span class="ayrac">/</span><a href="/araclar">Araçlar</a><span
+          class="ayrac">/</span
+        ><span aria-current="page">Erişilebilirlik denetimi</span>
+      </nav>
+      <h1>HTML erişilebilirlik denetleyici</h1>
+      <p style="color:var(--muted);font-size:14px;margin-top:8px;max-width:66ch">
+        Kurum içi bir başvuru formu ya da izleme panosu da erişilebilir olmak zorunda —
+        ekran okuyucuyla çalışan bir mesai arkadaşınız için, klavyeyle gezen biri için,
+        yarın sizin için. HTML'i yapıştırın; en sık ve en kolay düzeltilen sorunları
+        listeleyeyim.
+      </p>
+    </div>
+  </div>
+
+  <div class="kap arac-sayfa">
+    <section class="arac-blok">
+      <h2 class="arac-h2"><span class="arac-no">1</span> HTML</h2>
+      <div class="arac-alan">
+        <textarea id="e-girdi" rows="12" spellcheck="false" placeholder="<form>&#10;  <input type=&quot;text&quot;>&#10;..."
+        ></textarea>
+      </div>
+      <div class="arac-dugmeler">
+        <button type="button" class="dg" id="e-denetle">Denetle</button>
+        <button type="button" class="dg dg-hayalet" id="e-ornek">Sorunlu örnek</button>
+        <button type="button" class="dg dg-hayalet" id="e-temizle">Temizle</button>
+      </div>
+      <p class="arac-durum" id="e-durum" role="status" aria-live="polite"></p>
+    </section>
+
+    <section class="arac-blok" id="e-sonuc" hidden>
+      <h2 class="arac-h2"><span class="arac-no">2</span> Bulgular</h2>
+      <div class="arac-olcum" id="e-olcum"></div>
+      <div id="e-bulgular"></div>
+    </section>
+
+    <section class="arac-blok" id="e-yapi-blok" hidden>
+      <h2 class="arac-h2"><span class="arac-no">3</span> Başlık yapısı</h2>
+      <p class="arac-not" style="margin-top:0">
+        Ekran okuyucu kullanan biri sayfayı başlıklardan gezer. Düzey atlamak, içindekiler
+        listesinde boşluk bırakmak gibidir.
+      </p>
+      <ol class="e-basliklar" id="e-basliklar"></ol>
+    </section>
+
+    <section class="arac-blok">
+      <h2 class="arac-h2"><span class="arac-no">4</span> Tarayıcı yerine geçmez</h2>
+      <p class="arac-not" style="margin-top:0">
+        Bu denetim <b>işaretlemeye</b> bakar. Otomatik araçlar erişilebilirlik sorunlarının
+        ancak bir kısmını yakalar; geri kalanı yalnızca sayfayı klavyeyle gezerek ve bir ekran
+        okuyucuyla dinleyerek görülür. Aşağıdakiler beş dakikada yapılabilir ve otomatik
+        denetimden çok daha fazlasını gösterir.
+      </p>
+      <ul class="e-ipuclari">
+        <li>
+          <b>Fareyi bırakın, sekme tuşuyla gezin.</b> Her etkileşimli ögeye ulaşabiliyor
+          musunuz? Odak nerede olduğunu görebiliyor musunuz? Bir açılır pencereye girip
+          çıkabiliyor musunuz? Odak görünmüyorsa ya da bir yere sıkışıyorsa, klavye kullanan
+          herkes o sayfada mahsur kalır.
+        </li>
+        <li>
+          <b>Sayfayı %200 büyütün.</b> Metin taşıyor mu, düğmeler üst üste biniyor mu, yatay
+          kaydırma çubuğu çıkıyor mu? Görme güçlüğü olan kullanıcıların çoğu ekran okuyucu
+          değil, yakınlaştırma kullanır.
+        </li>
+        <li>
+          <b>Windows Anlatıcı ya da NVDA ile bir formu doldurun.</b> Alanların adı okunuyor
+          mu, hata mesajı duyuluyor mu? Bir formu gözünüz kapalı doldurmayı deneyin — beş
+          dakikada, otomatik denetimin yakalayamadığı her şeyi bulursunuz.
+        </li>
+        <li>
+          <b>Renkleri gri tonlamaya alın.</b> Yalnızca renkle anlatılan bir şey varsa
+          (kırmızı/yeşil durum noktaları, zorunlu alanların kırmızı etiketi) gri tonlamada
+          kaybolur. İkon ya da metin ekleyin.
+        </li>
+      </ul>
+    </section>
+  </div>
+
+  <script>
+    (() => {
+      const el = (s) => document.querySelector(s);
+      const kacir = (s) =>
+        String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+
+      const ANLAMSIZ_BAGLANTI = [
+        'buraya tıklayın', 'tıklayın', 'daha fazla', 'devamı', 'devamını oku',
+        'buradan', 'bağlantı', 'link', 'click here', 'read more', 'more', 'here',
+      ];
+
+      function denetle(ham) {
+        // Ayrıştırmayı tarayıcıya yaptırıyoruz; kendi HTML ayrıştırıcımızı
+        // yazmak yerine gerçek DOM üzerinden bakmak çok daha güvenilir.
+        const ayristirici = new DOMParser();
+        const belge = ayristirici.parseFromString(
+          /<html[\s>]/i.test(ham) ? ham : `<body>${ham}</body>`,
+          'text/html'
+        );
+        const kok = belge.body;
+
+        const bulgular = [];
+        const ekle = (tip, baslik, metin, ornek = null) =>
+          bulgular.push({ tip, baslik, metin, ornek });
+
+        const kisalt = (e) => {
+          const s = e.outerHTML ?? '';
+          return s.length > 120 ? s.slice(0, 120) + '…' : s;
+        };
+
+        /* --- görseller --- */
+        const gorseller = [...kok.querySelectorAll('img')];
+        const altsiz = gorseller.filter((g) => !g.hasAttribute('alt'));
+        if (altsiz.length) {
+          ekle(
+            'hata',
+            `${altsiz.length} görselde alt özniteliği yok`,
+            'Ekran okuyucu <code>alt</code> bulamayınca dosya adını okur — ' +
+              '"IMG_20260819_143052.jpg" gibi. Görsel bilgi taşıyorsa ne anlattığını yazın; ' +
+              'yalnızca süslemeyse <code>alt=""</code> boş bırakın (öznitelik yine de olsun).',
+            kisalt(altsiz[0])
+          );
+        }
+        const suphelialt = gorseller.filter((g) =>
+          /^(resim|görsel|image|img|foto|photo|logo)\.?$/i.test((g.getAttribute('alt') ?? '').trim())
+        );
+        if (suphelialt.length) {
+          ekle(
+            'uyari',
+            `${suphelialt.length} görselde alt metni bilgi taşımıyor`,
+            '"resim" ya da "görsel" yazmak, hiç yazmamaktan çok az daha iyidir. Görselin ne ' +
+              'anlattığını yazın.',
+            kisalt(suphelialt[0])
+          );
+        }
+
+        /* --- form alanları --- */
+        const alanlar = [...kok.querySelectorAll('input, select, textarea')].filter(
+          (a) => !['hidden', 'submit', 'button', 'reset', 'image'].includes(a.type)
+        );
+        const etiketsiz = alanlar.filter((a) => {
+          if (a.getAttribute('aria-label')?.trim()) return false;
+          if (a.getAttribute('aria-labelledby')?.trim()) return false;
+          if (a.id && kok.querySelector(`label[for="${CSS.escape(a.id)}"]`)) return false;
+          if (a.closest('label')) return false;
+          return true;
+        });
+        if (etiketsiz.length) {
+          ekle(
+            'hata',
+            `${etiketsiz.length} form alanında etiket yok`,
+            'Etiketsiz bir alan ekran okuyucuda yalnızca "düzenleme kutusu" diye duyulur. ' +
+              '<code>&lt;label for="…"&gt;</code> kullanın; yer tutucu (placeholder) etiket ' +
+              'yerine geçmez — kullanıcı yazmaya başlayınca kaybolur ve kontrastı zaten düşüktür.',
+            kisalt(etiketsiz[0])
+          );
+        }
+
+        const yerTutucuVar = alanlar.filter(
+          (a) => a.getAttribute('placeholder') && !a.getAttribute('aria-label') &&
+            !(a.id && kok.querySelector(`label[for="${CSS.escape(a.id)}"]`)) && !a.closest('label')
+        );
+        if (yerTutucuVar.length && !etiketsiz.length) {
+          ekle('uyari', 'Etiket yerine yer tutucu kullanılmış', 'Yer tutucu geçici bir ipucudur.', kisalt(yerTutucuVar[0]));
+        }
+
+        /* --- düğmeler --- */
+        const dugmeler = [...kok.querySelectorAll('button, [role="button"]')];
+        const adsizDugme = dugmeler.filter(
+          (d) =>
+            !d.textContent.trim() &&
+            !d.getAttribute('aria-label')?.trim() &&
+            !d.getAttribute('title')?.trim()
+        );
+        if (adsizDugme.length) {
+          ekle(
+            'hata',
+            `${adsizDugme.length} düğmenin erişilebilir adı yok`,
+            'İçinde yalnızca ikon olan düğmeler ekran okuyucuda "düğme" diye duyulur. ' +
+              '<code>aria-label="Kaydet"</code> ekleyin.',
+            kisalt(adsizDugme[0])
+          );
+        }
+
+        /* --- bağlantılar --- */
+        const baglantilar = [...kok.querySelectorAll('a')];
+        const hrefsiz = baglantilar.filter((b) => !b.hasAttribute('href'));
+        if (hrefsiz.length) {
+          ekle(
+            'hata',
+            `${hrefsiz.length} bağlantıda href yok`,
+            '<code>href</code> olmayan bir <code>&lt;a&gt;</code> klavyeyle odaklanamaz ve ' +
+              'bağlantı olarak duyulmaz. Tıklanabilir ama bağlantı değilse ' +
+              '<code>&lt;button&gt;</code> kullanın.',
+            kisalt(hrefsiz[0])
+          );
+        }
+        const anlamsiz = baglantilar.filter((b) =>
+          ANLAMSIZ_BAGLANTI.includes(b.textContent.trim().toLocaleLowerCase('tr'))
+        );
+        if (anlamsiz.length) {
+          ekle(
+            'uyari',
+            `${anlamsiz.length} bağlantı metni bilgi taşımıyor`,
+            'Ekran okuyucular sayfadaki bağlantıları liste hâlinde okuyabilir; "buraya ' +
+              'tıklayın" satırlarından oluşan bir liste işe yaramaz. Bağlantı metni tek ' +
+              'başına nereye gittiğini anlatmalı.',
+            kisalt(anlamsiz[0])
+          );
+        }
+        const yeniSekme = baglantilar.filter(
+          (b) => b.getAttribute('target') === '_blank' && !/yeni sekme|new tab|yeni pencere/i.test(
+            (b.textContent + ' ' + (b.getAttribute('aria-label') ?? '') + ' ' + (b.getAttribute('title') ?? ''))
+          )
+        );
+        if (yeniSekme.length) {
+          ekle(
+            'uyari',
+            `${yeniSekme.length} bağlantı yeni sekmede açılıyor ama bunu söylemiyor`,
+            'Beklenmedik sekme değişimi, ekran okuyucu ve büyüteç kullananları kaybettirir. ' +
+              'Metne ya da <code>aria-label</code>\'a "(yeni sekmede açılır)" ekleyin.',
+            kisalt(yeniSekme[0])
+          );
+        }
+
+        /* --- başlık yapısı --- */
+        const basliklar = [...kok.querySelectorAll('h1, h2, h3, h4, h5, h6')].map((b) => ({
+          duzey: Number(b.tagName[1]),
+          metin: b.textContent.trim(),
+        }));
+
+        const h1Sayisi = basliklar.filter((b) => b.duzey === 1).length;
+        if (basliklar.length && h1Sayisi === 0) {
+          ekle('hata', 'H1 yok', 'Her sayfada, sayfanın ne olduğunu söyleyen tek bir <code>h1</code> olmalı.');
+        } else if (h1Sayisi > 1) {
+          ekle(
+            'uyari',
+            `${h1Sayisi} adet H1 var`,
+            'Birden çok <code>h1</code> sayfanın ana konusunu belirsizleştirir. Alt bölümler ' +
+              '<code>h2</code> olmalı.'
+          );
+        }
+
+        const atlamalar = [];
+        for (let i = 1; i < basliklar.length; i++) {
+          const fark = basliklar[i].duzey - basliklar[i - 1].duzey;
+          if (fark > 1) {
+            atlamalar.push(
+              `h${basliklar[i - 1].duzey} → h${basliklar[i].duzey} ("${basliklar[i].metin.slice(0, 40)}")`
+            );
+          }
+        }
+        if (atlamalar.length) {
+          ekle(
+            'uyari',
+            `${atlamalar.length} yerde başlık düzeyi atlanmış`,
+            `Düzey atlamak, içindekiler listesinde boşluk bırakmak gibidir: ` +
+              `${atlamalar.slice(0, 3).join('; ')}. Görsel boyut için değil, yapı için ` +
+              `başlık seçin; boyutu CSS ile ayarlayın.`
+          );
+        }
+
+        /* --- tablolar --- */
+        const tablolar = [...kok.querySelectorAll('table')];
+        const bassizTablo = tablolar.filter((t) => !t.querySelector('th'));
+        if (bassizTablo.length) {
+          ekle(
+            'hata',
+            `${bassizTablo.length} tabloda başlık hücresi yok`,
+            'Ekran okuyucu hücreyi okurken hangi sütunda olduğunu <code>&lt;th&gt;</code> ' +
+              'sayesinde söyler. <code>&lt;td&gt;</code> ile kalın yazı yapmak bunun yerine geçmez.',
+            kisalt(bassizTablo[0])
+          );
+        }
+        const kapsamsiz = tablolar.filter(
+          (t) => t.querySelector('th') && ![...t.querySelectorAll('th')].some((h) => h.hasAttribute('scope'))
+        );
+        if (kapsamsiz.length) {
+          ekle(
+            'uyari',
+            `${kapsamsiz.length} tabloda scope belirtilmemiş`,
+            'Karmaşık tablolarda <code>scope="col"</code> ve <code>scope="row"</code>, hücre ' +
+              'ile başlık ilişkisini kesinleştirir.'
+          );
+        }
+
+        /* --- klavye ve odak --- */
+        const pozitifTab = [...kok.querySelectorAll('[tabindex]')].filter(
+          (e2) => Number(e2.getAttribute('tabindex')) > 0
+        );
+        if (pozitifTab.length) {
+          ekle(
+            'hata',
+            `${pozitifTab.length} ögede pozitif tabindex var`,
+            'Sıfırdan büyük <code>tabindex</code> sekme sırasını belge sırasından koparır ve ' +
+              'neredeyse her zaman şaşırtıcı bir gezinme üretir. Doğru çözüm, ögeleri HTML\'de ' +
+              'mantıklı sırada yazmaktır.',
+            kisalt(pozitifTab[0])
+          );
+        }
+
+        const tiklanabilirDiv = [...kok.querySelectorAll('div[onclick], span[onclick]')].filter(
+          (e2) => !e2.hasAttribute('tabindex') && !e2.getAttribute('role')
+        );
+        if (tiklanabilirDiv.length) {
+          ekle(
+            'hata',
+            `${tiklanabilirDiv.length} tıklanabilir div ya da span`,
+            'Bunlar klavyeyle odaklanamaz ve ekran okuyucuda düğme olarak duyulmaz. ' +
+              '<code>&lt;button&gt;</code> kullanın — bütün klavye davranışını hazır getirir.',
+            kisalt(tiklanabilirDiv[0])
+          );
+        }
+
+        /* --- dil ve belge --- */
+        if (/<html[\s>]/i.test(ham)) {
+          const html = belge.documentElement;
+          if (!html.getAttribute('lang')) {
+            ekle(
+              'hata',
+              'html etiketinde lang yok',
+              '<code>lang="tr"</code> olmadan ekran okuyucu metni yanlış dilde seslendirir; ' +
+                'Türkçe bir sayfa İngilizce telaffuzla okunur ve anlaşılmaz olur.'
+            );
+          }
+          if (!belge.querySelector('title')?.textContent.trim()) {
+            ekle('hata', 'Sayfa başlığı yok', '<code>&lt;title&gt;</code> sekmede ve ekran okuyucuda ilk duyulan şeydir.');
+          }
+        }
+
+        /* --- yalnızca renkle anlatım belirtisi --- */
+        const renkliMetin = [...kok.querySelectorAll('[style*="color"]')].filter(
+          (e2) => !e2.textContent.trim().match(/[✓✗×!]/) && e2.textContent.trim().length < 40
+        );
+        if (renkliMetin.length >= 3) {
+          ekle(
+            'uyari',
+            'Durum yalnızca renkle anlatılıyor olabilir',
+            `Satır içi renk verilmiş ${renkliMetin.length} kısa metin var. Kırmızı/yeşil ` +
+              `durum göstergeleri renk körlüğünde ayırt edilemez; ikon ya da metin etiketi ekleyin.`
+          );
+        }
+
+        /* --- olumlu bulgular --- */
+        if (kok.querySelector('main, [role="main"]')) {
+          ekle('ok', 'Ana içerik bölgesi tanımlı', '<code>&lt;main&gt;</code> kullanılmış — ekran okuyucu doğrudan içeriğe atlayabilir.');
+        }
+        if (kok.querySelector('a[href^="#"][class*="atla"], a[href^="#içerik"], a[href^="#icerik"], a[href^="#main"]')) {
+          ekle('ok', 'İçeriğe atlama bağlantısı var', 'Klavye kullanıcıları menüyü her sayfada baştan geçmek zorunda kalmaz.');
+        }
+
+        return { bulgular, basliklar, ogeSayisi: kok.querySelectorAll('*').length };
+      }
+
+      const SIRA = { hata: 0, uyari: 1, ok: 2 };
+
+      function calistir() {
+        const ham = el('#e-girdi').value;
+        const durum = el('#e-durum');
+
+        if (!ham.trim()) {
+          el('#e-sonuc').hidden = true;
+          el('#e-yapi-blok').hidden = true;
+          durum.textContent = '';
+          return;
+        }
+
+        const { bulgular, basliklar, ogeSayisi } = denetle(ham);
+        bulgular.sort((a, b) => SIRA[a.tip] - SIRA[b.tip]);
+
+        const hata = bulgular.filter((b) => b.tip === 'hata').length;
+        const uyari = bulgular.filter((b) => b.tip === 'uyari').length;
+
+        el('#e-sonuc').hidden = false;
+        el('#e-olcum').innerHTML =
+          `<span>Öge: <b>${ogeSayisi}</b></span>` +
+          `<span>Başlık: <b>${basliklar.length}</b></span>` +
+          `<span>Sorun: <b>${hata}</b></span>` +
+          `<span>Uyarı: <b>${uyari}</b></span>`;
+
+        el('#e-bulgular').innerHTML = bulgular.length
+          ? '<ul class="e-liste">' +
+            bulgular
+              .map(
+                (b) =>
+                  `<li data-tip="${b.tip}"><b>${b.baslik}</b><p>${b.metin}</p>` +
+                  (b.ornek ? `<pre class="e-ornek">${kacir(b.ornek)}</pre>` : '') +
+                  `</li>`
+              )
+              .join('') +
+            '</ul>'
+          : '<p class="arac-not" style="margin:0">İşaretlemede bilinen bir sorun bulunamadı. ' +
+            '4. bölümdeki elle denetimleri de yapın.</p>';
+
+        if (basliklar.length) {
+          el('#e-yapi-blok').hidden = false;
+          let onceki = 0;
+          el('#e-basliklar').innerHTML = basliklar
+            .map((b) => {
+              const atladi = onceki && b.duzey - onceki > 1;
+              onceki = b.duzey;
+              return (
+                `<li class="e-baslik"${atladi ? ' data-atladi="evet"' : ''} style="--d:${b.duzey}">` +
+                `<span class="e-duzey">h${b.duzey}</span>` +
+                `<span class="e-metin">${kacir(b.metin || '(boş başlık)')}</span>` +
+                (atladi ? '<span class="e-atlama">düzey atlandı</span>' : '') +
+                `</li>`
+              );
+            })
+            .join('');
+        } else {
+          el('#e-yapi-blok').hidden = true;
+        }
+
+        durum.className = 'arac-durum ' + (hata ? 'hata' : uyari ? '' : 'ok');
+        durum.textContent = hata
+          ? `${hata} ciddi sorun, ${uyari} uyarı bulundu.`
+          : uyari
+            ? `Ciddi sorun yok; ${uyari} iyileştirme önerisi var.`
+            : 'İşaretleme denetiminden temiz geçti.';
+      }
+
+      el('#e-denetle').addEventListener('click', calistir);
+      el('#e-girdi').addEventListener('input', () => {
+        if (el('#e-girdi').value.trim().length > 15) calistir();
+      });
+
+      el('#e-temizle').addEventListener('click', () => {
+        el('#e-girdi').value = '';
+        calistir();
+      });
+
+      el('#e-ornek').addEventListener('click', () => {
+        el('#e-girdi').value = [
+          '<h1>İzin Talep Formu</h1>',
+          '<h3>Çalışan bilgileri</h3>',
+          '',
+          '<form>',
+          '  <img src="/logo.png">',
+          '  <input type="text" placeholder="Ad Soyad">',
+          '  <input type="date" id="baslangic">',
+          '  <select><option>Yıllık</option><option>Mazeret</option></select>',
+          '',
+          '  <div onclick="gonder()">Gönder</div>',
+          '  <button><span class="ikon-kaydet"></span></button>',
+          '</form>',
+          '',
+          '<h3>Onay geçmişi</h3>',
+          '<table>',
+          '  <tr><td>Tarih</td><td>Durum</td></tr>',
+          '  <tr><td>12.08.2026</td><td><span style="color:#16a34a">Onaylandı</span></td></tr>',
+          '  <tr><td>03.07.2026</td><td><span style="color:#dc2626">Reddedildi</span></td></tr>',
+          '  <tr><td>21.05.2026</td><td><span style="color:#f59e0b">Beklemede</span></td></tr>',
+          '</table>',
+          '',
+          '<p>Ayrıntılar için <a href="/kilavuz" target="_blank">buraya tıklayın</a>.</p>',
+          '<a tabindex="3">Yardım</a>',
+        ].join('\n');
+        calistir();
+      });
+    })();
+  </script>
+
+  <style>
+    .arac-dugmeler {
+      display: flex;
+      gap: 10px;
+      flex-wrap: wrap;
+      margin-top: 4px;
+    }
+    .e-liste {
+      list-style: none;
+      margin: 0;
+      padding: 0;
+      display: grid;
+      gap: 11px;
+    }
+    .e-liste li {
+      border: 1px solid var(--line);
+      border-left: 3px solid var(--line);
+      border-radius: 10px;
+      padding: 12px 14px;
+      background: var(--paper);
+    }
+    .e-liste li[data-tip='hata'] {
+      border-left-color: light-dark(#dc2626, #f87171);
+    }
+    .e-liste li[data-tip='uyari'] {
+      border-left-color: light-dark(#f0c33c, #a97f1c);
+    }
+    .e-liste li[data-tip='ok'] {
+      border-left-color: light-dark(#16a34a, #4ade80);
+    }
+    .e-liste b {
+      font-size: 14px;
+      display: block;
+      margin-bottom: 5px;
+    }
+    .e-liste p {
+      margin: 0;
+      font-size: 13.5px;
+      line-height: 1.62;
+      color: var(--ink-soft);
+    }
+    .e-ornek {
+      margin: 9px 0 0;
+      background: var(--tint);
+      border-radius: 7px;
+      padding: 8px 10px;
+      font-size: 11.5px;
+      overflow-x: auto;
+      white-space: pre;
+      color: var(--muted);
+      font-family: var(--mono, ui-monospace, monospace);
+    }
+    .e-basliklar {
+      list-style: none;
+      margin: 0;
+      padding: 0;
+      display: grid;
+      gap: 5px;
+    }
+    .e-baslik {
+      display: flex;
+      align-items: baseline;
+      gap: 10px;
+      padding: 5px 0 5px calc((var(--d) - 1) * 20px);
+      border-left: 2px solid var(--line);
+      padding-left: calc(12px + (var(--d) - 1) * 20px);
+      font-size: 13.5px;
+    }
+    .e-baslik[data-atladi] {
+      border-left-color: light-dark(#f0c33c, #a97f1c);
+    }
+    .e-duzey {
+      font-family: var(--mono, ui-monospace, monospace);
+      font-size: 11.5px;
+      color: var(--muted);
+      flex: 0 0 auto;
+    }
+    .e-metin {
+      color: var(--ink-soft);
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+    .e-atlama {
+      font-size: 10.5px;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      color: light-dark(#92400e, #fbbf24);
+      white-space: nowrap;
+      margin-left: auto;
+    }
+    .e-ipuclari {
+      list-style: none;
+      margin: 0;
+      padding: 0;
+      display: grid;
+      gap: 12px;
+    }
+    .e-ipuclari li {
+      font-size: 13.5px;
+      line-height: 1.62;
+      color: var(--ink-soft);
+      border-left: 2px solid var(--line);
+      padding-left: 13px;
+    }
+  </style>
+</Base>

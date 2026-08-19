@@ -1,0 +1,549 @@
+---
+import Base from '../../layouts/Base.astro';
+---
+
+<Base
+  baslik="Disk bölümleme ve küme boyutu planlayıcı"
+  aciklama="Küme boyutu ne kadar alan israf eder, GPT mi MBR mi, hizalama neden önemli? Dosya profilinize göre hesaplar."
+  aramaya={true}
+  kategori="Araç"
+>
+  <div class="arama-bas">
+    <div class="kap">
+      <nav class="kirinti" aria-label="Kırıntı yolu" style="padding-top:0">
+        <a href="/">Ana sayfa</a><span class="ayrac">/</span><a href="/araclar">Araçlar</a><span
+          class="ayrac">/</span
+        ><span aria-current="page">Disk bölümleme</span>
+      </nav>
+      <h1>Disk bölümleme ve küme boyutu planlayıcı</h1>
+      <p style="color:var(--muted);font-size:14px;margin-top:8px;max-width:66ch">
+        Küme boyutu biçimlendirmede bir kez seçilir ve sonra değiştirilemez. Yanlış seçim,
+        milyonlarca küçük dosya tutan bir birimde diskin üçte birini görünmez şekilde yer.
+        Dosya profilinizi girin, ne kaybettiğinizi görün.
+      </p>
+    </div>
+  </div>
+
+  <div class="kap arac-sayfa">
+    <section class="arac-blok">
+      <h2 class="arac-h2"><span class="arac-no">1</span> Birim</h2>
+      <div class="arac-alanlar">
+        <label class="arac-alan"
+          >Birim boyutu (GB)
+          <input id="d-boyut" type="number" min="1" max="1000000" value="2048" />
+        </label>
+        <label class="arac-alan"
+          >Dosya sistemi
+          <select id="d-fs">
+            <option value="ntfs">NTFS</option>
+            <option value="refs">ReFS</option>
+            <option value="exfat">exFAT</option>
+            <option value="ext4">ext4</option>
+            <option value="xfs">XFS</option>
+          </select>
+        </label>
+        <label class="arac-alan"
+          >Küme boyutu
+          <select id="d-kume">
+            {
+              [512, 1024, 2048, 4096, 8192, 16384, 32768, 65536, 131072, 262144, 524288, 1048576].map(
+                (b) => (
+                  <option value={b} selected={b === 4096}>
+                    {b < 1024 ? `${b} bayt` : `${b / 1024} KB`}
+                  </option>
+                )
+              )
+            }
+          </select>
+        </label>
+        <label class="arac-alan"
+          >Dosya sayısı
+          <input id="d-dosyaAdet" type="number" min="1" max="1000000000" value="4000000" />
+        </label>
+        <label class="arac-alan"
+          >Ortalama dosya boyutu (KB)
+          <input id="d-dosyaBoyut" type="number" min="0.1" step="0.1" max="10000000" value="18" />
+        </label>
+        <label class="arac-alan"
+          >İş yükü
+          <select id="d-yuk">
+            <option value="dosya">Kullanıcı dosyaları — Office, PDF, görsel</option>
+            <option value="veritabani">Veri tabanı — büyük ve sıralı</option>
+            <option value="yedek">Yedekleme deposu — çok büyük dosyalar</option>
+            <option value="sanal">Sanal makine diskleri</option>
+            <option value="gelistirme">Kaynak kod ve derleme çıktısı</option>
+          </select>
+        </label>
+      </div>
+      <p class="arac-durum" id="d-durum" role="status" aria-live="polite"></p>
+    </section>
+
+    <section class="arac-blok">
+      <h2 class="arac-h2"><span class="arac-no">2</span> Sonuç</h2>
+      <div class="d-kartlar" id="d-kartlar"></div>
+      <div class="d-cubuk" id="d-cubuk"></div>
+    </section>
+
+    <section class="arac-blok">
+      <h2 class="arac-h2"><span class="arac-no">3</span> Küme boyutu karşılaştırması</h2>
+      <div class="d-kaydir">
+        <table class="d-tablo">
+          <thead>
+            <tr><th>Küme</th><th>İsraf</th><th>İsraf oranı</th><th>Azami birim</th><th>Not</th></tr>
+          </thead>
+          <tbody id="d-tablo"></tbody>
+        </table>
+      </div>
+    </section>
+
+    <section class="arac-blok">
+      <h2 class="arac-h2"><span class="arac-no">4</span> Değerlendirme</h2>
+      <div id="d-bulgular"></div>
+    </section>
+
+    <section class="arac-blok">
+      <h2 class="arac-h2"><span class="arac-no">5</span> Komutlar</h2>
+      <div style="position:relative">
+        <pre class="kod"><code id="d-komut"></code></pre>
+        <button class="kopyala" type="button" data-kaynak="d-komut">Kopyala</button>
+      </div>
+    </section>
+
+    <section class="arac-blok">
+      <h2 class="arac-h2"><span class="arac-no">6</span> Bilinmesi gerekenler</h2>
+      <ul class="d-ipuclari">
+        <li>
+          <b>Küme, ayrılabilen en küçük birimdir.</b> 1 KB'lık bir dosya, 64 KB küme
+          boyutunda 64 KB yer kaplar; 63 KB boşa gider. Bir milyon küçük dosyada bu 60 GB
+          eder. Buna "iç parçalanma" denir ve <code>dir</code> çıktısında görünmez —
+          yalnızca "diskteki boyut" sütununda belli olur.
+        </li>
+        <li>
+          <b>Küçük küme her zaman iyi değildir.</b> Küme küçüldükçe dosya sistemi tablosu
+          büyür, parçalanma artar ve büyük dosyalarda okuma başarımı düşer. Yedekleme
+          deposu ya da video arşivinde 64 KB küme, hem alan hem hız kazandırır.
+        </li>
+        <li>
+          <b>NTFS'te sıkıştırma yalnızca 4 KB ve altında çalışır.</b> Daha büyük küme
+          seçerseniz birim sıkıştırma özelliğini tamamen kaybedersiniz — sonradan
+          açılamaz, biçimlendirmek gerekir.
+        </li>
+        <li>
+          <b>MBR 2 TB'de biter.</b> Daha büyük diskler GPT gerektirir; MBR ile
+          biçimlendirilmiş 4 TB'lık bir disk sessizce 2 TB görünür. UEFI önyükleme de GPT
+          ister. Yeni kurulumlarda tereddütsüz GPT seçin.
+        </li>
+        <li>
+          <b>Çok küçük dosyalar NTFS'te kümeye bile inmez.</b> Yaklaşık 700 bayttan küçük
+          dosyalar MFT kaydının içine sığar ve ek küme tüketmez. Bu yüzden çok sayıda minik
+          dosyada gerçek israf, hesaplanandan az çıkabilir.
+        </li>
+        <li>
+          <b>Hizalama artık kendiliğinden doğrudur.</b> Windows Vista'dan beri bölümler
+          1 MB sınırına hizalanır. Ama eski bir görüntüden klonlanan ya da elle
+          <code>diskpart</code> ile oluşturulmuş bölümler hizasız olabilir; SSD ve RAID
+          üzerinde bu, her yazmayı iki fiziksel işleme çevirir.
+        </li>
+      </ul>
+    </section>
+  </div>
+
+  <script>
+    (() => {
+      const el = (s) => document.querySelector(s);
+      const say = (s) => Number(el(s).value) || 0;
+
+      /* Dosya sistemine göre azami birim boyutu (küme boyutuna bağlı) ve sınırlar */
+      const FS = {
+        ntfs: { ad: 'NTFS', azamiKume: 2097152, sikistirmaSiniri: 4096, azamiDosya: 16 * 1024 ** 4 },
+        refs: { ad: 'ReFS', azamiKume: 65536, sikistirmaSiniri: 0, azamiDosya: 35 * 1024 ** 5 },
+        exfat: { ad: 'exFAT', azamiKume: 33554432, sikistirmaSiniri: 0, azamiDosya: 128 * 1024 ** 5 },
+        ext4: { ad: 'ext4', azamiKume: 65536, sikistirmaSiniri: 0, azamiDosya: 16 * 1024 ** 4 },
+        xfs: { ad: 'XFS', azamiKume: 65536, sikistirmaSiniri: 0, azamiDosya: 8 * 1024 ** 6 },
+      };
+
+      const YUKLER = {
+        dosya: { ad: 'Kullanıcı dosyaları', onerilenKume: 4096, not: 'Karışık ve çoğunlukla küçük dosyalar' },
+        veritabani: { ad: 'Veri tabanı', onerilenKume: 65536, not: 'SQL Server 64 KB küme önerir' },
+        yedek: { ad: 'Yedekleme deposu', onerilenKume: 65536, not: 'Az sayıda çok büyük dosya' },
+        sanal: { ad: 'Sanal makine diskleri', onerilenKume: 65536, not: 'Büyük ve sıralı erişim' },
+        gelistirme: { ad: 'Kaynak kod', onerilenKume: 4096, not: 'Çok sayıda küçük dosya' },
+      };
+
+      const boyutYaz = (bayt) => {
+        if (bayt >= 1024 ** 4) return `${(bayt / 1024 ** 4).toFixed(2)} TB`;
+        if (bayt >= 1024 ** 3) return `${(bayt / 1024 ** 3).toFixed(1)} GB`;
+        if (bayt >= 1024 ** 2) return `${(bayt / 1024 ** 2).toFixed(1)} MB`;
+        if (bayt >= 1024) return `${(bayt / 1024).toFixed(1)} KB`;
+        return `${Math.round(bayt)} bayt`;
+      };
+
+      /** Ortalama dosya boyutuna göre küme başına kaybedilen alan.
+          Dosya boyutu kümeye tam bölünmüyorsa son küme yarım kalır. */
+      function israfHesapla(dosyaBayt, kume, adet) {
+        const kumeSayisi = Math.ceil(dosyaBayt / kume);
+        const kaplananBayt = kumeSayisi * kume;
+        return (kaplananBayt - dosyaBayt) * adet;
+      }
+
+      function hesapla() {
+        const birimBayt = say('#d-boyut') * 1024 ** 3;
+        const fsKod = el('#d-fs').value;
+        const fs = FS[fsKod];
+        const kume = Number(el('#d-kume').value);
+        const adet = say('#d-dosyaAdet');
+        const dosyaBayt = say('#d-dosyaBoyut') * 1024;
+        const yuk = YUKLER[el('#d-yuk').value];
+
+        const gercekVeri = dosyaBayt * adet;
+        const israf = israfHesapla(dosyaBayt, kume, adet);
+        const kaplanan = gercekVeri + israf;
+        const israfOrani = kaplanan > 0 ? (israf / kaplanan) * 100 : 0;
+        const kumeSayisi = Math.ceil(birimBayt / kume);
+        const doluluk = birimBayt > 0 ? (kaplanan / birimBayt) * 100 : 0;
+
+        el('#d-kartlar').innerHTML = [
+          { b: 'Gerçek veri', d: boyutYaz(gercekVeri), n: `${adet.toLocaleString('tr-TR')} dosya` },
+          { b: 'Diskte kaplanan', d: boyutYaz(kaplanan), n: `${kume < 1024 ? kume + ' bayt' : kume / 1024 + ' KB'} küme` },
+          { b: 'İsraf', d: boyutYaz(israf), n: `%${israfOrani.toFixed(1)} kayıp` },
+          { b: 'Birim doluluğu', d: `%${Math.round(doluluk)}`, n: `${boyutYaz(birimBayt)} birimde` },
+          { b: 'Küme sayısı', d: kumeSayisi.toLocaleString('tr-TR'), n: 'birimdeki toplam küme' },
+          {
+            b: 'Dosya başına küme',
+            d: String(Math.ceil(dosyaBayt / kume)),
+            n: `ortalama ${(dosyaBayt / 1024).toFixed(1)} KB dosya`,
+          },
+        ]
+          .map(
+            (k) =>
+              `<div class="d-kart"><span class="d-kart-b">${k.b}</span>` +
+              `<b class="d-kart-d">${k.d}</b><span class="d-kart-n">${k.n}</span></div>`
+          )
+          .join('');
+
+        /* --- görsel oran --- */
+        const veriYuzde = kaplanan > 0 ? (gercekVeri / kaplanan) * 100 : 0;
+        el('#d-cubuk').innerHTML =
+          '<span class="yan-etiket" style="display:block;margin-bottom:8px">Kaplanan alanın dağılımı</span>' +
+          `<div class="d-bar"><i style="width:${veriYuzde}%" title="Gerçek veri"></i>` +
+          `<u style="width:${100 - veriYuzde}%" title="İsraf"></u></div>` +
+          `<div class="d-efsane">` +
+          `<span><b class="d-veri"></b>Gerçek veri — ${boyutYaz(gercekVeri)}</span>` +
+          `<span><b class="d-israf"></b>Küme israfı — ${boyutYaz(israf)} (%${israfOrani.toFixed(1)})</span>` +
+          `</div>`;
+
+        /* --- karşılaştırma tablosu --- */
+        const kumeler = [512, 1024, 2048, 4096, 8192, 16384, 32768, 65536, 131072, 262144];
+        el('#d-tablo').innerHTML = kumeler
+          .filter((k) => k <= fs.azamiKume)
+          .map((k) => {
+            const i = israfHesapla(dosyaBayt, k, adet);
+            const kap = gercekVeri + i;
+            const oran = kap > 0 ? (i / kap) * 100 : 0;
+            // NTFS'te azami birim boyutu küme × 2^32
+            const azamiBirim = k * 2 ** 32;
+            const notlar = [];
+            if (fsKod === 'ntfs' && k > fs.sikistirmaSiniri) notlar.push('sıkıştırma kullanılamaz');
+            if (k === yuk.onerilenKume) notlar.push(`${yuk.ad} için önerilen`);
+            if (k === 4096) notlar.push('varsayılan');
+            return (
+              `<tr${k === kume ? ' data-secili="evet"' : ''}>` +
+              `<td>${k < 1024 ? k + ' B' : k / 1024 + ' KB'}</td>` +
+              `<td>${boyutYaz(i)}</td>` +
+              `<td>%${oran.toFixed(1)}</td>` +
+              `<td>${boyutYaz(azamiBirim)}</td>` +
+              `<td class="d-not">${notlar.join(', ') || '—'}</td></tr>`
+            );
+          })
+          .join('');
+
+        /* --- değerlendirme --- */
+        const bulgular = [];
+
+        if (israfOrani > 40) {
+          const iyi = kumeler.find((k) => {
+            const i = israfHesapla(dosyaBayt, k, adet);
+            return (i / (gercekVeri + i)) * 100 < 15;
+          });
+          bulgular.push([
+            'hata',
+            `<b>Alanın %${israfOrani.toFixed(0)}'i küme israfına gidiyor.</b> ` +
+              `${boyutYaz(israf)} hiçbir işe yaramadan tutuluyor. Ortalama dosyanız ` +
+              `${(dosyaBayt / 1024).toFixed(1)} KB ama küme ${kume / 1024} KB; her dosya ` +
+              `${Math.ceil(dosyaBayt / kume)} küme kaplıyor ve sonuncusu neredeyse boş kalıyor.` +
+              (iyi ? ` <b>${iyi < 1024 ? iyi + ' bayt' : iyi / 1024 + ' KB'}</b> küme bu oranı %15'in altına indirir.` : ''),
+          ]);
+        } else if (israfOrani > 15) {
+          bulgular.push([
+            'uyari',
+            `<b>%${israfOrani.toFixed(0)} küme israfı.</b> Kabul edilebilir ama daha küçük bir ` +
+              `küme boyutu ${boyutYaz(israf)}'ın bir kısmını geri kazandırır.`,
+          ]);
+        } else {
+          bulgular.push([
+            'ok',
+            `<b>Küme boyutu dosya profiline uygun.</b> İsraf %${israfOrani.toFixed(1)} — bu ` +
+              `oran normaldir ve daha küçük küme seçmenin getireceği parçalanma bunu aşar.`,
+          ]);
+        }
+
+        if (kume !== yuk.onerilenKume) {
+          bulgular.push([
+            'uyari',
+            `<b>${yuk.ad} için ${yuk.onerilenKume / 1024} KB küme önerilir.</b> ${yuk.not}. ` +
+              `Şu an ${kume < 1024 ? kume + ' bayt' : kume / 1024 + ' KB'} seçili.` +
+              (el('#d-yuk').value === 'veritabani'
+                ? ' SQL Server veri dosyaları 64 KB kümede belirgin daha iyi çalışır; veri ' +
+                  'sayfaları 8 KB\'lık gruplar hâlinde okunduğu için küme bu gruplarla hizalanır.'
+                : ''),
+          ]);
+        }
+
+        if (fsKod === 'ntfs' && kume > 4096) {
+          bulgular.push([
+            'uyari',
+            '<b>NTFS sıkıştırma kullanılamayacak.</b> 4 KB üstü küme boyutlarında birim ' +
+              'sıkıştırma tamamen devre dışıdır ve sonradan açılamaz. Arşiv birimlerinde bu ' +
+              'kabul edilebilir bir ödündür; kullanıcı verisinde düşünün.',
+          ]);
+        }
+
+        if (say('#d-boyut') > 2048) {
+          bulgular.push([
+            'hata',
+            `<b>${say('#d-boyut')} GB birim MBR ile biçimlendirilemez.</b> MBR bölüm tablosu ` +
+              `2 TB'de biter; daha büyüğü sessizce kırpılır. GPT kullanın — ayrıca UEFI ` +
+              `önyükleme de GPT ister.`,
+          ]);
+        }
+
+        if (kaplanan > birimBayt) {
+          bulgular.push([
+            'hata',
+            `<b>Veri birime sığmıyor.</b> ${boyutYaz(kaplanan)} veri, ${boyutYaz(birimBayt)} ` +
+              `birime konulamaz. Küme israfını hesaba katmayı unutmak, kapasite planlarında ` +
+              `en sık yapılan hatadır.`,
+          ]);
+        } else if (doluluk > 85) {
+          bulgular.push([
+            'uyari',
+            `<b>Birim %${Math.round(doluluk)} dolu olacak.</b> NTFS %85 üstünde belirgin ` +
+              `parçalanmaya başlar; ayrıca gölge kopya ve geçici dosyalar için pay kalmaz.`,
+          ]);
+        }
+
+        if (dosyaBayt < 700 && fsKod === 'ntfs') {
+          bulgular.push([
+            'ok',
+            '<b>Çok küçük dosyalar MFT içine sığabilir.</b> NTFS yaklaşık 700 bayttan küçük ' +
+              'dosyaları kayıt tablosunun içinde tutar ve ayrı küme harcamaz. Gerçek israf ' +
+              'hesaplanandan az çıkacaktır.',
+          ]);
+        }
+
+        el('#d-bulgular').innerHTML =
+          '<ul class="d-liste">' +
+          bulgular.map(([tip, m]) => `<li data-tip="${tip}">${m}</li>`).join('') +
+          '</ul>';
+
+        const durum = el('#d-durum');
+        const hataSayisi = bulgular.filter(([t]) => t === 'hata').length;
+        durum.className = 'arac-durum ' + (hataSayisi ? 'hata' : 'ok');
+        durum.textContent = hataSayisi
+          ? `${hataSayisi} ciddi sorun var — 4. bölüme bakın.`
+          : `%${israfOrani.toFixed(1)} israf; ${boyutYaz(kaplanan)} kaplanacak.`;
+
+        /* --- komutlar --- */
+        const kumeKb = kume / 1024;
+        el('#d-komut').textContent =
+          `# Mevcut küme boyutunu öğren (biçimlendirdikten sonra değiştirilemez)\n` +
+          `fsutil fsinfo ntfsinfo D:\n` +
+          `# "Bytes Per Cluster" satırına bakın.\n\n` +
+          `# PowerShell ile bütün birimlerin küme boyutu\n` +
+          `Get-CimInstance Win32_Volume |\n` +
+          `    Where-Object { $_.DriveLetter } |\n` +
+          `    Select-Object DriveLetter, Label, FileSystem,\n` +
+          `        @{ n = 'KumeKB'; e = { $_.BlockSize / 1KB } },\n` +
+          `        @{ n = 'BoyutGB'; e = { [math]::Round($_.Capacity / 1GB, 1) } },\n` +
+          `        @{ n = 'BosGB';   e = { [math]::Round($_.FreeSpace / 1GB, 1) } } |\n` +
+          `    Format-Table -AutoSize\n\n` +
+          `# Yeni birim oluştur — GPT ve ${kumeKb} KB küme\n` +
+          `$disk = Get-Disk -Number 2\n` +
+          `Initialize-Disk -Number $disk.Number -PartitionStyle GPT -ErrorAction SilentlyContinue\n` +
+          `New-Partition -DiskNumber $disk.Number -UseMaximumSize -DriveLetter D |\n` +
+          `    Format-Volume -FileSystem ${fs.ad.toUpperCase()} -AllocationUnitSize ${kume} \`\n` +
+          `        -NewFileSystemLabel '${yuk.ad}' -Confirm:$false\n\n` +
+          `# Bölüm hizalamasını doğrula (1048576 = 1 MB, doğru değer budur)\n` +
+          `Get-Partition | Select-Object DiskNumber, PartitionNumber, Offset, Size\n\n` +
+          `# Gerçek dosya profilini ölç — tahmin yerine bu sayıyı kullanın\n` +
+          `$d = Get-ChildItem D:\\ -Recurse -File -ErrorAction SilentlyContinue\n` +
+          `$d | Measure-Object Length -Average -Sum -Maximum |\n` +
+          `    Select-Object Count, Average, Sum, Maximum\n\n` +
+          `# Linux tarafında\n` +
+          `# tune2fs -l /dev/sdb1 | grep -i 'block size'   # ext4\n` +
+          `# xfs_info /mnt/veri | grep bsize               # XFS\n` +
+          `# mkfs.ext4 -b 4096 /dev/sdb1`;
+      }
+
+      document
+        .querySelectorAll('.arac-alan input, .arac-alan select')
+        .forEach((g) => {
+          g.addEventListener('input', hesapla);
+          g.addEventListener('change', hesapla);
+        });
+
+      document.querySelectorAll('.kopyala').forEach((d) => {
+        d.addEventListener('click', async () => {
+          try {
+            await navigator.clipboard.writeText(el(`#${d.dataset.kaynak}`).textContent);
+            d.textContent = 'Kopyalandı';
+            setTimeout(() => (d.textContent = 'Kopyala'), 1600);
+          } catch {
+            /* pano izni yoksa kullanıcı elle seçer */
+          }
+        });
+      });
+
+      hesapla();
+    })();
+  </script>
+
+  <style>
+    .d-kartlar {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(min(160px, 100%), 1fr));
+      gap: 10px;
+      margin-bottom: 20px;
+    }
+    .d-kart {
+      border: 1px solid var(--line);
+      border-radius: 11px;
+      padding: 13px 15px;
+      display: grid;
+      gap: 3px;
+      background: var(--paper);
+    }
+    .d-kart-b {
+      font-size: 11.5px;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+      color: var(--muted);
+    }
+    .d-kart-d {
+      font-size: 21px;
+      letter-spacing: -0.02em;
+      font-family: var(--mono, ui-monospace, monospace);
+      color: var(--indigo-metin);
+    }
+    .d-kart-n {
+      font-size: 12px;
+      color: var(--muted);
+      line-height: 1.45;
+    }
+    .d-bar {
+      display: flex;
+      height: 26px;
+      border-radius: 8px;
+      overflow: hidden;
+      border: 1px solid var(--line);
+    }
+    .d-bar i {
+      display: block;
+      background: var(--indigo);
+    }
+    .d-bar u {
+      display: block;
+      background: light-dark(#dc2626, #b91c1c);
+    }
+    .d-efsane {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px 18px;
+      margin-top: 10px;
+      font-size: 12.5px;
+      color: var(--ink-soft);
+    }
+    .d-efsane span {
+      display: inline-flex;
+      align-items: center;
+      gap: 7px;
+    }
+    .d-efsane b {
+      width: 11px;
+      height: 11px;
+      border-radius: 3px;
+      display: inline-block;
+      flex: 0 0 auto;
+    }
+    .d-veri {
+      background: var(--indigo);
+    }
+    .d-israf {
+      background: light-dark(#dc2626, #b91c1c);
+    }
+    .d-kaydir {
+      overflow-x: auto;
+    }
+    .d-tablo {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 13px;
+      min-width: 540px;
+    }
+    .d-tablo th,
+    .d-tablo td {
+      text-align: left;
+      padding: 9px 12px;
+      border-bottom: 1px solid var(--line);
+    }
+    .d-tablo th {
+      color: var(--muted);
+      font-size: 11.5px;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+    }
+    .d-tablo td:nth-child(1),
+    .d-tablo td:nth-child(2),
+    .d-tablo td:nth-child(3),
+    .d-tablo td:nth-child(4) {
+      font-family: var(--mono, ui-monospace, monospace);
+      white-space: nowrap;
+    }
+    .d-tablo tr[data-secili] {
+      background: var(--tint);
+    }
+    .d-tablo tr[data-secili] td:nth-child(3) {
+      color: var(--indigo-metin);
+      font-weight: 700;
+    }
+    .d-not {
+      color: var(--muted);
+      font-size: 12.5px;
+    }
+    .d-liste,
+    .d-ipuclari {
+      list-style: none;
+      margin: 0;
+      padding: 0;
+      display: grid;
+      gap: 12px;
+    }
+    .d-liste li,
+    .d-ipuclari li {
+      font-size: 13.5px;
+      line-height: 1.62;
+      color: var(--ink-soft);
+      border-left: 2px solid var(--line);
+      padding-left: 13px;
+    }
+    .d-liste li[data-tip='hata'] {
+      border-left-color: light-dark(#dc2626, #f87171);
+    }
+    .d-liste li[data-tip='uyari'] {
+      border-left-color: light-dark(#f0c33c, #a97f1c);
+    }
+    .d-liste li[data-tip='ok'] {
+      border-left-color: light-dark(#16a34a, #4ade80);
+    }
+  </style>
+</Base>

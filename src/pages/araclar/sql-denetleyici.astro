@@ -1,0 +1,615 @@
+---
+import Base from '../../layouts/Base.astro';
+---
+
+<Base
+  baslik="SQL sorgu denetleyici"
+  aciklama="Sorgunuzu yapıştırın: WHERE'siz UDPATE, SELECT *, sarmalanmış sütun, NOLOCK ve dizini kullanılamaz hâle getiren kalıpları bulur."
+  aramaya={true}
+  kategori="Araç"
+>
+  <div class="arama-bas">
+    <div class="kap">
+      <nav class="kirinti" aria-label="Kırıntı yolu" style="padding-top:0">
+        <a href="/">Ana sayfa</a><span class="ayrac">/</span><a href="/araclar">Araçlar</a><span
+          class="ayrac">/</span
+        ><span aria-current="page">SQL denetleyici</span>
+      </nav>
+      <h1>SQL sorgu denetleyici</h1>
+      <p style="color:var(--muted);font-size:14px;margin-top:8px;max-width:66ch">
+        Bir sorgu çalışıyor olabilir ve yine de yanlış olabilir: dizini kullanamayan bir
+        koşul, kilitleri atlayan bir ipucu, yanlışlıkla tüm tabloyu güncelleyen bir
+        <code>UPDATE</code>. Yapıştırın; ne çalıştırdığınızı görün.
+      </p>
+      <p style="color:var(--muted);font-size:13px;margin-top:10px;max-width:66ch">
+        Denetim metin üzerinden yapılır; sorgu çalıştırılmaz ve hiçbir yere gönderilmez.
+        Gerçek başarım için sorgu planına bakmanın yerini tutmaz.
+      </p>
+    </div>
+  </div>
+
+  <div class="kap arac-sayfa">
+    <section class="arac-blok">
+      <h2 class="arac-h2"><span class="arac-no">1</span> Sorgu</h2>
+      <div class="arac-alan">
+        <textarea id="q-girdi" rows="12" spellcheck="false" placeholder="SELECT * FROM Siparis WHERE ..."
+        ></textarea>
+      </div>
+      <div class="arac-dugmeler">
+        <button type="button" class="dg" id="q-denetle">Denetle</button>
+        <button type="button" class="dg dg-hayalet" id="q-ornek">Sorunlu örnek</button>
+        <button type="button" class="dg dg-hayalet" id="q-temizle">Temizle</button>
+      </div>
+      <p class="arac-durum" id="q-durum" role="status" aria-live="polite"></p>
+    </section>
+
+    <section class="arac-blok" id="q-sonuc" hidden>
+      <h2 class="arac-h2"><span class="arac-no">2</span> Bulgular</h2>
+      <div class="arac-olcum" id="q-olcum"></div>
+      <div id="q-bulgular"></div>
+    </section>
+
+    <section class="arac-blok">
+      <h2 class="arac-h2"><span class="arac-no">3</span> Sorguyu incelerken</h2>
+      <div style="position:relative">
+        <pre class="kod"><code>{`-- SQL Server: gerçek plan ve gerçek maliyet
+SET STATISTICS IO, TIME ON;
+-- sorgunuz burada
+SET STATISTICS IO, TIME OFF;
+-- "logical reads" sayısı, satır sayısından çok daha bilgilendiricidir.
+
+-- Eksik dizin önerileri (körü körüne uygulamayın, yön gösterir)
+SELECT TOP 20
+    d.statement, s.avg_user_impact, s.user_seeks, s.user_scans
+FROM sys.dm_db_missing_index_group_stats s
+JOIN sys.dm_db_missing_index_groups g ON s.group_handle = g.index_group_handle
+JOIN sys.dm_db_missing_index_details d ON g.index_handle = d.index_handle
+ORDER BY s.avg_user_impact DESC;
+
+-- En pahalı sorgular
+SELECT TOP 20
+    qs.total_logical_reads / qs.execution_count AS OrtOkuma,
+    qs.execution_count,
+    SUBSTRING(t.text, qs.statement_start_offset / 2 + 1, 200) AS Sorgu
+FROM sys.dm_exec_query_stats qs
+CROSS APPLY sys.dm_exec_sql_text(qs.sql_handle) t
+ORDER BY OrtOkuma DESC;
+
+-- PostgreSQL
+EXPLAIN (ANALYZE, BUFFERS) SELECT ...;
+
+-- MySQL
+EXPLAIN ANALYZE SELECT ...;`}</code></pre>
+        <button class="kopyala" type="button" id="q-kopyala">Kopyala</button>
+      </div>
+    </section>
+
+    <section class="arac-blok">
+      <h2 class="arac-h2"><span class="arac-no">4</span> Neden bu kalıplar sorun?</h2>
+      <ul class="q-ipuclari">
+        <li>
+          <b>Sütunu sarmalamak dizini iptal eder.</b>
+          <code>WHERE YEAR(Tarih) = 2026</code> yazdığınızda veri tabanı <i>her satır için</i>
+          fonksiyonu çalıştırmak zorunda kalır ve <code>Tarih</code> üzerindeki dizini
+          kullanamaz. Doğrusu aralık vermektir:
+          <code>WHERE Tarih &gt;= '2026-01-01' AND Tarih &lt; '2027-01-01'</code>. Aynı şey
+          <code>UPPER()</code>, <code>ISNULL()</code> ve hesaplamalar için de geçerlidir.
+        </li>
+        <li>
+          <b>Baştan joker arama dizini kullanamaz.</b> <code>LIKE '%metin%'</code> tam tarama
+          demektir; <code>LIKE 'metin%'</code> ise dizin araması yapabilir. Gerçekten metin
+          içinde arama gerekiyorsa tam metin dizini kullanın.
+        </li>
+        <li>
+          <b><code>NOLOCK</code> "hızlandırır" değil, "yanlış okur" demektir.</b> Kirli okuma
+          yapar: henüz kaydedilmemiş veriyi görebilir, aynı satırı iki kez okuyabilir ya da
+          hiç okumayabilir. Rapor sayıları bu yüzden tutmaz. Kilit sorunu varsa çözüm
+          anlık görüntü yalıtımıdır (<code>READ COMMITTED SNAPSHOT</code>).
+        </li>
+        <li>
+          <b>Örtük tür dönüşümü sessizce yavaşlatır.</b> <code>VARCHAR</code> bir sütunu
+          <code>NVARCHAR</code> parametreyle karşılaştırdığınızda veri tabanı sütunu dönüştürür
+          ve dizini bırakır. Plan bunu "CONVERT_IMPLICIT" olarak gösterir; yavaşlığın en sık
+          görünmez sebebidir.
+        </li>
+        <li>
+          <b><code>SELECT *</code> kırılgan ve pahalıdır.</b> Kapsayan dizin kullanılmasını
+          engeller, gereksiz sütun taşır ve tabloya sütun eklendiğinde uygulamayı bozabilir.
+          Görünümlerde ise sütun listesi oluşturma anında dondurulur — sonradan eklenen sütun
+          hiç görünmez.
+        </li>
+        <li>
+          <b>Toplu güncelleme günlüğü şişirir.</b> Milyonlarca satırı tek bir işlemde
+          güncellemek işlem günlüğünü doldurur, kilitleri büyütür ve geri alma saatler sürer.
+          Toplu işleri <code>TOP (5000)</code> gibi parçalara bölüp döngüyle çalıştırın.
+        </li>
+      </ul>
+    </section>
+  </div>
+
+  <script>
+    (() => {
+      const el = (s) => document.querySelector(s);
+      const kacir = (s) =>
+        String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+
+      /** Dize sabitlerini ve yorumları boşlukla değiştirir; içlerindeki kelimeler
+          yanlış alarm üretmesin diye. Uzunluk korunur ki satır numarası kaymasın. */
+      function temizle(sql) {
+        let cikti = '';
+        let i = 0;
+        while (i < sql.length) {
+          const k = sql[i];
+
+          if (k === "'" || k === '"' || k === '[') {
+            const kapanis = k === '[' ? ']' : k;
+            cikti += ' ';
+            i++;
+            while (i < sql.length) {
+              if (sql[i] === kapanis) {
+                // SQL'de tırnak iki kez yazılarak kaçırılır
+                if (sql[i + 1] === kapanis) {
+                  cikti += '  ';
+                  i += 2;
+                  continue;
+                }
+                cikti += ' ';
+                i++;
+                break;
+              }
+              cikti += sql[i] === '\n' ? '\n' : ' ';
+              i++;
+            }
+            continue;
+          }
+
+          if (k === '-' && sql[i + 1] === '-') {
+            while (i < sql.length && sql[i] !== '\n') {
+              cikti += ' ';
+              i++;
+            }
+            continue;
+          }
+
+          if (k === '/' && sql[i + 1] === '*') {
+            while (i < sql.length && !(sql[i] === '*' && sql[i + 1] === '/')) {
+              cikti += sql[i] === '\n' ? '\n' : ' ';
+              i++;
+            }
+            cikti += '  ';
+            i += 2;
+            continue;
+          }
+
+          cikti += k;
+          i++;
+        }
+        return cikti;
+      }
+
+      /** Yalnızca yorumları siler, dize sabitlerini korur. LIKE deseni gibi
+          içeriğe bakması gereken denetimler için gerekli — temizle() dizeleri
+          boşluğa çevirdiği için orada joker karakter kaybolur. */
+      function yorumlariTemizle(sql) {
+        let cikti = '';
+        let i = 0;
+        let tirnak = null;
+        while (i < sql.length) {
+          const k = sql[i];
+          if (tirnak) {
+            cikti += k;
+            if (k === tirnak) tirnak = null;
+            i++;
+            continue;
+          }
+          if (k === "'" || k === '"') {
+            tirnak = k;
+            cikti += k;
+            i++;
+            continue;
+          }
+          if (k === '-' && sql[i + 1] === '-') {
+            while (i < sql.length && sql[i] !== '\n') {
+              cikti += ' ';
+              i++;
+            }
+            continue;
+          }
+          if (k === '/' && sql[i + 1] === '*') {
+            while (i < sql.length && !(sql[i] === '*' && sql[i + 1] === '/')) {
+              cikti += sql[i] === '\n' ? '\n' : ' ';
+              i++;
+            }
+            cikti += '  ';
+            i += 2;
+            continue;
+          }
+          cikti += k;
+          i++;
+        }
+        return cikti;
+      }
+
+      const satirNo = (metin, indis) => metin.slice(0, indis).split('\n').length;
+
+      function denetle(ham) {
+        const sql = temizle(ham);
+        const dizeli = yorumlariTemizle(ham);
+        const bulgular = [];
+        const ekle = (tip, baslik, metin, no = null) =>
+          bulgular.push({ tip, baslik, metin, no });
+
+        const bul = (desen) => {
+          const m = new RegExp(desen.source, desen.flags.includes('g') ? desen.flags : desen.flags + 'g');
+          return [...sql.matchAll(m)];
+        };
+
+        /* --- WHERE'siz UPDATE ve DELETE: en tehlikeli bulgu --- */
+        for (const m of bul(/\b(UPDATE|DELETE)\b/gi)) {
+          const komut = m[0].toUpperCase();
+          // Bu komuttan sonraki noktalı virgüle kadar olan parça
+          const sonrasi = sql.slice(m.index);
+          const bitis = sonrasi.indexOf(';');
+          const govde = bitis === -1 ? sonrasi : sonrasi.slice(0, bitis);
+          if (!/\bWHERE\b/i.test(govde)) {
+            ekle(
+              'hata',
+              `WHERE olmadan ${komut}`,
+              `Bu ifade <b>tablodaki bütün satırları</b> etkiler. Kasıtlıysa sorun yok; ` +
+                `değilse geri dönüşü yedekten olur. Çalıştırmadan önce aynı koşulu ` +
+                `<code>SELECT COUNT(*)</code> ile deneyip kaç satır döndüğüne bakın.`,
+              satirNo(sql, m.index)
+            );
+          }
+        }
+
+        /* --- sütunu sarmalayan koşullar --- */
+        const sarmalayicilar = [
+          ['YEAR', 'Tarih sütununu YEAR() ile sarmak yerine aralık verin'],
+          ['MONTH', 'Ay filtresi için tarih aralığı kullanın'],
+          ['DAY', 'Gün filtresi için tarih aralığı kullanın'],
+          ['CONVERT', 'Sütunu değil, parametreyi dönüştürün'],
+          ['CAST', 'Sütunu değil, parametreyi dönüştürün'],
+          ['UPPER', 'Harf duyarsız karşılaştırma için harmanlama (collation) kullanın'],
+          ['LOWER', 'Harf duyarsız karşılaştırma için harmanlama kullanın'],
+          ['ISNULL', 'OR ile ayrı koşul yazmak dizini korur'],
+          ['COALESCE', 'OR ile ayrı koşul yazmak dizini korur'],
+          ['LTRIM', 'Veriyi yazarken temizleyin, okurken değil'],
+          ['RTRIM', 'Veriyi yazarken temizleyin, okurken değil'],
+          ['SUBSTRING', 'Baştan eşleşme için LIKE ön ek araması kullanın'],
+        ];
+        for (const [fn, oneri] of sarmalayicilar) {
+          const desen = new RegExp(`\\b(WHERE|AND|OR)\\b[^()]{0,40}\\b${fn}\\s*\\(`, 'gi');
+          for (const m of [...sql.matchAll(desen)]) {
+            ekle(
+              'uyari',
+              `Koşulda sütun ${fn}() ile sarmalanmış`,
+              `Sütun bir fonksiyonun içine girdiğinde üzerindeki dizin kullanılamaz ve ` +
+                `veri tabanı tabloyu baştan sona tarar. ${oneri}.`,
+              satirNo(sql, m.index)
+            );
+            break; // aynı fonksiyon için tek uyarı yeter
+          }
+        }
+
+        /* --- baştan joker: desenin kendisine bakmak gerektiği için
+               dize sabitlerinin korunduğu sürüm kullanılıyor --- */
+        for (const m of [...dizeli.matchAll(/\bLIKE\s+N?['"]\s*%/gi)]) {
+          ekle(
+            'uyari',
+            'Baştan joker ile LIKE',
+            `<code>LIKE '%…'</code> dizin araması yapamaz; tablo baştan sona taranır. ` +
+              `Sondan joker (<code>'metin%'</code>) dizini kullanabilir. Gerçekten metin ` +
+              `içinde arama gerekiyorsa tam metin dizini kurun.`,
+            satirNo(sql, m.index)
+          );
+          break;
+        }
+
+        /* --- NOLOCK --- */
+        for (const m of bul(/\bNOLOCK\b|\bREAD\s+UNCOMMITTED\b/gi)) {
+          ekle(
+            'hata',
+            'NOLOCK / READ UNCOMMITTED',
+            `Kirli okuma yapar: kaydedilmemiş veriyi görebilir, aynı satırı iki kez okuyabilir ` +
+              `ya da hiç okumayabilir. "Hızlandırma" olarak eklenen bu ipucu, raporların ` +
+              `yanlış sayı vermesinin en sık sebebidir. Kilit beklemesi gerçek bir sorunsa ` +
+              `çözüm <code>READ COMMITTED SNAPSHOT</code> yalıtımıdır.`,
+            satirNo(sql, m.index)
+          );
+          break;
+        }
+
+        /* --- SELECT * --- */
+        for (const m of bul(/\bSELECT\s+\*/gi)) {
+          const gorunumMu = /\bCREATE\s+(OR\s+REPLACE\s+)?VIEW\b/i.test(sql);
+          ekle(
+            gorunumMu ? 'hata' : 'uyari',
+            'SELECT *',
+            gorunumMu
+              ? 'Görünüm tanımında <code>SELECT *</code> özellikle tehlikelidir: sütun listesi ' +
+                'oluşturma anında dondurulur, tabloya sonradan eklenen sütunlar görünmez ve ' +
+                'görünüm yeniden derlenene kadar yanlış sonuç verebilir.'
+              : 'Gerekli sütunları açıkça yazmak kapsayan dizin kullanılmasını sağlar, ağ ' +
+                'trafiğini azaltır ve tabloya sütun eklendiğinde uygulamanın bozulmasını önler.',
+            satirNo(sql, m.index)
+          );
+          break;
+        }
+
+        /* --- SELECT * ile birlikte TOP/LIMIT yokluğu --- */
+        if (/\bSELECT\b/i.test(sql) && !/\b(TOP|LIMIT|FETCH\s+FIRST|OFFSET)\b/i.test(sql)) {
+          const birlesim = (sql.match(/\bJOIN\b/gi) ?? []).length;
+          if (birlesim >= 3) {
+            ekle(
+              'uyari',
+              'Satır sınırı olmayan çoklu birleşim',
+              `${birlesim} birleşim var ve sonucu sınırlayan bir <code>TOP</code> ya da ` +
+                `<code>LIMIT</code> yok. Geliştirme verisinde hızlı çalışan böyle bir sorgu, ` +
+                `üretimde milyonlarca satır döndürebilir.`
+            );
+          }
+        }
+
+        /* --- NOT IN + alt sorgu: NULL tuzağı --- */
+        for (const m of bul(/\bNOT\s+IN\s*\(\s*SELECT\b/gi)) {
+          ekle(
+            'hata',
+            'NOT IN ile alt sorgu',
+            `Alt sorgu tek bir <code>NULL</code> döndürdüğünde <code>NOT IN</code> ` +
+              `<b>hiçbir satır döndürmez</b> — hata da vermez. Bu, sessizce yanlış sonuç ` +
+              `üreten klasik bir tuzaktır. <code>NOT EXISTS</code> kullanın; hem doğrudur hem ` +
+              `genelde daha hızlıdır.`,
+            satirNo(sql, m.index)
+          );
+          break;
+        }
+
+        /* --- eski birleşim sözdizimi --- */
+        for (const m of bul(/\bFROM\s+\w+\s*,\s*\w+/gi)) {
+          ekle(
+            'uyari',
+            'Eski virgüllü birleşim sözdizimi',
+            `<code>FROM a, b WHERE a.id = b.id</code> biçimi hâlâ çalışır ama birleşim ` +
+              `koşulunu filtre koşulundan ayırt edilemez kılar. Bir <code>WHERE</code> ` +
+              `maddesi unutulduğunda kartezyen çarpım oluşur ve kimse fark etmez. ` +
+              `<code>JOIN … ON</code> yazın.`,
+            satirNo(sql, m.index)
+          );
+          break;
+        }
+
+        /* --- ORDER BY sütun numarası --- */
+        for (const m of bul(/\bORDER\s+BY\s+\d+/gi)) {
+          ekle(
+            'uyari',
+            'ORDER BY sütun numarasıyla',
+            'Sütun sırası değiştiğinde sıralama sessizce başka bir sütuna kayar. Sütun adı yazın.',
+            satirNo(sql, m.index)
+          );
+          break;
+        }
+
+        /* --- SELECT içinde DISTINCT: genelde eksik birleşim koşulunun belirtisi --- */
+        for (const m of bul(/\bSELECT\s+DISTINCT\b/gi)) {
+          ekle(
+            'uyari',
+            'SELECT DISTINCT',
+            'Yinelenen satırları temizlemek için eklenen <code>DISTINCT</code>, çoğu zaman ' +
+              'eksik ya da yanlış bir birleşim koşulunun belirtisidir. Önce birleşimin ' +
+              'gerçekten tekil satır üretip üretmediğine bakın; sıralama maliyeti boşuna ödenmesin.',
+            satirNo(sql, m.index)
+          );
+          break;
+        }
+
+        /* --- örtük dönüşüm belirtisi: N ön eki olmadan Unicode karşılaştırma --- */
+        if (/\bNVARCHAR\b/i.test(sql) && /=\s*'/.test(sql) && !/=\s*N'/.test(sql)) {
+          ekle(
+            'uyari',
+            'Olası örtük tür dönüşümü',
+            `<code>NVARCHAR</code> bir sütunu <code>N</code> ön eki olmayan bir sabitle ` +
+              `karşılaştırmak, veri tabanını sütunu dönüştürmeye zorlayabilir ve dizini ` +
+              `kullanılamaz hâle getirir. Planda <code>CONVERT_IMPLICIT</code> görüyorsanız ` +
+              `sebebi budur.`
+          );
+        }
+
+        /* --- işlem içinde toplu güncelleme --- */
+        const guncelleme = /\b(UPDATE|DELETE|INSERT)\b/i.test(sql);
+        if (guncelleme && !/\b(TOP|LIMIT)\s*\(?\s*\d+/i.test(sql) && /\bWHERE\b/i.test(sql)) {
+          ekle(
+            'uyari',
+            'Parçalanmamış toplu değişiklik',
+            'Çok satırlı bir güncelleme tek işlemde çalıştırıldığında işlem günlüğü şişer, ' +
+              'kilitler satırdan tabloya yükselebilir ve geri alma çok uzun sürer. Büyük ' +
+              'işleri <code>TOP (5000)</code> gibi parçalara bölüp döngüyle çalıştırın.'
+          );
+        }
+
+        /* --- işlem yokluğu --- */
+        const degistirenSayisi = (sql.match(/\b(UPDATE|DELETE|INSERT|MERGE|DROP|TRUNCATE|ALTER)\b/gi) ?? [])
+          .length;
+        if (degistirenSayisi >= 2 && !/\bBEGIN\s+TRAN/i.test(sql)) {
+          ekle(
+            'uyari',
+            'Birden çok değiştirme, işlem yok',
+            `${degistirenSayisi} adet veri değiştiren ifade var ama bir işlem (transaction) ` +
+              `içine alınmamış. Ortada bir hata olursa yarısı uygulanmış bir durum kalır.`
+          );
+        }
+
+        /* --- geri dönülemez ifadeler --- */
+        for (const m of bul(/\b(DROP\s+(TABLE|DATABASE)|TRUNCATE\s+TABLE)\b/gi)) {
+          ekle(
+            'hata',
+            `Geri alınamaz ifade: ${m[0].toUpperCase()}`,
+            '<code>TRUNCATE</code> tek tek satır silmediği için tetikleyicileri çalıştırmaz ve ' +
+              '<code>DROP</code> nesneyi tamamen kaldırır. İkisi de yedekten dönmeyi gerektirir. ' +
+              'Üretimde çalıştırmadan önce yedeğin var olduğunu ve geri yüklenebildiğini doğrulayın.',
+            satirNo(sql, m.index)
+          );
+        }
+
+        return { bulgular, sql };
+      }
+
+      const SIRA = { hata: 0, uyari: 1, ok: 2 };
+
+      function calistir() {
+        const ham = el('#q-girdi').value;
+        const durum = el('#q-durum');
+
+        if (!ham.trim()) {
+          el('#q-sonuc').hidden = true;
+          durum.textContent = '';
+          return;
+        }
+
+        const { bulgular, sql } = denetle(ham);
+        bulgular.sort((a, b) => SIRA[a.tip] - SIRA[b.tip] || (a.no ?? 0) - (b.no ?? 0));
+
+        const hata = bulgular.filter((b) => b.tip === 'hata').length;
+        const uyari = bulgular.filter((b) => b.tip === 'uyari').length;
+
+        const ifadeSayisi = (sql.match(/;/g) ?? []).length || 1;
+        const birlesim = (sql.match(/\bJOIN\b/gi) ?? []).length;
+
+        el('#q-sonuc').hidden = false;
+        el('#q-olcum').innerHTML =
+          `<span>Satır: <b>${ham.split('\n').length}</b></span>` +
+          `<span>İfade: <b>${ifadeSayisi}</b></span>` +
+          `<span>Birleşim: <b>${birlesim}</b></span>` +
+          `<span>Sorun: <b>${hata}</b></span>` +
+          `<span>Uyarı: <b>${uyari}</b></span>`;
+
+        el('#q-bulgular').innerHTML = bulgular.length
+          ? '<ul class="q-liste">' +
+            bulgular
+              .map(
+                (b) =>
+                  `<li data-tip="${b.tip}"><div class="q-bulgu-ust"><b>${b.baslik}</b>` +
+                  (b.no ? `<span class="q-satir">satır ${b.no}</span>` : '') +
+                  `</div><p>${b.metin}</p></li>`
+              )
+              .join('') +
+            '</ul>'
+          : '<p class="arac-not" style="margin:0">Bilinen bir sorunlu kalıp bulunamadı. ' +
+            'Bu, sorgunun hızlı olduğu anlamına gelmez — gerçek başarım için sorgu planına bakın.</p>';
+
+        durum.className = 'arac-durum ' + (hata ? 'hata' : uyari ? '' : 'ok');
+        durum.textContent = hata
+          ? `${hata} ciddi bulgu, ${uyari} uyarı.`
+          : uyari
+            ? `Ciddi bulgu yok; ${uyari} iyileştirme önerisi var.`
+            : 'Bilinen sorunlu kalıp bulunamadı.';
+      }
+
+      el('#q-denetle').addEventListener('click', calistir);
+      el('#q-girdi').addEventListener('input', () => {
+        if (el('#q-girdi').value.trim().length > 15) calistir();
+      });
+
+      el('#q-temizle').addEventListener('click', () => {
+        el('#q-girdi').value = '';
+        calistir();
+      });
+
+      el('#q-ornek').addEventListener('click', () => {
+        el('#q-girdi').value = [
+          '-- Aylık sipariş raporu',
+          'SELECT DISTINCT *',
+          'FROM Siparis s, Musteri m',
+          'WHERE s.MusteriId = m.Id',
+          '  AND YEAR(s.Tarih) = 2026',
+          "  AND UPPER(m.Ad) LIKE '%LTD%'",
+          '  AND s.Durum NOT IN (SELECT Kod FROM IptalDurumlari)',
+          'ORDER BY 3;',
+          '',
+          '-- Eski kayıtları temizle',
+          'UPDATE Siparis WITH (NOLOCK)',
+          "SET Durum = 'arsiv';",
+          '',
+          'DELETE FROM SiparisGecmisi;',
+        ].join('\n');
+        calistir();
+      });
+
+      el('#q-kopyala').addEventListener('click', async (e) => {
+        try {
+          await navigator.clipboard.writeText(e.currentTarget.previousElementSibling.textContent);
+          e.currentTarget.textContent = 'Kopyalandı';
+          setTimeout(() => (e.currentTarget.textContent = 'Kopyala'), 1600);
+        } catch {
+          /* pano izni yoksa kullanıcı elle seçer */
+        }
+      });
+    })();
+  </script>
+
+  <style>
+    .arac-dugmeler {
+      display: flex;
+      gap: 10px;
+      flex-wrap: wrap;
+      margin-top: 4px;
+    }
+    .q-liste {
+      list-style: none;
+      margin: 0;
+      padding: 0;
+      display: grid;
+      gap: 11px;
+    }
+    .q-liste li {
+      border: 1px solid var(--line);
+      border-left: 3px solid var(--line);
+      border-radius: 10px;
+      padding: 12px 14px;
+      background: var(--paper);
+    }
+    .q-liste li[data-tip='hata'] {
+      border-left-color: light-dark(#dc2626, #f87171);
+    }
+    .q-liste li[data-tip='uyari'] {
+      border-left-color: light-dark(#f0c33c, #a97f1c);
+    }
+    .q-bulgu-ust {
+      display: flex;
+      justify-content: space-between;
+      gap: 12px;
+      align-items: baseline;
+      flex-wrap: wrap;
+      margin-bottom: 5px;
+    }
+    .q-bulgu-ust b {
+      font-size: 14px;
+    }
+    .q-satir {
+      font-size: 11.5px;
+      color: var(--muted);
+      font-family: var(--mono, ui-monospace, monospace);
+      white-space: nowrap;
+    }
+    .q-liste p {
+      margin: 0;
+      font-size: 13.5px;
+      line-height: 1.62;
+      color: var(--ink-soft);
+    }
+    .q-ipuclari {
+      list-style: none;
+      margin: 0;
+      padding: 0;
+      display: grid;
+      gap: 12px;
+    }
+    .q-ipuclari li {
+      font-size: 13.5px;
+      line-height: 1.62;
+      color: var(--ink-soft);
+      border-left: 2px solid var(--line);
+      padding-left: 13px;
+    }
+  </style>
+</Base>

@@ -520,5 +520,59 @@
     "etiket": "yeni",
     "cevrimici": false,
     "grup": "Kimlik & Sertifika"
+  },
+  {
+    "slug": "yaml-dogrulayici",
+    "ad": "YAML doğrulayıcı ve tuzak denetleyici",
+    "ozet": "Sekme, tutarsız girinti, yinelenen anahtar ve no/1.10/22:30 gibi sessizce tür değiştiren değerler.",
+    "ikon": "kutu",
+    "etiket": "yeni",
+    "cevrimici": false,
+    "grup": "Bulut & Konteyner"
+  },
+  {
+    "slug": "sql-denetleyici",
+    "ad": "SQL sorgu denetleyici",
+    "ozet": "WHERE'siz UPDATE, sarmalanmış sütun, NOLOCK ve NOT IN gibi sessizce yanlış sonuç veren kalıplar.",
+    "ikon": "terminal",
+    "etiket": "yeni",
+    "cevrimici": false,
+    "grup": "Metin, Kod & Zaman"
+  },
+  {
+    "slug": "gunluk-saklama",
+    "ad": "Günlük toplama ve saklama boyutlandırıcı",
+    "ozet": "Kaynaklardan gelen olay hızı, günlük hacim ve saklama süresine göre gereken depolama.",
+    "ikon": "akis",
+    "etiket": "yeni",
+    "cevrimici": false,
+    "grup": "Kapasite & Süre"
+  },
+  {
+    "slug": "erisilebilirlik-denetimi",
+    "ad": "HTML erişilebilirlik denetleyici",
+    "ozet": "Eksik alternatif metin, etiketsiz form alanı, atlanan başlık düzeyi ve klavye tuzakları.",
+    "ikon": "pencere",
+    "etiket": "yeni",
+    "cevrimici": false,
+    "grup": "Erişilebilirlik & Arayüz"
+  },
+  {
+    "slug": "disk-bolumleme",
+    "ad": "Disk bölümleme ve küme boyutu planlayıcı",
+    "ozet": "Küme boyutunun görünmez alan israfı, GPT sınırları ve iş yüküne göre doğru seçim.",
+    "ikon": "sunucu",
+    "etiket": "yeni",
+    "cevrimici": false,
+    "grup": "Kapasite & Süre"
+  },
+  {
+    "slug": "k8s-manifest",
+    "ad": "Kubernetes manifest denetleyici",
+    "ozet": "Ayrıcalıklı konteyner, eksik yoklama, tek kopya ve gömülü sır gibi üretim öncesi bulgular.",
+    "ikon": "dugum",
+    "etiket": "yeni",
+    "cevrimici": false,
+    "grup": "Bulut & Konteyner"
   }
 ]

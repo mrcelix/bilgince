@@ -1,0 +1,642 @@
+---
+import Base from '../../layouts/Base.astro';
+---
+
+<Base
+  baslik="YAML doğrulayıcı ve tuzak denetleyici"
+  aciklama="Sekme, tutarsız girinti, yinelenen anahtar ve YAML'ın meşhur tür tuzakları: no, yes, 1.10, 22:30. Hepsini satır numarasıyla bulur."
+  aramaya={true}
+  kategori="Araç"
+>
+  <div class="arama-bas">
+    <div class="kap">
+      <nav class="kirinti" aria-label="Kırıntı yolu" style="padding-top:0">
+        <a href="/">Ana sayfa</a><span class="ayrac">/</span><a href="/araclar">Araçlar</a><span
+          class="ayrac">/</span
+        ><span aria-current="page">YAML doğrulayıcı</span>
+      </nav>
+      <h1>YAML doğrulayıcı ve tuzak denetleyici</h1>
+      <p style="color:var(--muted);font-size:14px;margin-top:8px;max-width:66ch">
+        YAML'ın zor tarafı sözdizimi değil, <b>sessizce yanlış türe dönüşen değerlerdir</b>.
+        <code>no</code> bir dize değil, <code>false</code> olur. <code>1.10</code> sürüm numarası
+        değil, <code>1.1</code> sayısı olur. Yapıştırın; hem yapıyı denetleyeyim hem bu tuzakları
+        satır satır göstereyim.
+      </p>
+    </div>
+  </div>
+
+  <div class="kap arac-sayfa">
+    <section class="arac-blok">
+      <h2 class="arac-h2"><span class="arac-no">1</span> YAML</h2>
+      <div class="arac-alan">
+        <textarea id="y-girdi" rows="14" spellcheck="false" placeholder="apiVersion: v1&#10;kind: ConfigMap&#10;..."
+        ></textarea>
+      </div>
+      <div class="arac-dugmeler">
+        <button type="button" class="dg" id="y-denetle">Denetle</button>
+        <button type="button" class="dg dg-hayalet" id="y-ornek">Tuzaklı örnek</button>
+        <button type="button" class="dg dg-hayalet" id="y-temizle">Temizle</button>
+      </div>
+      <p class="arac-durum" id="y-durum" role="status" aria-live="polite"></p>
+    </section>
+
+    <section class="arac-blok" id="y-sonuc" hidden>
+      <h2 class="arac-h2"><span class="arac-no">2</span> Bulgular</h2>
+      <div class="arac-olcum" id="y-olcum"></div>
+      <div id="y-bulgular"></div>
+    </section>
+
+    <section class="arac-blok" id="y-onizleme-blok" hidden>
+      <h2 class="arac-h2"><span class="arac-no">3</span> Değerler nasıl okunacak?</h2>
+      <p class="arac-not" style="margin-top:0">
+        Ayrıştırıcının bu satırlardan ne anlayacağı. Beklediğinizden farklıysa tırnak ekleyin.
+      </p>
+      <div class="y-kaydir">
+        <table class="y-tablo">
+          <thead>
+            <tr><th>Satır</th><th>Anahtar</th><th>Yazdığınız</th><th>Okunacak tür</th><th>Değer</th></tr>
+          </thead>
+          <tbody id="y-onizleme"></tbody>
+        </table>
+      </div>
+    </section>
+
+    <section class="arac-blok">
+      <h2 class="arac-h2"><span class="arac-no">4</span> YAML'ın klasik tuzakları</h2>
+      <ul class="y-ipuclari">
+        <li>
+          <b>Norveç sorunu.</b> Ülke kodu <code>NO</code> yazarsanız YAML 1.1 bunu
+          <code>false</code> okur. Aynı şey <code>yes</code>, <code>on</code>, <code>off</code>,
+          <code>y</code>, <code>n</code> için de geçerlidir. Bunlar dize olacaksa
+          <b>tırnak içine alın</b>. Bu, YAML'ın en meşhur hatasıdır ve adını Norveç'ten alır.
+        </li>
+        <li>
+          <b>Sürüm numaraları sayıya dönüşür.</b> <code>version: 1.10</code> ondalık sayı olarak
+          okunur ve <code>1.1</code> olur — son sıfır kaybolur. Sürüm, sürüm numarasıdır;
+          <code>"1.10"</code> yazın.
+        </li>
+        <li>
+          <b>Saat gibi görünen değerler altmışlık sayı olur.</b> YAML 1.1'de
+          <code>22:30</code> sayı olarak okunur (1350). Saatleri ve MAC adreslerini tırnaklayın.
+        </li>
+        <li>
+          <b>Sekme karakteri YAML'da yasaktır.</b> Girinti yalnızca boşlukla yapılır. Bir
+          düzenleyici sekme eklediğinde hata mesajı genelde başka bir satırı gösterir ve
+          saatlerinizi yer.
+        </li>
+        <li>
+          <b>Yinelenen anahtar sessizce ezilir.</b> Aynı seviyede iki kez yazılan anahtarın
+          yalnızca sonuncusu geçerlidir; çoğu ayrıştırıcı uyarı bile vermez. Uzun yapılandırma
+          dosyalarında en sinsi hata türüdür.
+        </li>
+        <li>
+          <b>Sekizlik sayı tuzağı.</b> Başında sıfır olan sayılar (<code>0755</code>) bazı
+          ayrıştırıcılarda sekizlik okunur ve 493 olur. Dosya izinlerini her zaman tırnak
+          içinde yazın.
+        </li>
+      </ul>
+    </section>
+  </div>
+
+  <script>
+    (() => {
+      const el = (s) => document.querySelector(s);
+      const kacir = (s) =>
+        String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+
+      /* --- satır çözümleme ----------------------------------------------------
+         Tam bir YAML ayrıştırıcısı değil; yapıyı ve tür tuzaklarını yakalamak
+         için satır satır tarama yapılıyor. Blok metinlerin içi atlanır. */
+      function satirlariCoz(ham) {
+        const satirlar = ham.replace(/\r\n?/g, '\n').split('\n');
+        const cikti = [];
+        let blokGirinti = null; // blok metin (| ya da >) içindeyken dolu
+
+        for (let i = 0; i < satirlar.length; i++) {
+          const ham2 = satirlar[i];
+          const girinti = ham2.length - ham2.trimStart().length;
+          const govde = ham2.trim();
+
+          // Blok metnin içindeyiz: içerik olduğu gibi kabul edilir
+          if (blokGirinti !== null) {
+            if (govde === '' || girinti > blokGirinti) {
+              cikti.push({ no: i + 1, ham: ham2, tur: 'blok', girinti });
+              continue;
+            }
+            blokGirinti = null;
+          }
+
+          if (govde === '') {
+            cikti.push({ no: i + 1, ham: ham2, tur: 'bos', girinti });
+            continue;
+          }
+          if (govde.startsWith('#')) {
+            cikti.push({ no: i + 1, ham: ham2, tur: 'yorum', girinti });
+            continue;
+          }
+          if (govde === '---' || govde === '...') {
+            cikti.push({ no: i + 1, ham: ham2, tur: 'belge', girinti });
+            continue;
+          }
+
+          // Liste ögesi: "- " ile başlar, ardından anahtar da gelebilir
+          let listeMi = false;
+          let kalan = govde;
+          if (/^-(\s|$)/.test(govde)) {
+            listeMi = true;
+            kalan = govde.slice(1).trim();
+          }
+
+          // Anahtar: tırnak dışındaki ilk iki nokta
+          const anahtarSonu = ikiNoktaBul(kalan);
+          if (anahtarSonu === -1) {
+            cikti.push({ no: i + 1, ham: ham2, tur: listeMi ? 'listeDeger' : 'deger', girinti, deger: kalan, listeMi });
+            continue;
+          }
+
+          const anahtar = kalan.slice(0, anahtarSonu).trim();
+          let deger = kalan.slice(anahtarSonu + 1).trim();
+
+          // Satır sonundaki yorum değerden ayrılır (tırnak içinde değilse)
+          const yorumYeri = yorumBul(deger);
+          if (yorumYeri !== -1) deger = deger.slice(0, yorumYeri).trim();
+
+          if (/^[|>][+-]?\d*\s*$/.test(deger)) blokGirinti = girinti;
+
+          cikti.push({
+            no: i + 1,
+            ham: ham2,
+            tur: 'anahtar',
+            girinti,
+            anahtar,
+            deger,
+            listeMi,
+            iki: anahtarSonu,
+          });
+        }
+        return cikti;
+      }
+
+      /** Tırnak dışındaki ilk ": " ya da satır sonu ":" konumunu bulur. */
+      function ikiNoktaBul(s) {
+        let tirnak = null;
+        for (let i = 0; i < s.length; i++) {
+          const k = s[i];
+          if (tirnak) {
+            if (k === tirnak && s[i - 1] !== '\\') tirnak = null;
+            continue;
+          }
+          if (k === '"' || k === "'") {
+            tirnak = k;
+            continue;
+          }
+          if (k === '#') return -1; // yorum başladı, anahtar yok
+          if (k === ':' && (i === s.length - 1 || /\s/.test(s[i + 1]))) return i;
+        }
+        return -1;
+      }
+
+      /** Tırnak dışındaki " #" konumunu bulur. */
+      function yorumBul(s) {
+        let tirnak = null;
+        for (let i = 0; i < s.length; i++) {
+          const k = s[i];
+          if (tirnak) {
+            if (k === tirnak && s[i - 1] !== '\\') tirnak = null;
+            continue;
+          }
+          if (k === '"' || k === "'") {
+            tirnak = k;
+            continue;
+          }
+          if (k === '#' && (i === 0 || /\s/.test(s[i - 1]))) return i;
+        }
+        return -1;
+      }
+
+      /* --- tür tahmini --------------------------------------------------------
+         YAML 1.1 kuralları; Kubernetes, Compose ve Ansible hâlâ bunu kullanır. */
+      /* Tek harflik y ve n bilerek dışarıda: YAML 1.1 belirtiminde mantıksal
+         sayılsalar da PyYAML, js-yaml ve Go'nun ayrıştırıcısı bunları dize
+         okur. Listeye alınsalardı "image: y" gibi satırlar yanlış alarm verirdi. */
+      const MANTIKSAL = /^(yes|Yes|YES|no|No|NO|true|True|TRUE|false|False|FALSE|on|On|ON|off|Off|OFF)$/;
+      const TEHLIKELI_MANTIKSAL = /^(yes|Yes|YES|no|No|NO|on|On|ON|off|Off|OFF)$/;
+
+      function turTahmin(deger) {
+        if (deger === '') return { tur: 'boş', sonuc: 'null' };
+        if (/^["']/.test(deger)) return { tur: 'dize', sonuc: deger.replace(/^["']|["']$/g, '') };
+        if (/^[|>]/.test(deger)) return { tur: 'blok metin', sonuc: '(çok satırlı)' };
+        if (/^[[{]/.test(deger)) return { tur: 'satır içi koleksiyon', sonuc: deger };
+        if (/^(null|Null|NULL|~)$/.test(deger)) return { tur: 'null', sonuc: 'null' };
+        if (MANTIKSAL.test(deger)) {
+          const dogruMu = /^(y|Y|yes|Yes|YES|true|True|TRUE|on|On|ON)$/.test(deger);
+          return { tur: 'mantıksal', sonuc: String(dogruMu) };
+        }
+        if (/^[-+]?0[0-7]+$/.test(deger)) {
+          return { tur: 'sekizlik sayı', sonuc: String(parseInt(deger, 8)) };
+        }
+        if (/^[-+]?0x[0-9a-fA-F]+$/.test(deger)) {
+          return { tur: 'onaltılık sayı', sonuc: String(parseInt(deger, 16)) };
+        }
+        if (/^[-+]?\d+$/.test(deger)) return { tur: 'tam sayı', sonuc: deger };
+        if (/^[-+]?(\d+\.\d*|\.\d+)([eE][-+]?\d+)?$/.test(deger)) {
+          return { tur: 'ondalık sayı', sonuc: String(Number(deger)) };
+        }
+        // YAML 1.1 altmışlık: 22:30 → 1350
+        if (/^[-+]?\d{1,2}(:[0-5]?\d)+$/.test(deger)) {
+          const parcalar = deger.split(':').map(Number);
+          const sayi = parcalar.reduce((t, p) => t * 60 + p, 0);
+          return { tur: 'altmışlık sayı', sonuc: String(sayi) };
+        }
+        return { tur: 'dize', sonuc: deger };
+      }
+
+      /* --- denetim ------------------------------------------------------------- */
+      function denetle(ham) {
+        const satirlar = satirlariCoz(ham);
+        const bulgular = [];
+        const ekle = (tip, baslik, metin, no) => bulgular.push({ tip, baslik, metin, no });
+
+        /* --- sekme karakteri: YAML'da girintide yasaktır --- */
+        for (const s of satirlar) {
+          if (s.tur === 'blok' || s.tur === 'yorum') continue;
+          const girintiKismi = s.ham.slice(0, s.ham.length - s.ham.trimStart().length);
+          if (girintiKismi.includes('\t')) {
+            ekle(
+              'hata',
+              'Girintide sekme karakteri',
+              'YAML girintide sekme kabul etmez; yalnızca boşluk. Ayrıştırıcının vereceği hata ' +
+                'mesajı genelde başka bir satırı gösterir, bu yüzden bulması zordur.',
+              s.no
+            );
+          }
+        }
+
+        /* --- girinti tutarlılığı --- */
+        const girintiler = satirlar
+          .filter((s) => s.tur === 'anahtar' && s.girinti > 0)
+          .map((s) => s.girinti);
+        const tekil = [...new Set(girintiler)].sort((a, b) => a - b);
+        if (tekil.length) {
+          const birim = tekil[0];
+          const uyumsuz = tekil.filter((g) => g % birim !== 0);
+          if (uyumsuz.length) {
+            ekle(
+              'uyari',
+              'Girinti adımı tutarsız',
+              `Girinti birimi ${birim} boşluk görünüyor ama ${uyumsuz.join(', ')} boşlukluk ` +
+                `satırlar da var. YAML bunu kabul edebilir ama okunurluğu bozar ve ` +
+                `kopyala-yapıştırda hata üretir.`,
+              null
+            );
+          }
+        }
+
+        /* --- anahtardan sonra boşluk ------------------------------------------
+           "a:1" biçimi YAML'da anahtar sayılmaz; bütün satır düz bir dize olur.
+           Bu yüzden satır zaten "anahtar" olarak sınıflanmamış olur ve denetimi
+           orada değil, dize satırlarında yapmak gerekir.
+           URL (http://) ve saat (22:30) yanlış alarm vermesin diye anahtarın
+           harfle başlaması ve iki noktadan sonra eğik çizgi gelmemesi aranıyor. */
+        for (const s of satirlar) {
+          if (s.tur === 'blok' || s.tur === 'yorum' || s.tur === 'bos') continue;
+          const govde = s.ham.trim().replace(/^-\s*/, '');
+          const m = /^([A-Za-z_][\w.-]*):([^\s/])/.exec(govde);
+          if (m) {
+            ekle(
+              'hata',
+              'İki noktadan sonra boşluk yok',
+              `<code>${kacir(m[1])}:${kacir(m[2])}…</code> — YAML anahtarı ayırmak için iki ` +
+                `noktadan sonra boşluk ister. Boşluksuz yazıldığında bu satır bir anahtar değil, ` +
+                `düz bir metin olarak okunur ve ayar sessizce uygulanmaz.`,
+              s.no
+            );
+          }
+        }
+
+        /* --- yinelenen anahtar: aynı girintide, aynı üst blokta ---------------
+           Liste ögelerinin altındaki anahtarlar birbirinin kopyası değildir:
+           iki ayrı konteynerin ikisinde de "image" bulunması normaldir. Bu yüzden
+           her liste ögesine yolda ayrı bir sıra numarası veriliyor. */
+        const yollar = new Map();
+        const yigin = [];
+        let listeSayaci = 0;
+
+        for (const s of satirlar) {
+          if (s.tur !== 'anahtar') continue;
+          while (yigin.length && yigin[yigin.length - 1].girinti >= s.girinti) yigin.pop();
+          if (s.listeMi) listeSayaci++;
+          const dal = s.listeMi ? `${s.anahtar}[${listeSayaci}]` : s.anahtar;
+          const yol = [...yigin.map((y) => y.dal), dal].join('.');
+
+          // Liste ögesinin kendi anahtarı her ögede tekrarlanır; sorun değil
+          if (!s.listeMi) {
+            if (yollar.has(yol)) {
+              ekle(
+                'hata',
+                'Yinelenen anahtar',
+                `<code>${kacir(yol)}</code> daha önce ${yollar.get(yol)}. satırda tanımlanmış. ` +
+                  `YAML sessizce sonuncusunu kullanır; ilk tanım tamamen yok sayılır.`,
+                s.no
+              );
+            } else {
+              yollar.set(yol, s.no);
+            }
+          }
+          yigin.push({ dal, girinti: s.girinti });
+        }
+
+        /* --- tür tuzakları --- */
+        for (const s of satirlar) {
+          if (s.tur !== 'anahtar' || !s.deger) continue;
+          const t = turTahmin(s.deger);
+
+          if (t.tur === 'mantıksal' && TEHLIKELI_MANTIKSAL.test(s.deger)) {
+            ekle(
+              'hata',
+              'Norveç sorunu',
+              `<code>${kacir(s.anahtar)}: ${kacir(s.deger)}</code> — YAML bunu ` +
+                `<b>${t.sonuc}</b> olarak okur, dize olarak değil. Metin olması gerekiyorsa ` +
+                `tırnak içine alın: <code>"${kacir(s.deger)}"</code>`,
+              s.no
+            );
+          }
+
+          if (t.tur === 'ondalık sayı' && /\.\d*0$/.test(s.deger)) {
+            ekle(
+              'hata',
+              'Sürüm numarası sayıya dönüşüyor',
+              `<code>${kacir(s.anahtar)}: ${kacir(s.deger)}</code> ondalık sayı olarak okunur ve ` +
+                `<b>${t.sonuc}</b> olur — sondaki sıfır kaybolur. Sürüm numarasıysa tırnaklayın.`,
+              s.no
+            );
+          }
+
+          if (t.tur === 'altmışlık sayı') {
+            ekle(
+              'hata',
+              'Altmışlık sayı tuzağı',
+              `<code>${kacir(s.anahtar)}: ${kacir(s.deger)}</code> — YAML 1.1 bunu saat değil, ` +
+                `<b>${t.sonuc}</b> sayısı olarak okur. Saat, süre ya da MAC adresiyse tırnaklayın.`,
+              s.no
+            );
+          }
+
+          if (t.tur === 'sekizlik sayı') {
+            ekle(
+              'uyari',
+              'Sekizlik sayı olarak okunuyor',
+              `<code>${kacir(s.anahtar)}: ${kacir(s.deger)}</code> başında sıfır olduğu için ` +
+                `sekizlik sayı sayılır ve <b>${t.sonuc}</b> olur. Dosya izni ya da kod ise ` +
+                `tırnaklayın.`,
+              s.no
+            );
+          }
+
+          // Sondaki boşluk, tırnaksız dizede fark edilmez ama değerin parçası olabilir
+          if (/\s$/.test(s.ham) && !/^["']/.test(s.deger)) {
+            ekle(
+              'uyari',
+              'Satır sonunda boşluk',
+              'Görünmez ama bazı ayrıştırıcılarda değerin parçası olur. Düzenleyicinizde ' +
+                '"kaydederken sondaki boşlukları sil" seçeneğini açın.',
+              s.no
+            );
+          }
+        }
+
+        /* --- yapısal denetimler --- */
+        const belgeSayisi = satirlar.filter((s) => s.tur === 'belge' && s.ham.trim() === '---').length;
+        const anahtarSayisi = satirlar.filter((s) => s.tur === 'anahtar').length;
+
+        if (!anahtarSayisi) {
+          ekle('hata', 'Anahtar bulunamadı', 'Belgede hiç <code>anahtar: değer</code> çifti yok.', null);
+        }
+
+        // Kubernetes ve Compose için hızlı bağlam denetimi
+        const metin = ham;
+        if (/^\s*apiVersion:/m.test(metin) && !/^\s*kind:/m.test(metin)) {
+          ekle('hata', 'kind eksik', 'Kubernetes belgesinde <code>apiVersion</code> var ama <code>kind</code> yok.', null);
+        }
+        if (/^\s*(services|version):/m.test(metin) && /\t/.test(metin)) {
+          ekle('uyari', 'Compose dosyasında sekme', 'Docker Compose sekme içeren dosyayı reddeder.', null);
+        }
+
+        return { bulgular, satirlar, belgeSayisi, anahtarSayisi };
+      }
+
+      const SIRA = { hata: 0, uyari: 1, ok: 2 };
+
+      function calistir() {
+        const ham = el('#y-girdi').value;
+        const durum = el('#y-durum');
+
+        if (!ham.trim()) {
+          el('#y-sonuc').hidden = true;
+          el('#y-onizleme-blok').hidden = true;
+          durum.textContent = '';
+          return;
+        }
+
+        const { bulgular, satirlar, belgeSayisi, anahtarSayisi } = denetle(ham);
+        bulgular.sort((a, b) => SIRA[a.tip] - SIRA[b.tip] || (a.no ?? 0) - (b.no ?? 0));
+
+        const hata = bulgular.filter((b) => b.tip === 'hata').length;
+        const uyari = bulgular.filter((b) => b.tip === 'uyari').length;
+
+        el('#y-sonuc').hidden = false;
+        el('#y-olcum').innerHTML =
+          `<span>Satır: <b>${satirlar.length}</b></span>` +
+          `<span>Anahtar: <b>${anahtarSayisi}</b></span>` +
+          (belgeSayisi ? `<span>Belge: <b>${belgeSayisi + 1}</b></span>` : '') +
+          `<span>Sorun: <b>${hata}</b></span>` +
+          `<span>Uyarı: <b>${uyari}</b></span>`;
+
+        el('#y-bulgular').innerHTML = bulgular.length
+          ? '<ul class="y-liste">' +
+            bulgular
+              .map(
+                (b) =>
+                  `<li data-tip="${b.tip}"><div class="y-bulgu-ust"><b>${b.baslik}</b>` +
+                  (b.no ? `<span class="y-satir">satır ${b.no}</span>` : '') +
+                  `</div><p>${b.metin}</p></li>`
+              )
+              .join('') +
+            '</ul>'
+          : '<p class="arac-not" style="margin:0">Bilinen bir tuzak bulunamadı.</p>';
+
+        /* --- değer önizlemesi: yalnızca ilginç olanlar --- */
+        const ilginc = satirlar
+          .filter((s) => s.tur === 'anahtar' && s.deger)
+          .map((s) => ({ ...s, t: turTahmin(s.deger) }))
+          .filter((s) => s.t.tur !== 'dize' || s.deger !== s.t.sonuc);
+
+        if (ilginc.length) {
+          el('#y-onizleme-blok').hidden = false;
+          el('#y-onizleme').innerHTML = ilginc
+            .slice(0, 40)
+            .map((s) => {
+              const supheli = ['mantıksal', 'altmışlık sayı', 'sekizlik sayı'].includes(s.t.tur);
+              return (
+                `<tr${supheli ? ' data-supheli="evet"' : ''}>` +
+                `<td>${s.no}</td><td><code>${kacir(s.anahtar)}</code></td>` +
+                `<td><code>${kacir(s.deger)}</code></td>` +
+                `<td>${s.t.tur}</td><td><code>${kacir(s.t.sonuc)}</code></td></tr>`
+              );
+            })
+            .join('');
+        } else {
+          el('#y-onizleme-blok').hidden = true;
+        }
+
+        durum.className = 'arac-durum ' + (hata ? 'hata' : uyari ? '' : 'ok');
+        durum.textContent = hata
+          ? `${hata} sorun, ${uyari} uyarı bulundu.`
+          : uyari
+            ? `Ciddi sorun yok; ${uyari} uyarı var.`
+            : 'Denetimden temiz geçti.';
+      }
+
+      el('#y-denetle').addEventListener('click', calistir);
+      el('#y-girdi').addEventListener('input', () => {
+        if (el('#y-girdi').value.trim().length > 15) calistir();
+      });
+
+      el('#y-temizle').addEventListener('click', () => {
+        el('#y-girdi').value = '';
+        calistir();
+      });
+
+      el('#y-ornek').addEventListener('click', () => {
+        el('#y-girdi').value = [
+          'apiVersion: apps/v1',
+          'kind: Deployment',
+          'metadata:',
+          '  name: siparis-api',
+          '  labels:',
+          '    ulke: NO',
+          '    surum: 1.10',
+          'spec:',
+          '  replicas: 3',
+          '  template:',
+          '    spec:',
+          '      containers:',
+          '        - name: uygulama',
+          '          image: kayit.ornek.com/siparis:1.20',
+          '          env:',
+          '            - name: BAKIM_SAATI',
+          '              value: 22:30',
+          '            - name: HATA_AYIKLA',
+          '              value: off',
+          '          volumeMounts:',
+          '            - name: ayar',
+          '              mountPath: /etc/uygulama',
+          '      volumes:',
+          '        - name: ayar',
+          '          configMap:',
+          '            name: siparis-ayar',
+          '            defaultMode: 0644',
+          '  replicas: 5',
+        ].join('\n');
+        calistir();
+      });
+    })();
+  </script>
+
+  <style>
+    .arac-dugmeler {
+      display: flex;
+      gap: 10px;
+      flex-wrap: wrap;
+      margin-top: 4px;
+    }
+    .y-liste {
+      list-style: none;
+      margin: 0;
+      padding: 0;
+      display: grid;
+      gap: 11px;
+    }
+    .y-liste li {
+      border: 1px solid var(--line);
+      border-left: 3px solid var(--line);
+      border-radius: 10px;
+      padding: 12px 14px;
+      background: var(--paper);
+    }
+    .y-liste li[data-tip='hata'] {
+      border-left-color: light-dark(#dc2626, #f87171);
+    }
+    .y-liste li[data-tip='uyari'] {
+      border-left-color: light-dark(#f0c33c, #a97f1c);
+    }
+    .y-bulgu-ust {
+      display: flex;
+      justify-content: space-between;
+      gap: 12px;
+      align-items: baseline;
+      flex-wrap: wrap;
+      margin-bottom: 5px;
+    }
+    .y-bulgu-ust b {
+      font-size: 14px;
+    }
+    .y-satir {
+      font-size: 11.5px;
+      color: var(--muted);
+      font-family: var(--mono, ui-monospace, monospace);
+      white-space: nowrap;
+    }
+    .y-liste p {
+      margin: 0;
+      font-size: 13.5px;
+      line-height: 1.62;
+      color: var(--ink-soft);
+    }
+    .y-kaydir {
+      overflow-x: auto;
+    }
+    .y-tablo {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 13px;
+      min-width: 560px;
+    }
+    .y-tablo th,
+    .y-tablo td {
+      text-align: left;
+      padding: 8px 11px;
+      border-bottom: 1px solid var(--line);
+    }
+    .y-tablo th {
+      color: var(--muted);
+      font-size: 11.5px;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+    }
+    .y-tablo code {
+      font-size: 12.5px;
+    }
+    .y-tablo tr[data-supheli] {
+      background: light-dark(#fffbeb, #2e2410);
+    }
+    .y-tablo tr[data-supheli] td:nth-child(4) {
+      color: light-dark(#92400e, #fbbf24);
+      font-weight: 600;
+    }
+    .y-ipuclari {
+      list-style: none;
+      margin: 0;
+      padding: 0;
+      display: grid;
+      gap: 12px;
+    }
+    .y-ipuclari li {
+      font-size: 13.5px;
+      line-height: 1.62;
+      color: var(--ink-soft);
+      border-left: 2px solid var(--line);
+      padding-left: 13px;
+    }
+  </style>
+</Base>

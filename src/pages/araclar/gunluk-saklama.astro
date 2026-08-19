@@ -1,0 +1,573 @@
+---
+import Base from '../../layouts/Base.astro';
+---
+
+<Base
+  baslik="Günlük toplama ve saklama boyutlandırıcı"
+  aciklama="Kaç sunucudan saniyede kaç olay gelir, günde kaç gigabayt eder, mevzuatın istediği süre için ne kadar depolama gerekir?"
+  aramaya={true}
+  kategori="Araç"
+>
+  <div class="arama-bas">
+    <div class="kap">
+      <nav class="kirinti" aria-label="Kırıntı yolu" style="padding-top:0">
+        <a href="/">Ana sayfa</a><span class="ayrac">/</span><a href="/araclar">Araçlar</a><span
+          class="ayrac">/</span
+        ><span aria-current="page">Günlük boyutlandırıcı</span>
+      </nav>
+      <h1>Günlük toplama ve saklama boyutlandırıcı</h1>
+      <p style="color:var(--muted);font-size:14px;margin-top:8px;max-width:66ch">
+        Merkezi günlük toplama projeleri genelde depolama tahmininde patlar: "günde birkaç
+        gigabayt" diye başlanır, altı ay sonra disk dolar ve kayıtlar sessizce dönmeye başlar.
+        Kaynakları girin, gerçek sayıyı görün.
+      </p>
+    </div>
+  </div>
+
+  <div class="kap arac-sayfa">
+    <section class="arac-blok">
+      <h2 class="arac-h2"><span class="arac-no">1</span> Kaynaklar</h2>
+      <div class="k-kaynaklar" id="k-kaynaklar"></div>
+      <div class="arac-dugmeler">
+        <button type="button" class="dg dg-hayalet" id="k-ekle">Kaynak ekle</button>
+        <button type="button" class="dg dg-hayalet" id="k-ornek">Örnek kurum</button>
+      </div>
+    </section>
+
+    <section class="arac-blok">
+      <h2 class="arac-h2"><span class="arac-no">2</span> Saklama ve sıkıştırma</h2>
+      <div class="arac-alanlar">
+        <label class="arac-alan"
+          >Sıcak saklama (gün)
+          <input id="k-sicak" type="number" min="1" max="3650" value="30" />
+          <small>Aranabilir, hızlı disk üzerinde.</small>
+        </label>
+        <label class="arac-alan"
+          >Soğuk saklama (gün)
+          <input id="k-soguk" type="number" min="0" max="3650" value="365" />
+          <small>Arşiv; arama yavaş ama ucuz.</small>
+        </label>
+        <label class="arac-alan"
+          >Sıkıştırma oranı
+          <input id="k-sikistirma" type="number" min="1" step="0.5" max="30" value="8" />
+          <small>Metin günlüklerde 6-12 kat tipiktir.</small>
+        </label>
+        <label class="arac-alan"
+          >Dizin yükü (%)
+          <input id="k-dizin" type="number" min="0" max="200" value="35" />
+          <small>Arama dizininin ham veriye eklediği pay.</small>
+        </label>
+        <label class="arac-alan"
+          >Kopya sayısı
+          <input id="k-kopya" type="number" min="1" max="5" value="2" />
+          <small>Kümede her belgenin kaç kopyası tutuluyor.</small>
+        </label>
+        <label class="arac-alan"
+          >Tepe çarpanı
+          <input id="k-tepe" type="number" min="1" step="0.1" max="20" value="3" />
+          <small>Olay anında akış hızının ortalamaya oranı.</small>
+        </label>
+      </div>
+      <p class="arac-durum" id="k-durum" role="status" aria-live="polite"></p>
+    </section>
+
+    <section class="arac-blok">
+      <h2 class="arac-h2"><span class="arac-no">3</span> Sonuç</h2>
+      <div class="k-kartlar" id="k-kartlar"></div>
+      <div class="k-kaydir">
+        <table class="k-tablo">
+          <thead>
+            <tr><th>Katman</th><th>Süre</th><th>Ham veri</th><th>Diskte</th><th>Payı</th></tr>
+          </thead>
+          <tbody id="k-tablo"></tbody>
+        </table>
+      </div>
+    </section>
+
+    <section class="arac-blok">
+      <h2 class="arac-h2"><span class="arac-no">4</span> Değerlendirme</h2>
+      <div id="k-bulgular"></div>
+    </section>
+
+    <section class="arac-blok">
+      <h2 class="arac-h2"><span class="arac-no">5</span> Günlük toplarken</h2>
+      <ul class="k-ipuclari">
+        <li>
+          <b>Her şeyi toplamak, hiçbir şeyi toplamamaya yakındır.</b> Ayrıntı düzeyini
+          yükselttiğinizde hacim on katına çıkar ve gerçek olaylar gürültüde kaybolur.
+          Hangi soruyu cevaplamak istediğinizi belirleyip o kaynağı toplayın; "belki lazım
+          olur" diye toplanan veri, dolan diskle birlikte silinen ilk şeydir.
+        </li>
+        <li>
+          <b>Tepe akışı, ortalamanın kat kat üstündedir.</b> Bir saldırı ya da arıza sırasında
+          olay sayısı patlar — yani tam ihtiyaç duyduğunuz anda. Toplama altyapısı ortalamaya
+          göre boyutlandırılmışsa o anda kayıt düşürmeye başlar ve olayın en kritik dakikaları
+          kaybolur.
+        </li>
+        <li>
+          <b>Saat eşitlemesi olmadan korelasyon yapılamaz.</b> Farklı sunuculardan gelen
+          kayıtları birleştirmenin tek koşulu saatlerin doğru olmasıdır. Sunucu saatlerini UTC
+          tutun ve NTP'yi izleyin — bu, günlük projesinin en ucuz ve en kritik parçasıdır.
+        </li>
+        <li>
+          <b>Günlükler delil olabilir.</b> Adli bir incelemeye konu olacaksa değiştirilmediğinin
+          gösterilebilmesi gerekir: yazma-bir-kez depolama, özet zinciri ya da ayrı bir
+          sisteme kopyalama. Sonradan eklenen bir bütünlük denetimi, geçmiş kayıtlar için
+          bir şey ifade etmez.
+        </li>
+        <li>
+          <b>Sıkıştırma oranını ölçün, tahmin etmeyin.</b> Düz metin günlükler 8-12 kat
+          sıkışır; JSON biçimindeki yapılandırılmış kayıtlar alan adlarının tekrarı sayesinde
+          daha da iyi sıkışabilir. Ama ikili veri ya da şifreli içerik neredeyse hiç sıkışmaz.
+          Bir haftalık gerçek veriyle ölçüp planı ona göre yapın.
+        </li>
+      </ul>
+    </section>
+  </div>
+
+  <script>
+    (() => {
+      const el = (s) => document.querySelector(s);
+      const say = (s) => Number(el(s).value) || 0;
+
+      /* Kaynak türüne göre tipik olay hızı ve olay başına bayt.
+         Sayılar saha ortalamasıdır; kesin değer için kendi ölçümünüzü girin. */
+      const TURLER = {
+        windows: { ad: 'Windows sunucu', olay: 12, bayt: 900 },
+        windowsDenetim: { ad: 'Windows (tam denetim)', olay: 120, bayt: 1100 },
+        linux: { ad: 'Linux sunucu', olay: 6, bayt: 220 },
+        guvenlikDuvari: { ad: 'Güvenlik duvarı', olay: 900, bayt: 280 },
+        web: { ad: 'Web sunucusu', olay: 200, bayt: 420 },
+        vekil: { ad: 'Vekil sunucu', olay: 450, bayt: 500 },
+        anahtar: { ad: 'Ağ anahtarı', olay: 3, bayt: 200 },
+        uygulama: { ad: 'Uygulama', olay: 40, bayt: 600 },
+        veritabani: { ad: 'Veri tabanı', olay: 25, bayt: 700 },
+        istemci: { ad: 'İstemci bilgisayar', olay: 4, bayt: 800 },
+        ozel: { ad: 'Özel', olay: 10, bayt: 500 },
+      };
+
+      let sayac = 0;
+      let kaynaklar = [];
+
+      function kaynakEkle(on = {}) {
+        const tur = on.tur ?? 'windows';
+        kaynaklar.push({
+          kimlik: ++sayac,
+          tur,
+          adet: on.adet ?? 10,
+          olay: on.olay ?? TURLER[tur].olay,
+          bayt: on.bayt ?? TURLER[tur].bayt,
+        });
+        ciz();
+      }
+
+      function ciz() {
+        el('#k-kaynaklar').innerHTML = kaynaklar
+          .map(
+            (k) =>
+              `<div class="k-kaynak" data-kimlik="${k.kimlik}">` +
+              `<select class="k-tur" aria-label="Kaynak türü">` +
+              Object.entries(TURLER)
+                .map(([d, t]) => `<option value="${d}"${d === k.tur ? ' selected' : ''}>${t.ad}</option>`)
+                .join('') +
+              `</select>` +
+              `<label class="k-mini">adet<input type="number" class="k-adet" min="1" max="100000" value="${k.adet}" /></label>` +
+              `<label class="k-mini">olay/sn<input type="number" class="k-olay" min="0" step="0.1" max="100000" value="${k.olay}" /></label>` +
+              `<label class="k-mini">bayt<input type="number" class="k-bayt" min="10" max="100000" value="${k.bayt}" /></label>` +
+              `<button type="button" class="k-sil" aria-label="Kaynağı sil">×</button>` +
+              `</div>`
+          )
+          .join('');
+        hesapla();
+      }
+
+      const boyut = (gb) => {
+        if (gb >= 1024) return `${(gb / 1024).toFixed(2)} TB`;
+        if (gb >= 1) return `${gb.toFixed(1)} GB`;
+        return `${Math.round(gb * 1024)} MB`;
+      };
+
+      function hesapla() {
+        const sicak = say('#k-sicak');
+        const soguk = say('#k-soguk');
+        const sikistirma = Math.max(1, say('#k-sikistirma'));
+        const dizin = say('#k-dizin') / 100;
+        const kopya = Math.max(1, say('#k-kopya'));
+        const tepe = Math.max(1, say('#k-tepe'));
+
+        // Saniyedeki olay ve bayt
+        const olaySn = kaynaklar.reduce((t, k) => t + k.adet * k.olay, 0);
+        const baytSn = kaynaklar.reduce((t, k) => t + k.adet * k.olay * k.bayt, 0);
+
+        const gunlukGb = (baytSn * 86400) / 1024 ** 3;
+        const aylikGb = gunlukGb * 30.44;
+        const yillikGb = gunlukGb * 365.25;
+
+        // Diskte: sıkıştırma böler, dizin ve kopya çarpar
+        const diskCarpani = ((1 + dizin) * kopya) / sikistirma;
+        const sicakGb = gunlukGb * sicak * diskCarpani;
+        // Soğuk katmanda arama dizini tutulmaz
+        const sogukGb = gunlukGb * soguk * (kopya / sikistirma);
+        const toplamGb = sicakGb + sogukGb;
+
+        const tepeOlay = olaySn * tepe;
+        const tepeMbit = (baytSn * tepe * 8) / 1e6;
+
+        el('#k-kartlar').innerHTML = [
+          { b: 'Olay hızı', d: `${Math.round(olaySn).toLocaleString('tr-TR')}/sn`, n: `tepede ${Math.round(tepeOlay).toLocaleString('tr-TR')}/sn` },
+          { b: 'Günlük hacim', d: boyut(gunlukGb), n: 'sıkıştırma öncesi ham veri' },
+          { b: 'Aylık hacim', d: boyut(aylikGb), n: 'ham' },
+          { b: 'Toplam disk', d: boyut(toplamGb), n: `${sicak} gün sıcak + ${soguk} gün soğuk` },
+          { b: 'Ağ trafiği', d: `${tepeMbit.toFixed(1)} Mbit/sn`, n: 'tepe anında toplama trafiği' },
+          { b: 'Disk çarpanı', d: `${diskCarpani.toFixed(2)}×`, n: 'sıcak katmanda ham veriye oran' },
+        ]
+          .map(
+            (k) =>
+              `<div class="k-kart"><span class="k-kart-b">${k.b}</span>` +
+              `<b class="k-kart-d">${k.d}</b><span class="k-kart-n">${k.n}</span></div>`
+          )
+          .join('');
+
+        el('#k-tablo').innerHTML = [
+          ['Sıcak (aranabilir)', `${sicak} gün`, gunlukGb * sicak, sicakGb],
+          ...(soguk > 0 ? [['Soğuk (arşiv)', `${soguk} gün`, gunlukGb * soguk, sogukGb]] : []),
+          ['Toplam', `${sicak + soguk} gün`, gunlukGb * (sicak + soguk), toplamGb],
+        ]
+          .map(
+            ([ad, sure, ham, disk], i, dizi) =>
+              `<tr${i === dizi.length - 1 ? ' class="k-toplam"' : ''}>` +
+              `<td><b>${ad}</b></td><td>${sure}</td>` +
+              `<td>${boyut(ham)}</td><td>${boyut(disk)}</td>` +
+              `<td>${toplamGb > 0 ? '%' + Math.round((disk / toplamGb) * 100) : '—'}</td></tr>`
+          )
+          .join('');
+
+        /* --- değerlendirme --- */
+        const bulgular = [];
+
+        if (!kaynaklar.length) {
+          bulgular.push(['uyari', '<b>Kaynak eklenmedi.</b>']);
+        }
+
+        if (tepeOlay > 20000) {
+          bulgular.push([
+            'hata',
+            `<b>Tepe akışı çok yüksek (${Math.round(tepeOlay).toLocaleString('tr-TR')} olay/sn).</b> ` +
+              `Bu hız tek düğümlü bir toplayıcıyı aşar; kuyruk (Kafka, Redis) ya da yatay ` +
+              `ölçeklenen bir alım katmanı gerekir. Aksi hâlde olay anında kayıt düşer — ` +
+              `hem de tam ihtiyaç duyduğunuz dakikalarda.`,
+          ]);
+        } else if (tepeOlay > 5000) {
+          bulgular.push([
+            'uyari',
+            `<b>Tepe akışı ${Math.round(tepeOlay).toLocaleString('tr-TR')} olay/sn.</b> ` +
+              `Alım katmanının bu hızı tamponlayabildiğini gerçekten sınayın; çoğu kurulum ` +
+              `ortalama yüke göre yapılandırılır ve tepede sessizce kayıt düşürür.`,
+          ]);
+        }
+
+        if (toplamGb > 50 * 1024) {
+          bulgular.push([
+            'uyari',
+            `<b>Toplam ${boyut(toplamGb)} depolama.</b> Bu ölçekte maliyeti belirleyen şey ` +
+              `saklama süresidir. Mevzuat gerçekten ${sicak + soguk} gün istiyor mu, yoksa ` +
+              `"ne olur ne olmaz" mı? Sıcak katmanı kısaltmak maliyeti en hızlı düşüren karardır.`,
+          ]);
+        }
+
+        const guvenlikDuvariVar = kaynaklar.some((k) => k.tur === 'guvenlikDuvari');
+        if (guvenlikDuvariVar) {
+          const gdOran =
+            kaynaklar
+              .filter((k) => k.tur === 'guvenlikDuvari')
+              .reduce((t, k) => t + k.adet * k.olay * k.bayt, 0) / (baytSn || 1);
+          if (gdOran > 0.5) {
+            bulgular.push([
+              'uyari',
+              `<b>Hacmin %${Math.round(gdOran * 100)}'i güvenlik duvarından geliyor.</b> ` +
+                `Kabul edilen bağlantı kayıtları genelde en büyük ve en az bilgilendirici ` +
+                `kaynaktır. Yalnızca reddedilenleri ve dış bağlantıları toplamak, hacmi ` +
+                `çoğu zaman onda birine indirir ve arama kalitesini artırır.`,
+            ]);
+          }
+        }
+
+        const denetimVar = kaynaklar.some((k) => k.tur === 'windowsDenetim');
+        if (denetimVar) {
+          bulgular.push([
+            'uyari',
+            '<b>Tam denetim açık Windows sunucular var.</b> Nesne erişim denetimi hacmi ' +
+              'on katına çıkarabilir. Gerçekten izlenmesi gereken paylaşımları seçip ' +
+              'denetimi yalnızca onlara uygulamak, aynı görünürlüğü çok daha ucuza verir.',
+          ]);
+        }
+
+        if (sicak < 30) {
+          bulgular.push([
+            'hata',
+            `<b>Sıcak saklama ${sicak} gün.</b> Bir ihlalin fark edilmesi sahada haftalar, ` +
+              `çoğu zaman aylar sürer. Olay ortaya çıktığında kayıtlar çoktan dönmüş olur. ` +
+              `Aranabilir katman için 90 gün yaygın bir alt sınırdır.`,
+          ]);
+        }
+
+        if (soguk === 0) {
+          bulgular.push([
+            'uyari',
+            '<b>Arşiv katmanı yok.</b> Sıcak katman dolduğunda kayıtlar tamamen kaybolur. ' +
+              'Ucuz nesne depolamada sıkıştırılmış arşiv tutmak, sıcak katmanı büyütmekten ' +
+              'kat kat ucuzdur.',
+          ]);
+        }
+
+        if (sikistirma > 15) {
+          bulgular.push([
+            'uyari',
+            `<b>${sikistirma}× sıkıştırma iyimser.</b> Düz metin günlüklerde 8-12 kat tipiktir; ` +
+              `bu değerin üstünü ancak kendi verinizle ölçtüyseniz varsayın. Fazla iyimser ` +
+              `bir oran, planı doğrudan yanlış yapar.`,
+          ]);
+        }
+
+        if (kopya === 1 && sicak > 0) {
+          bulgular.push([
+            'uyari',
+            '<b>Tek kopya.</b> Bir düğüm kaybında o düğümdeki kayıtlar gider. Günlükler ' +
+              'genelde "yeniden üretilemez" veridir; en az iki kopya tutun.',
+          ]);
+        }
+
+        if (!bulgular.length) {
+          bulgular.push(['ok', '<b>Boyutlandırma dengeli görünüyor.</b>']);
+        }
+
+        el('#k-bulgular').innerHTML =
+          '<ul class="k-liste">' +
+          bulgular.map(([tip, m]) => `<li data-tip="${tip}">${m}</li>`).join('') +
+          '</ul>';
+
+        const durum = el('#k-durum');
+        const hataSayisi = bulgular.filter(([t]) => t === 'hata').length;
+        durum.className = 'arac-durum ' + (hataSayisi ? 'hata' : 'ok');
+        durum.textContent = hataSayisi
+          ? `${hataSayisi} ciddi sorun var — 4. bölüme bakın.`
+          : `Günde ${boyut(gunlukGb)}, toplam ${boyut(toplamGb)} disk.`;
+      }
+
+      /* --- olaylar --- */
+      document.addEventListener('input', (e) => {
+        const satir = e.target.closest('.k-kaynak');
+        if (satir) {
+          const k = kaynaklar.find((x) => x.kimlik === Number(satir.dataset.kimlik));
+          if (k) {
+            k.adet = Number(satir.querySelector('.k-adet').value) || 1;
+            k.olay = Number(satir.querySelector('.k-olay').value) || 0;
+            k.bayt = Number(satir.querySelector('.k-bayt').value) || 0;
+          }
+          hesapla();
+          return;
+        }
+        if (e.target.closest('.arac-alan')) hesapla();
+      });
+
+      document.addEventListener('change', (e) => {
+        const tur = e.target.closest('.k-tur');
+        if (tur) {
+          const satir = tur.closest('.k-kaynak');
+          const k = kaynaklar.find((x) => x.kimlik === Number(satir.dataset.kimlik));
+          if (k) {
+            k.tur = tur.value;
+            // Tür değişince tipik değerler yeniden yüklenir
+            k.olay = TURLER[k.tur].olay;
+            k.bayt = TURLER[k.tur].bayt;
+          }
+          ciz();
+        }
+      });
+
+      document.addEventListener('click', (e) => {
+        if (e.target.closest('#k-ekle')) {
+          kaynakEkle();
+          return;
+        }
+        const sil = e.target.closest('.k-sil');
+        if (sil) {
+          const satir = sil.closest('.k-kaynak');
+          kaynaklar = kaynaklar.filter((x) => x.kimlik !== Number(satir.dataset.kimlik));
+          ciz();
+        }
+      });
+
+      el('#k-ornek').addEventListener('click', () => {
+        kaynaklar = [];
+        sayac = 0;
+        kaynakEkle({ tur: 'windows', adet: 24 });
+        kaynakEkle({ tur: 'linux', adet: 12 });
+        kaynakEkle({ tur: 'guvenlikDuvari', adet: 2 });
+        kaynakEkle({ tur: 'web', adet: 4 });
+        kaynakEkle({ tur: 'veritabani', adet: 3 });
+        kaynakEkle({ tur: 'istemci', adet: 180 });
+      });
+
+      kaynakEkle({ tur: 'windows', adet: 20 });
+      kaynakEkle({ tur: 'linux', adet: 10 });
+      kaynakEkle({ tur: 'guvenlikDuvari', adet: 2 });
+    })();
+  </script>
+
+  <style>
+    .k-kaynaklar {
+      display: grid;
+      gap: 9px;
+      margin-bottom: 12px;
+    }
+    .k-kaynak {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      gap: 10px;
+      border: 1px solid var(--line);
+      border-radius: 10px;
+      padding: 9px 11px;
+      background: var(--paper);
+    }
+    .k-tur {
+      flex: 1 1 170px;
+      min-width: 0;
+      border: 1px solid var(--line);
+      border-radius: 7px;
+      padding: 6px 9px;
+      font: inherit;
+      font-size: 13px;
+      background: var(--bg);
+      color: var(--ink);
+    }
+    .k-mini {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      font-size: 12px;
+      color: var(--muted);
+    }
+    .k-mini input {
+      width: 5.5em;
+      border: 1px solid var(--line);
+      border-radius: 7px;
+      padding: 6px 8px;
+      font: inherit;
+      font-size: 13px;
+      background: var(--bg);
+      color: var(--ink);
+    }
+    .k-sil {
+      margin-left: auto;
+      border: 1px solid var(--line);
+      background: transparent;
+      border-radius: 7px;
+      width: 28px;
+      height: 28px;
+      cursor: pointer;
+      color: var(--muted);
+      font-size: 16px;
+      line-height: 1;
+    }
+    .k-sil:hover {
+      border-color: light-dark(#dc2626, #f87171);
+      color: light-dark(#dc2626, #f87171);
+    }
+    .arac-dugmeler {
+      display: flex;
+      gap: 10px;
+      flex-wrap: wrap;
+    }
+    .k-kartlar {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(min(165px, 100%), 1fr));
+      gap: 10px;
+      margin-bottom: 18px;
+    }
+    .k-kart {
+      border: 1px solid var(--line);
+      border-radius: 11px;
+      padding: 13px 15px;
+      display: grid;
+      gap: 3px;
+      background: var(--paper);
+    }
+    .k-kart-b {
+      font-size: 11.5px;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+      color: var(--muted);
+    }
+    .k-kart-d {
+      font-size: 21px;
+      letter-spacing: -0.02em;
+      font-family: var(--mono, ui-monospace, monospace);
+      color: var(--indigo-metin);
+    }
+    .k-kart-n {
+      font-size: 12px;
+      color: var(--muted);
+      line-height: 1.45;
+    }
+    .k-kaydir {
+      overflow-x: auto;
+    }
+    .k-tablo {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 13px;
+      min-width: 480px;
+    }
+    .k-tablo th,
+    .k-tablo td {
+      text-align: left;
+      padding: 10px 12px;
+      border-bottom: 1px solid var(--line);
+    }
+    .k-tablo th {
+      color: var(--muted);
+      font-size: 11.5px;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+    }
+    .k-tablo td:nth-child(3),
+    .k-tablo td:nth-child(4) {
+      font-family: var(--mono, ui-monospace, monospace);
+      white-space: nowrap;
+    }
+    .k-toplam {
+      background: var(--tint);
+    }
+    .k-toplam td:nth-child(4) {
+      color: var(--indigo-metin);
+      font-weight: 700;
+    }
+    .k-liste,
+    .k-ipuclari {
+      list-style: none;
+      margin: 0;
+      padding: 0;
+      display: grid;
+      gap: 12px;
+    }
+    .k-liste li,
+    .k-ipuclari li {
+      font-size: 13.5px;
+      line-height: 1.62;
+      color: var(--ink-soft);
+      border-left: 2px solid var(--line);
+      padding-left: 13px;
+    }
+    .k-liste li[data-tip='hata'] {
+      border-left-color: light-dark(#dc2626, #f87171);
+    }
+    .k-liste li[data-tip='uyari'] {
+      border-left-color: light-dark(#f0c33c, #a97f1c);
+    }
+    .k-liste li[data-tip='ok'] {
+      border-left-color: light-dark(#16a34a, #4ade80);
+    }
+  </style>
+</Base>

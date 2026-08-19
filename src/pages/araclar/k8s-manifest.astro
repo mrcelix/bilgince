@@ -1,0 +1,480 @@
+---
+import Base from '../../layouts/Base.astro';
+---
+
+<Base
+  baslik="Kubernetes manifest denetleyici"
+  aciklama="Manifestinizi yapıştırın: ayrıcalıklı konteyner, eksik yoklama, sabitlenmemiş imaj ve tek kopya gibi üretime çıkmadan düzeltilmesi gereken noktaları bulur."
+  aramaya={true}
+  kategori="Araç"
+>
+  <div class="arama-bas">
+    <div class="kap">
+      <nav class="kirinti" aria-label="Kırıntı yolu" style="padding-top:0">
+        <a href="/">Ana sayfa</a><span class="ayrac">/</span><a href="/araclar">Araçlar</a><span
+          class="ayrac">/</span
+        ><span aria-current="page">Manifest denetleyici</span>
+      </nav>
+      <h1>Kubernetes manifest denetleyici</h1>
+      <p style="color:var(--muted);font-size:14px;margin-top:8px;max-width:66ch">
+        Bir manifest <code>kubectl apply</code> ile kabul ediliyorsa doğru demek değildir.
+        Kubernetes eksik yoklamayı, tek kopyayı ya da kök çalışan bir konteyneri sorun
+        saymaz — siz saymalısınız. Manifesti yapıştırın, üretime çıkmadan görün.
+      </p>
+      <p style="color:var(--muted);font-size:13px;margin-top:10px;max-width:66ch">
+        Bu araç manifesti <b>okur ve eleştirir</b>; değer hesaplamak için
+        <a href="/araclar/k8s-kaynak-planlayici">Kubernetes kaynak planlayıcıya</a> bakın.
+      </p>
+    </div>
+  </div>
+
+  <div class="kap arac-sayfa">
+    <section class="arac-blok">
+      <h2 class="arac-h2"><span class="arac-no">1</span> Manifest</h2>
+      <div class="arac-alan">
+        <textarea id="m-girdi" rows="14" spellcheck="false" placeholder="apiVersion: apps/v1&#10;kind: Deployment&#10;..."
+        ></textarea>
+      </div>
+      <div class="arac-dugmeler">
+        <button type="button" class="dg" id="m-denetle">Denetle</button>
+        <button type="button" class="dg dg-hayalet" id="m-ornek">Sorunlu örnek</button>
+        <button type="button" class="dg dg-hayalet" id="m-temizle">Temizle</button>
+      </div>
+      <p class="arac-durum" id="m-durum" role="status" aria-live="polite"></p>
+    </section>
+
+    <section class="arac-blok" id="m-sonuc" hidden>
+      <h2 class="arac-h2"><span class="arac-no">2</span> Bulgular</h2>
+      <div class="arac-olcum" id="m-olcum"></div>
+      <div id="m-bulgular"></div>
+    </section>
+
+    <section class="arac-blok">
+      <h2 class="arac-h2"><span class="arac-no">3</span> Üretime çıkmadan önce</h2>
+      <ul class="m-ipuclari">
+        <li>
+          <b>Yoklamalar olmadan sağlıklı görünmek kolaydır.</b> Süreç ayakta olduğu sürece
+          Kubernetes podu hazır sayar ve trafik gönderir — uygulama içeride kilitlenmiş olsa
+          bile. <code>readinessProbe</code> "trafik alabilir miyim", <code>livenessProbe</code>
+          "yeniden başlatılmalı mıyım" sorusunu cevaplar. İkisini aynı uç noktaya bağlamak
+          yaygın ama yanlıştır: geçici bir bağımlılık arızasında liveness podu gereksiz yere
+          öldürür.
+        </li>
+        <li>
+          <b>Tek kopya bakım demek değil, kesinti demektir.</b> Düğüm boşaltıldığında ya da
+          güncelleme yapıldığında o tek pod durur ve yerine geleni beklersiniz. En az iki
+          kopya ve bir <code>PodDisruptionBudget</code>, planlı bakımı görünmez kılar.
+        </li>
+        <li>
+          <b>Etiket sabitlenmemişse dağıtım yeniden üretilemez.</b> <code>latest</code> ile
+          bugün çalışan sürüm, yarın farklı bir imaj çeker ve neyin değiştiğini bilemezsiniz.
+          Geri alma da imkânsızlaşır — çünkü geri alacağınız şey de <code>latest</code>'tir.
+        </li>
+        <li>
+          <b>Sırlar ortam değişkeni olarak görünür.</b> <code>env</code> ile verilen bir sır
+          <code>kubectl describe pod</code> çıktısında, çökme raporlarında ve alt süreçlerin
+          ortamında görünür. Dosya olarak bağlamak (<code>volumeMounts</code>) hem daha
+          gizlidir hem rotasyonu kolaylaştırır.
+        </li>
+        <li>
+          <b>Kaynak isteği yoksa planlayıcı kördür.</b> <code>requests</code> olmadan
+          Kubernetes podun ne kadar yer kaplayacağını bilemez, düğümü aşırı doldurur ve
+          baskı anında ilk o podu tahliye eder (BestEffort sınıfı). Ölçmediyseniz bile bir
+          değer verin; hiç vermemekten iyidir.
+        </li>
+      </ul>
+    </section>
+  </div>
+
+  <script>
+    (() => {
+      const el = (s) => document.querySelector(s);
+      const kacir = (s) =>
+        String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+
+      /** Belgeyi --- ile ayırır; her parça ayrı bir kaynak. */
+      const belgeleriAyir = (ham) =>
+        ham
+          .replace(/\r\n?/g, '\n')
+          .split(/^---\s*$/m)
+          .map((b) => b.trim())
+          .filter(Boolean);
+
+      const alanAl = (metin, ad) => {
+        const m = new RegExp(`^\\s*${ad}:\\s*(.+)$`, 'm').exec(metin);
+        return m ? m[1].trim().replace(/^["']|["']$/g, '') : null;
+      };
+
+      const varMi = (metin, ad) => new RegExp(`^\\s*${ad}:`, 'm').test(metin);
+
+      function belgeDenetle(metin, indis) {
+        const bulgular = [];
+        const ekle = (tip, baslik, aciklama) => bulgular.push({ tip, baslik, aciklama, belge: indis });
+
+        const kind = alanAl(metin, 'kind');
+        const ad = alanAl(metin, 'name') ?? '(adsız)';
+        if (!kind) {
+          ekle('hata', 'kind belirtilmemiş', 'Her Kubernetes kaynağının bir <code>kind</code> alanı olmalı.');
+          return { bulgular, kind: null, ad };
+        }
+
+        const podTasiyan = ['Deployment', 'StatefulSet', 'DaemonSet', 'Job', 'CronJob', 'Pod'].includes(kind);
+
+        /* --- imaj etiketi --- */
+        const imajlar = [...metin.matchAll(/^\s*-?\s*image:\s*(.+)$/gm)].map((m) =>
+          m[1].trim().replace(/^["']|["']$/g, '')
+        );
+        for (const imaj of imajlar) {
+          if (/@sha256:/.test(imaj)) continue;
+          if (/:latest$/.test(imaj)) {
+            ekle(
+              'hata',
+              'latest etiketi',
+              `<code>${kacir(imaj)}</code> — dağıtım yeniden üretilebilir değil ve geri alma ` +
+                `anlamsız hâle gelir. Sürüm sabitleyin, kritik yerlerde özet (digest) kullanın.`
+            );
+          } else if (!imaj.includes(':')) {
+            ekle('uyari', 'Etiket verilmemiş', `<code>${kacir(imaj)}</code> etiketsiz; Kubernetes <code>latest</code> varsayar.`);
+          }
+        }
+
+        if (!podTasiyan) return { bulgular, kind, ad };
+
+        /* --- kaynak istekleri --- */
+        if (!varMi(metin, 'resources')) {
+          ekle(
+            'hata',
+            'Kaynak isteği yok',
+            'Pod <i>BestEffort</i> sınıfına düşer: planlayıcı ne kadar yer kaplayacağını ' +
+              'bilemez ve düğüm baskı altına girdiğinde ilk bu pod tahliye edilir.'
+          );
+        } else {
+          if (!/requests:/.test(metin)) {
+            ekle('hata', 'requests tanımlı değil', 'Yalnızca <code>limits</code> verilmişse Kubernetes requests değerini limite eşitler; bu genelde istenenden fazla yer ayırtır.');
+          }
+          if (/limits:/.test(metin) && !/limits:[\s\S]{0,120}memory:/.test(metin)) {
+            ekle(
+              'uyari',
+              'Bellek limiti yok',
+              'Bellek sıkıştırılamaz bir kaynaktır; limitsiz bir konteyner düğümün belleğini ' +
+                'tüketip komşu podları da öldürebilir.'
+            );
+          }
+          if (/limits:[\s\S]{0,160}cpu:/.test(metin)) {
+            ekle(
+              'uyari',
+              'CPU limiti var',
+              'CFS kotası nedeniyle ortalama kullanım limitin altındayken bile kısıtlama ' +
+                'görürsünüz. Gecikme duyarlı servislerde CPU limiti koymamak genelde daha iyidir; ' +
+                'Guaranteed QoS istiyorsanız limiti request\'e eşitleyin.'
+            );
+          }
+        }
+
+        /* --- yoklamalar --- */
+        const hazir = varMi(metin, 'readinessProbe');
+        const canli = varMi(metin, 'livenessProbe');
+        if (!hazir) {
+          ekle(
+            'hata',
+            'readinessProbe yok',
+            'Kubernetes, süreç ayakta olduğu anda trafik göndermeye başlar. Uygulama henüz ' +
+              'açılışını bitirmediyse ilk istekler hata alır ve bu her dağıtımda tekrarlanır.'
+          );
+        }
+        if (!canli) {
+          ekle(
+            'uyari',
+            'livenessProbe yok',
+            'Uygulama kilitlendiğinde (süreç ayakta ama yanıt vermiyor) kimse fark etmez ve ' +
+              'pod sonsuza kadar öyle kalır.'
+          );
+        }
+        if (hazir && canli) {
+          const hazirYol = /readinessProbe:[\s\S]{0,200}?path:\s*(\S+)/.exec(metin)?.[1];
+          const canliYol = /livenessProbe:[\s\S]{0,200}?path:\s*(\S+)/.exec(metin)?.[1];
+          if (hazirYol && canliYol && hazirYol === canliYol) {
+            ekle(
+              'uyari',
+              'Yoklamalar aynı uç noktayı kullanıyor',
+              `İkisi de <code>${kacir(hazirYol)}</code> adresine bakıyor. Bu uç nokta bir ` +
+                `bağımlılığı (veri tabanı gibi) denetliyorsa, geçici bir arızada liveness ` +
+                `podu öldürür ve durum daha da kötüleşir. Liveness yalnızca sürecin kendi ` +
+                `sağlığına bakmalı.`
+            );
+          }
+        }
+        if ((hazir || canli) && !varMi(metin, 'startupProbe') && /initialDelaySeconds:\s*(\d+)/.test(metin)) {
+          const gecikme = Number(/initialDelaySeconds:\s*(\d+)/.exec(metin)[1]);
+          if (gecikme > 30) {
+            ekle(
+              'uyari',
+              `initialDelaySeconds ${gecikme} saniye`,
+              'Uzun açılışlar için <code>startupProbe</code> daha doğrudur: açılış bitene kadar ' +
+                'diğer yoklamaları erteler, ama açılış beklenenden erken biterse boşuna beklemez.'
+            );
+          }
+        }
+
+        /* --- güvenlik --- */
+        if (/privileged:\s*true/.test(metin)) {
+          ekle(
+            'hata',
+            'Ayrıcalıklı konteyner',
+            '<code>privileged: true</code> konteynere neredeyse tam ana makine yetkisi verir ve ' +
+              'konteyner sınırını anlamsızlaştırır. Gerçekten gerekiyorsa hangi yeteneğe ' +
+              'ihtiyaç duyulduğunu bulup yalnızca onu <code>capabilities.add</code> ile verin.'
+          );
+        }
+        if (/hostNetwork:\s*true/.test(metin)) {
+          ekle('hata', 'hostNetwork kullanılıyor', 'Pod, düğümün ağ yığınını doğrudan kullanır: port çakışması olur ve ağ ilkeleri (NetworkPolicy) bu podu koruyamaz.');
+        }
+        if (/hostPID:\s*true|hostIPC:\s*true/.test(metin)) {
+          ekle('hata', 'hostPID / hostIPC açık', 'Konteyner, düğümdeki bütün süreçleri görür. Yalıtımın büyük kısmı kalkar.');
+        }
+        if (/hostPath:/.test(metin)) {
+          ekle(
+            'uyari',
+            'hostPath birimi',
+            'Düğümün dosya sistemine doğrudan erişim, podu o düğüme bağlar ve yanlış bir yol ' +
+              'ana makineyi etkileyebilir. Kalıcı veri için <code>PersistentVolumeClaim</code> kullanın.'
+          );
+        }
+        if (!/runAsNonRoot:\s*true/.test(metin)) {
+          ekle(
+            'uyari',
+            'runAsNonRoot belirtilmemiş',
+            'İmaj kök kullanıcıyla çalışıyorsa konteyner de kök olur. ' +
+              '<code>securityContext.runAsNonRoot: true</code> bunu engeller ve imaj kökse ' +
+              'pod hiç başlamaz — sessizce kök çalışmasından iyidir.'
+          );
+        }
+        if (!/allowPrivilegeEscalation:\s*false/.test(metin)) {
+          ekle('uyari', 'allowPrivilegeEscalation kapatılmamış', 'Bu bayrak <code>false</code> yapılmazsa konteyner içindeki bir süreç setuid yoluyla yetki yükseltebilir.');
+        }
+        if (!/readOnlyRootFilesystem:\s*true/.test(metin)) {
+          ekle('uyari', 'Kök dosya sistemi yazılabilir', 'Çoğu uygulamanın kök dosya sistemine yazması gerekmez. Salt okunur yapmak, ele geçirilmiş bir süreç için kalıcılık kurmayı belirgin zorlaştırır.');
+        }
+
+        /* --- sırlar --- */
+        if (/valueFrom:[\s\S]{0,80}secretKeyRef/.test(metin)) {
+          ekle(
+            'uyari',
+            'Sır ortam değişkeni olarak veriliyor',
+            'Ortam değişkenleri <code>kubectl describe pod</code> çıktısında, çökme ' +
+              'raporlarında ve alt süreçlerin ortamında görünür. Dosya olarak bağlamak ' +
+              '(<code>volumeMounts</code>) daha gizlidir ve rotasyonu kolaylaştırır.'
+          );
+        }
+        const acikSir = /^\s*-?\s*(name:\s*\w*(PASSWORD|SECRET|TOKEN|KEY)\w*[\s\S]{0,40}?value:\s*)(?!.*valueFrom)(\S+)/im.exec(metin);
+        if (acikSir && !/\$\(/.test(acikSir[3])) {
+          ekle(
+            'hata',
+            'Manifestte düz metin sır',
+            'Parola ya da anahtar doğrudan yazılmış. Bu dosya sürüm kontrolüne girdiğinde sır ' +
+              'kalıcı olarak sızar. <code>Secret</code> kaynağı kullanın.'
+          );
+        }
+
+        /* --- dayanıklılık --- */
+        if (kind === 'Deployment') {
+          const kopya = alanAl(metin, 'replicas');
+          if (kopya === '1') {
+            ekle(
+              'hata',
+              'Tek kopya',
+              'Düğüm boşaltıldığında ya da güncelleme yapıldığında kesinti olur. En az iki ' +
+                'kopya ve bir <code>PodDisruptionBudget</code>, planlı bakımı görünmez kılar.'
+            );
+          } else if (kopya === null) {
+            ekle('uyari', 'replicas belirtilmemiş', 'Öntanımlı değer 1\'dir; yani tek kopya.');
+          }
+          if (!/strategy:/.test(metin)) {
+            ekle('uyari', 'Güncelleme stratejisi belirtilmemiş', 'Öntanımlı <code>RollingUpdate</code> çoğu durumda doğrudur, ama <code>maxUnavailable</code> değerini açıkça yazmak beklenen davranışı belgeler.');
+          }
+        }
+
+        if (!/affinity:|topologySpreadConstraints:/.test(metin) && kind === 'Deployment') {
+          ekle(
+            'uyari',
+            'Yerleşim kısıtı yok',
+            'Bütün kopyalar aynı düğüme yerleşebilir; o düğüm arızalandığında hepsi birden ' +
+              'gider. <code>topologySpreadConstraints</code> ile kopyaları düğümlere yayın.'
+          );
+        }
+
+        /* --- ad alanı ve etiketler --- */
+        if (!varMi(metin, 'namespace')) {
+          ekle('uyari', 'Ad alanı belirtilmemiş', 'Kaynak <code>default</code> ad alanına gider; hangi bağlamda <code>apply</code> ettiğinize bağlı olarak yanlış kümeye düşebilir.');
+        }
+        if (!/labels:/.test(metin)) {
+          ekle('uyari', 'Etiket yok', 'Etiketler olmadan kaynakları sorgulamak, gruplamak ve maliyet dağıtmak mümkün olmaz.');
+        }
+
+        return { bulgular, kind, ad };
+      }
+
+      const SIRA = { hata: 0, uyari: 1, ok: 2 };
+
+      function calistir() {
+        const ham = el('#m-girdi').value;
+        const durum = el('#m-durum');
+
+        if (!ham.trim()) {
+          el('#m-sonuc').hidden = true;
+          durum.textContent = '';
+          return;
+        }
+
+        const belgeler = belgeleriAyir(ham);
+        const tumBulgular = [];
+        const kaynaklar = [];
+
+        belgeler.forEach((b, i) => {
+          const { bulgular, kind, ad } = belgeDenetle(b, i);
+          if (kind) kaynaklar.push({ kind, ad });
+          tumBulgular.push(...bulgular.map((x) => ({ ...x, kaynakAd: ad, kaynakKind: kind })));
+        });
+
+        tumBulgular.sort((a, b) => SIRA[a.tip] - SIRA[b.tip] || a.belge - b.belge);
+
+        const hata = tumBulgular.filter((b) => b.tip === 'hata').length;
+        const uyari = tumBulgular.filter((b) => b.tip === 'uyari').length;
+
+        el('#m-sonuc').hidden = false;
+        el('#m-olcum').innerHTML =
+          `<span>Belge: <b>${belgeler.length}</b></span>` +
+          `<span>Kaynak: <b>${kaynaklar.map((k) => k.kind).join(', ') || '—'}</b></span>` +
+          `<span>Sorun: <b>${hata}</b></span>` +
+          `<span>Uyarı: <b>${uyari}</b></span>`;
+
+        el('#m-bulgular').innerHTML = tumBulgular.length
+          ? '<ul class="m-liste">' +
+            tumBulgular
+              .map(
+                (b) =>
+                  `<li data-tip="${b.tip}"><div class="m-bulgu-ust"><b>${b.baslik}</b>` +
+                  (belgeler.length > 1 && b.kaynakKind
+                    ? `<span class="m-kaynak">${kacir(b.kaynakKind)}/${kacir(b.kaynakAd)}</span>`
+                    : '') +
+                  `</div><p>${b.aciklama}</p></li>`
+              )
+              .join('') +
+            '</ul>'
+          : '<p class="arac-not" style="margin:0">Bilinen bir sorun bulunamadı.</p>';
+
+        durum.className = 'arac-durum ' + (hata ? 'hata' : uyari ? '' : 'ok');
+        durum.textContent = hata
+          ? `${hata} ciddi sorun, ${uyari} uyarı bulundu.`
+          : uyari
+            ? `Ciddi sorun yok; ${uyari} iyileştirme önerisi var.`
+            : 'Denetimden temiz geçti.';
+      }
+
+      el('#m-denetle').addEventListener('click', calistir);
+      el('#m-girdi').addEventListener('input', () => {
+        if (el('#m-girdi').value.trim().length > 20) calistir();
+      });
+
+      el('#m-temizle').addEventListener('click', () => {
+        el('#m-girdi').value = '';
+        calistir();
+      });
+
+      el('#m-ornek').addEventListener('click', () => {
+        el('#m-girdi').value = [
+          'apiVersion: apps/v1',
+          'kind: Deployment',
+          'metadata:',
+          '  name: siparis-api',
+          'spec:',
+          '  replicas: 1',
+          '  template:',
+          '    spec:',
+          '      hostNetwork: true',
+          '      containers:',
+          '        - name: uygulama',
+          '          image: kayit.ornek.com/siparis:latest',
+          '          securityContext:',
+          '            privileged: true',
+          '          env:',
+          '            - name: DB_PASSWORD',
+          '              value: Sirket2026!',
+          '          ports:',
+          '            - containerPort: 8080',
+          '      volumes:',
+          '        - name: kayit',
+          '          hostPath:',
+          '            path: /var/log/uygulama',
+        ].join('\n');
+        calistir();
+      });
+    })();
+  </script>
+
+  <style>
+    .arac-dugmeler {
+      display: flex;
+      gap: 10px;
+      flex-wrap: wrap;
+      margin-top: 4px;
+    }
+    .m-liste {
+      list-style: none;
+      margin: 0;
+      padding: 0;
+      display: grid;
+      gap: 11px;
+    }
+    .m-liste li {
+      border: 1px solid var(--line);
+      border-left: 3px solid var(--line);
+      border-radius: 10px;
+      padding: 12px 14px;
+      background: var(--paper);
+    }
+    .m-liste li[data-tip='hata'] {
+      border-left-color: light-dark(#dc2626, #f87171);
+    }
+    .m-liste li[data-tip='uyari'] {
+      border-left-color: light-dark(#f0c33c, #a97f1c);
+    }
+    .m-bulgu-ust {
+      display: flex;
+      justify-content: space-between;
+      gap: 12px;
+      align-items: baseline;
+      flex-wrap: wrap;
+      margin-bottom: 5px;
+    }
+    .m-bulgu-ust b {
+      font-size: 14px;
+    }
+    .m-kaynak {
+      font-size: 11.5px;
+      color: var(--muted);
+      font-family: var(--mono, ui-monospace, monospace);
+      white-space: nowrap;
+    }
+    .m-liste p {
+      margin: 0;
+      font-size: 13.5px;
+      line-height: 1.62;
+      color: var(--ink-soft);
+    }
+    .m-ipuclari {
+      list-style: none;
+      margin: 0;
+      padding: 0;
+      display: grid;
+      gap: 12px;
+    }
+    .m-ipuclari li {
+      font-size: 13.5px;
+      line-height: 1.62;
+      color: var(--ink-soft);
+      border-left: 2px solid var(--line);
+      padding-left: 13px;
+    }
+  </style>
+</Base>
