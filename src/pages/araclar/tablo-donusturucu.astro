@@ -1,0 +1,580 @@
+---
+import Base from '../../layouts/Base.astro';
+---
+
+<Base
+  baslik="CSV ve tablo dönüştürücü"
+  aciklama="CSV, TSV ya da panodan yapıştırılmış tabloyu Markdown, JSON, SQL, PowerShell ve HTML biçimine çevirir. Ayracı ve tırnakları kendisi tanır."
+  aramaya={true}
+  kategori="Araç"
+>
+  <div class="arama-bas">
+    <div class="kap">
+      <nav class="kirinti" aria-label="Kırıntı yolu" style="padding-top:0">
+        <a href="/">Ana sayfa</a><span class="ayrac">/</span><a href="/araclar">Araçlar</a><span
+          class="ayrac">/</span
+        ><span aria-current="page">Tablo dönüştürücü</span>
+      </nav>
+      <h1>CSV ve tablo dönüştürücü</h1>
+      <p style="color:var(--muted);font-size:14px;margin-top:8px;max-width:66ch">
+        Excel'den kopyalanan bir listeyi belgeye Markdown tablosu olarak koymak, bir betiğe
+        gömmek ya da veri tabanına eklemek. Yapıştırın; araç ayracı ve tırnaklamayı kendisi
+        tanısın. Veri tarayıcıdan çıkmaz.
+      </p>
+    </div>
+  </div>
+
+  <div class="kap arac-sayfa">
+    <section class="arac-blok">
+      <h2 class="arac-h2"><span class="arac-no">1</span> Veri</h2>
+      <div class="arac-alan">
+        <textarea id="c-girdi" rows="9" spellcheck="false" placeholder="CSV, TSV ya da Excel'den kopyalanmış tablo…"
+        ></textarea>
+      </div>
+      <div class="arac-dugmeler">
+        <button type="button" class="dg dg-hayalet" id="c-ornek">Örnek</button>
+        <button type="button" class="dg dg-hayalet" id="c-temizle">Temizle</button>
+      </div>
+      <div class="arac-alanlar" style="margin-top:14px">
+        <label class="arac-alan"
+          >Ayraç
+          <select id="c-ayrac">
+            <option value="auto">Kendisi bulsun</option>
+            <option value=",">Virgül</option>
+            <option value=";">Noktalı virgül</option>
+            <option value="\t">Sekme</option>
+            <option value="|">Dikey çizgi</option>
+          </select>
+          <small>Türkçe Excel virgül yerine <b>noktalı virgül</b> kullanır.</small>
+        </label>
+        <label class="arac-alan"
+          >Tablo adı
+          <input id="c-tabloAd" type="text" spellcheck="false" value="kayitlar" />
+          <small>SQL çıktısında kullanılır.</small>
+        </label>
+      </div>
+      <label class="c-sec">
+        <input type="checkbox" id="c-baslik" checked />
+        <span>İlk satır başlık satırı</span>
+      </label>
+      <p class="arac-durum" id="c-durum" role="status" aria-live="polite"></p>
+    </section>
+
+    <section class="arac-blok" id="c-sonuc" hidden>
+      <h2 class="arac-h2"><span class="arac-no">2</span> Çıktı</h2>
+      <div class="c-bicimler">
+        {
+          [
+            ['markdown', 'Markdown'],
+            ['json', 'JSON'],
+            ['sql', 'SQL'],
+            ['powershell', 'PowerShell'],
+            ['html', 'HTML'],
+            ['csv', 'Temiz CSV'],
+          ].map(([deger, ad], i) => (
+            <label class="c-bicim">
+              <input type="radio" name="c-bicim" value={deger} checked={i === 0} />
+              <span>{ad}</span>
+            </label>
+          ))
+        }
+      </div>
+      <div style="position:relative">
+        <pre class="kod c-cikti"><code id="c-cikti"></code></pre>
+        <button class="kopyala" type="button" id="c-kopyala">Kopyala</button>
+      </div>
+    </section>
+
+    <section class="arac-blok" id="c-onizleme-blok" hidden>
+      <h2 class="arac-h2"><span class="arac-no">3</span> Önizleme</h2>
+      <div class="arac-olcum" id="c-olcum"></div>
+      <div class="c-kaydir">
+        <table class="c-tablo" id="c-onizleme"></table>
+      </div>
+      <p class="arac-not" id="c-turler"></p>
+    </section>
+
+    <section class="arac-blok">
+      <h2 class="arac-h2"><span class="arac-no">4</span> CSV'nin sinsi tarafları</h2>
+      <ul class="c-ipuclari">
+        <li>
+          <b>Türkçe Excel noktalı virgül kullanır.</b> Ondalık ayracı virgül olduğu için sütun
+          ayracı noktalı virgüle kayar. Aynı dosyayı İngilizce bir sistemde açan kişi tek
+          sütun görür. Paylaşırken hangi ayracı kullandığınızı yazın ya da sekme kullanın —
+          sekme hiçbir dilde ondalık ayracı değildir.
+        </li>
+        <li>
+          <b>Tırnak içindeki ayraç ayraç değildir.</b> <code>"Ankara, Çankaya"</code> tek bir
+          alandır. Kendi ayrıştırıcınızı <code>split(',')</code> ile yazmayın; bu araç tırnak
+          durumunu izleyerek ayrıştırır, iki tırnak (<code>""</code>) kaçırılmış tırnak sayılır.
+        </li>
+        <li>
+          <b>Excel sayı sandığı her şeyi bozar.</b> Başında sıfır olan kodlar
+          (<code>0532...</code>), uzun sayılar ve <code>1-2</code> gibi değerler açılırken
+          değişir. Bunları korumak için CSV yerine sekme ile ayrılmış dosya kullanın ve içe
+          aktarırken sütun türünü <i>metin</i> seçin.
+        </li>
+        <li>
+          <b>Satır sonu alanın içinde olabilir.</b> Adres alanları çok satırlı olur ve tırnak
+          içinde satır sonu taşır. "Dosyada 500 satır var ama 480 kayıt çıkıyor" durumunun
+          sebebi genelde budur.
+        </li>
+        <li>
+          <b>SQL çıktısını doğrudan üretime çalıştırmayın.</b> Araç tek tırnakları kaçırır ama
+          üretilen komut yine de bir <i>taslaktır</i>. Sütun türlerini, boş değer davranışını
+          ve varsa yabancı anahtarları gözden geçirin; önce bir işlem (transaction) içinde
+          deneyin.
+        </li>
+      </ul>
+    </section>
+  </div>
+
+  <script>
+    (() => {
+      const el = (s) => document.querySelector(s);
+      const kacir = (s) =>
+        String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+
+      /* --- ayraç tahmini -------------------------------------------------------
+         Tırnak dışındaki adayları sayıp satırlar arasında en tutarlı olanı seçer. */
+      function ayracBul(metin) {
+        const adaylar = [';', ',', '\t', '|'];
+        const satirlar = metin.split(/\r?\n/).filter((s) => s.trim()).slice(0, 20);
+        if (!satirlar.length) return ',';
+
+        let enIyi = ',';
+        let enIyiPuan = -1;
+
+        for (const a of adaylar) {
+          const sayimlar = satirlar.map((s) => {
+            let n = 0;
+            let tirnakta = false;
+            for (let i = 0; i < s.length; i++) {
+              if (s[i] === '"') tirnakta = !tirnakta;
+              else if (!tirnakta && s[i] === a) n++;
+            }
+            return n;
+          });
+
+          const ortalama = sayimlar.reduce((t, x) => t + x, 0) / sayimlar.length;
+          if (ortalama < 1) continue;
+          // Tutarlılık: bütün satırlarda aynı sayıda geçmesi beklenir
+          const sapma = sayimlar.reduce((t, x) => t + Math.abs(x - ortalama), 0) / sayimlar.length;
+          const puan = ortalama - sapma * 3;
+          if (puan > enIyiPuan) {
+            enIyiPuan = puan;
+            enIyi = a;
+          }
+        }
+        return enIyi;
+      }
+
+      /* --- ayrıştırma ---------------------------------------------------------
+         Tırnak durumunu izler; alan içindeki ayraç ve satır sonunu korur. */
+      function ayristir(metin, ayrac) {
+        const satirlar = [];
+        let satir = [];
+        let alan = '';
+        let tirnakta = false;
+
+        for (let i = 0; i < metin.length; i++) {
+          const k = metin[i];
+
+          if (tirnakta) {
+            if (k === '"') {
+              if (metin[i + 1] === '"') {
+                alan += '"'; // kaçırılmış tırnak
+                i++;
+              } else {
+                tirnakta = false;
+              }
+            } else {
+              alan += k;
+            }
+            continue;
+          }
+
+          if (k === '"' && alan === '') {
+            tirnakta = true;
+          } else if (k === ayrac) {
+            satir.push(alan);
+            alan = '';
+          } else if (k === '\n') {
+            satir.push(alan);
+            satirlar.push(satir);
+            satir = [];
+            alan = '';
+          } else if (k === '\r') {
+            // CRLF'in CR'si yok sayılır
+          } else {
+            alan += k;
+          }
+        }
+        if (alan !== '' || satir.length) {
+          satir.push(alan);
+          satirlar.push(satir);
+        }
+        return satirlar.filter((s) => s.some((a) => a.trim() !== ''));
+      }
+
+      /* --- tür tahmini --------------------------------------------------------- */
+      function turTahmin(degerler) {
+        const dolu = degerler.filter((d) => d.trim() !== '');
+        if (!dolu.length) return 'metin';
+        if (dolu.every((d) => /^-?\d+$/.test(d.trim()))) return 'tamsayi';
+        // Türkçe ondalık virgülü de sayı sayılır
+        if (dolu.every((d) => /^-?\d+([.,]\d+)?$/.test(d.trim()))) return 'ondalik';
+        if (dolu.every((d) => /^(true|false|evet|hayır|hayir|1|0)$/i.test(d.trim()))) return 'mantiksal';
+        if (dolu.every((d) => !Number.isNaN(Date.parse(d.trim())) && /\d{4}|\d{2}[./-]\d{2}/.test(d))) {
+          return 'tarih';
+        }
+        return 'metin';
+      }
+
+      const SQL_TURU = {
+        tamsayi: 'INT',
+        ondalik: 'DECIMAL(18,4)',
+        mantiksal: 'BIT',
+        tarih: 'DATETIME2',
+        metin: 'NVARCHAR(255)',
+      };
+
+      /* --- çıktı biçimleri ------------------------------------------------------ */
+      function markdownYaz(basliklar, satirlar) {
+        const kacirMd = (s) => s.replace(/\|/g, '\\|').replace(/\n/g, '<br>');
+        // Sütun genişliklerini hizala — kaynak hâli de okunabilir olsun
+        const genislikler = basliklar.map((b, i) =>
+          Math.max(kacirMd(b).length, ...satirlar.map((s) => kacirMd(s[i] ?? '').length), 3)
+        );
+        const satirYaz = (hucreler) =>
+          '| ' + hucreler.map((h, i) => kacirMd(h ?? '').padEnd(genislikler[i])).join(' | ') + ' |';
+
+        return [
+          satirYaz(basliklar),
+          '| ' + genislikler.map((g) => '-'.repeat(g)).join(' | ') + ' |',
+          ...satirlar.map(satirYaz),
+        ].join('\n');
+      }
+
+      function jsonYaz(basliklar, satirlar, turler) {
+        const nesneler = satirlar.map((s) => {
+          const n = {};
+          basliklar.forEach((b, i) => {
+            const ham = (s[i] ?? '').trim();
+            if (ham === '') n[b] = null;
+            else if (turler[i] === 'tamsayi') n[b] = Number(ham);
+            else if (turler[i] === 'ondalik') n[b] = Number(ham.replace(',', '.'));
+            else if (turler[i] === 'mantiksal') n[b] = /^(true|evet|1)$/i.test(ham);
+            else n[b] = ham;
+          });
+          return n;
+        });
+        return JSON.stringify(nesneler, null, 2);
+      }
+
+      function sqlYaz(basliklar, satirlar, turler, tabloAd) {
+        const ad = tabloAd.replace(/[^A-Za-z0-9_]/g, '_') || 'kayitlar';
+        const sutunAd = (b) => b.replace(/[^A-Za-z0-9_ğüşıöçĞÜŞİÖÇ]/g, '_');
+        const deger = (ham, tur) => {
+          const t = (ham ?? '').trim();
+          if (t === '') return 'NULL';
+          if (tur === 'tamsayi') return t;
+          if (tur === 'ondalik') return t.replace(',', '.');
+          if (tur === 'mantiksal') return /^(true|evet|1)$/i.test(t) ? '1' : '0';
+          // Tek tırnak SQL'de iki tırnakla kaçırılır
+          return `N'${t.replace(/'/g, "''")}'`;
+        };
+
+        return [
+          `CREATE TABLE ${ad} (`,
+          basliklar.map((b, i) => `    ${sutunAd(b)} ${SQL_TURU[turler[i]]}`).join(',\n'),
+          `);`,
+          ``,
+          `INSERT INTO ${ad} (${basliklar.map(sutunAd).join(', ')}) VALUES`,
+          satirlar
+            .map((s) => `    (${basliklar.map((_, i) => deger(s[i], turler[i])).join(', ')})`)
+            .join(',\n') + ';',
+        ].join('\n');
+      }
+
+      function powershellYaz(basliklar, satirlar, turler) {
+        const ad = (b) => (/^[A-Za-z_][A-Za-z0-9_]*$/.test(b) ? b : `'${b.replace(/'/g, "''")}'`);
+        const deger = (ham, tur) => {
+          const t = (ham ?? '').trim();
+          if (t === '') return '$null';
+          if (tur === 'tamsayi') return t;
+          if (tur === 'ondalik') return t.replace(',', '.');
+          if (tur === 'mantiksal') return /^(true|evet|1)$/i.test(t) ? '$true' : '$false';
+          return `'${t.replace(/'/g, "''")}'`;
+        };
+
+        return [
+          '$kayitlar = @(',
+          satirlar
+            .map(
+              (s) =>
+                '    [pscustomobject]@{ ' +
+                basliklar.map((b, i) => `${ad(b)} = ${deger(s[i], turler[i])}`).join('; ') +
+                ' }'
+            )
+            .join('\n'),
+          ')',
+          '',
+          '$kayitlar | Format-Table -AutoSize',
+        ].join('\n');
+      }
+
+      function htmlYaz(basliklar, satirlar) {
+        return [
+          '<table>',
+          '  <thead>',
+          '    <tr>' + basliklar.map((b) => `<th>${kacir(b)}</th>`).join('') + '</tr>',
+          '  </thead>',
+          '  <tbody>',
+          ...satirlar.map(
+            (s) => '    <tr>' + basliklar.map((_, i) => `<td>${kacir(s[i] ?? '')}</td>`).join('') + '</tr>'
+          ),
+          '  </tbody>',
+          '</table>',
+        ].join('\n');
+      }
+
+      function csvYaz(basliklar, satirlar) {
+        const alan = (h) => {
+          const t = h ?? '';
+          return /[",\n]/.test(t) ? `"${t.replace(/"/g, '""')}"` : t;
+        };
+        return [basliklar, ...satirlar].map((s) => s.map(alan).join(',')).join('\n');
+      }
+
+      /* --- çizim ---------------------------------------------------------------- */
+      let sonVeri = null;
+
+      function calistir() {
+        const ham = el('#c-girdi').value;
+        const durum = el('#c-durum');
+
+        if (!ham.trim()) {
+          el('#c-sonuc').hidden = true;
+          el('#c-onizleme-blok').hidden = true;
+          durum.textContent = '';
+          sonVeri = null;
+          return;
+        }
+
+        const secim = el('#c-ayrac').value;
+        const ayrac = secim === 'auto' ? ayracBul(ham) : secim === '\\t' ? '\t' : secim;
+        const satirlar = ayristir(ham, ayrac);
+
+        if (!satirlar.length) {
+          durum.className = 'arac-durum hata';
+          durum.textContent = 'Veri çözümlenemedi.';
+          return;
+        }
+
+        const baslikVar = el('#c-baslik').checked;
+        const sutunSayisi = Math.max(...satirlar.map((s) => s.length));
+        const basliklar = baslikVar
+          ? satirlar[0].map((b, i) => b.trim() || `sutun${i + 1}`)
+          : Array.from({ length: sutunSayisi }, (_, i) => `sutun${i + 1}`);
+        const govde = baslikVar ? satirlar.slice(1) : satirlar;
+
+        // Eksik sütunları doldur
+        const dolu = govde.map((s) => Array.from({ length: basliklar.length }, (_, i) => s[i] ?? ''));
+
+        const turler = basliklar.map((_, i) => turTahmin(dolu.map((s) => s[i])));
+        sonVeri = { basliklar, satirlar: dolu, turler };
+
+        /* --- önizleme --- */
+        el('#c-onizleme-blok').hidden = false;
+        const gosterilen = dolu.slice(0, 12);
+        el('#c-onizleme').innerHTML =
+          '<thead><tr>' +
+          basliklar.map((b) => `<th>${kacir(b)}</th>`).join('') +
+          '</tr></thead><tbody>' +
+          gosterilen
+            .map((s) => '<tr>' + s.map((h) => `<td>${kacir(h)}</td>`).join('') + '</tr>')
+            .join('') +
+          (dolu.length > 12
+            ? `<tr class="c-daha"><td colspan="${basliklar.length}">… ${dolu.length - 12} satır daha</td></tr>`
+            : '') +
+          '</tbody>';
+
+        const ayracAdi = { ',': 'virgül', ';': 'noktalı virgül', '\t': 'sekme', '|': 'dikey çizgi' }[ayrac];
+        el('#c-olcum').innerHTML =
+          `<span>Satır: <b>${dolu.length}</b></span>` +
+          `<span>Sütun: <b>${basliklar.length}</b></span>` +
+          `<span>Ayraç: <b>${ayracAdi}</b></span>` +
+          `<span>Boş hücre: <b>${dolu.flat().filter((h) => h.trim() === '').length}</b></span>`;
+
+        el('#c-turler').innerHTML =
+          '<b>Tahmin edilen sütun türleri:</b> ' +
+          basliklar.map((b, i) => `<code>${kacir(b)}</code> → ${turler[i]}`).join(', ') +
+          '. SQL ve PowerShell çıktısında bu türler kullanılır; yanlışsa çıktıyı elle düzeltin.';
+
+        /* --- düzensiz satır uyarısı --- */
+        const duzensiz = govde.filter((s) => s.length !== basliklar.length).length;
+        if (duzensiz) {
+          durum.className = 'arac-durum hata';
+          durum.textContent =
+            `${duzensiz} satırda sütun sayısı başlıktan farklı. Ayraç yanlış seçilmiş ya da ` +
+            `bazı alanlarda tırnaklanmamış ayraç var — önizlemeyi kontrol edin.`;
+        } else {
+          durum.className = 'arac-durum ok';
+          durum.textContent = `${dolu.length} satır, ${basliklar.length} sütun çözümlendi.`;
+        }
+
+        ciz();
+      }
+
+      function ciz() {
+        if (!sonVeri) return;
+        const { basliklar, satirlar, turler } = sonVeri;
+        const bicim = document.querySelector('input[name="c-bicim"]:checked').value;
+        const tabloAd = el('#c-tabloAd').value;
+
+        const cikti = {
+          markdown: () => markdownYaz(basliklar, satirlar),
+          json: () => jsonYaz(basliklar, satirlar, turler),
+          sql: () => sqlYaz(basliklar, satirlar, turler, tabloAd),
+          powershell: () => powershellYaz(basliklar, satirlar, turler),
+          html: () => htmlYaz(basliklar, satirlar),
+          csv: () => csvYaz(basliklar, satirlar),
+        }[bicim]();
+
+        el('#c-sonuc').hidden = false;
+        el('#c-cikti').textContent = cikti;
+      }
+
+      /* --- olaylar --------------------------------------------------------------- */
+      el('#c-girdi').addEventListener('input', calistir);
+      el('#c-ayrac').addEventListener('change', calistir);
+      el('#c-baslik').addEventListener('change', calistir);
+      el('#c-tabloAd').addEventListener('input', ciz);
+      document
+        .querySelectorAll('input[name="c-bicim"]')
+        .forEach((r) => r.addEventListener('change', ciz));
+
+      el('#c-ornek').addEventListener('click', () => {
+        el('#c-girdi').value = [
+          'Sunucu;IP;Rol;CPU;Bellek GB;Devreye Alma;Etkin',
+          'SRV-DOSYA-01;10.20.0.11;"Dosya, yazıcı";8;32;2023-04-12;evet',
+          'SRV-UYG-03;10.20.0.14;Uygulama;16;64;2024-11-02;evet',
+          'SRV-VT-01;10.20.0.21;"Veri tabanı";32;256;2022-01-20;evet',
+          'SRV-TEST-09;10.20.9.9;Test;4;8;2025-06-30;hayır',
+          'SRV-YEDEK-02;10.20.0.31;Yedekleme;8;48;2021-09-15;evet',
+        ].join('\n');
+        calistir();
+      });
+
+      el('#c-temizle').addEventListener('click', () => {
+        el('#c-girdi').value = '';
+        calistir();
+      });
+
+      el('#c-kopyala').addEventListener('click', async (e) => {
+        try {
+          await navigator.clipboard.writeText(el('#c-cikti').textContent);
+          e.currentTarget.textContent = 'Kopyalandı';
+          setTimeout(() => (e.currentTarget.textContent = 'Kopyala'), 1600);
+        } catch {
+          /* pano izni yoksa kullanıcı elle seçer */
+        }
+      });
+    })();
+  </script>
+
+  <style>
+    .arac-dugmeler {
+      display: flex;
+      gap: 10px;
+      flex-wrap: wrap;
+      margin-top: 4px;
+    }
+    .c-sec {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 13px;
+      color: var(--ink-soft);
+      cursor: pointer;
+      margin-top: 10px;
+    }
+    .c-bicimler {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      margin-bottom: 12px;
+    }
+    .c-bicim {
+      display: inline-flex;
+      align-items: center;
+      border: 1px solid var(--line);
+      border-radius: 999px;
+      padding: 6px 14px;
+      font-size: 12.5px;
+      color: var(--muted);
+      cursor: pointer;
+      background: var(--paper);
+    }
+    .c-bicim input {
+      position: absolute;
+      opacity: 0;
+      pointer-events: none;
+    }
+    .c-bicim:has(input:checked) {
+      border-color: var(--indigo);
+      color: var(--indigo-metin);
+      background: var(--tint);
+    }
+    .c-cikti {
+      max-height: 420px;
+      overflow: auto;
+    }
+    .c-kaydir {
+      overflow-x: auto;
+      border: 1px solid var(--line);
+      border-radius: 11px;
+    }
+    .c-tablo {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 12.5px;
+    }
+    .c-tablo th,
+    .c-tablo td {
+      text-align: left;
+      padding: 8px 11px;
+      border-bottom: 1px solid var(--line);
+      white-space: nowrap;
+    }
+    .c-tablo th {
+      color: var(--muted);
+      font-size: 11px;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+      background: var(--tint);
+      position: sticky;
+      top: 0;
+    }
+    .c-daha td {
+      color: var(--muted);
+      text-align: center;
+      font-style: italic;
+    }
+    .c-ipuclari {
+      list-style: none;
+      margin: 0;
+      padding: 0;
+      display: grid;
+      gap: 12px;
+    }
+    .c-ipuclari li {
+      font-size: 13.5px;
+      line-height: 1.62;
+      color: var(--ink-soft);
+      border-left: 2px solid var(--line);
+      padding-left: 13px;
+    }
+  </style>
+</Base>

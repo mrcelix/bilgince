@@ -1,0 +1,485 @@
+---
+import Base from '../../layouts/Base.astro';
+---
+
+<Base
+  baslik="RAID IOPS hesaplayıcı"
+  aciklama="Yazma cezası yüzünden diskleriniz kâğıt üzerindeki performansı vermez. RAID seviyesine ve okuma/yazma karışımına göre gerçek IOPS'u hesaplar."
+  aramaya={true}
+  kategori="Araç"
+>
+  <div class="arama-bas">
+    <div class="kap">
+      <nav class="kirinti" aria-label="Kırıntı yolu" style="padding-top:0">
+        <a href="/">Ana sayfa</a><span class="ayrac">/</span><a href="/araclar">Araçlar</a><span
+          class="ayrac">/</span
+        ><span aria-current="page">RAID IOPS hesaplayıcı</span>
+      </nav>
+      <h1>RAID IOPS hesaplayıcı</h1>
+      <p style="color:var(--muted);font-size:14px;margin-top:8px;max-width:66ch">
+        "Sekiz diskim var, her biri 180 IOPS, demek ki 1440 IOPS." Hayır. RAID 5'te her yazma
+        işlemi diske dört ayrı işlem olarak iner. Yazma cezasını hesaba katmadan yapılan
+        kapasite planlarının hepsi yanlıştır.
+      </p>
+    </div>
+  </div>
+
+  <div class="kap arac-sayfa">
+    <section class="arac-blok">
+      <h2 class="arac-h2"><span class="arac-no">1</span> Diskler</h2>
+      <div class="arac-alanlar">
+        <label class="arac-alan"
+          >Disk sayısı
+          <input id="r-adet" type="number" min="1" max="1000" value="8" />
+        </label>
+        <label class="arac-alan"
+          >Disk türü
+          <select id="r-tur">
+            <option value="7200">7.200 rpm SATA — 80 IOPS</option>
+            <option value="10000">10.000 rpm SAS — 140 IOPS</option>
+            <option value="15000" selected>15.000 rpm SAS — 180 IOPS</option>
+            <option value="ssd-sata">SATA SSD — 25.000 IOPS</option>
+            <option value="ssd-sas">SAS SSD — 60.000 IOPS</option>
+            <option value="nvme">NVMe SSD — 400.000 IOPS</option>
+            <option value="ozel">Özel değer</option>
+          </select>
+        </label>
+        <label class="arac-alan" id="r-ozel-alan" hidden
+          >Disk başına IOPS
+          <input id="r-ozel" type="number" min="1" max="10000000" value="180" />
+        </label>
+        <label class="arac-alan"
+          >RAID seviyesi
+          <select id="r-raid">
+            <option value="0">RAID 0 — şeritleme, yedeklilik yok</option>
+            <option value="1">RAID 1 — aynalama</option>
+            <option value="5" selected>RAID 5 — tek eşlik</option>
+            <option value="6">RAID 6 — çift eşlik</option>
+            <option value="10">RAID 10 — aynalanmış şerit</option>
+            <option value="50">RAID 50</option>
+            <option value="60">RAID 60</option>
+          </select>
+        </label>
+        <label class="arac-alan"
+          >Okuma oranı (%)
+          <input id="r-okuma" type="number" min="0" max="100" value="70" />
+          <small>Kalanı yazma. İzleme aracınızdan alın; tahmin etmeyin.</small>
+        </label>
+        <label class="arac-alan"
+          >Disk kapasitesi (TB)
+          <input id="r-kapasite" type="number" min="0.1" step="0.1" max="100" value="1.8" />
+        </label>
+      </div>
+    </section>
+
+    <section class="arac-blok">
+      <h2 class="arac-h2"><span class="arac-no">2</span> Sonuç</h2>
+      <div class="r-kartlar" id="r-kartlar"></div>
+      <p class="arac-durum" id="r-durum" role="status" aria-live="polite"></p>
+    </section>
+
+    <section class="arac-blok">
+      <h2 class="arac-h2"><span class="arac-no">3</span> İhtiyacınız karşılanıyor mu?</h2>
+      <div class="arac-alanlar">
+        <label class="arac-alan"
+          >Gereken IOPS
+          <input id="r-gereken" type="number" min="1" max="10000000" value="2000" />
+        </label>
+        <label class="arac-alan"
+          >Tepe çarpanı
+          <input id="r-tepe" type="number" min="1" step="0.1" max="20" value="2" />
+          <small>Tepe anındaki yükün ortalamaya oranı.</small>
+        </label>
+      </div>
+      <div class="r-cubuklar" id="r-cubuklar"></div>
+      <div id="r-oneri"></div>
+    </section>
+
+    <section class="arac-blok">
+      <h2 class="arac-h2"><span class="arac-no">4</span> RAID seviyeleri yan yana</h2>
+      <div class="r-kaydir">
+        <table class="r-tablo">
+          <thead>
+            <tr>
+              <th>RAID</th><th>Yazma cezası</th><th>Kullanılabilir</th>
+              <th>Bu yapılandırmada IOPS</th><th>Dayanıklılık</th>
+            </tr>
+          </thead>
+          <tbody id="r-tablo"></tbody>
+        </table>
+      </div>
+    </section>
+
+    <section class="arac-blok">
+      <h2 class="arac-h2"><span class="arac-no">5</span> Yazma cezası nereden geliyor?</h2>
+      <ul class="r-ipuclari">
+        <li>
+          <b>RAID 5'te bir yazma, dört işlemdir.</b> Yeni veriyi yazmadan önce eski veriyi
+          <i>oku</i>, eski eşliği <i>oku</i>, yeni veriyi <i>yaz</i>, yeni eşliği <i>yaz</i>.
+          Dolayısıyla ceza 4'tür. RAID 6'da iki eşlik olduğu için ceza 6'ya çıkar.
+        </li>
+        <li>
+          <b>RAID 1 ve 10'da ceza 2'dir.</b> Veri iki diske de yazılır. Buna karşılık okumada
+          kayıp yoktur; her iki aynadan da okunabilir. Yazma ağırlıklı iş yükleri için doğru
+          seçim neredeyse her zaman RAID 10'dur.
+        </li>
+        <li>
+          <b>Yeniden yapılandırma penceresi asıl risktir.</b> Büyük disklerde RAID 5 yeniden
+          yapılandırması günlerce sürer ve bu süre boyunca dizi korumasızdır. Üstelik okuma
+          yükü diğer diskleri de zorlar; ikinci arıza tam da bu pencerede olur. 4 TB üstü
+          disklerde RAID 5 kullanmak, sanılandan çok daha riskli bir bahistir.
+        </li>
+        <li>
+          <b>Bu hesap sıralı erişimi kapsamaz.</b> Yedekleme ve büyük dosya kopyalama gibi
+          sıralı işlerde denetleyici tam şerit yazması yapabilir ve cezayı büyük ölçüde
+          atlatır. Buradaki sayılar <b>rastgele erişim</b> içindir — veri tabanı ve sanal makine
+          iş yükleri için doğru olan da budur.
+        </li>
+        <li>
+          <b>SSD'de ceza var ama darboğaz genelde başka yerde.</b> Yazma cezası matematiği
+          aynıdır; ancak SSD'lerde sınır çoğu zaman denetleyici, ara bellek ya da bağlantı
+          hattı olur. Hesabın verdiği sayı üst sınırdır; ölçüm bunun altında çıkıyorsa
+          denetleyiciye bakın.
+        </li>
+      </ul>
+    </section>
+  </div>
+
+  <script>
+    (() => {
+      const el = (s) => document.querySelector(s);
+      const say = (s) => Number(el(s).value) || 0;
+
+      const DISK_IOPS = {
+        7200: 80,
+        10000: 140,
+        15000: 180,
+        'ssd-sata': 25000,
+        'ssd-sas': 60000,
+        nvme: 400000,
+      };
+
+      /* Yazma cezası: bir mantıksal yazmanın kaç fiziksel işleme dönüştüğü.
+         Kullanılabilir disk oranı da seviyeye göre değişir. */
+      const RAID = {
+        0: { ceza: 1, ad: 'RAID 0', kullanilir: (n) => n, dayaniklilik: 'Yok — tek disk arızası bütün veriyi götürür', enAz: 1 },
+        1: { ceza: 2, ad: 'RAID 1', kullanilir: (n) => Math.floor(n / 2), dayaniklilik: 'Her aynadan biri arızalanabilir', enAz: 2 },
+        5: { ceza: 4, ad: 'RAID 5', kullanilir: (n) => n - 1, dayaniklilik: 'Tek disk arızası', enAz: 3 },
+        6: { ceza: 6, ad: 'RAID 6', kullanilir: (n) => n - 2, dayaniklilik: 'İki disk arızası', enAz: 4 },
+        10: { ceza: 2, ad: 'RAID 10', kullanilir: (n) => Math.floor(n / 2), dayaniklilik: 'Her aynadan biri arızalanabilir', enAz: 4 },
+        50: { ceza: 4, ad: 'RAID 50', kullanilir: (n) => n - 2, dayaniklilik: 'Her gruptan bir disk', enAz: 6 },
+        60: { ceza: 6, ad: 'RAID 60', kullanilir: (n) => n - 4, dayaniklilik: 'Her gruptan iki disk', enAz: 8 },
+      };
+
+      function diskIops() {
+        const tur = el('#r-tur').value;
+        return tur === 'ozel' ? say('#r-ozel') : DISK_IOPS[tur];
+      }
+
+      /** Etkin IOPS = (ham IOPS) / (okuma oranı × 1 + yazma oranı × ceza) */
+      function etkinIops(adet, birim, ceza, okumaOrani) {
+        const ham = adet * birim;
+        const yazmaOrani = 1 - okumaOrani;
+        const ortalamaCarpan = okumaOrani * 1 + yazmaOrani * ceza;
+        return ham / ortalamaCarpan;
+      }
+
+      function hesapla() {
+        const adet = say('#r-adet');
+        const birim = diskIops();
+        const seviye = el('#r-raid').value;
+        const r = RAID[seviye];
+        const okuma = say('#r-okuma') / 100;
+        const kapasite = say('#r-kapasite');
+
+        const ham = adet * birim;
+        const etkin = etkinIops(adet, birim, r.ceza, okuma);
+        const kullanilirDisk = Math.max(0, r.kullanilir(adet));
+        const kullanilirTb = kullanilirDisk * kapasite;
+        const kayipYuzde = ((ham - etkin) / ham) * 100;
+
+        el('#r-kartlar').innerHTML = [
+          { b: 'Ham IOPS', d: Math.round(ham).toLocaleString('tr-TR'), n: `${adet} disk × ${birim.toLocaleString('tr-TR')}` },
+          {
+            b: 'Etkin IOPS',
+            d: Math.round(etkin).toLocaleString('tr-TR'),
+            n: `%${Math.round(okuma * 100)} okuma / %${Math.round((1 - okuma) * 100)} yazma`,
+          },
+          { b: 'Yazma cezası', d: `${r.ceza}×`, n: r.ad },
+          { b: 'Kayıp', d: `%${Math.round(kayipYuzde)}`, n: 'Cezanın yediği performans' },
+          {
+            b: 'Kullanılabilir alan',
+            d: kullanilirTb >= 1 ? `${kullanilirTb.toFixed(1)} TB` : `${Math.round(kullanilirTb * 1024)} GB`,
+            n: `${kullanilirDisk} diskin karşılığı`,
+          },
+          {
+            b: 'Yazma IOPS',
+            d: Math.round(ham / r.ceza).toLocaleString('tr-TR'),
+            n: 'Yüzde yüz yazma olsaydı',
+          },
+        ]
+          .map(
+            (k) =>
+              `<div class="r-kart"><span class="r-kart-b">${k.b}</span>` +
+              `<b class="r-kart-d">${k.d}</b><span class="r-kart-n">${k.n}</span></div>`
+          )
+          .join('');
+
+        /* --- durum --- */
+        const durum = el('#r-durum');
+        if (adet < r.enAz) {
+          durum.className = 'arac-durum hata';
+          durum.textContent = `${r.ad} en az ${r.enAz} disk ister; ${adet} disk yetmez.`;
+        } else if (seviye === '5' && kapasite >= 4) {
+          durum.className = 'arac-durum hata';
+          durum.textContent =
+            `${kapasite} TB disklerle RAID 5 riskli: yeniden yapılandırma günler sürer ve ` +
+            `dizi o süre boyunca korumasız kalır. RAID 6 ya da RAID 10 düşünün.`;
+        } else {
+          durum.className = 'arac-durum ok';
+          durum.textContent =
+            `${r.ad}: ${Math.round(etkin).toLocaleString('tr-TR')} etkin IOPS, ` +
+            `${kullanilirTb.toFixed(1)} TB kullanılabilir alan.`;
+        }
+
+        /* --- ihtiyaç karşılaştırması --- */
+        const gereken = say('#r-gereken');
+        const tepe = say('#r-tepe');
+        const tepeGereken = gereken * tepe;
+
+        el('#r-cubuklar').innerHTML = [
+          ['Ortalama ihtiyaç', gereken, etkin],
+          ['Tepe ihtiyaç', tepeGereken, etkin],
+        ]
+          .map(([ad, deger, kapasiteDeger]) => {
+            const oran = (deger / kapasiteDeger) * 100;
+            const durumTip = oran > 100 ? 'kritik' : oran > 80 ? 'uyari' : 'ok';
+            return (
+              `<div class="r-cubuk" data-durum="${durumTip}">` +
+              `<div class="r-cubuk-ust"><span>${ad}</span>` +
+              `<b>${Math.round(deger).toLocaleString('tr-TR')} / ${Math.round(kapasiteDeger).toLocaleString('tr-TR')} IOPS</b></div>` +
+              `<div class="r-ray"><i style="width:${Math.min(100, oran)}%"></i></div>` +
+              `<span class="r-cubuk-alt">%${Math.round(oran)} doluluk</span></div>`
+            );
+          })
+          .join('');
+
+        /* --- öneri --- */
+        const oneriler = [];
+        if (tepeGereken > etkin) {
+          // Aynı RAID seviyesinde kaç disk gerekirdi?
+          const gerekenDisk = Math.ceil((tepeGereken * (okuma + (1 - okuma) * r.ceza)) / birim);
+          oneriler.push([
+            'hata',
+            `<b>Tepe yükü karşılanamıyor.</b> ${Math.round(tepeGereken).toLocaleString('tr-TR')} IOPS ` +
+              `gerekiyor, dizi ${Math.round(etkin).toLocaleString('tr-TR')} veriyor. Aynı ` +
+              `yapılandırmayla <b>${gerekenDisk} disk</b> gerekirdi. Alternatif: RAID 10'a ` +
+              `geçmek cezayı ${r.ceza}'ten 2'ye indirir ve aynı disk sayısıyla ` +
+              `${Math.round(etkinIops(adet, birim, 2, okuma)).toLocaleString('tr-TR')} IOPS verir — ` +
+              `karşılığında kullanılabilir alanın bir kısmından vazgeçersiniz.`,
+          ]);
+        } else if (tepeGereken > etkin * 0.8) {
+          oneriler.push([
+            'uyari',
+            `<b>Tepede pay kalmıyor.</b> Dizi %${Math.round((tepeGereken / etkin) * 100)} doluluğa ` +
+              `çıkıyor. Bu seviyede gecikme (latency) belirgin şekilde artmaya başlar; IOPS ` +
+              `sayısı yetse bile kullanıcı yavaşlama hisseder.`,
+          ]);
+        } else {
+          oneriler.push([
+            'ok',
+            `<b>Yeterli pay var.</b> Tepe yükte dizi %${Math.round((tepeGereken / etkin) * 100)} ` +
+              `doluluğa çıkıyor; gecikme düşük kalır.`,
+          ]);
+        }
+
+        if (okuma < 0.5 && r.ceza >= 4) {
+          oneriler.push([
+            'uyari',
+            `<b>Yazma ağırlıklı yükte eşlikli RAID pahalıdır.</b> İş yükünüz ` +
+              `%${Math.round((1 - okuma) * 100)} yazma; ${r.ad}'in ${r.ceza}× cezası burada ` +
+              `en çok acıtır. RAID 10 aynı disklerle ` +
+              `${Math.round(etkinIops(adet, birim, 2, okuma)).toLocaleString('tr-TR')} IOPS verirdi.`,
+          ]);
+        }
+
+        if (birim >= 25000 && r.ceza >= 4) {
+          oneriler.push([
+            'uyari',
+            `<b>SSD'de darboğaz büyük olasılıkla disk değil.</b> Hesap ` +
+              `${Math.round(etkin).toLocaleString('tr-TR')} IOPS diyor ama bu rakamlarda ` +
+              `denetleyici, bağlantı hattı ya da dosya sistemi önce doyar. Ölçmeden bu sayıya ` +
+              `göre taahhüt vermeyin.`,
+          ]);
+        }
+
+        el('#r-oneri').innerHTML =
+          '<ul class="r-liste">' +
+          oneriler.map(([tip, m]) => `<li data-tip="${tip}">${m}</li>`).join('') +
+          '</ul>';
+
+        /* --- karşılaştırma tablosu --- */
+        el('#r-tablo').innerHTML = Object.entries(RAID)
+          .map(([kod, x]) => {
+            const yeter = adet >= x.enAz;
+            const e = yeter ? etkinIops(adet, birim, x.ceza, okuma) : 0;
+            const alan = yeter ? Math.max(0, x.kullanilir(adet)) * kapasite : 0;
+            return (
+              `<tr${kod === seviye ? ' data-secili="evet"' : ''}${yeter ? '' : ' class="r-yetmez"'}>` +
+              `<td><b>${x.ad}</b></td>` +
+              `<td>${x.ceza}×</td>` +
+              `<td>${yeter ? alan.toFixed(1) + ' TB' : `en az ${x.enAz} disk`}</td>` +
+              `<td>${yeter ? Math.round(e).toLocaleString('tr-TR') : '—'}</td>` +
+              `<td>${x.dayaniklilik}</td>` +
+              `</tr>`
+            );
+          })
+          .join('');
+      }
+
+      el('#r-tur').addEventListener('change', () => {
+        el('#r-ozel-alan').hidden = el('#r-tur').value !== 'ozel';
+        hesapla();
+      });
+
+      document
+        .querySelectorAll('.arac-alan input, .arac-alan select')
+        .forEach((g) => {
+          g.addEventListener('input', hesapla);
+          g.addEventListener('change', hesapla);
+        });
+
+      hesapla();
+    })();
+  </script>
+
+  <style>
+    .r-kartlar {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(min(160px, 100%), 1fr));
+      gap: 10px;
+      margin-bottom: 14px;
+    }
+    .r-kart {
+      border: 1px solid var(--line);
+      border-radius: 11px;
+      padding: 13px 15px;
+      display: grid;
+      gap: 3px;
+      background: var(--paper);
+    }
+    .r-kart-b {
+      font-size: 11.5px;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+      color: var(--muted);
+    }
+    .r-kart-d {
+      font-size: 22px;
+      letter-spacing: -0.02em;
+      font-family: var(--mono, ui-monospace, monospace);
+      color: var(--indigo-metin);
+    }
+    .r-kart-n {
+      font-size: 12px;
+      color: var(--muted);
+      line-height: 1.45;
+    }
+    .r-cubuklar {
+      display: grid;
+      gap: 14px;
+      margin: 14px 0 18px;
+    }
+    .r-cubuk-ust {
+      display: flex;
+      justify-content: space-between;
+      gap: 12px;
+      font-size: 13px;
+      margin-bottom: 5px;
+      flex-wrap: wrap;
+    }
+    .r-ray {
+      height: 9px;
+      border-radius: 999px;
+      background: var(--tint);
+      overflow: hidden;
+      border: 1px solid var(--line);
+    }
+    .r-ray i {
+      display: block;
+      height: 100%;
+      background: var(--indigo);
+    }
+    .r-cubuk[data-durum='kritik'] .r-ray i {
+      background: light-dark(#dc2626, #f87171);
+    }
+    .r-cubuk[data-durum='uyari'] .r-ray i {
+      background: light-dark(#f0c33c, #a97f1c);
+    }
+    .r-cubuk-alt {
+      font-size: 12px;
+      color: var(--muted);
+      margin-top: 4px;
+      display: block;
+    }
+    .r-kaydir {
+      overflow-x: auto;
+    }
+    .r-tablo {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 13px;
+      min-width: 560px;
+    }
+    .r-tablo th,
+    .r-tablo td {
+      text-align: left;
+      padding: 9px 12px;
+      border-bottom: 1px solid var(--line);
+      vertical-align: top;
+      line-height: 1.5;
+    }
+    .r-tablo th {
+      color: var(--muted);
+      font-size: 11.5px;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+    }
+    .r-tablo td:nth-child(4) {
+      font-family: var(--mono, ui-monospace, monospace);
+      color: var(--indigo-metin);
+      white-space: nowrap;
+    }
+    .r-tablo tr[data-secili] {
+      background: var(--tint);
+    }
+    .r-yetmez {
+      opacity: 0.45;
+    }
+    .r-liste,
+    .r-ipuclari {
+      list-style: none;
+      margin: 0;
+      padding: 0;
+      display: grid;
+      gap: 12px;
+    }
+    .r-liste li,
+    .r-ipuclari li {
+      font-size: 13.5px;
+      line-height: 1.62;
+      color: var(--ink-soft);
+      border-left: 2px solid var(--line);
+      padding-left: 13px;
+    }
+    .r-liste li[data-tip='hata'] {
+      border-left-color: light-dark(#dc2626, #f87171);
+    }
+    .r-liste li[data-tip='uyari'] {
+      border-left-color: light-dark(#f0c33c, #a97f1c);
+    }
+    .r-liste li[data-tip='ok'] {
+      border-left-color: light-dark(#16a34a, #4ade80);
+    }
+  </style>
+</Base>

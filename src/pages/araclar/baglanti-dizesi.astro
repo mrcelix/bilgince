@@ -1,0 +1,569 @@
+---
+import Base from '../../layouts/Base.astro';
+---
+
+<Base
+  baslik="Veri tabanı bağlantı dizesi üreteci"
+  aciklama="SQL Server, PostgreSQL, MySQL, Oracle ve MongoDB için doğru bağlantı dizesini üretir; şifreleme, havuz ve zaman aşımı ayarlarını açıklar."
+  aramaya={true}
+  kategori="Araç"
+>
+  <div class="arama-bas">
+    <div class="kap">
+      <nav class="kirinti" aria-label="Kırıntı yolu" style="padding-top:0">
+        <a href="/">Ana sayfa</a><span class="ayrac">/</span><a href="/araclar">Araçlar</a><span
+          class="ayrac">/</span
+        ><span aria-current="page">Bağlantı dizesi üreteci</span>
+      </nav>
+      <h1>Veri tabanı bağlantı dizesi üreteci</h1>
+      <p style="color:var(--muted);font-size:14px;margin-top:8px;max-width:66ch">
+        Her sürücünün kendi anahtar adları, kendi öntanımlı davranışı var. Alanları doldurun;
+        araç doğru dizeyi üretsin ve hangi ayarın ne yaptığını söylesin.
+        <b>Parolayı buraya girmeyin</b> — üretilen dizede yer tutucu bırakılır; gerçek değeri
+        ortam değişkeninden ya da sır kasasından okutun.
+      </p>
+    </div>
+  </div>
+
+  <div class="kap arac-sayfa">
+    <section class="arac-blok">
+      <h2 class="arac-h2"><span class="arac-no">1</span> Veri tabanı</h2>
+      <div class="b-motorlar" role="radiogroup" aria-label="Veri tabanı motoru">
+        {
+          [
+            ['mssql', 'SQL Server', '1433'],
+            ['postgres', 'PostgreSQL', '5432'],
+            ['mysql', 'MySQL / MariaDB', '3306'],
+            ['oracle', 'Oracle', '1521'],
+            ['mongo', 'MongoDB', '27017'],
+          ].map(([deger, ad, port], i) => (
+            <label class="b-motor">
+              <input type="radio" name="b-motor" value={deger} checked={i === 0} data-port={port} />
+              <b>{ad}</b>
+              <span>{port}</span>
+            </label>
+          ))
+        }
+      </div>
+    </section>
+
+    <section class="arac-blok">
+      <h2 class="arac-h2"><span class="arac-no">2</span> Bağlantı</h2>
+      <div class="arac-alanlar">
+        <label class="arac-alan"
+          >Sunucu
+          <input id="b-sunucu" type="text" spellcheck="false" value="SRV-VT-01.ornek.local" />
+        </label>
+        <label class="arac-alan"
+          >Port
+          <input id="b-port" type="number" min="1" max="65535" value="1433" />
+        </label>
+        <label class="arac-alan"
+          >Veri tabanı adı
+          <input id="b-vt" type="text" spellcheck="false" value="Uygulama" />
+        </label>
+        <label class="arac-alan"
+          >Kullanıcı
+          <input id="b-kullanici" type="text" spellcheck="false" value="uygulama_svc" />
+        </label>
+        <label class="arac-alan" id="b-ornek-alan"
+          >Örnek adı <i>(SQL Server)</i>
+          <input id="b-ornekAd" type="text" spellcheck="false" placeholder="SQLEXPRESS" />
+          <small>Boş bırakırsanız varsayılan örnek kullanılır.</small>
+        </label>
+        <label class="arac-alan"
+          >Bağlantı zaman aşımı (sn)
+          <input id="b-zamanAsimi" type="number" min="1" max="300" value="15" />
+        </label>
+      </div>
+
+      <div class="b-secenekler">
+        <label class="b-sec"
+          ><input type="checkbox" id="b-tls" checked />
+          <span>Şifreli bağlantı <i>(ağda parola ve veri açık gitmesin)</i></span>
+        </label>
+        <label class="b-sec"
+          ><input type="checkbox" id="b-sertifika" checked />
+          <span>Sunucu sertifikasını doğrula <i>(kapatmak şifrelemeyi anlamsızlaştırır)</i></span>
+        </label>
+        <label class="b-sec" id="b-entegre-alan"
+          ><input type="checkbox" id="b-entegre" />
+          <span>Windows kimlik doğrulaması <i>(parola gerekmez — tercih edilen yol)</i></span>
+        </label>
+        <label class="b-sec"
+          ><input type="checkbox" id="b-havuz" checked />
+          <span>Bağlantı havuzu</span>
+        </label>
+        <label class="b-sec"
+          ><input type="checkbox" id="b-salt" />
+          <span>Salt okunur amaç <i>(okuma kopyasına yönlendir)</i></span>
+        </label>
+      </div>
+      <p class="arac-durum" id="b-durum" role="status" aria-live="polite"></p>
+    </section>
+
+    <section class="arac-blok">
+      <h2 class="arac-h2"><span class="arac-no">3</span> Bağlantı dizeleri</h2>
+      <div class="b-ciktilar" id="b-ciktilar"></div>
+    </section>
+
+    <section class="arac-blok">
+      <h2 class="arac-h2"><span class="arac-no">4</span> Ayarlar ne yapıyor?</h2>
+      <div id="b-aciklama"></div>
+    </section>
+
+    <section class="arac-blok">
+      <h2 class="arac-h2"><span class="arac-no">5</span> Parolayı nereye koymalı?</h2>
+      <div class="b-kartlar">
+        <div class="b-kart">
+          <b>Ortam değişkeni</b>
+          <p>En basit ve çoğu durumda yeterli yol. Dizeyi kodda kurun, sırrı ortamdan okuyun.</p>
+          <pre class="kod"><code>{`# PowerShell
+$env:VT_PAROLA = (Get-Secret VT_PAROLA -AsPlainText)
+
+# .NET yapılandırmasında
+"Server=...;User ID=...;Password=\${VT_PAROLA};"`}</code></pre>
+        </div>
+        <div class="b-kart">
+          <b>Windows kimlik doğrulaması</b>
+          <p>
+            SQL Server'da en iyi seçenek: parola hiç var olmaz. Uygulama havuzu bir hizmet
+            hesabıyla çalışır, veri tabanı o hesaba yetki verir.
+          </p>
+          <pre class="kod"><code>Integrated Security=true;</code></pre>
+        </div>
+        <div class="b-kart">
+          <b>Yönetilen kimlik</b>
+          <p>
+            Bulutta çalışıyorsanız parola tutmanın hiç gereği yok; kimlik doğrulaması altyapı
+            tarafından yapılır ve anahtar rotasyonu kendiliğinden olur.
+          </p>
+          <pre class="kod"><code>Authentication=Active Directory Managed Identity;</code></pre>
+        </div>
+        <div class="b-kart">
+          <b>Sır kasası</b>
+          <p>
+            Birden çok ortam ve düzenli rotasyon varsa doğru yatırım budur. Uygulama açılışta
+            kasadan okur, bellekte tutar, diske yazmaz.
+          </p>
+          <pre class="kod"><code>Get-Secret -Name VT_PAROLA -Vault Kurumsal</code></pre>
+        </div>
+      </div>
+      <p class="arac-not">
+        <b>Yapmayın:</b> parolayı kaynak koduna gömmek, yapılandırma dosyasını sürüm kontrolüne
+        eklemek, bağlantı dizesini bilet sistemine ya da sohbete yapıştırmak. Sızan sırların
+        çoğu saldırıyla değil, kopyala-yapıştırla ortaya çıkar.
+      </p>
+    </section>
+  </div>
+
+  <script>
+    (() => {
+      const el = (s) => document.querySelector(s);
+      const kacir = (s) =>
+        String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+
+      const YER_TUTUCU = '${VT_PAROLA}';
+
+      function alanlar() {
+        return {
+          motor: document.querySelector('input[name="b-motor"]:checked').value,
+          sunucu: el('#b-sunucu').value.trim() || 'localhost',
+          port: Number(el('#b-port').value) || 0,
+          vt: el('#b-vt').value.trim() || 'veritabani',
+          kullanici: el('#b-kullanici').value.trim() || 'kullanici',
+          ornekAd: el('#b-ornekAd').value.trim(),
+          zamanAsimi: Number(el('#b-zamanAsimi').value) || 15,
+          tls: el('#b-tls').checked,
+          sertifika: el('#b-sertifika').checked,
+          entegre: el('#b-entegre').checked,
+          havuz: el('#b-havuz').checked,
+          salt: el('#b-salt').checked,
+        };
+      }
+
+      /** URI biçiminde kullanıcı adı ve parola kaçırılmalıdır. */
+      const uriKacir = (s) => encodeURIComponent(s);
+
+      function dizeler(a) {
+        const sunucuPort = a.port ? `${a.sunucu}:${a.port}` : a.sunucu;
+
+        if (a.motor === 'mssql') {
+          const hedef = a.ornekAd
+            ? `${a.sunucu}\\${a.ornekAd}`
+            : a.port && a.port !== 1433
+              ? `${a.sunucu},${a.port}`
+              : a.sunucu;
+
+          const parcalar = [`Server=${hedef}`, `Database=${a.vt}`];
+          if (a.entegre) parcalar.push('Integrated Security=true');
+          else parcalar.push(`User ID=${a.kullanici}`, `Password=${YER_TUTUCU}`);
+          parcalar.push(`Encrypt=${a.tls ? 'true' : 'false'}`);
+          parcalar.push(`TrustServerCertificate=${a.sertifika ? 'false' : 'true'}`);
+          parcalar.push(`Connect Timeout=${a.zamanAsimi}`);
+          if (!a.havuz) parcalar.push('Pooling=false');
+          else parcalar.push('Min Pool Size=5', 'Max Pool Size=100');
+          if (a.salt) parcalar.push('ApplicationIntent=ReadOnly');
+          parcalar.push('Application Name=Uygulama');
+
+          return [
+            ['ADO.NET / .NET', parcalar.join(';') + ';'],
+            [
+              'JDBC',
+              `jdbc:sqlserver://${hedef};databaseName=${a.vt};` +
+                (a.entegre
+                  ? 'integratedSecurity=true;'
+                  : `user=${a.kullanici};password=${YER_TUTUCU};`) +
+                `encrypt=${a.tls};trustServerCertificate=${!a.sertifika};loginTimeout=${a.zamanAsimi};`,
+            ],
+            [
+              'sqlcmd',
+              `sqlcmd -S ${hedef} -d ${a.vt} ` +
+                (a.entegre ? '-E' : `-U ${a.kullanici} -P "$env:VT_PAROLA"`) +
+                ` -N -l ${a.zamanAsimi}`,
+            ],
+            [
+              'Python (pyodbc)',
+              `DRIVER={ODBC Driver 18 for SQL Server};SERVER=${hedef};DATABASE=${a.vt};` +
+                (a.entegre ? 'Trusted_Connection=yes;' : `UID=${a.kullanici};PWD=${YER_TUTUCU};`) +
+                `Encrypt=${a.tls ? 'yes' : 'no'};TrustServerCertificate=${a.sertifika ? 'no' : 'yes'};`,
+            ],
+          ];
+        }
+
+        if (a.motor === 'postgres') {
+          const sslmode = a.tls ? (a.sertifika ? 'verify-full' : 'require') : 'disable';
+          return [
+            [
+              'URI',
+              `postgresql://${uriKacir(a.kullanici)}:${YER_TUTUCU}@${sunucuPort}/${a.vt}` +
+                `?sslmode=${sslmode}&connect_timeout=${a.zamanAsimi}` +
+                (a.salt ? '&target_session_attrs=read-only' : ''),
+            ],
+            [
+              'Anahtar-değer',
+              `host=${a.sunucu} port=${a.port} dbname=${a.vt} user=${a.kullanici} ` +
+                `password=${YER_TUTUCU} sslmode=${sslmode} connect_timeout=${a.zamanAsimi}`,
+            ],
+            [
+              'JDBC',
+              `jdbc:postgresql://${sunucuPort}/${a.vt}?user=${a.kullanici}&password=${YER_TUTUCU}` +
+                `&ssl=${a.tls}&sslmode=${sslmode}&connectTimeout=${a.zamanAsimi}`,
+            ],
+            [
+              'psql',
+              `PGPASSWORD="$VT_PAROLA" psql -h ${a.sunucu} -p ${a.port} -U ${a.kullanici} -d ${a.vt} ` +
+                `--set=sslmode=${sslmode}`,
+            ],
+          ];
+        }
+
+        if (a.motor === 'mysql') {
+          const ssl = a.tls ? (a.sertifika ? 'VERIFY_IDENTITY' : 'REQUIRED') : 'DISABLED';
+          return [
+            [
+              'URI',
+              `mysql://${uriKacir(a.kullanici)}:${YER_TUTUCU}@${sunucuPort}/${a.vt}` +
+                `?ssl-mode=${ssl}&connect-timeout=${a.zamanAsimi}&charset=utf8mb4`,
+            ],
+            [
+              'ADO.NET (MySqlConnector)',
+              `Server=${a.sunucu};Port=${a.port};Database=${a.vt};User ID=${a.kullanici};` +
+                `Password=${YER_TUTUCU};SslMode=${a.tls ? (a.sertifika ? 'VerifyFull' : 'Required') : 'None'};` +
+                `Connection Timeout=${a.zamanAsimi};CharSet=utf8mb4;` +
+                (a.havuz ? 'Pooling=true;MinimumPoolSize=5;MaximumPoolSize=100;' : 'Pooling=false;'),
+            ],
+            [
+              'JDBC',
+              `jdbc:mysql://${sunucuPort}/${a.vt}?user=${a.kullanici}&password=${YER_TUTUCU}` +
+                `&useSSL=${a.tls}&verifyServerCertificate=${a.sertifika}` +
+                `&connectTimeout=${a.zamanAsimi * 1000}&characterEncoding=utf8`,
+            ],
+            [
+              'mysql istemcisi',
+              `mysql -h ${a.sunucu} -P ${a.port} -u ${a.kullanici} -p ${a.vt} ` +
+                `--ssl-mode=${ssl} --default-character-set=utf8mb4`,
+            ],
+          ];
+        }
+
+        if (a.motor === 'oracle') {
+          return [
+            [
+              'Kolay bağlantı',
+              `${sunucuPort}/${a.vt}`,
+            ],
+            [
+              'TNS tanımı',
+              `(DESCRIPTION=(ADDRESS=(PROTOCOL=${a.tls ? 'TCPS' : 'TCP'})(HOST=${a.sunucu})` +
+                `(PORT=${a.port}))(CONNECT_DATA=(SERVICE_NAME=${a.vt}))` +
+                `(CONNECT_TIMEOUT=${a.zamanAsimi}))`,
+            ],
+            [
+              'ADO.NET (ODP.NET)',
+              `User Id=${a.kullanici};Password=${YER_TUTUCU};` +
+                `Data Source=${sunucuPort}/${a.vt};Connection Timeout=${a.zamanAsimi};` +
+                (a.havuz ? 'Pooling=true;Min Pool Size=5;Max Pool Size=100;' : 'Pooling=false;'),
+            ],
+            [
+              'JDBC',
+              `jdbc:oracle:thin:@${a.tls ? '(DESCRIPTION=(ADDRESS=(PROTOCOL=TCPS)(HOST=' + a.sunucu + ')(PORT=' + a.port + '))(CONNECT_DATA=(SERVICE_NAME=' + a.vt + ')))' : '//' + sunucuPort + '/' + a.vt}`,
+            ],
+          ];
+        }
+
+        // MongoDB
+        const secenekler = [
+          `authSource=admin`,
+          `connectTimeoutMS=${a.zamanAsimi * 1000}`,
+          `serverSelectionTimeoutMS=${a.zamanAsimi * 1000}`,
+          `tls=${a.tls}`,
+        ];
+        if (a.tls && !a.sertifika) secenekler.push('tlsAllowInvalidCertificates=true');
+        if (a.salt) secenekler.push('readPreference=secondaryPreferred');
+        if (a.havuz) secenekler.push('maxPoolSize=100', 'minPoolSize=5');
+
+        return [
+          [
+            'Standart URI',
+            `mongodb://${uriKacir(a.kullanici)}:${YER_TUTUCU}@${sunucuPort}/${a.vt}` +
+              `?${secenekler.join('&')}`,
+          ],
+          [
+            'Çoğaltma kümesi',
+            `mongodb://${uriKacir(a.kullanici)}:${YER_TUTUCU}@${a.sunucu}:${a.port},` +
+              `${a.sunucu.replace(/^[^.]+/, 'dugum2')}:${a.port}/${a.vt}` +
+              `?replicaSet=rs0&${secenekler.join('&')}`,
+          ],
+          [
+            'mongosh',
+            `mongosh "mongodb://${a.sunucu}:${a.port}/${a.vt}" --username ${a.kullanici} ` +
+              `--authenticationDatabase admin${a.tls ? ' --tls' : ''}`,
+          ],
+        ];
+      }
+
+      const ACIKLAMALAR = {
+        mssql: [
+          ['Encrypt', 'ODBC Driver 18 ve .NET 8 ile öntanımlı <code>true</code> oldu. Eski uygulamaları yükselttiğinizde bağlantılar aniden kesilirse ilk bakılacak yer burasıdır.'],
+          ['TrustServerCertificate', '<code>true</code> yapmak sertifika doğrulamasını atlar; bu, şifrelemeyi ortadaki adam saldırısına karşı işlevsiz kılar. Kendinden imzalı sertifika varsa çözüm bu değil, sertifikayı istemciye güvendirmektir.'],
+          ['ApplicationIntent=ReadOnly', 'Her zaman açık kullanılabilirlik grubunda okuma kopyasına yönlendirir. Raporlama sorgularını asıl sunucudan almak, en kolay performans kazancıdır.'],
+          ['Application Name', 'Küçük bir alan ama <code>sp_who2</code> çıktısında hangi uygulamanın sorgu attığını görmenizi sağlar. Doldurun.'],
+        ],
+        postgres: [
+          ['sslmode=verify-full', 'Hem şifreler hem sunucu adını sertifikayla karşılaştırır. <code>require</code> yalnızca şifreler, kimin karşınızda olduğunu doğrulamaz — açıkça daha zayıftır.'],
+          ['connect_timeout', 'Yalnızca bağlantı kurulumu içindir; sorgu süresi ayrı bir ayardır (<code>statement_timeout</code>). İkisini karıştırmak sık yapılan hatadır.'],
+          ['target_session_attrs=read-only', 'Birden çok sunucu yazdığınızda salt okunur olanı seçer. Yük devretmeli kurulumlarda istemci tarafı yönlendirme sağlar.'],
+          ['Parola dosyası', 'Parolayı dizeye koymak yerine <code>~/.pgpass</code> (600 izinli) kullanabilirsiniz; komut geçmişine ve süreç listesine düşmez.'],
+        ],
+        mysql: [
+          ['ssl-mode=VERIFY_IDENTITY', 'Sertifikayı ve sunucu adını doğrular. <code>REQUIRED</code> yalnızca şifreler; <code>PREFERRED</code> ise sunucu desteklemezse sessizce şifresiz devam eder — üretimde kullanmayın.'],
+          ['charset=utf8mb4', 'MySQL\'de <code>utf8</code> aslında üç baytlıktır ve emoji ile bazı karakterleri saklayamaz. Her zaman <code>utf8mb4</code> yazın.'],
+          ['connectTimeout (JDBC)', 'JDBC bu değeri <b>milisaniye</b> bekler; diğer istemciler saniye. Aynı sayıyı iki yere kopyalamak bin kat fark yaratır.'],
+          ['Havuz boyutu', 'MySQL\'in <code>max_connections</code> değeri havuzların toplamından büyük olmalı. Beş uygulama sunucusu × 100 havuz = 500 bağlantı; sunucu 151 kabul ediyorsa üretimde çakılırsınız.'],
+        ],
+        oracle: [
+          ['Kolay bağlantı', '<code>sunucu:port/servis</code> biçimi <code>tnsnames.ora</code> gerektirmez; dağıtımı çok basitleştirir.'],
+          ['SERVICE_NAME vs SID', 'Modern Oracle sürümlerinde servis adı kullanılır. Eski belgelerden kopyalanan <code>SID</code> tanımları çok örnekli kurulumlarda yanlış örneğe bağlanır.'],
+          ['TCPS', 'Şifreli bağlantı için protokol <code>TCP</code> değil <code>TCPS</code> olmalı ve port genelde 2484\'tür. Yalnızca protokolü değiştirip portu unutmak sık yapılan hatadır.'],
+          ['Havuz', 'ODP.NET havuzu öntanımlı açıktır. Kapatmak, her bağlantıda tam bir kimlik doğrulama turu demektir — gecikmeyi belirgin artırır.'],
+        ],
+        mongo: [
+          ['authSource', 'Kullanıcı hangi veri tabanında tanımlıysa o yazılmalı; genelde <code>admin</code>. Yanlış yazılması "kimlik doğrulama başarısız" hatasının bir numaralı sebebidir.'],
+          ['serverSelectionTimeoutMS', 'Sürücü, uygun bir sunucu bulmak için bu kadar bekler. Öntanımlı 30 saniyedir ve bir arıza anında uygulamanızın 30 saniye asılı kalması demektir; düşürün.'],
+          ['readPreference=secondaryPreferred', 'Okumaları ikincil düğümlere kaydırır. Ama ikincil düğümler geride kalabilir; yazdıktan hemen sonra okuyan kodlar bozulur.'],
+          ['Parolada özel karakter', 'URI biçiminde <code>@</code>, <code>:</code> ve <code>/</code> karakterleri yüzde kodlanmalıdır. Araç kullanıcı adını kaçırıyor; parolayı kodda <code>encodeURIComponent</code> ile geçirin.'],
+        ],
+      };
+
+      function ciz() {
+        const a = alanlar();
+
+        // SQL Server'a özel alanları göster/gizle
+        el('#b-ornek-alan').hidden = a.motor !== 'mssql';
+        el('#b-entegre-alan').hidden = a.motor !== 'mssql';
+
+        const liste = dizeler(a);
+        el('#b-ciktilar').innerHTML = liste
+          .map(
+            ([ad, dize], i) =>
+              `<div class="b-cikti"><span class="yan-etiket">${ad}</span>` +
+              `<div style="position:relative">` +
+              `<pre class="kod b-kirp"><code id="b-dize-${i}">${kacir(dize)}</code></pre>` +
+              `<button class="kopyala" type="button" data-kaynak="b-dize-${i}">Kopyala</button>` +
+              `</div></div>`
+          )
+          .join('');
+
+        el('#b-aciklama').innerHTML =
+          '<ul class="b-liste">' +
+          ACIKLAMALAR[a.motor]
+            .map(([ad, m]) => `<li><b>${ad}</b> — ${m}</li>`)
+            .join('') +
+          '</ul>';
+
+        /* --- durum --- */
+        const durum = el('#b-durum');
+        if (!a.tls) {
+          durum.className = 'arac-durum hata';
+          durum.textContent =
+            'Şifreleme kapalı — parola ve veri ağda açık gidiyor. Yerel geliştirme dışında kullanmayın.';
+        } else if (!a.sertifika) {
+          durum.className = 'arac-durum hata';
+          durum.textContent =
+            'Sertifika doğrulaması kapalı. Bağlantı şifreli ama karşınızdakinin gerçekten ' +
+            'sunucunuz olduğunu doğrulamıyorsunuz; ortadaki adam saldırısına açıksınız.';
+        } else if (a.motor === 'mssql' && !a.entegre) {
+          durum.className = 'arac-durum';
+          durum.textContent =
+            'SQL Server\'da Windows kimlik doğrulaması varken parola kullanmak gereksiz risktir — ' +
+            'mümkünse yukarıdaki kutuyu işaretleyin.';
+        } else {
+          durum.className = 'arac-durum ok';
+          durum.textContent = 'Şifreleme ve sertifika doğrulaması açık.';
+        }
+      }
+
+      document
+        .querySelectorAll('input[name="b-motor"]')
+        .forEach((r) =>
+          r.addEventListener('change', () => {
+            el('#b-port').value = r.dataset.port;
+            ciz();
+          })
+        );
+
+      document
+        .querySelectorAll('.arac-alan input, .b-sec input')
+        .forEach((g) => {
+          g.addEventListener('input', ciz);
+          g.addEventListener('change', ciz);
+        });
+
+      document.addEventListener('click', async (e) => {
+        const d = e.target.closest('.kopyala');
+        if (!d || !d.dataset.kaynak) return;
+        try {
+          await navigator.clipboard.writeText(el(`#${d.dataset.kaynak}`).textContent);
+          d.textContent = 'Kopyalandı';
+          setTimeout(() => (d.textContent = 'Kopyala'), 1600);
+        } catch {
+          /* pano izni yoksa kullanıcı elle seçer */
+        }
+      });
+
+      ciz();
+    })();
+  </script>
+
+  <style>
+    .b-motorlar {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(min(150px, 100%), 1fr));
+      gap: 10px;
+    }
+    .b-motor {
+      display: grid;
+      gap: 2px;
+      border: 1px solid var(--line);
+      border-radius: 11px;
+      padding: 12px 14px;
+      cursor: pointer;
+      background: var(--paper);
+      position: relative;
+    }
+    .b-motor input {
+      position: absolute;
+      opacity: 0;
+      pointer-events: none;
+    }
+    .b-motor b {
+      font-size: 13.5px;
+    }
+    .b-motor span {
+      font-size: 12px;
+      color: var(--muted);
+      font-family: var(--mono, ui-monospace, monospace);
+    }
+    .b-motor:has(input:checked) {
+      border-color: var(--indigo);
+      background: var(--tint);
+      box-shadow: 0 0 0 1px var(--indigo);
+    }
+    .b-secenekler {
+      display: grid;
+      gap: 9px;
+      margin-top: 14px;
+    }
+    .b-sec {
+      display: inline-flex;
+      align-items: baseline;
+      gap: 8px;
+      font-size: 13px;
+      color: var(--ink-soft);
+      cursor: pointer;
+      line-height: 1.5;
+    }
+    .b-sec i,
+    .arac-alan i {
+      font-style: normal;
+      color: var(--muted);
+      font-size: 12px;
+    }
+    .b-ciktilar {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr);
+      gap: 16px;
+    }
+    .b-kirp {
+      white-space: pre-wrap;
+      word-break: break-all;
+      max-height: 200px;
+      overflow: auto;
+    }
+    .b-kartlar {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(min(280px, 100%), 1fr));
+      gap: 14px;
+    }
+    .b-kart {
+      border: 1px solid var(--line);
+      border-radius: 12px;
+      padding: 15px 16px;
+    }
+    .b-kart b {
+      font-size: 13.5px;
+      display: block;
+      margin-bottom: 6px;
+    }
+    .b-kart p {
+      font-size: 13px;
+      line-height: 1.6;
+      color: var(--ink-soft);
+      margin: 0 0 10px;
+    }
+    .b-kart pre {
+      margin: 0;
+      font-size: 12px;
+    }
+    .b-liste {
+      list-style: none;
+      margin: 0;
+      padding: 0;
+      display: grid;
+      gap: 12px;
+    }
+    .b-liste li {
+      font-size: 13.5px;
+      line-height: 1.62;
+      color: var(--ink-soft);
+      border-left: 2px solid var(--line);
+      padding-left: 13px;
+    }
+    .b-liste b {
+      font-family: var(--mono, ui-monospace, monospace);
+      font-size: 12.5px;
+      color: var(--indigo-metin);
+    }
+  </style>
+</Base>

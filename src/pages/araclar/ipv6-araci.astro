@@ -1,0 +1,481 @@
+---
+import Base from '../../layouts/Base.astro';
+---
+
+<Base
+  baslik="IPv6 adres aracı"
+  aciklama="IPv6 adresini açar, kurallı biçime sıkıştırır, ağ ve aralığını çıkarır, adres türünü söyler; EUI-64 ve ters DNS adını üretir."
+  aramaya={true}
+  kategori="Araç"
+>
+  <div class="arama-bas">
+    <div class="kap">
+      <nav class="kirinti" aria-label="Kırıntı yolu" style="padding-top:0">
+        <a href="/">Ana sayfa</a><span class="ayrac">/</span><a href="/araclar">Araçlar</a><span
+          class="ayrac">/</span
+        ><span aria-current="page">IPv6 aracı</span>
+      </nav>
+      <h1>IPv6 adres aracı</h1>
+      <p style="color:var(--muted);font-size:14px;margin-top:8px;max-width:66ch">
+        IPv6'da aynı adres onlarca farklı biçimde yazılabilir; güvenlik duvarı kuralını bir
+        biçimde, günlüğü başka biçimde görürsünüz. Adresi girin: kurallı biçimi, açık hâli, ağ
+        aralığı, türü ve ters DNS adı bir arada.
+      </p>
+    </div>
+  </div>
+
+  <div class="kap arac-sayfa">
+    <section class="arac-blok">
+      <h2 class="arac-h2"><span class="arac-no">1</span> Adres</h2>
+      <div class="arac-alan">
+        <label for="i-girdi">IPv6 adresi, isteğe bağlı önek ile</label>
+        <input id="i-girdi" type="text" spellcheck="false" value="2a01:4f8:0:2::1a3f:0:0:8a2e/64" />
+      </div>
+      <div class="arac-dugmeler">
+        <button type="button" class="dg dg-hayalet" data-ornek="2001:db8:85a3::8a2e:370:7334/64">Belge adresi</button>
+        <button type="button" class="dg dg-hayalet" data-ornek="fe80::1c2d:3e4f:5a6b:7c8d%eth0">Bağlantı yerel</button>
+        <button type="button" class="dg dg-hayalet" data-ornek="fd12:3456:789a:1::/48">Benzersiz yerel</button>
+        <button type="button" class="dg dg-hayalet" data-ornek="::ffff:192.168.1.10">IPv4 eşlenmiş</button>
+        <button type="button" class="dg dg-hayalet" data-ornek="2a03:2880:f12f:83:face:b00c:0:25de/128">Tek adres</button>
+      </div>
+      <p class="arac-durum" id="i-durum" role="status" aria-live="polite"></p>
+    </section>
+
+    <section class="arac-blok" id="i-sonuc" hidden>
+      <h2 class="arac-h2"><span class="arac-no">2</span> Biçimler</h2>
+      <div class="i-satirlar" id="i-bicimler"></div>
+    </section>
+
+    <section class="arac-blok" id="i-ag-blok" hidden>
+      <h2 class="arac-h2"><span class="arac-no">3</span> Ağ</h2>
+      <div class="arac-olcum" id="i-olcum"></div>
+      <div class="i-satirlar" id="i-ag"></div>
+    </section>
+
+    <section class="arac-blok" id="i-tur-blok" hidden>
+      <h2 class="arac-h2"><span class="arac-no">4</span> Adres türü</h2>
+      <div id="i-tur"></div>
+    </section>
+
+    <section class="arac-blok">
+      <h2 class="arac-h2"><span class="arac-no">5</span> IPv6'da sık takılan yerler</h2>
+      <ul class="i-ipuclari">
+        <li>
+          <b>Sıkıştırma kuralları katıdır.</b> <code>::</code> bir adreste yalnızca <i>bir kez</i>
+          kullanılabilir ve en uzun sıfır dizisini kısaltır; eşitlik varsa en soldaki seçilir.
+          Ayrıca tek bir sıfır grubu <code>::</code> ile kısaltılmaz — <code>2001:db8:0:1::1</code>
+          doğru, <code>2001:db8::1:0:0:0:1</code> gibi keyfi kısaltmalar kurallı değildir.
+          Metin karşılaştırmasıyla adres eşitliği aramak bu yüzden hatalıdır.
+        </li>
+        <li>
+          <b>Adres yazarken küçük harf.</b> RFC 5952 kurallı biçimde onaltılık harflerin küçük
+          olmasını ister. Windows araçları büyük harf yazabilir; iki günlüğü karşılaştırırken
+          ikisini de kurallı biçime çevirin.
+        </li>
+        <li>
+          <b>URL'de köşeli parantez zorunludur.</b> <code>http://[2001:db8::1]:8080/</code> —
+          parantezsiz yazarsanız iki nokta port ayracıyla karışır. Yapılandırma dosyalarında
+          en sık yapılan yazım hatası budur.
+        </li>
+        <li>
+          <b>Bağlantı yerel adreslerde bölge kimliği gerekir.</b> <code>fe80::1</code> tek başına
+          anlamsızdır; hangi arayüzden gidileceği yazılmalıdır: Linux'ta
+          <code>fe80::1%eth0</code>, Windows'ta <code>fe80::1%12</code>. Bölge numarası makineye
+          özeldir, taşınamaz.
+        </li>
+        <li>
+          <b>Alt ağ maskesi diye bir şey yok.</b> IPv6'da yalnızca önek uzunluğu vardır ve
+          uç ağlar için standart <code>/64</code>'tür. Daha dar bir önek (ör. <code>/112</code>)
+          teknik olarak çalışır ama SLAAC'ı bozar; noktadan noktaya bağlantılar dışında
+          kullanmayın.
+        </li>
+        <li>
+          <b>Benzersiz yerel adres NAT değildir.</b> <code>fc00::/7</code> IPv4'teki özel
+          adreslerin karşılığı gibi görünür ama IPv6'da amaç adres çevirisi değil, yalnızca
+          yönlendirilemez iç adresleme sağlamaktır. İnternete çıkacak makinelere genel adres verin.
+        </li>
+      </ul>
+    </section>
+  </div>
+
+  <script>
+    (() => {
+      const el = (s) => document.querySelector(s);
+
+      /* --- ayrıştırma ---------------------------------------------------------
+         Sonuç 8 adet 16 bitlik grup. Gömülü IPv4 ve :: sıkıştırması desteklenir. */
+      function coz(metin) {
+        let s = metin.trim();
+        let bolge = null;
+        let onek = null;
+
+        const bolgeAyrac = s.indexOf('%');
+        if (bolgeAyrac !== -1) {
+          const kalan = s.slice(bolgeAyrac + 1);
+          const egik = kalan.indexOf('/');
+          bolge = egik === -1 ? kalan : kalan.slice(0, egik);
+          s = s.slice(0, bolgeAyrac) + (egik === -1 ? '' : kalan.slice(egik));
+        }
+
+        const egik = s.indexOf('/');
+        if (egik !== -1) {
+          onek = Number(s.slice(egik + 1));
+          s = s.slice(0, egik);
+          if (!Number.isInteger(onek) || onek < 0 || onek > 128) return { hata: 'Önek 0 ile 128 arasında olmalı.' };
+        }
+
+        if (!s) return { hata: 'Adres boş.' };
+
+        // Gömülü IPv4: son iki grup yerine geçer
+        const nokta = s.lastIndexOf('.');
+        if (nokta !== -1) {
+          const ikiNokta = s.lastIndexOf(':');
+          if (ikiNokta === -1 || ikiNokta > nokta) return { hata: 'IPv4 kısmı hatalı yerde.' };
+          const v4 = s.slice(ikiNokta + 1);
+          const parcalar = v4.split('.');
+          if (parcalar.length !== 4 || parcalar.some((p) => !/^\d{1,3}$/.test(p) || Number(p) > 255)) {
+            return { hata: `Gömülü IPv4 adresi geçersiz: ${v4}` };
+          }
+          const a = (Number(parcalar[0]) << 8) | Number(parcalar[1]);
+          const b = (Number(parcalar[2]) << 8) | Number(parcalar[3]);
+          s = s.slice(0, ikiNokta + 1) +
+            a.toString(16) + ':' + b.toString(16);
+        }
+
+        const cift = s.split('::');
+        if (cift.length > 2) return { hata: ':: bir adreste yalnızca bir kez kullanılabilir.' };
+
+        const grupCoz = (parca) =>
+          parca === '' ? [] : parca.split(':').map((g) => {
+            if (!/^[0-9a-fA-F]{1,4}$/.test(g)) return NaN;
+            return parseInt(g, 16);
+          });
+
+        let gruplar;
+        if (cift.length === 2) {
+          const sol = grupCoz(cift[0]);
+          const sag = grupCoz(cift[1]);
+          const eksik = 8 - sol.length - sag.length;
+          if (eksik < 1) return { hata: ':: en az bir sıfır grubunun yerini almalı.' };
+          gruplar = [...sol, ...new Array(eksik).fill(0), ...sag];
+        } else {
+          gruplar = grupCoz(s);
+          if (gruplar.length !== 8) {
+            return { hata: `Adres 8 grup olmalı, ${gruplar.length} grup bulundu.` };
+          }
+        }
+
+        if (gruplar.some((g) => Number.isNaN(g))) return { hata: 'Geçersiz onaltılık grup.' };
+        return { gruplar, onek, bolge };
+      }
+
+      /* --- biçimler ------------------------------------------------------------ */
+      const acikYaz = (g) => g.map((x) => x.toString(16).padStart(4, '0')).join(':');
+
+      /** RFC 5952 kurallı biçim: en uzun sıfır dizisi :: olur, harfler küçük. */
+      function kuralliYaz(g) {
+        let enIyiBas = -1;
+        let enIyiUzunluk = 0;
+        let bas = -1;
+        let uzunluk = 0;
+
+        for (let i = 0; i < 8; i++) {
+          if (g[i] === 0) {
+            if (bas === -1) bas = i;
+            uzunluk++;
+            // Eşitlikte en soldaki kazanır: kesin büyüklük karşılaştırması
+            if (uzunluk > enIyiUzunluk) {
+              enIyiUzunluk = uzunluk;
+              enIyiBas = bas;
+            }
+          } else {
+            bas = -1;
+            uzunluk = 0;
+          }
+        }
+
+        // Tek bir sıfır grubu :: ile kısaltılmaz
+        if (enIyiUzunluk < 2) return g.map((x) => x.toString(16)).join(':');
+
+        const sol = g.slice(0, enIyiBas).map((x) => x.toString(16)).join(':');
+        const sag = g.slice(enIyiBas + enIyiUzunluk).map((x) => x.toString(16)).join(':');
+        return `${sol}::${sag}`;
+      }
+
+      const tersDns = (g) =>
+        acikYaz(g).replace(/:/g, '').split('').reverse().join('.') + '.ip6.arpa';
+
+      /* --- ağ hesabı ----------------------------------------------------------- */
+      function agHesapla(g, onek) {
+        const ag = [...g];
+        const yayin = [...g];
+        for (let i = 0; i < 8; i++) {
+          const bit = onek - i * 16;
+          if (bit >= 16) continue;
+          if (bit <= 0) {
+            ag[i] = 0;
+            yayin[i] = 0xffff;
+          } else {
+            const maske = (0xffff << (16 - bit)) & 0xffff;
+            ag[i] = g[i] & maske;
+            yayin[i] = g[i] | (0xffff ^ maske);
+          }
+        }
+        return { ag, son: yayin };
+      }
+
+      /* --- tür tanıma ---------------------------------------------------------- */
+      const TURLER = [
+        { onek: [0, 0, 0, 0, 0, 0, 0, 1], bit: 128, ad: 'Geri döngü', tip: 'ok', not: 'IPv4\'teki 127.0.0.1 karşılığı. Yalnızca makinenin kendisi.' },
+        { onek: [0, 0, 0, 0, 0, 0, 0, 0], bit: 128, ad: 'Belirsiz adres', tip: 'uyari', not: '<code>::</code> — "adresim yok" demektir. Hedef olarak kullanılamaz.' },
+        { onek: [0, 0, 0, 0, 0, 0xffff, 0, 0], bit: 96, ad: 'IPv4 eşlenmiş', tip: 'ok', not: 'IPv6 yuvası üzerinden IPv4 trafiği. Güvenlik duvarı kuralı yazarken hem IPv4 hem IPv6 tarafını düşünün.' },
+        { onek: [0xfe80, 0, 0, 0, 0, 0, 0, 0], bit: 10, ad: 'Bağlantı yerel', tip: 'uyari', not: 'Yalnızca aynı bağlantı üzerinde geçerli, yönlendirilmez. Kullanırken bölge kimliği (<code>%eth0</code>) zorunludur.' },
+        { onek: [0xfc00, 0, 0, 0, 0, 0, 0, 0], bit: 7, ad: 'Benzersiz yerel (ULA)', tip: 'ok', not: 'IPv4\'teki 10.0.0.0/8 gibi iç kullanım. İnternete yönlendirilmez ama NAT gerektirmez.' },
+        { onek: [0xff00, 0, 0, 0, 0, 0, 0, 0], bit: 8, ad: 'Çoklu gönderim', tip: 'ok', not: 'Bir gruba gönderim. IPv6\'da yayın (broadcast) yoktur, yerini bu alır.' },
+        { onek: [0x2001, 0x0db8, 0, 0, 0, 0, 0, 0], bit: 32, ad: 'Belgeleme aralığı', tip: 'uyari', not: 'RFC 3849 ile belgeler için ayrılmış. Üretimde kullanılmaz — bir yapılandırmada görürseniz örnekten kopyalanmış demektir.' },
+        { onek: [0x2002, 0, 0, 0, 0, 0, 0, 0], bit: 16, ad: '6to4 geçiş adresi', tip: 'uyari', not: 'Kullanımdan kaldırıldı (RFC 7526). Hâlâ görüyorsanız eski bir geçiş yapılandırması vardır.' },
+        { onek: [0x2000, 0, 0, 0, 0, 0, 0, 0], bit: 3, ad: 'Genel tekil gönderim', tip: 'ok', not: 'İnternete yönlendirilebilir genel adres. Güvenlik duvarı kuralınızın burada olduğundan emin olun.' },
+      ];
+
+      function turBul(g) {
+        for (const t of TURLER) {
+          let uyar = true;
+          for (let i = 0; i < 8 && uyar; i++) {
+            const bit = t.bit - i * 16;
+            if (bit <= 0) break;
+            const maske = bit >= 16 ? 0xffff : (0xffff << (16 - bit)) & 0xffff;
+            if ((g[i] & maske) !== (t.onek[i] & maske)) uyar = false;
+          }
+          if (uyar) return t;
+        }
+        return { ad: 'Ayrılmış ya da atanmamış', tip: 'uyari', not: 'Bu aralık henüz kullanıma açılmamış olabilir.' };
+      }
+
+      /* --- EUI-64 -------------------------------------------------------------- */
+      function eui64Coz(g) {
+        // Arayüz kimliğinin 11. ve 12. baytı ff:fe ise MAC'ten türetilmiş demektir
+        if (((g[5] & 0xff) !== 0xff) || ((g[6] >> 8) !== 0xfe)) return null;
+        const baytlar = [
+          (g[4] >> 8) ^ 0x02, // evrensel/yerel biti geri çevrilir
+          g[4] & 0xff,
+          g[5] >> 8,
+          g[6] & 0xff,
+          g[7] >> 8,
+          g[7] & 0xff,
+        ];
+        return baytlar.map((b) => b.toString(16).padStart(2, '0')).join(':');
+      }
+
+      /* --- çizim ---------------------------------------------------------------- */
+      function satir(etiket, deger, not = '') {
+        return (
+          `<div class="i-satir"><span class="i-etiket">${etiket}</span>` +
+          `<code class="i-deger">${deger}</code>` +
+          (not ? `<span class="i-not">${not}</span>` : '') +
+          `</div>`
+        );
+      }
+
+      function hesapla() {
+        const sonuc = coz(el('#i-girdi').value);
+        const durum = el('#i-durum');
+
+        if (sonuc.hata) {
+          durum.className = 'arac-durum hata';
+          durum.textContent = sonuc.hata;
+          el('#i-sonuc').hidden = true;
+          el('#i-ag-blok').hidden = true;
+          el('#i-tur-blok').hidden = true;
+          return;
+        }
+
+        const { gruplar, onek, bolge } = sonuc;
+        const kurali = kuralliYaz(gruplar);
+
+        /* --- biçimler --- */
+        const bicimler = [
+          satir('Kurallı biçim', kurali + (bolge ? `%${bolge}` : ''), 'RFC 5952 — kural budur'),
+          satir('Açık biçim', acikYaz(gruplar), 'Karşılaştırma ve sıralama için'),
+          satir('URL içinde', `http://[${kurali}]${onek === 128 || onek === null ? ':8080' : ''}/`, 'Köşeli parantez zorunlu'),
+          satir('Ters DNS', tersDns(gruplar), 'PTR kaydı için'),
+        ];
+
+        const mac = eui64Coz(gruplar);
+        if (mac) {
+          bicimler.push(
+            satir('Türetildiği MAC', mac, 'Arayüz kimliği EUI-64 ile üretilmiş — adres donanımı ele veriyor')
+          );
+        }
+
+        el('#i-sonuc').hidden = false;
+        el('#i-bicimler').innerHTML = bicimler.join('');
+
+        /* --- ağ --- */
+        if (onek !== null) {
+          const { ag, son } = agHesapla(gruplar, onek);
+          const hostBit = 128 - onek;
+          const adresSayisi =
+            hostBit >= 64 ? `2^${hostBit}` : (2 ** hostBit).toLocaleString('tr-TR');
+          const altAg64 = onek <= 64 ? 2 ** (64 - onek) : 0;
+
+          el('#i-ag-blok').hidden = false;
+          el('#i-olcum').innerHTML =
+            `<span>Önek: <b>/${onek}</b></span>` +
+            `<span>Adres: <b>${adresSayisi}</b></span>` +
+            (altAg64
+              ? `<span>/64 alt ağ: <b>${altAg64 >= 1e6 ? altAg64.toExponential(2) : altAg64.toLocaleString('tr-TR')}</b></span>`
+              : '') +
+            `<span>Host biti: <b>${hostBit}</b></span>`;
+
+          el('#i-ag').innerHTML = [
+            satir('Ağ adresi', kuralliYaz(ag) + `/${onek}`),
+            satir('İlk adres', kuralliYaz(ag)),
+            satir('Son adres', kuralliYaz(son)),
+            satir('Açık ağ', acikYaz(ag)),
+          ].join('');
+        } else {
+          el('#i-ag-blok').hidden = true;
+        }
+
+        /* --- tür --- */
+        const t = turBul(gruplar);
+        const notlar = [[t.tip, `<b>${t.ad}.</b> ${t.not}`]];
+
+        if (bolge) {
+          notlar.push([
+            'ok',
+            `<b>Bölge kimliği: <code>${bolge}</code>.</b> Bu değer yalnızca bu makinede geçerlidir; ` +
+              `adresi başka bir makineye kopyalarken bölge kısmını değiştirmeniz gerekir.`,
+          ]);
+        } else if (t.ad === 'Bağlantı yerel') {
+          notlar.push([
+            'hata',
+            '<b>Bölge kimliği eksik.</b> Bağlantı yerel bir adres, hangi arayüzden gidileceği ' +
+              'belirtilmeden kullanılamaz. Linux\'ta <code>%eth0</code>, Windows\'ta ' +
+              '<code>%12</code> gibi bir sonek ekleyin.',
+          ]);
+        }
+
+        if (onek !== null && onek > 64 && onek < 128 && t.ad === 'Genel tekil gönderim') {
+          notlar.push([
+            'uyari',
+            `<b>/${onek} önek SLAAC'ı bozar.</b> Otomatik adres yapılandırması ${64} bitlik ` +
+              `arayüz kimliği bekler. Uç ağlarda her zaman /64 kullanın; daha dar önekler ` +
+              `yalnızca noktadan noktaya bağlantılar (/127) içindir.`,
+          ]);
+        }
+
+        if (onek === 128) {
+          notlar.push(['ok', '<b>/128 tek bir adresi gösterir.</b> Güvenlik duvarı kuralı ya da statik atama için doğru biçim.']);
+        }
+
+        if (mac) {
+          notlar.push([
+            'uyari',
+            '<b>Gizlilik uyarısı.</b> EUI-64 ile üretilmiş adres, cihazın MAC adresini ve ' +
+              'dolayısıyla üreticisini açığa çıkarır; ağ değiştirseniz bile arayüz kimliği aynı ' +
+              'kalır ve cihaz izlenebilir. Modern işletim sistemleri bunun yerine geçici ' +
+              'rastgele adres (RFC 8981) kullanır.',
+          ]);
+        }
+
+        el('#i-tur-blok').hidden = false;
+        el('#i-tur').innerHTML =
+          '<ul class="i-liste">' +
+          notlar.map(([tip, m]) => `<li data-tip="${tip}">${m}</li>`).join('') +
+          '</ul>';
+
+        durum.className = 'arac-durum ok';
+        durum.textContent = `${t.ad} adresi çözümlendi.`;
+      }
+
+      el('#i-girdi').addEventListener('input', hesapla);
+      document.querySelectorAll('[data-ornek]').forEach((d) => {
+        d.addEventListener('click', () => {
+          el('#i-girdi').value = d.dataset.ornek;
+          hesapla();
+        });
+      });
+
+      hesapla();
+    })();
+  </script>
+
+  <style>
+    .arac-dugmeler {
+      display: flex;
+      gap: 10px;
+      flex-wrap: wrap;
+      margin: 12px 0 4px;
+    }
+    .i-satirlar {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr);
+      gap: 9px;
+    }
+    .i-satir {
+      display: grid;
+      grid-template-columns: minmax(0, 150px) minmax(0, 1fr);
+      gap: 4px 14px;
+      align-items: baseline;
+      border: 1px solid var(--line);
+      border-radius: 10px;
+      padding: 11px 13px;
+      background: var(--paper);
+    }
+    @media (max-width: 620px) {
+      .i-satir {
+        grid-template-columns: minmax(0, 1fr);
+      }
+    }
+    .i-etiket {
+      font-size: 11.5px;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+      color: var(--muted);
+    }
+    .i-deger {
+      font-size: 13.5px;
+      overflow-x: auto;
+      white-space: nowrap;
+      display: block;
+      min-width: 0;
+    }
+    .i-not {
+      grid-column: 2;
+      font-size: 12px;
+      color: var(--muted);
+      line-height: 1.5;
+    }
+    @media (max-width: 620px) {
+      .i-not {
+        grid-column: 1;
+      }
+    }
+    .i-liste,
+    .i-ipuclari {
+      list-style: none;
+      margin: 0;
+      padding: 0;
+      display: grid;
+      gap: 12px;
+    }
+    .i-liste li,
+    .i-ipuclari li {
+      font-size: 13.5px;
+      line-height: 1.62;
+      color: var(--ink-soft);
+      border-left: 2px solid var(--line);
+      padding-left: 13px;
+    }
+    .i-liste li[data-tip='hata'] {
+      border-left-color: light-dark(#dc2626, #f87171);
+    }
+    .i-liste li[data-tip='uyari'] {
+      border-left-color: light-dark(#f0c33c, #a97f1c);
+    }
+    .i-liste li[data-tip='ok'] {
+      border-left-color: light-dark(#16a34a, #4ade80);
+    }
+  </style>
+</Base>
