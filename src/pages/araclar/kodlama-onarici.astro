@@ -1,0 +1,567 @@
+---
+import Base from '../../layouts/Base.astro';
+---
+
+<Base
+  baslik="Bozuk Türkçe karakter onarıcı"
+  aciklama="TÃ¼rkÃ§e, Türkçe, T?rk?e… Bozulmuş metni tarayıcıda çözer, hangi kodlama zincirinin bozduğunu söyler ve tekrar olmaması için doğru komutu verir."
+  aramaya={true}
+  kategori="Araç"
+>
+  <div class="arama-bas">
+    <div class="kap">
+      <nav class="kirinti" aria-label="Kırıntı yolu" style="padding-top:0">
+        <a href="/">Ana sayfa</a><span class="ayrac">/</span><a href="/araclar">Araçlar</a><span
+          class="ayrac">/</span
+        ><span aria-current="page">Kodlama onarıcı</span>
+      </nav>
+      <h1>Bozuk Türkçe karakter onarıcı</h1>
+      <p style="color:var(--muted);font-size:14px;margin-top:8px;max-width:66ch">
+        CSV dışa aktarımı, günlük dosyası, veri tabanı alanı, PowerShell çıktısı… Türkçe metin bir
+        yerlerde yanlış kodlamayla okunmuş. Yapıştırın: araç olası zincirleri dener, en makul
+        onarımı seçer ve hatanın nerede olduğunu söyler.
+      </p>
+    </div>
+  </div>
+
+  <div class="kap arac-sayfa">
+    <section class="arac-blok">
+      <h2 class="arac-h2"><span class="arac-no">1</span> Bozuk metin</h2>
+      <div class="arac-alan">
+        <textarea id="e-girdi" rows="6" spellcheck="false" placeholder="TÃ¼rkÃ§e karakterler bozulmuÅŸ"
+        ></textarea>
+      </div>
+      <div class="arac-dugmeler">
+        <button type="button" class="dg dg-hayalet" data-ornek="TÃ¼rkÃ§e karakterler bozulmuÅŸ. ÅžehirdeÅŸ ÃœlkÃ¼ ÄŸÃ¶zÃ¼yle baktÄ±.">Klasik bozulma</button>
+        <button type="button" class="dg dg-hayalet" data-ornek="TÃƒÂ¼rkÃƒÂ§e karakterler iki kez bozuldu">Çift bozulma</button>
+        <button type="button" class="dg dg-hayalet" id="e-ornek-html">HTML varlıkları</button>
+        <button type="button" class="dg dg-hayalet" id="e-ornek-kacis">Kaçış dizileri</button>
+        <button type="button" class="dg dg-hayalet" id="e-temizle">Temizle</button>
+      </div>
+      <p class="arac-durum" id="e-durum" role="status" aria-live="polite"></p>
+    </section>
+
+    <section class="arac-blok" id="e-sonuc" hidden>
+      <h2 class="arac-h2"><span class="arac-no">2</span> Onarım adayları</h2>
+      <p class="arac-not" style="margin-top:0">
+        Adaylar Türkçe metne benzerliğine göre sıralandı. Beklediğiniz sonuç en üstte değilse
+        listeden seçin.
+      </p>
+      <div class="e-adaylar" id="e-adaylar"></div>
+    </section>
+
+    <section class="arac-blok" id="e-teshis-blok" hidden>
+      <h2 class="arac-h2"><span class="arac-no">3</span> Teşhis</h2>
+      <p class="e-teshis" id="e-teshis"></p>
+      <div class="e-baytlar" id="e-baytlar"></div>
+    </section>
+
+    <section class="arac-blok">
+      <h2 class="arac-h2"><span class="arac-no">4</span> Tekrar olmaması için</h2>
+      <div class="e-kartlar">
+        <div class="e-kart">
+          <b>Windows PowerShell 5.1</b>
+          <p>
+            <code>Set-Content</code> ve <code>Add-Content</code> öntanımlı olarak sistem kod
+            sayfasını kullanır — Türkçe Windows'ta cp1254. Her yazımda kodlamayı açıkça verin.
+          </p>
+          <pre class="kod"><code>Get-Process | Export-Csv rapor.csv -Encoding UTF8 -NoTypeInformation
+"metin" | Set-Content dosya.txt -Encoding UTF8</code></pre>
+          <small
+            >5.1'de <code>-Encoding UTF8</code> <b>BOM'lu</b> UTF-8 yazar. BOM'suz istiyorsanız
+            <code>[System.IO.File]::WriteAllText()</code> kullanın.</small
+          >
+        </div>
+        <div class="e-kart">
+          <b>PowerShell 7+</b>
+          <p>
+            Öntanımlı zaten BOM'suz UTF-8'dir; sorun genelde <i>okurken</i> çıkar. Kaynak dosya
+            cp1254 ise okurken söylemeniz gerekir.
+          </p>
+          <pre class="kod"><code>Get-Content eski.csv -Encoding windows-1254 |
+    Set-Content yeni.csv -Encoding utf8NoBOM</code></pre>
+        </div>
+        <div class="e-kart">
+          <b>Komut istemi ve çıktı yakalama</b>
+          <p>
+            Konsolun kod sayfası ile dosyaya yazılan kodlama farklı olabilir. Boru hattının
+            başında ikisini de UTF-8'e sabitleyin.
+          </p>
+          <pre class="kod"><code>chcp 65001
+$OutputEncoding = [Text.Encoding]::UTF8
+[Console]::OutputEncoding = [Text.Encoding]::UTF8</code></pre>
+        </div>
+        <div class="e-kart">
+          <b>MySQL ve MSSQL</b>
+          <p>
+            Bağlantı kodlaması sütun kodlamasından bağımsızdır. Sütun <code>utf8mb4</code> olsa
+            bile bağlantı <code>latin1</code> ise veri bozularak yazılır.
+          </p>
+          <pre class="kod"><code>-- MySQL
+SET NAMES utf8mb4;
+-- MSSQL: NVARCHAR kullanın, VARCHAR değil
+SELECT N'Türkçe' AS ornek;</code></pre>
+        </div>
+        <div class="e-kart">
+          <b>CSV'yi Excel açınca bozuluyorsa</b>
+          <p>
+            Excel, BOM'suz UTF-8 CSV'yi sistem kod sayfası sanır. Ya BOM ekleyin ya da
+            "Veri → Metinden" ile açıp kodlamayı elle seçin.
+          </p>
+          <pre class="kod"><code>$b = [Text.UTF8Encoding]::new($true)   # $true = BOM ekle
+[IO.File]::WriteAllText("rapor.csv", $icerik, $b)</code></pre>
+        </div>
+        <div class="e-kart">
+          <b>Türkçe'ye özel tuzak: nokta</b>
+          <p>
+            <code>ToUpper()</code> Türkçe yerel ayarda <code>i</code> harfini <code>İ</code>
+            yapar, İngilizce'de <code>I</code>. Sunucu adı ve hesap karşılaştırmalarında bu fark
+            gerçek arızalara yol açar.
+          </p>
+          <pre class="kod"><code># Karşılaştırmada her zaman değişmez kültür kullanın
+$a.ToUpperInvariant() -eq $b.ToUpperInvariant()</code></pre>
+        </div>
+      </div>
+    </section>
+  </div>
+
+  <script>
+    (() => {
+      const el = (s) => document.querySelector(s);
+
+      /* --- cp1252'nin 0x80-0x9F aralığı --------------------------------------
+         Latin-1 bu aralıkta denetim karakteri tanımlar, Windows-1252 ise
+         yazdırılabilir simgeler. Mojibake'nin çoğu tam bu farktan doğar. */
+      const CP1252_UST = {
+        0x20ac: 0x80, 0x201a: 0x82, 0x0192: 0x83, 0x201e: 0x84, 0x2026: 0x85,
+        0x2020: 0x86, 0x2021: 0x87, 0x02c6: 0x88, 0x2030: 0x89, 0x0160: 0x8a,
+        0x2039: 0x8b, 0x0152: 0x8c, 0x017d: 0x8e, 0x2018: 0x91, 0x2019: 0x92,
+        0x201c: 0x93, 0x201d: 0x94, 0x2022: 0x95, 0x2013: 0x96, 0x2014: 0x97,
+        0x02dc: 0x98, 0x2122: 0x99, 0x0161: 0x9a, 0x203a: 0x9b, 0x0153: 0x9c,
+        0x017e: 0x9e, 0x0178: 0x9f,
+      };
+
+      /** Metni cp1252 baytlarına çevirir; çevrilemeyen karakter varsa null. */
+      function cp1252Baytlari(metin) {
+        const cikti = new Uint8Array(metin.length);
+        for (let i = 0; i < metin.length; i++) {
+          const k = metin.codePointAt(i);
+          if (k > 0xffff) return null; // BMP dışı — cp1252'de karşılığı yok
+          if (k < 0x80 || (k >= 0xa0 && k <= 0xff)) cikti[i] = k;
+          else if (k in CP1252_UST) cikti[i] = CP1252_UST[k];
+          else return null;
+        }
+        return cikti;
+      }
+
+      /** Metni latin-1 baytlarına çevirir. */
+      function latin1Baytlari(metin) {
+        const cikti = new Uint8Array(metin.length);
+        for (let i = 0; i < metin.length; i++) {
+          const k = metin.codePointAt(i);
+          if (k > 0xff) return null;
+          cikti[i] = k;
+        }
+        return cikti;
+      }
+
+      /** Baytları verilen kodlamayla çözer; geçersizse null. */
+      function coz(baytlar, kodlama) {
+        if (!baytlar) return null;
+        try {
+          return new TextDecoder(kodlama, { fatal: true }).decode(baytlar);
+        } catch {
+          return null;
+        }
+      }
+
+      /* --- Türkçe metne benzerlik puanı --------------------------------------
+         Doğru onarım, Türkçe harfleri bol ve mojibake artığı olmayan metindir. */
+      const TR_HARF = 'çğıöşüÇĞİÖŞÜ';
+      const SUPHELI = 'ÃÂÅŸÄ±Ð�þýÿ¿½';
+
+      function puan(metin) {
+        if (!metin) return -1e9;
+        let p = 0;
+        for (const k of metin) {
+          if (TR_HARF.includes(k)) p += 12;
+          else if (SUPHELI.includes(k)) p -= 14;
+          else if (k === '�') p -= 40; // değiştirme karakteri: veri gerçekten kayıp
+          else if (k.charCodeAt(0) < 32 && k !== '\n' && k !== '\t' && k !== '\r') p -= 25;
+          else if (k.charCodeAt(0) > 0x2000 && k.charCodeAt(0) < 0x2100) p -= 6; // tipografik simge yığılması
+        }
+        // Türkçe'de sık geçen ekler doğru çözülmüşse ödüllendir
+        for (const ek of ['ler', 'lar', 'nin', 'nın', 'için', 'değil', 'şey', 'ği']) {
+          if (metin.toLocaleLowerCase('tr').includes(ek)) p += 6;
+        }
+        return p;
+      }
+
+      /* --- onarım zincirleri -------------------------------------------------- */
+      function adaylar(ham) {
+        const liste = [{ ad: 'Değişiklik yok', metin: ham, zincir: 'Girdi olduğu gibi' }];
+
+        // 1) UTF-8 baytları cp1252/latin-1 sanılarak okunmuş — en yaygın durum
+        for (const [kodAd, baytFn] of [
+          ['Windows-1252', cp1252Baytlari],
+          ['ISO-8859-1', latin1Baytlari],
+        ]) {
+          const bir = coz(baytFn(ham), 'utf-8');
+          if (bir && bir !== ham) {
+            liste.push({
+              ad: `UTF-8 → ${kodAd} bozulması`,
+              metin: bir,
+              zincir: `Metin UTF-8 yazılmış, ${kodAd} olarak okunmuş`,
+            });
+            // 2) Aynı hata iki kez olmuş (çift bozulma)
+            const iki = coz(baytFn(bir), 'utf-8');
+            if (iki && iki !== bir) {
+              liste.push({
+                ad: `${kodAd} üzerinden çift bozulma`,
+                metin: iki,
+                zincir: `Aynı hata iki kez yaşanmış — genelde iki farklı aktarım adımında`,
+              });
+            }
+          }
+        }
+
+        // 3) UTF-8 baytları ISO-8859-9 (Türkçe) sanılarak okunmuş
+        const t9 = coz(latin1Baytlari(ham), 'iso-8859-9');
+        if (t9 && t9 !== ham) {
+          liste.push({
+            ad: 'ISO-8859-9 karışması',
+            metin: t9,
+            zincir: 'Türkçe Latin-5 tablosu ile UTF-8 birbirine karışmış',
+          });
+        }
+
+        // 4) HTML varlıkları
+        if (/&[a-zA-Z#0-9]+;/.test(ham)) {
+          const g = document.createElement('textarea');
+          g.innerHTML = ham;
+          if (g.value !== ham) {
+            liste.push({
+              ad: 'HTML varlıkları çözüldü',
+              metin: g.value,
+              zincir: 'Metin bir HTML alanından kaçırılmış hâlde kopyalanmış',
+            });
+          }
+        }
+
+        // 5) \uXXXX kaçış dizileri
+        if (/\\u[0-9a-fA-F]{4}|\\x[0-9a-fA-F]{2}/.test(ham)) {
+          const c = ham
+            .replace(/\\u([0-9a-fA-F]{4})/g, (_, h) => String.fromCharCode(parseInt(h, 16)))
+            .replace(/\\x([0-9a-fA-F]{2})/g, (_, h) => String.fromCharCode(parseInt(h, 16)));
+          liste.push({
+            ad: 'Kaçış dizileri çözüldü',
+            metin: c,
+            zincir: 'Metin JSON ya da kaynak kodundan kaçırılmış hâlde alınmış',
+          });
+        }
+
+        // 6) Yüzde kodlaması
+        if (/%[0-9a-fA-F]{2}/.test(ham)) {
+          try {
+            const c = decodeURIComponent(ham);
+            if (c !== ham) {
+              liste.push({
+                ad: 'URL kodlaması çözüldü',
+                metin: c,
+                zincir: 'Metin bir adres satırından ya da form gönderiminden gelmiş',
+              });
+            }
+          } catch {
+            /* geçersiz yüzde dizisi — aday listeye eklenmez */
+          }
+        }
+
+        // Aynı sonucu veren adayları tekle
+        const gorulen = new Set();
+        return liste
+          .filter((a) => {
+            if (gorulen.has(a.metin)) return false;
+            gorulen.add(a.metin);
+            return true;
+          })
+          .map((a) => ({ ...a, puan: puan(a.metin) }))
+          .sort((a, b) => b.puan - a.puan);
+      }
+
+      /* --- bayt görünümü ----------------------------------------------------- */
+      function baytGorunumu(metin) {
+        const baytlar = new TextEncoder().encode(metin);
+        const parcalar = [];
+        let i = 0;
+        for (const k of metin) {
+          const b = new TextEncoder().encode(k);
+          const cokBaytli = b.length > 1;
+          parcalar.push(
+            `<span class="e-bayt${cokBaytli ? ' e-cok' : ''}">` +
+              `<i>${k === ' ' ? '␣' : k === '\n' ? '⏎' : k}</i>` +
+              `<u>${[...b].map((x) => x.toString(16).padStart(2, '0')).join(' ')}</u>` +
+              `</span>`
+          );
+          i++;
+          if (i >= 60) break;
+        }
+        return {
+          html: parcalar.join(''),
+          toplam: baytlar.length,
+          karakter: [...metin].length,
+          kirpildi: [...metin].length > 60,
+        };
+      }
+
+      /* --- çizim ------------------------------------------------------------- */
+      let secili = 0;
+      let suAdaylar = [];
+
+      function cizAdaylar() {
+        el('#e-adaylar').innerHTML = suAdaylar
+          .map(
+            (a, i) =>
+              `<button type="button" class="e-aday" data-i="${i}"${i === secili ? ' data-secili="evet"' : ''}>` +
+              `<span class="e-aday-ust"><b>${a.ad}</b>${i === 0 && a.puan > 0 ? '<em>en olası</em>' : ''}</span>` +
+              `<span class="e-aday-metin">${a.metin.slice(0, 220).replace(/&/g, '&amp;').replace(/</g, '&lt;') || '(boş)'}</span>` +
+              `<span class="e-aday-alt">${a.zincir}</span>` +
+              `</button>`
+          )
+          .join('');
+      }
+
+      function cizTeshis() {
+        const a = suAdaylar[secili];
+        if (!a) return;
+
+        el('#e-teshis-blok').hidden = false;
+        const g = baytGorunumu(a.metin);
+
+        el('#e-teshis').innerHTML =
+          secili === 0 && a.ad === 'Değişiklik yok'
+            ? 'Metinde tanıdık bir bozulma deseni bulunamadı — zaten doğru olabilir, ya da ' +
+              'bozulma geri döndürülemez türden olabilir (soru işaretleri ve <code>?</code> ' +
+              'karakterleri veri kaybı demektir, onarılamaz).'
+            : `<b>${a.zincir}.</b> Onarılmış metin ${g.karakter} karakter, UTF-8 olarak ` +
+              `${g.toplam} bayt tutuyor. Aşağıda her karakterin UTF-8 karşılığı var; ` +
+              `çok baytlı olanlar işaretli — bozulma tam olarak bu karakterlerde yaşanır.`;
+
+        el('#e-baytlar').innerHTML =
+          g.html + (g.kirpildi ? '<span class="e-kirpik">… ilk 60 karakter</span>' : '');
+      }
+
+      function calistir() {
+        const ham = el('#e-girdi').value;
+        if (!ham.trim()) {
+          el('#e-sonuc').hidden = true;
+          el('#e-teshis-blok').hidden = true;
+          el('#e-durum').textContent = '';
+          return;
+        }
+
+        suAdaylar = adaylar(ham);
+        secili = 0;
+        el('#e-sonuc').hidden = false;
+        cizAdaylar();
+        cizTeshis();
+
+        const enIyi = suAdaylar[0];
+        const durum = el('#e-durum');
+        if (ham.includes('�') || /\?{2,}/.test(ham)) {
+          durum.className = 'arac-durum hata';
+          durum.textContent =
+            'Metinde değiştirme karakteri (�) ya da art arda soru işareti var — ' +
+            'bu karakterler geri getirilemez, kaynağı yeniden dışa aktarmanız gerekir.';
+        } else if (enIyi.ad === 'Değişiklik yok') {
+          durum.className = 'arac-durum';
+          durum.textContent = 'Bilinen bir bozulma deseni bulunamadı.';
+        } else {
+          durum.className = 'arac-durum ok';
+          durum.textContent = `${suAdaylar.length - 1} onarım adayı bulundu.`;
+        }
+      }
+
+      /* --- olaylar ----------------------------------------------------------- */
+      el('#e-girdi').addEventListener('input', calistir);
+
+      el('#e-adaylar').addEventListener('click', async (e) => {
+        const d = e.target.closest('.e-aday');
+        if (!d) return;
+        secili = Number(d.dataset.i);
+        cizAdaylar();
+        cizTeshis();
+        try {
+          await navigator.clipboard.writeText(suAdaylar[secili].metin);
+          el('#e-durum').className = 'arac-durum ok';
+          el('#e-durum').textContent = 'Seçilen onarım panoya kopyalandı.';
+        } catch {
+          /* pano izni yoksa kullanıcı elle seçer */
+        }
+      });
+
+      document.querySelectorAll('[data-ornek]').forEach((d) => {
+        d.addEventListener('click', () => {
+          el('#e-girdi').value = d.dataset.ornek;
+          calistir();
+        });
+      });
+
+      // Bu iki örnek kaçırılmış metin içerdiği için HTML özniteliğinde tutulamaz
+      el('#e-ornek-html').addEventListener('click', () => {
+        el('#e-girdi').value =
+          'T&uuml;rk&ccedil;e karakterler bozulmu&#351; &ndash; &Ouml;zt&uuml;rk &amp; ortaklar&#305;';
+        calistir();
+      });
+
+      el('#e-ornek-kacis').addEventListener('click', () => {
+        el('#e-girdi').value =
+          'T\\u00fcrk\\u00e7e karakterler bozulmu\\u015f \\u2014 \\u015eehir\\u0131n\\u0131n';
+        calistir();
+      });
+
+      el('#e-temizle').addEventListener('click', () => {
+        el('#e-girdi').value = '';
+        calistir();
+      });
+    })();
+  </script>
+
+  <style>
+    .arac-dugmeler {
+      display: flex;
+      gap: 10px;
+      flex-wrap: wrap;
+      margin-top: 4px;
+    }
+    .e-adaylar {
+      display: grid;
+      gap: 10px;
+    }
+    .e-aday {
+      display: grid;
+      gap: 5px;
+      text-align: left;
+      border: 1px solid var(--line);
+      border-radius: 11px;
+      padding: 12px 14px;
+      background: var(--paper);
+      cursor: pointer;
+      font-family: inherit;
+      color: var(--ink);
+      width: 100%;
+    }
+    .e-aday:hover {
+      border-color: var(--indigo);
+    }
+    .e-aday[data-secili] {
+      border-color: var(--indigo);
+      background: var(--tint);
+      box-shadow: 0 0 0 1px var(--indigo);
+    }
+    .e-aday-ust {
+      display: flex;
+      align-items: center;
+      gap: 9px;
+      font-size: 13px;
+    }
+    .e-aday-ust em {
+      font-style: normal;
+      font-size: 10.5px;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      background: var(--indigo);
+      color: #fff;
+      border-radius: 999px;
+      padding: 2px 8px;
+    }
+    .e-aday-metin {
+      font-family: var(--mono, ui-monospace, monospace);
+      font-size: 13px;
+      line-height: 1.6;
+      word-break: break-word;
+    }
+    .e-aday-alt {
+      font-size: 12px;
+      color: var(--muted);
+    }
+    .e-teshis {
+      font-size: 13.5px;
+      line-height: 1.65;
+      color: var(--ink-soft);
+      margin: 0 0 14px;
+    }
+    .e-baytlar {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 4px;
+      align-items: flex-start;
+    }
+    .e-bayt {
+      display: grid;
+      gap: 2px;
+      justify-items: center;
+      border: 1px solid var(--line);
+      border-radius: 6px;
+      padding: 4px 5px;
+      min-width: 26px;
+      background: var(--paper);
+    }
+    .e-bayt i {
+      font-style: normal;
+      font-size: 14px;
+      line-height: 1.2;
+    }
+    .e-bayt u {
+      text-decoration: none;
+      font-family: var(--mono, ui-monospace, monospace);
+      font-size: 9.5px;
+      color: var(--muted);
+      white-space: nowrap;
+    }
+    .e-cok {
+      border-color: var(--indigo);
+      background: var(--tint);
+    }
+    .e-cok u {
+      color: var(--indigo-metin);
+    }
+    .e-kirpik {
+      align-self: center;
+      font-size: 12px;
+      color: var(--muted);
+      padding-left: 6px;
+    }
+    .e-kartlar {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(min(290px, 100%), 1fr));
+      gap: 14px;
+    }
+    .e-kart {
+      border: 1px solid var(--line);
+      border-radius: 12px;
+      padding: 15px 16px;
+    }
+    .e-kart b {
+      font-size: 13.5px;
+      display: block;
+      margin-bottom: 6px;
+    }
+    .e-kart p {
+      font-size: 13px;
+      line-height: 1.6;
+      color: var(--ink-soft);
+      margin: 0 0 10px;
+    }
+    .e-kart pre {
+      margin: 0;
+      font-size: 12px;
+    }
+    .e-kart small {
+      display: block;
+      margin-top: 8px;
+      font-size: 12px;
+      color: var(--muted);
+      line-height: 1.5;
+    }
+  </style>
+</Base>

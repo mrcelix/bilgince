@@ -277,5 +277,59 @@
     "etiket": "yeni",
     "cevrimici": false,
     "grup": "Bulut & Konteyner"
+  },
+  {
+    "slug": "olay-filtresi",
+    "ad": "Windows olay filtresi üreteci",
+    "ozet": "Olay kimliği, seviye ve zamandan çalışır XPath, Get-WinEvent ve wevtutil satırı; dokuz hazır senaryo.",
+    "ikon": "pencere",
+    "etiket": "yeni",
+    "cevrimici": false,
+    "grup": "Windows & Operasyon"
+  },
+  {
+    "slug": "kodlama-onarici",
+    "ad": "Bozuk Türkçe karakter onarıcı",
+    "ozet": "TÃ¼rkÃ§e biçiminde bozulmuş metni çözer, hangi kodlama zincirinin bozduğunu söyler.",
+    "ikon": "terminal",
+    "etiket": "yeni",
+    "cevrimici": false,
+    "grup": "Metin, Kod & Zaman"
+  },
+  {
+    "slug": "powershell-kodlayici",
+    "ad": "PowerShell komut kodlayıcı",
+    "ozet": "Çok satırlı betiği -EncodedCommand Base64'e çevirir; zamanlanmış görev satırı ve geri çözme dahil.",
+    "ikon": "terminal",
+    "etiket": "yeni",
+    "cevrimici": false,
+    "grup": "Windows & Operasyon"
+  },
+  {
+    "slug": "tcp-verim",
+    "ad": "TCP verim hesaplayıcı",
+    "ozet": "Pencere boyutu, gecikme ve paket kaybının gerçek verime etkisi; hattı neden dolduramadığınızı gösterir.",
+    "ikon": "akis",
+    "etiket": "yeni",
+    "cevrimici": false,
+    "grup": "Ağ & DNS"
+  },
+  {
+    "slug": "yedek-saklama",
+    "ad": "Yedek saklama ve alan planlayıcı",
+    "ozet": "Saklama planından kaç kopya ve kaç terabayt çıkacağını hesaplar; 3-2-1 denetimiyle.",
+    "ikon": "kutu",
+    "etiket": "yeni",
+    "cevrimici": false,
+    "grup": "Kapasite & Süre"
+  },
+  {
+    "slug": "etkin-izin",
+    "ad": "Paylaşım ve NTFS etkin izin hesaplayıcı",
+    "ozet": "İki izin listesi kesişince kullanıcı gerçekte ne yapabilir? Gerekçesini adım adım gösterir.",
+    "ikon": "kalkan",
+    "etiket": "yeni",
+    "cevrimici": false,
+    "grup": "Windows & Operasyon"
   }
 ]

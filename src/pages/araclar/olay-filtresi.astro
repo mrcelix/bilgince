@@ -1,0 +1,547 @@
+---
+import Base from '../../layouts/Base.astro';
+
+const hazirlar = [
+  {
+    ad: 'Başarısız oturum açma',
+    aciklama: 'Yanlış parola, süresi dolmuş hesap, kapalı hesap — hepsi 4625.',
+    gunluk: 'Security',
+    kimlikler: '4625',
+    seviye: [],
+    saat: 24,
+  },
+  {
+    ad: 'Hesap kilitlenmesi',
+    aciklama: 'Kilidi hangi makinenin tetiklediğini görmek için etki alanı denetleyicisinde çalıştırın.',
+    gunluk: 'Security',
+    kimlikler: '4740',
+    seviye: [],
+    saat: 72,
+  },
+  {
+    ad: 'Uzak masaüstü oturumları',
+    aciklama: 'Başarılı ağ/uzak oturumlar. Tür 10 ve 7 RDP demektir.',
+    gunluk: 'Security',
+    kimlikler: '4624',
+    seviye: [],
+    saat: 24,
+  },
+  {
+    ad: 'Yeni servis kuruldu',
+    aciklama: '7045 kalıcılık için en çok kötüye kullanılan olaydır; her birini gerekçesiyle eşleştirin.',
+    gunluk: 'System',
+    kimlikler: '7045',
+    seviye: [],
+    saat: 168,
+  },
+  {
+    ad: 'Beklenmedik yeniden başlatma',
+    aciklama: '6008 temiz olmayan kapanma, 1074 planlı, 41 çekirdek güç kaybı.',
+    gunluk: 'System',
+    kimlikler: '6008, 1074, 41',
+    seviye: [],
+    saat: 720,
+  },
+  {
+    ad: 'Disk ve depolama hataları',
+    aciklama: 'Kötü blok, zaman aşımı, denetleyici sıfırlaması. Diskin ölmeden önceki sesi.',
+    gunluk: 'System',
+    kimlikler: '7, 9, 11, 15, 51, 129, 153',
+    seviye: [],
+    saat: 168,
+  },
+  {
+    ad: 'Günlük temizlendi',
+    aciklama: 'Denetim günlüğünün silinmesi kendi başına bir bulgudur.',
+    gunluk: 'Security',
+    kimlikler: '1102, 104',
+    seviye: [],
+    saat: 720,
+  },
+  {
+    ad: 'Uygulama çökmeleri',
+    aciklama: 'Application Error ve .NET çalışma zamanı hataları.',
+    gunluk: 'Application',
+    kimlikler: '1000, 1026',
+    seviye: ['2'],
+    saat: 168,
+  },
+  {
+    ad: 'Yalnızca hata ve kritik',
+    aciklama: 'Bir sunucuya ilk bakışta çalıştırılacak sorgu.',
+    gunluk: 'System',
+    kimlikler: '',
+    seviye: ['1', '2'],
+    saat: 24,
+  },
+];
+---
+
+<Base
+  baslik="Windows olay filtresi üreteci"
+  aciklama="Olay kimliği, seviye, kaynak ve zaman aralığından çalışır XPath sorgusu, Get-WinEvent komutu ve wevtutil satırı üretir. Dokuz hazır senaryoyla."
+  aramaya={true}
+  kategori="Araç"
+>
+  <div class="arama-bas">
+    <div class="kap">
+      <nav class="kirinti" aria-label="Kırıntı yolu" style="padding-top:0">
+        <a href="/">Ana sayfa</a><span class="ayrac">/</span><a href="/araclar">Araçlar</a><span
+          class="ayrac">/</span
+        ><span aria-current="page">Olay filtresi üreteci</span>
+      </nav>
+      <h1>Windows olay filtresi üreteci</h1>
+      <p style="color:var(--muted);font-size:14px;margin-top:8px;max-width:66ch">
+        Olay Görüntüleyici'nin arayüzünde on dakika kaybetmek yerine sorguyu doğrudan yazın.
+        Araç aynı filtreyi üç biçimde birden verir: <code>Get-WinEvent</code> karma tablosu (en
+        hızlısı), XPath (en esneği) ve <code>wevtutil</code> (PowerShell'siz makineler için).
+      </p>
+    </div>
+  </div>
+
+  <div class="kap arac-sayfa">
+    <section class="arac-blok">
+      <h2 class="arac-h2"><span class="arac-no">1</span> Hazır senaryolar</h2>
+      <div class="o-hazirlar">
+        {
+          hazirlar.map((h) => (
+            <button
+              type="button"
+              class="o-hazir"
+              data-gunluk={h.gunluk}
+              data-kimlikler={h.kimlikler}
+              data-seviye={h.seviye.join(',')}
+              data-saat={String(h.saat)}
+            >
+              <b>{h.ad}</b>
+              <span>{h.aciklama}</span>
+            </button>
+          ))
+        }
+      </div>
+    </section>
+
+    <section class="arac-blok">
+      <h2 class="arac-h2"><span class="arac-no">2</span> Filtre</h2>
+      <div class="arac-alanlar">
+        <label class="arac-alan"
+          >Günlük
+          <input
+            id="o-gunluk"
+            type="text"
+            spellcheck="false"
+            value="System"
+            list="o-gunlukler"
+          />
+          <datalist id="o-gunlukler">
+            <option value="System"></option>
+            <option value="Security"></option>
+            <option value="Application"></option>
+            <option value="Setup"></option>
+            <option value="Microsoft-Windows-TaskScheduler/Operational"></option>
+            <option value="Microsoft-Windows-TerminalServices-LocalSessionManager/Operational"></option>
+            <option value="Microsoft-Windows-WindowsUpdateClient/Operational"></option>
+            <option value="Microsoft-Windows-PowerShell/Operational"></option>
+            <option value="Directory Service"></option>
+          </datalist>
+          <small>Kanal adını <code>Get-WinEvent -ListLog *</code> ile bulabilirsiniz.</small>
+        </label>
+        <label class="arac-alan"
+          >Olay kimlikleri
+          <input id="o-kimlikler" type="text" spellcheck="false" placeholder="4625, 4740, 4624" />
+          <small>Virgülle ayırın. Dışlamak için başına eksi koyun: <code>-4688</code></small>
+        </label>
+        <label class="arac-alan"
+          >Kaynak (sağlayıcı)
+          <input id="o-kaynak" type="text" spellcheck="false" placeholder="disk" />
+          <small>İsteğe bağlı. Örnek: <code>disk</code>, <code>Service Control Manager</code></small>
+        </label>
+        <label class="arac-alan"
+          >Son kaç saat
+          <input id="o-saat" type="number" min="0" max="8760" value="24" />
+          <small>0 yazarsanız zaman filtresi eklenmez.</small>
+        </label>
+        <label class="arac-alan"
+          >En fazla kayıt
+          <input id="o-adet" type="number" min="1" max="10000" value="200" />
+        </label>
+        <label class="arac-alan"
+          >Bilgisayar (uzak)
+          <input id="o-bilgisayar" type="text" spellcheck="false" placeholder="SRV-DOSYA-02" />
+          <small>Boş bırakırsanız yerel makine.</small>
+        </label>
+      </div>
+
+      <span class="yan-etiket" style="margin-top:16px;display:block">Seviye</span>
+      <div class="o-seviyeler">
+        {
+          [
+            ['1', 'Kritik'],
+            ['2', 'Hata'],
+            ['3', 'Uyarı'],
+            ['4', 'Bilgi'],
+            ['5', 'Ayrıntı'],
+          ].map(([deger, ad]) => (
+            <label class="o-seviye">
+              <input type="checkbox" data-seviye={deger} />
+              <span>{ad}</span>
+              <i>{deger}</i>
+            </label>
+          ))
+        }
+      </div>
+
+      <label class="o-sec" style="margin-top:14px">
+        <input type="checkbox" id="o-veri-ac" />
+        <span>Olay verisi alanına göre süz <i>(ör. yalnızca belirli bir kullanıcı)</i></span>
+      </label>
+      <div class="arac-alanlar" id="o-veri-alanlar" hidden>
+        <label class="arac-alan"
+          >Alan adı
+          <input id="o-veri-ad" type="text" spellcheck="false" value="TargetUserName" />
+          <small>4625 için <code>TargetUserName</code>, 4740 için <code>SubjectUserName</code></small>
+        </label>
+        <label class="arac-alan"
+          >Değer
+          <input id="o-veri-deger" type="text" spellcheck="false" placeholder="mcelik" />
+        </label>
+      </div>
+      <p class="arac-durum" id="o-durum" role="status" aria-live="polite"></p>
+    </section>
+
+    <section class="arac-blok">
+      <h2 class="arac-h2"><span class="arac-no">3</span> Komutlar</h2>
+      <div class="o-cikti">
+        <div>
+          <span class="yan-etiket">Get-WinEvent — karma tablo <i>(en hızlısı)</i></span>
+          <div style="position:relative">
+            <pre class="kod"><code id="o-hash"></code></pre>
+            <button class="kopyala" type="button" data-kaynak="o-hash">Kopyala</button>
+          </div>
+        </div>
+        <div>
+          <span class="yan-etiket">Get-WinEvent — XPath <i>(alan bazlı süzme için)</i></span>
+          <div style="position:relative">
+            <pre class="kod"><code id="o-xpath"></code></pre>
+            <button class="kopyala" type="button" data-kaynak="o-xpath">Kopyala</button>
+          </div>
+        </div>
+        <div>
+          <span class="yan-etiket">wevtutil <i>(PowerShell olmayan ortamlar)</i></span>
+          <div style="position:relative">
+            <pre class="kod"><code id="o-wevt"></code></pre>
+            <button class="kopyala" type="button" data-kaynak="o-wevt">Kopyala</button>
+          </div>
+        </div>
+        <div>
+          <span class="yan-etiket">Ham XPath <i>(Olay Görüntüleyici → Özel görünüm)</i></span>
+          <div style="position:relative">
+            <pre class="kod"><code id="o-ham"></code></pre>
+            <button class="kopyala" type="button" data-kaynak="o-ham">Kopyala</button>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="arac-blok">
+      <h2 class="arac-h2"><span class="arac-no">4</span> Bilmekte fayda var</h2>
+      <ul class="o-ipuclari">
+        <li>
+          <b>Karma tablo neden daha hızlı?</b> <code>-FilterHashtable</code> süzmeyi olay
+          günlüğü hizmetine yaptırır. <code>Get-WinEvent | Where-Object</code> ise önce milyonlarca
+          kaydı PowerShell'e taşır. Büyük Security günlüklerinde aradaki fark dakikalarla ölçülür.
+        </li>
+        <li>
+          <b>XPath'te 23 koşul sınırı vardır.</b> Uzun kimlik listelerinde sorgu sessizce
+          reddedilir; kimlikleri gruplayıp iki sorgu çalıştırın.
+        </li>
+        <li>
+          <b>Security günlüğü yönetici ister.</b> Yükseltilmiş oturum yoksa
+          <code>Get-WinEvent</code> "Attempted to perform an unauthorized operation" der.
+        </li>
+        <li>
+          <b>Kayıt yoksa hata verir.</b> Filtreye uyan kayıt olmadığında komut kırmızı bir hata
+          yazar; bu bir arıza değildir. Betiklerde
+          <code>-ErrorAction SilentlyContinue</code> ekleyin.
+        </li>
+        <li>
+          <b>4625 tek başına yeterli değil.</b> Yanlış parola mı, kapalı hesap mı, saat kayması mı
+          olduğunu <code>Status</code> ve <code>SubStatus</code> alanları söyler.
+          <code>0xC000006A</code> yanlış parola, <code>0xC0000234</code> kilitli hesaptır.
+        </li>
+        <li>
+          <b>Zaman dilimi tuzağı.</b> Olaylar UTC saklanır, arayüz yerel saatle gösterir. İki
+          sunucunun günlüğünü karşılaştırırken <code>TimeCreated.ToUniversalTime()</code> kullanın.
+        </li>
+      </ul>
+    </section>
+  </div>
+
+  <script>
+    (() => {
+      const el = (s) => document.querySelector(s);
+      const kacir = (s) =>
+        s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/'/g, '&apos;');
+
+      /** "4625, 4740, -4688" → { dahil: [...], haric: [...] } */
+      function kimlikleriAyir(metin) {
+        const dahil = [];
+        const haric = [];
+        for (const p of metin.split(/[,\s]+/).filter(Boolean)) {
+          const n = Number(p);
+          if (!Number.isInteger(n)) continue;
+          if (p.trim().startsWith('-')) haric.push(Math.abs(n));
+          else dahil.push(n);
+        }
+        return { dahil, haric };
+      }
+
+      function seciliSeviyeler() {
+        return [...document.querySelectorAll('[data-seviye]')]
+          .filter((k) => k.checked)
+          .map((k) => k.dataset.seviye);
+      }
+
+      function uret() {
+        const gunluk = el('#o-gunluk').value.trim() || 'System';
+        const { dahil, haric } = kimlikleriAyir(el('#o-kimlikler').value);
+        const kaynak = el('#o-kaynak').value.trim();
+        const saat = Number(el('#o-saat').value) || 0;
+        const adet = Number(el('#o-adet').value) || 200;
+        const bilgisayar = el('#o-bilgisayar').value.trim();
+        const seviyeler = seciliSeviyeler();
+        const veriAcik = el('#o-veri-ac').checked;
+        const veriAd = el('#o-veri-ad').value.trim();
+        const veriDeger = el('#o-veri-deger').value.trim();
+
+        /* --- XPath ------------------------------------------------------- */
+        const sistemKosullari = [];
+        if (dahil.length) {
+          sistemKosullari.push('(' + dahil.map((k) => `EventID=${k}`).join(' or ') + ')');
+        }
+        for (const k of haric) sistemKosullari.push(`EventID!=${k}`);
+        if (seviyeler.length) {
+          sistemKosullari.push('(' + seviyeler.map((s) => `Level=${s}`).join(' or ') + ')');
+        }
+        if (kaynak) sistemKosullari.push(`Provider[@Name='${kacir(kaynak)}']`);
+        if (saat > 0) sistemKosullari.push(`TimeCreated[timediff(@SystemTime) <= ${saat * 3600000}]`);
+
+        let xpath = sistemKosullari.length ? `*[System[${sistemKosullari.join(' and ')}]]` : '*';
+        if (veriAcik && veriAd && veriDeger) {
+          xpath += `[EventData[Data[@Name='${kacir(veriAd)}']='${kacir(veriDeger)}']]`;
+        }
+
+        // XPath'te en fazla 23 koşul kurulabilir
+        const kosulSayisi =
+          dahil.length + haric.length + seviyeler.length + (kaynak ? 1 : 0) + (saat > 0 ? 1 : 0);
+
+        /* --- karma tablo ------------------------------------------------- */
+        const karma = [`LogName = '${gunluk}'`];
+        if (dahil.length) karma.push(`ID = ${dahil.join(', ')}`);
+        if (seviyeler.length) karma.push(`Level = ${seviyeler.join(', ')}`);
+        if (kaynak) karma.push(`ProviderName = '${kaynak}'`);
+        if (saat > 0) karma.push(`StartTime = (Get-Date).AddHours(-${saat})`);
+
+        const uzak = bilgisayar ? ` -ComputerName ${bilgisayar}` : '';
+
+        let hashKomut =
+          `Get-WinEvent${uzak} -MaxEvents ${adet} -ErrorAction SilentlyContinue -FilterHashtable @{\n` +
+          karma.map((s) => `    ${s}`).join('\n') +
+          `\n} |\n` +
+          `    Select-Object TimeCreated, Id, LevelDisplayName, ProviderName,\n` +
+          `        @{ n = 'Ileti'; e = { ($_.Message -split "\`n")[0] } } |\n` +
+          `    Format-Table -AutoSize`;
+
+        if (haric.length) {
+          hashKomut =
+            `# Karma tablo dışlama desteklemez; ${haric.join(', ')} kimlikleri sonradan eleniyor\n` +
+            hashKomut.replace(
+              ' |\n    Select-Object',
+              ` |\n    Where-Object { $_.Id -notin @(${haric.join(', ')}) } |\n    Select-Object`
+            );
+        }
+        if (veriAcik && veriAd && veriDeger) {
+          hashKomut =
+            `# Karma tablo olay verisi alanına göre süzemez — XPath sürümünü kullanın\n` + hashKomut;
+        }
+
+        el('#o-hash').textContent = hashKomut;
+
+        /* --- XPath komutu ------------------------------------------------ */
+        el('#o-xpath').textContent =
+          `Get-WinEvent${uzak} -LogName '${gunluk}' -MaxEvents ${adet} -ErrorAction SilentlyContinue \`\n` +
+          `    -FilterXPath "${xpath.replace(/"/g, '""')}" |\n` +
+          `    Select-Object TimeCreated, Id, LevelDisplayName, Message |\n` +
+          `    Format-List`;
+
+        /* --- wevtutil ---------------------------------------------------- */
+        const uzakWevt = bilgisayar ? ` /r:${bilgisayar}` : '';
+        el('#o-wevt').textContent =
+          `wevtutil qe "${gunluk}"${uzakWevt} /q:"${xpath}" /f:text /c:${adet} /rd:true`;
+
+        /* --- ham XPath --------------------------------------------------- */
+        el('#o-ham').textContent = xpath;
+
+        /* --- durum ------------------------------------------------------- */
+        const durum = el('#o-durum');
+        if (kosulSayisi > 23) {
+          durum.className = 'arac-durum hata';
+          durum.textContent =
+            `${kosulSayisi} koşul var — XPath en fazla 23 koşul kabul eder. ` +
+            `Kimlikleri ikiye bölüp iki sorgu çalıştırın.`;
+        } else if (gunluk === 'Security' && !bilgisayar) {
+          durum.className = 'arac-durum';
+          durum.textContent =
+            'Security günlüğü yükseltilmiş oturum ister — PowerShell\'i yönetici olarak açın.';
+        } else {
+          durum.className = 'arac-durum ok';
+          durum.textContent = `${kosulSayisi} koşullu filtre hazır.`;
+        }
+      }
+
+      /* --- olaylar ------------------------------------------------------- */
+      document
+        .querySelectorAll('#o-gunluk, #o-kimlikler, #o-kaynak, #o-saat, #o-adet, #o-bilgisayar, #o-veri-ad, #o-veri-deger')
+        .forEach((g) => g.addEventListener('input', uret));
+      document.querySelectorAll('[data-seviye]').forEach((k) => k.addEventListener('change', uret));
+
+      el('#o-veri-ac').addEventListener('change', (e) => {
+        el('#o-veri-alanlar').hidden = !e.target.checked;
+        uret();
+      });
+
+      document.querySelectorAll('.o-hazir').forEach((d) => {
+        d.addEventListener('click', () => {
+          el('#o-gunluk').value = d.dataset.gunluk;
+          el('#o-kimlikler').value = d.dataset.kimlikler;
+          el('#o-saat').value = d.dataset.saat;
+          const seviyeler = d.dataset.seviye ? d.dataset.seviye.split(',') : [];
+          document.querySelectorAll('[data-seviye]').forEach((k) => {
+            k.checked = seviyeler.includes(k.dataset.seviye);
+          });
+          document.querySelectorAll('.o-hazir[data-secili]').forEach((x) => {
+            delete x.dataset.secili;
+          });
+          d.dataset.secili = 'evet';
+          uret();
+        });
+      });
+
+      document.querySelectorAll('.kopyala').forEach((d) => {
+        d.addEventListener('click', async () => {
+          try {
+            await navigator.clipboard.writeText(el(`#${d.dataset.kaynak}`).textContent);
+            d.textContent = 'Kopyalandı';
+            setTimeout(() => (d.textContent = 'Kopyala'), 1600);
+          } catch {
+            /* pano izni yoksa kullanıcı elle seçer */
+          }
+        });
+      });
+
+      uret();
+    })();
+  </script>
+
+  <style>
+    .o-hazirlar {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(min(240px, 100%), 1fr));
+      gap: 10px;
+    }
+    .o-hazir {
+      display: grid;
+      gap: 4px;
+      text-align: left;
+      border: 1px solid var(--line);
+      border-radius: 11px;
+      padding: 12px 14px;
+      background: var(--paper);
+      cursor: pointer;
+      font-family: inherit;
+      color: var(--ink);
+    }
+    .o-hazir b {
+      font-size: 13.5px;
+    }
+    .o-hazir span {
+      font-size: 12.5px;
+      color: var(--muted);
+      line-height: 1.5;
+    }
+    .o-hazir:hover {
+      border-color: var(--indigo);
+    }
+    .o-hazir[data-secili] {
+      border-color: var(--indigo);
+      background: var(--tint);
+      box-shadow: 0 0 0 1px var(--indigo);
+    }
+    .o-seviyeler {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      margin-top: 6px;
+    }
+    .o-seviye {
+      display: inline-flex;
+      align-items: center;
+      gap: 7px;
+      border: 1px solid var(--line);
+      border-radius: 999px;
+      padding: 6px 12px;
+      font-size: 13px;
+      color: var(--muted);
+      cursor: pointer;
+      background: var(--paper);
+    }
+    .o-seviye i {
+      font-style: normal;
+      font-size: 11px;
+      opacity: 0.6;
+      font-family: var(--mono, ui-monospace, monospace);
+    }
+    .o-seviye:has(input:checked) {
+      border-color: var(--indigo);
+      color: var(--indigo-metin);
+      background: var(--tint);
+    }
+    .o-sec {
+      display: inline-flex;
+      align-items: baseline;
+      gap: 8px;
+      font-size: 13px;
+      color: var(--ink-soft);
+      cursor: pointer;
+      line-height: 1.5;
+    }
+    .o-sec i,
+    .yan-etiket i {
+      font-style: normal;
+      color: var(--muted);
+      font-size: 12px;
+      font-weight: 400;
+      text-transform: none;
+      letter-spacing: 0;
+    }
+    .o-cikti {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr);
+      gap: 18px;
+    }
+    .o-ipuclari {
+      list-style: none;
+      margin: 0;
+      padding: 0;
+      display: grid;
+      gap: 11px;
+    }
+    .o-ipuclari li {
+      font-size: 13.5px;
+      line-height: 1.6;
+      color: var(--ink-soft);
+      border-left: 2px solid var(--line);
+      padding-left: 13px;
+    }
+  </style>
+</Base>

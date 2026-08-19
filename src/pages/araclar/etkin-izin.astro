@@ -1,0 +1,602 @@
+---
+import Base from '../../layouts/Base.astro';
+---
+
+<Base
+  baslik="Paylaşım ve NTFS etkin izin hesaplayıcı"
+  aciklama="Paylaşım izni ile NTFS izni birleşince kullanıcı gerçekte ne yapabilir? Grup üyelikleri, reddetme kuralları ve devralma dahil hesaplar."
+  aramaya={true}
+  kategori="Araç"
+>
+  <div class="arama-bas">
+    <div class="kap">
+      <nav class="kirinti" aria-label="Kırıntı yolu" style="padding-top:0">
+        <a href="/">Ana sayfa</a><span class="ayrac">/</span><a href="/araclar">Araçlar</a><span
+          class="ayrac">/</span
+        ><span aria-current="page">Etkin izin hesaplayıcı</span>
+      </nav>
+      <h1>Paylaşım ve NTFS etkin izin hesaplayıcı</h1>
+      <p style="color:var(--muted);font-size:14px;margin-top:8px;max-width:66ch">
+        "Klasörde Tam Denetim verdim ama kullanıcı hâlâ yazamıyor." Ağ üzerinden erişimde iki ayrı
+        izin listesi birlikte çalışır ve daha kısıtlayıcı olan kazanır. Kuralları girin, aracın
+        sonucu ve <b>gerekçesini</b> göstersin.
+      </p>
+    </div>
+  </div>
+
+  <div class="kap arac-sayfa">
+    <section class="arac-blok">
+      <h2 class="arac-h2"><span class="arac-no">1</span> Kullanıcı</h2>
+      <div class="arac-alanlar">
+        <label class="arac-alan"
+          >Kullanıcı adı
+          <input id="z-kullanici" type="text" spellcheck="false" value="mcelik" />
+        </label>
+        <label class="arac-alan"
+          >Üye olduğu gruplar
+          <input id="z-gruplar" type="text" spellcheck="false" value="Muhasebe, Domain Users" />
+          <small>Virgülle ayırın. <code>whoami /groups</code> ile listeleyebilirsiniz.</small>
+        </label>
+      </div>
+      <label class="z-sec">
+        <input type="checkbox" id="z-yerel" />
+        <span
+          >Yerel oturum <i>(konsolda ya da RDP ile — paylaşım izni uygulanmaz)</i></span
+        >
+      </label>
+    </section>
+
+    <section class="arac-blok">
+      <h2 class="arac-h2"><span class="arac-no">2</span> Paylaşım izinleri</h2>
+      <p class="arac-not" style="margin-top:0">
+        Yalnızca ağ üzerinden (<code>\\sunucu\paylasim</code>) erişimde uygulanır.
+      </p>
+      <div class="z-kurallar" id="z-paylasim-kurallar"></div>
+      <button type="button" class="dg dg-hayalet" data-ekle="paylasim">Kural ekle</button>
+    </section>
+
+    <section class="arac-blok">
+      <h2 class="arac-h2"><span class="arac-no">3</span> NTFS izinleri</h2>
+      <p class="arac-not" style="margin-top:0">
+        Dosya sisteminin kendi izinleri. Hem yerel hem ağ erişiminde uygulanır.
+      </p>
+      <div class="z-kurallar" id="z-ntfs-kurallar"></div>
+      <button type="button" class="dg dg-hayalet" data-ekle="ntfs">Kural ekle</button>
+    </section>
+
+    <section class="arac-blok">
+      <h2 class="arac-h2"><span class="arac-no">4</span> Sonuç</h2>
+      <div class="z-sonuc" id="z-sonuc"></div>
+      <span class="yan-etiket" style="margin-top:18px;display:block">Nasıl hesaplandı</span>
+      <ol class="z-adimlar" id="z-adimlar"></ol>
+    </section>
+
+    <section class="arac-blok">
+      <h2 class="arac-h2"><span class="arac-no">5</span> Doğrulama komutları</h2>
+      <div style="position:relative">
+        <pre class="kod"><code id="z-komut"></code></pre>
+        <button class="kopyala" type="button" id="z-kopyala">Kopyala</button>
+      </div>
+    </section>
+
+    <section class="arac-blok">
+      <h2 class="arac-h2"><span class="arac-no">6</span> Kurallar</h2>
+      <ul class="z-ipuclari">
+        <li>
+          <b>İki liste kesişir, birleşmez.</b> Ağdan erişimde etkin izin, paylaşım izni ile NTFS
+          izninin <i>kesişimidir</i>. Paylaşımda Okuma, NTFS'te Tam Denetim verdiyseniz sonuç
+          Okumadır. Bu yüzden yaygın uygulama, paylaşımı
+          <code>Authenticated Users: Tam Denetim</code> yapıp bütün denetimi NTFS'te tutmaktır.
+        </li>
+        <li>
+          <b>Reddetme her zaman kazanır.</b> Kullanıcı beş grup üzerinden İzin alıyor olsa da tek
+          bir Reddet kuralı hepsini geçersiz kılar. Reddetme kuralları hata ayıklamayı
+          zorlaştırdığı için ancak gerçekten gerektiğinde kullanılmalıdır.
+        </li>
+        <li>
+          <b>Düzeyler iç içe geçmiştir.</b> Tam denetim, Değiştirme'yi; Değiştirme, Okuma ve
+          yürütmeyi; o da Okuma'yı kapsar. Bunun pratik sonucu şudur: <i>Değiştirme'yi
+          reddettiğinizde kullanıcı okuyamaz da</i>. "Sadece yazmasını engelleyeyim" diye konan
+          Reddet kuralları bu yüzden klasörü tamamen erişilemez yapar. Araç da bu nedenle her
+          Reddet kuralında sonucu <i>Erişim yok</i> gösterir.
+          <br />
+          Gerçekten yazma-okuma ayrımı istiyorsanız Reddet değil, gelişmiş izinlerden
+          <i>yalnızca</i> gereken hakları veren bir İzin kuralı yazın.
+        </li>
+        <li>
+          <b>Hesap adı karşılaştırması Türkçe kuralına uymaz.</b> Windows değişmez kültür kullanır;
+          <code>MCELIK</code> ile <code>mcelik</code> aynı hesaptır. Kendi betiğinizde
+          <code>ToLower()</code> yerine <code>ToUpperInvariant()</code> kullanın, yoksa Türkçe
+          yerel ayarda <code>I</code> harfi <code>ı</code>'ya inip eşleşme sessizce bozulur.
+        </li>
+        <li>
+          <b>İzinler grup üyelikleri boyunca toplanır.</b> Kullanıcı A grubundan Okuma, B
+          grubundan Yazma alıyorsa sonucu Okuma + Yazma'dır. Reddet yoksa toplama kuralı işler.
+        </li>
+        <li>
+          <b>Belirtik (explicit) izin, devralınandan (inherited) önce gelir.</b> Sıralama şudur:
+          belirtik Reddet → belirtik İzin → devralınan Reddet → devralınan İzin. Üst klasörden
+          gelen bir Reddet, alt klasördeki belirtik bir İzni <i>engellemez</i>.
+        </li>
+        <li>
+          <b>Simge durumundaki tuzak: sahiplik.</b> Bir nesnenin sahibi, izinleri ne olursa olsun
+          izinleri <i>değiştirebilir</i>. Erişimi kesilmiş görünen bir kullanıcı sahipse kendine
+          yeniden izin verebilir.
+        </li>
+        <li>
+          <b>Erişim belirteci oturum açarken oluşur.</b> Kullanıcıyı yeni bir gruba eklediğinizde
+          değişiklik açık oturumlarda görünmez; oturumu kapatıp açması ya da
+          <code>klist purge</code> sonrası yeniden bağlanması gerekir. "İzin verdim ama olmadı"
+          şikâyetlerinin görünmez sebebi çoğu zaman budur.
+        </li>
+      </ul>
+    </section>
+  </div>
+
+  <script>
+    (() => {
+      const el = (s) => document.querySelector(s);
+
+      /* --- izin düzeyleri: sayı büyüdükçe yetki artar --- */
+      const DUZEYLER = [
+        { deger: 0, ad: 'Erişim yok' },
+        { deger: 1, ad: 'Okuma' },
+        { deger: 2, ad: 'Okuma ve yürütme' },
+        { deger: 3, ad: 'Değiştirme' },
+        { deger: 4, ad: 'Tam denetim' },
+      ];
+
+      const duzeyAdi = (d) => DUZEYLER.find((x) => x.deger === d)?.ad ?? 'Erişim yok';
+
+      let sayac = 0;
+      const kurallar = { paylasim: [], ntfs: [] };
+
+      function kuralEkle(tur, on = {}) {
+        kurallar[tur].push({
+          kimlik: ++sayac,
+          kim: on.kim ?? 'Everyone',
+          duzey: on.duzey ?? 1,
+          reddet: on.reddet ?? false,
+          devralinan: on.devralinan ?? false,
+        });
+        cizKurallar(tur);
+        hesapla();
+      }
+
+      function cizKurallar(tur) {
+        const kap = el(tur === 'paylasim' ? '#z-paylasim-kurallar' : '#z-ntfs-kurallar');
+        kap.innerHTML = kurallar[tur]
+          .map(
+            (k) =>
+              `<div class="z-kural" data-tur="${tur}" data-kimlik="${k.kimlik}">` +
+              `<input type="text" class="z-kim" value="${k.kim.replace(/"/g, '&quot;')}" ` +
+              `spellcheck="false" aria-label="Kullanıcı ya da grup" />` +
+              `<select class="z-duzey" aria-label="İzin düzeyi">` +
+              DUZEYLER.map(
+                (d) => `<option value="${d.deger}"${d.deger === k.duzey ? ' selected' : ''}>${d.ad}</option>`
+              ).join('') +
+              `</select>` +
+              `<label class="z-etiket z-reddet"><input type="checkbox" class="z-r"${k.reddet ? ' checked' : ''} /> Reddet</label>` +
+              (tur === 'ntfs'
+                ? `<label class="z-etiket"><input type="checkbox" class="z-d"${k.devralinan ? ' checked' : ''} /> Devralınan</label>`
+                : '') +
+              `<button type="button" class="z-sil" aria-label="Kuralı sil">×</button>` +
+              `</div>`
+          )
+          .join('');
+      }
+
+      /** Kullanıcı bu kuralın hedefi mi?
+          Karşılaştırmada bilerek Türkçe yerel ayarı kullanmıyoruz: Windows hesap
+          adlarını değişmez kültürle karşılaştırır. Türkçe kuralında 'MCELIK'
+          küçük harfe 'mcelık' diye iner ve 'mcelik' ile eşleşmez. */
+      function kapsiyorMu(kim, kullanici, gruplar) {
+        const k = kim.trim().toLowerCase();
+        if (!k) return false;
+        if (k === 'everyone' || k === 'herkes' || k === 'authenticated users') return true;
+        if (k === kullanici.trim().toLowerCase()) return true;
+        return gruplar.some((g) => g.trim().toLowerCase() === k);
+      }
+
+      /** Bir izin listesinin etkin düzeyini ve gerekçesini üretir. */
+      function listeyiCoz(liste, kullanici, gruplar, ad) {
+        const gecerli = liste.filter((k) => kapsiyorMu(k.kim, kullanici, gruplar));
+        const adimlar = [];
+
+        if (!gecerli.length) {
+          adimlar.push(
+            `<b>${ad}:</b> ${kullanici} ya da üye olduğu gruplar için hiçbir kural yok — ` +
+              `kural olmaması erişim olmaması demektir.`
+          );
+          return { duzey: 0, adimlar };
+        }
+
+        // Belirtik kurallar devralınanlardan önce değerlendirilir
+        const belirtik = gecerli.filter((k) => !k.devralinan);
+        const devralinan = gecerli.filter((k) => k.devralinan);
+
+        const belirtikReddet = belirtik.filter((k) => k.reddet);
+        const belirtikIzin = belirtik.filter((k) => !k.reddet);
+        const devralinanReddet = devralinan.filter((k) => k.reddet);
+        const devralinanIzin = devralinan.filter((k) => !k.reddet);
+
+        /* Buradaki beş düzey iç içe geçmiş kümelerdir: Tam denetim ⊃ Değiştirme
+           ⊃ Okuma ve yürütme ⊃ Okuma. Yani hangi düzeyde olursa olsun bir Reddet
+           kuralı okuma hakkını da kapsar ve sonuç "erişim yok"a iner. Windows'un
+           arayüzünde farklı görünse de kullanıcının yaşadığı şey budur. */
+
+        // 1) Belirtik Reddet — her şeyden önce gelir ve her şeyi bitirir
+        if (belirtikReddet.length) {
+          adimlar.push(
+            `<b>${ad}:</b> belirtik <u>Reddet</u> kuralı var ` +
+              `(${belirtikReddet.map((k) => `${k.kim}: ${duzeyAdi(k.duzey)}`).join(', ')}). ` +
+              `Reddetme her zaman kazanır ve bu düzeylerin hepsi okuma hakkını da kapsadığı için ` +
+              `sonuç <i>Erişim yok</i>. Kaç grup üzerinden izin alındığının önemi yoktur.`
+          );
+          return { duzey: 0, adimlar };
+        }
+
+        // 2) Belirtik İzin — gruplar boyunca toplanır
+        let duzey = 0;
+        if (belirtikIzin.length) {
+          duzey = Math.max(...belirtikIzin.map((k) => k.duzey));
+          adimlar.push(
+            `<b>${ad}:</b> belirtik İzin kuralları toplanır — ` +
+              belirtikIzin.map((k) => `${k.kim}: ${duzeyAdi(k.duzey)}`).join(', ') +
+              ` → en geniş olan <i>${duzeyAdi(duzey)}</i> geçerli.`
+          );
+        }
+
+        // 3) Devralınan Reddet — ama belirtik bir İzin varsa ona dokunamaz
+        if (devralinanReddet.length) {
+          if (belirtikIzin.length) {
+            adimlar.push(
+              `<b>${ad}:</b> devralınan Reddet kuralı var ` +
+                `(${devralinanReddet.map((k) => k.kim).join(', ')}) ama <u>belirtik İzin</u> ondan ` +
+                `önce değerlendirilir — bu yüzden düzey düşmüyor. Sıralama tam olarak şudur: ` +
+                `belirtik Reddet → belirtik İzin → devralınan Reddet → devralınan İzin.`
+            );
+          } else {
+            adimlar.push(
+              `<b>${ad}:</b> devralınan Reddet kuralı var ` +
+                `(${devralinanReddet.map((k) => `${k.kim}: ${duzeyAdi(k.duzey)}`).join(', ')}) ve ` +
+                `bunu geçersiz kılacak belirtik bir İzin yok → <i>Erişim yok</i>. ` +
+                `Üst klasörde konmuş bir Reddet kuralını aramanız gerekebilir.`
+            );
+            return { duzey: 0, adimlar };
+          }
+        }
+
+        // 4) Devralınan İzin — yalnızca düzeyi yükseltebilir
+        if (devralinanIzin.length) {
+          const d = Math.max(...devralinanIzin.map((k) => k.duzey));
+          if (d > duzey) {
+            adimlar.push(
+              `<b>${ad}:</b> devralınan İzin kuralları da eklenir — ` +
+                devralinanIzin.map((k) => `${k.kim}: ${duzeyAdi(k.duzey)}`).join(', ') +
+                ` → düzey <i>${duzeyAdi(d)}</i>'ye çıkıyor.`
+            );
+            duzey = d;
+          }
+        }
+
+        return { duzey, adimlar };
+      }
+
+      function hesapla() {
+        const kullanici = el('#z-kullanici').value.trim() || 'kullanici';
+        const gruplar = el('#z-gruplar').value.split(',').map((s) => s.trim()).filter(Boolean);
+        const yerel = el('#z-yerel').checked;
+
+        const ntfs = listeyiCoz(kurallar.ntfs, kullanici, gruplar, 'NTFS');
+        const adimlar = [...ntfs.adimlar];
+        let sonuc = ntfs.duzey;
+        let dar = 'NTFS';
+
+        if (yerel) {
+          adimlar.push(
+            '<b>Yerel oturum:</b> paylaşım izinleri yalnızca ağ üzerinden erişimde uygulanır, ' +
+              'bu yüzden hiç değerlendirilmedi. Sonucu tek başına NTFS belirliyor.'
+          );
+        } else {
+          const paylasim = listeyiCoz(kurallar.paylasim, kullanici, gruplar, 'Paylaşım');
+          adimlar.unshift(...paylasim.adimlar);
+          sonuc = Math.min(paylasim.duzey, ntfs.duzey);
+          dar = paylasim.duzey < ntfs.duzey ? 'Paylaşım' : paylasim.duzey > ntfs.duzey ? 'NTFS' : 'ikisi de';
+          adimlar.push(
+            `<b>Kesişim:</b> ağ erişiminde iki listenin <u>daha kısıtlayıcı</u> olanı geçerlidir. ` +
+              `Paylaşım <i>${duzeyAdi(paylasim.duzey)}</i>, NTFS <i>${duzeyAdi(ntfs.duzey)}</i> ` +
+              `→ etkin izin <i>${duzeyAdi(sonuc)}</i> (dar boğaz: ${dar}).`
+          );
+        }
+
+        /* --- sonuç kartı --- */
+        const yapabilir = [
+          ['Klasörü listeleme', sonuc >= 1],
+          ['Dosya okuma', sonuc >= 1],
+          ['Program çalıştırma', sonuc >= 2],
+          ['Dosya oluşturma ve yazma', sonuc >= 3],
+          ['Dosya silme', sonuc >= 3],
+          ['İzinleri değiştirme', sonuc >= 4],
+          ['Sahipliği alma', sonuc >= 4],
+        ];
+
+        el('#z-sonuc').innerHTML =
+          `<div class="z-buyuk" data-duzey="${sonuc}">` +
+          `<span>Etkin izin</span><b>${duzeyAdi(sonuc)}</b>` +
+          `<em>${kullanici} · ${yerel ? 'yerel oturum' : 'ağ üzerinden'}</em>` +
+          `</div>` +
+          `<ul class="z-yapabilir">` +
+          yapabilir
+            .map(
+              ([ad, olur]) =>
+                `<li data-olur="${olur}"><i>${olur ? '✓' : '✕'}</i>${ad}</li>`
+            )
+            .join('') +
+          `</ul>`;
+
+        el('#z-adimlar').innerHTML = adimlar.map((a) => `<li>${a}</li>`).join('');
+
+        /* --- doğrulama komutları --- */
+        el('#z-komut').textContent =
+          `# NTFS izinlerini oku\n` +
+          `Get-Acl 'D:\\Paylasim\\Muhasebe' | Select-Object -ExpandProperty Access |\n` +
+          `    Select-Object IdentityReference, FileSystemRights, AccessControlType, IsInherited |\n` +
+          `    Format-Table -AutoSize\n\n` +
+          `# Paylaşım izinlerini oku\n` +
+          `Get-SmbShareAccess -Name 'Muhasebe' | Format-Table -AutoSize\n\n` +
+          `# ${kullanici} hangi gruplarda? (kullanıcının kendi makinesinde)\n` +
+          `whoami /groups\n\n` +
+          `# Etki alanı tarafında özyinelemeli grup üyeliği\n` +
+          `Get-ADPrincipalGroupMembership '${kullanici}' | Select-Object name\n\n` +
+          `# Erişim belirteci eski olabilir — kullanıcı oturumu yenilesin\n` +
+          `klist purge\n\n` +
+          `# Klasik ama hâlâ en hızlı özet\n` +
+          `icacls 'D:\\Paylasim\\Muhasebe'`;
+      }
+
+      /* --- olaylar ---------------------------------------------------------- */
+      document.addEventListener('input', (e) => {
+        const satir = e.target.closest('.z-kural');
+        if (satir) {
+          const tur = satir.dataset.tur;
+          const k = kurallar[tur].find((x) => x.kimlik === Number(satir.dataset.kimlik));
+          if (k) {
+            k.kim = satir.querySelector('.z-kim').value;
+            k.duzey = Number(satir.querySelector('.z-duzey').value);
+            k.reddet = satir.querySelector('.z-r').checked;
+            const d = satir.querySelector('.z-d');
+            k.devralinan = d ? d.checked : false;
+          }
+          hesapla();
+          return;
+        }
+        if (e.target.closest('#z-kullanici, #z-gruplar, #z-yerel')) hesapla();
+      });
+
+      document.addEventListener('change', (e) => {
+        if (e.target.closest('.z-kural') || e.target.id === 'z-yerel') hesapla();
+      });
+
+      document.addEventListener('click', (e) => {
+        const ekle = e.target.closest('[data-ekle]');
+        if (ekle) {
+          kuralEkle(ekle.dataset.ekle);
+          return;
+        }
+        const sil = e.target.closest('.z-sil');
+        if (sil) {
+          const satir = sil.closest('.z-kural');
+          const tur = satir.dataset.tur;
+          kurallar[tur] = kurallar[tur].filter((x) => x.kimlik !== Number(satir.dataset.kimlik));
+          cizKurallar(tur);
+          hesapla();
+        }
+      });
+
+      el('#z-kopyala').addEventListener('click', async (e) => {
+        try {
+          await navigator.clipboard.writeText(el('#z-komut').textContent);
+          e.currentTarget.textContent = 'Kopyalandı';
+          setTimeout(() => (e.currentTarget.textContent = 'Kopyala'), 1600);
+        } catch {
+          /* pano izni yoksa kullanıcı elle seçer */
+        }
+      });
+
+      /* --- klasik senaryo: paylaşımda Okuma, NTFS'te Tam Denetim --- */
+      kuralEkle('paylasim', { kim: 'Everyone', duzey: 1 });
+      kuralEkle('ntfs', { kim: 'Muhasebe', duzey: 4 });
+      kuralEkle('ntfs', { kim: 'Domain Users', duzey: 2, devralinan: true });
+    })();
+  </script>
+
+  <style>
+    .z-sec {
+      display: inline-flex;
+      align-items: baseline;
+      gap: 8px;
+      font-size: 13px;
+      color: var(--ink-soft);
+      cursor: pointer;
+      line-height: 1.5;
+      margin-top: 12px;
+    }
+    .z-sec i {
+      font-style: normal;
+      color: var(--muted);
+      font-size: 12px;
+    }
+    .z-kurallar {
+      display: grid;
+      gap: 9px;
+      margin-bottom: 12px;
+    }
+    .z-kural {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      gap: 9px;
+      border: 1px solid var(--line);
+      border-radius: 10px;
+      padding: 9px 11px;
+      background: var(--paper);
+    }
+    .z-kim {
+      flex: 1 1 150px;
+      min-width: 0;
+      border: 1px solid var(--line);
+      border-radius: 7px;
+      padding: 6px 9px;
+      font: inherit;
+      font-size: 13px;
+      background: var(--bg);
+      color: var(--ink);
+    }
+    .z-duzey {
+      flex: 0 1 auto;
+      border: 1px solid var(--line);
+      border-radius: 7px;
+      padding: 6px 9px;
+      font: inherit;
+      font-size: 13px;
+      background: var(--bg);
+      color: var(--ink);
+    }
+    .z-etiket {
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
+      font-size: 12.5px;
+      color: var(--muted);
+      cursor: pointer;
+      white-space: nowrap;
+    }
+    .z-kural:has(.z-r:checked) {
+      border-color: light-dark(#dc2626, #f87171);
+      background: light-dark(#fef2f2, #2a1616);
+    }
+    .z-kural:has(.z-r:checked) .z-reddet {
+      color: light-dark(#991b1b, #fca5a5);
+      font-weight: 600;
+    }
+    .z-sil {
+      margin-left: auto;
+      border: 1px solid var(--line);
+      background: transparent;
+      border-radius: 7px;
+      width: 28px;
+      height: 28px;
+      cursor: pointer;
+      color: var(--muted);
+      font-size: 16px;
+      line-height: 1;
+    }
+    .z-sil:hover {
+      border-color: light-dark(#dc2626, #f87171);
+      color: light-dark(#dc2626, #f87171);
+    }
+    .z-sonuc {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr);
+      gap: 16px;
+    }
+    .z-buyuk {
+      border: 1px solid var(--line);
+      border-radius: 12px;
+      padding: 18px 20px;
+      display: grid;
+      gap: 3px;
+      background: var(--tint);
+    }
+    .z-buyuk span {
+      font-size: 11.5px;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      color: var(--muted);
+    }
+    .z-buyuk b {
+      font-size: 27px;
+      letter-spacing: -0.02em;
+    }
+    .z-buyuk em {
+      font-style: normal;
+      font-size: 12.5px;
+      color: var(--muted);
+    }
+    .z-buyuk[data-duzey='0'] {
+      background: light-dark(#fef2f2, #2a1616);
+      border-color: light-dark(#fecaca, #7f2b2b);
+    }
+    .z-buyuk[data-duzey='0'] b {
+      color: light-dark(#991b1b, #fca5a5);
+    }
+    .z-buyuk[data-duzey='4'] b {
+      color: light-dark(#b45309, #fbbf24);
+    }
+    .z-yapabilir {
+      list-style: none;
+      margin: 0;
+      padding: 0;
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(min(200px, 100%), 1fr));
+      gap: 7px 16px;
+    }
+    .z-yapabilir li {
+      display: flex;
+      align-items: center;
+      gap: 9px;
+      font-size: 13.5px;
+      color: var(--muted);
+    }
+    .z-yapabilir li[data-olur='true'] {
+      color: var(--ink);
+    }
+    .z-yapabilir i {
+      font-style: normal;
+      width: 18px;
+      height: 18px;
+      border-radius: 50%;
+      display: grid;
+      place-items: center;
+      font-size: 11px;
+      flex: 0 0 auto;
+      background: light-dark(#fee2e2, #3b1d1d);
+      color: light-dark(#991b1b, #fca5a5);
+    }
+    .z-yapabilir li[data-olur='true'] i {
+      background: light-dark(#dcfce7, #06301f);
+      color: light-dark(#166534, #6ee7b7);
+    }
+    .z-adimlar {
+      margin: 8px 0 0;
+      padding-left: 20px;
+      display: grid;
+      gap: 11px;
+    }
+    .z-adimlar li {
+      font-size: 13.5px;
+      line-height: 1.62;
+      color: var(--ink-soft);
+    }
+    .z-adimlar u {
+      text-decoration: none;
+      font-weight: 700;
+      color: var(--indigo-metin);
+    }
+    .z-ipuclari {
+      list-style: none;
+      margin: 0;
+      padding: 0;
+      display: grid;
+      gap: 12px;
+    }
+    .z-ipuclari li {
+      font-size: 13.5px;
+      line-height: 1.62;
+      color: var(--ink-soft);
+      border-left: 2px solid var(--line);
+      padding-left: 13px;
+    }
+  </style>
+</Base>

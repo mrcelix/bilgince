@@ -1,0 +1,492 @@
+---
+import Base from '../../layouts/Base.astro';
+
+const senaryolar = [
+  { ad: 'Aynı kampüs', gecikme: 1, kayip: 0, hat: 1000, aciklama: 'Bina içi anahtarlama' },
+  { ad: 'Şehir içi MPLS', gecikme: 8, kayip: 0.01, hat: 100, aciklama: 'İstanbul içi iki şube' },
+  { ad: 'Ankara – İstanbul', gecikme: 14, kayip: 0.05, hat: 200, aciklama: 'Yurt içi omurga' },
+  { ad: 'Türkiye – Frankfurt', gecikme: 45, kayip: 0.1, hat: 500, aciklama: 'Avrupa veri merkezi' },
+  { ad: 'Türkiye – Virginia', gecikme: 120, kayip: 0.2, hat: 1000, aciklama: 'ABD doğu yakası bulut' },
+  { ad: 'Uydu bağlantısı', gecikme: 600, kayip: 1, hat: 50, aciklama: 'Geostatik uydu — şube yedeği' },
+];
+---
+
+<Base
+  baslik="TCP verim hesaplayıcı"
+  aciklama="Hat kapasitenizi neden alamadığınızı gösterir: pencere boyutu, gecikme ve paket kaybının gerçek verime etkisi. Uzak şube ve yedek aktarımı planlarken."
+  aramaya={true}
+  kategori="Araç"
+>
+  <div class="arama-bas">
+    <div class="kap">
+      <nav class="kirinti" aria-label="Kırıntı yolu" style="padding-top:0">
+        <a href="/">Ana sayfa</a><span class="ayrac">/</span><a href="/araclar">Araçlar</a><span
+          class="ayrac">/</span
+        ><span aria-current="page">TCP verim hesaplayıcı</span>
+      </nav>
+      <h1>TCP verim hesaplayıcı</h1>
+      <p style="color:var(--muted);font-size:14px;margin-top:8px;max-width:66ch">
+        "1 Gbit hattımız var ama dosya kopyalama 40 Mbit'te takılıyor." Genelde hat değil, TCP
+        penceresi ve gecikme suçludur. Değerleri girin; aracın hangi sınıra çarptığınızı ve neyi
+        değiştirmenin işe yarayacağını söylesin.
+      </p>
+    </div>
+  </div>
+
+  <div class="kap arac-sayfa">
+    <section class="arac-blok">
+      <h2 class="arac-h2"><span class="arac-no">1</span> Bağlantı</h2>
+      <div class="t-senaryolar">
+        {
+          senaryolar.map((s) => (
+            <button
+              type="button"
+              class="t-senaryo"
+              data-gecikme={String(s.gecikme)}
+              data-kayip={String(s.kayip)}
+              data-hat={String(s.hat)}
+            >
+              <b>{s.ad}</b>
+              <span>
+                {s.gecikme} ms · {s.hat} Mbit
+              </span>
+              <em>{s.aciklama}</em>
+            </button>
+          ))
+        }
+      </div>
+
+      <div class="arac-alanlar" style="margin-top:18px">
+        <label class="arac-alan"
+          >Hat kapasitesi (Mbit/sn)
+          <input id="t-hat" type="number" min="1" max="100000" value="200" />
+        </label>
+        <label class="arac-alan"
+          >Gidiş-dönüş gecikmesi (ms)
+          <input id="t-gecikme" type="number" min="0.1" step="0.1" max="2000" value="14" />
+          <small><code>ping</code> çıktısındaki ortalama süre.</small>
+        </label>
+        <label class="arac-alan"
+          >Paket kaybı (%)
+          <input id="t-kayip" type="number" min="0" step="0.01" max="20" value="0.05" />
+          <small>%0 girerseniz kayıp modeli devre dışı kalır.</small>
+        </label>
+        <label class="arac-alan"
+          >TCP pencere boyutu (KB)
+          <input id="t-pencere" type="number" min="8" max="65536" value="64" />
+          <small>Ölçeklemesiz TCP'nin tavanı 64 KB'dır.</small>
+        </label>
+        <label class="arac-alan"
+          >MSS (bayt)
+          <input id="t-mss" type="number" min="500" max="9000" value="1460" />
+          <small>Standart Ethernet'te 1460; jumbo çerçevede 8960.</small>
+        </label>
+        <label class="arac-alan"
+          >Eşzamanlı akış sayısı
+          <input id="t-akis" type="number" min="1" max="256" value="1" />
+          <small>robocopy /MT, rsync paralel, çoklu oturum.</small>
+        </label>
+      </div>
+    </section>
+
+    <section class="arac-blok">
+      <h2 class="arac-h2"><span class="arac-no">2</span> Sonuç</h2>
+      <div class="t-kartlar" id="t-kartlar"></div>
+      <div class="t-cubuklar" id="t-cubuklar"></div>
+      <p class="arac-durum" id="t-durum" role="status" aria-live="polite"></p>
+    </section>
+
+    <section class="arac-blok">
+      <h2 class="arac-h2"><span class="arac-no">3</span> Aktarım süresi</h2>
+      <div class="arac-alanlar">
+        <label class="arac-alan"
+          >Aktarılacak veri
+          <input id="t-veri" type="number" min="0.1" step="0.1" value="500" />
+        </label>
+        <label class="arac-alan"
+          >Birim
+          <select id="t-birim">
+            <option value="1">GB</option>
+            <option value="1024">TB</option>
+            <option value="0.001">MB</option>
+          </select>
+        </label>
+      </div>
+      <div class="t-sure" id="t-sure"></div>
+    </section>
+
+    <section class="arac-blok">
+      <h2 class="arac-h2"><span class="arac-no">4</span> Ne yapmalı?</h2>
+      <div id="t-oneriler"></div>
+    </section>
+
+    <section class="arac-blok">
+      <h2 class="arac-h2"><span class="arac-no">5</span> Hesap nereden geliyor?</h2>
+      <ul class="t-ipuclari">
+        <li>
+          <b>Pencere sınırı.</b> TCP, onay gelmeden en fazla bir pencere dolusu veri gönderir.
+          Dolayısıyla tek akışın üst sınırı <code>pencere ÷ gecikme</code>'dir. 64 KB pencere ve
+          100 ms gecikmede bu, hattınız ne olursa olsun <b>5.2 Mbit/sn</b> demektir.
+        </li>
+        <li>
+          <b>Bant gecikme çarpımı (BDP).</b> Hattı doldurmak için gereken pencere
+          <code>kapasite × gecikme</code>'dir. 200 Mbit ve 14 ms için 350 KB; yani 64 KB pencere
+          bu hattın ancak beşte birini kullanabilir. Pencere ölçekleme (RFC 1323) tam olarak bu
+          sorunu çözmek için vardır ve modern sistemlerde açıktır.
+        </li>
+        <li>
+          <b>Kayıp modeli.</b> Mathis formülü tek akış için üst sınırı
+          <code>MSS ÷ (gecikme × √kayıp) × 1.22</code> verir. Buradaki acı gerçek şudur: kayıp
+          <b>karekökle</b> girer, yani binde birlik bir kayıp bile uzun mesafede verimi yarıya
+          indirebilir. Uzak bağlantılarda kablo/optik sorununu kovalamak, pencere ayarından daha
+          çok kazandırır.
+        </li>
+        <li>
+          <b>Paralel akış neden işe yarar?</b> Her akışın kendi penceresi ve kendi kayıp tepkisi
+          vardır. Sekiz akış, tek akışın sekiz katına yakın verim üretir — ta ki hat kapasitesine
+          çarpana kadar. <code>robocopy /MT:16</code> ve çoklu <code>rsync</code> bu yüzden
+          çalışır.
+        </li>
+        <li>
+          <b>Bu bir üst sınırdır.</b> Gerçek verim ayrıca disk hızına, şifreleme yüküne, güvenlik
+          duvarı denetimine ve SMB imzalamaya takılır. Hesap "en iyi durumda bu kadar" der; ölçüm
+          bunun altında çıkıyorsa aradaki farkı bu katmanlarda arayın.
+        </li>
+      </ul>
+    </section>
+  </div>
+
+  <script>
+    (() => {
+      const el = (s) => document.querySelector(s);
+      const say = (s) => Number(el(s).value) || 0;
+
+      const bicim = (mbit) => {
+        if (mbit >= 1000) return `${(mbit / 1000).toFixed(2)} Gbit/sn`;
+        if (mbit >= 1) return `${mbit.toFixed(1)} Mbit/sn`;
+        return `${(mbit * 1000).toFixed(0)} kbit/sn`;
+      };
+
+      function hesapla() {
+        const hat = say('#t-hat');
+        const gecikme = say('#t-gecikme');
+        const kayip = say('#t-kayip') / 100;
+        const pencereKB = say('#t-pencere');
+        const mss = say('#t-mss');
+        const akis = Math.max(1, say('#t-akis'));
+
+        if (!hat || !gecikme) return;
+
+        /* --- pencere sınırı: pencere ÷ RTT --- */
+        const pencereBit = pencereKB * 1024 * 8;
+        const pencereSiniri = (pencereBit / (gecikme / 1000) / 1e6) * akis;
+
+        /* --- Mathis: MSS / (RTT × √p) × 1.22 --- */
+        const mathis =
+          kayip > 0
+            ? ((mss * 8) / (gecikme / 1000) / Math.sqrt(kayip)) * 1.22 * akis / 1e6
+            : Infinity;
+
+        /* --- hattı doldurmak için gereken pencere --- */
+        const gerekenKB = (hat * 1e6 * (gecikme / 1000)) / 8 / 1024;
+
+        const gercek = Math.min(hat, pencereSiniri, mathis);
+        const darBogaz =
+          gercek === hat ? 'hat' : pencereSiniri <= mathis ? 'pencere' : 'kayıp';
+
+        /* --- kartlar --- */
+        el('#t-kartlar').innerHTML = [
+          { b: 'Beklenen verim', d: bicim(gercek), n: `Hattın %${Math.round((gercek / hat) * 100)}'i` },
+          { b: 'Pencere sınırı', d: bicim(pencereSiniri), n: `${pencereKB} KB × ${akis} akış` },
+          {
+            b: 'Kayıp sınırı',
+            d: kayip > 0 ? bicim(mathis) : 'yok',
+            n: kayip > 0 ? `Mathis, %${(kayip * 100).toFixed(2)} kayıp` : 'Kayıp girilmedi',
+          },
+          {
+            b: 'Gereken pencere',
+            d: gerekenKB >= 1024 ? `${(gerekenKB / 1024).toFixed(1)} MB` : `${Math.round(gerekenKB)} KB`,
+            n: 'Hattı tek akışla doldurmak için',
+          },
+        ]
+          .map(
+            (k) =>
+              `<div class="t-kart"><span class="t-kart-b">${k.b}</span>` +
+              `<b class="t-kart-d">${k.d}</b><span class="t-kart-n">${k.n}</span></div>`
+          )
+          .join('');
+
+        /* --- çubuklar --- */
+        const enBuyuk = Math.max(hat, pencereSiniri, Number.isFinite(mathis) ? mathis : 0);
+        const cubuklar = [
+          ['Hat kapasitesi', hat, false],
+          ['Pencere sınırı', pencereSiniri, darBogaz === 'pencere'],
+          ...(kayip > 0 ? [['Kayıp sınırı', mathis, darBogaz === 'kayıp']] : []),
+          ['Gerçekleşen', gercek, true],
+        ];
+        el('#t-cubuklar').innerHTML = cubuklar
+          .map(
+            ([ad, deger, vurgu]) =>
+              `<div class="t-cubuk"${vurgu ? ' data-vurgu="evet"' : ''}>` +
+              `<div class="t-cubuk-ust"><span>${ad}</span><b>${bicim(deger)}</b></div>` +
+              `<div class="t-ray"><i style="width:${Math.min(100, (deger / enBuyuk) * 100)}%"></i></div>` +
+              `</div>`
+          )
+          .join('');
+
+        /* --- durum --- */
+        const durum = el('#t-durum');
+        const kullanimOrani = (gercek / hat) * 100;
+        // Uydu gibi uç durumlarda oran %1'in altına iner; tam sayıya yuvarlamak "%0" yazar
+        const kullanim = kullanimOrani < 1 ? kullanimOrani.toFixed(1) : String(Math.round(kullanimOrani));
+
+        durum.className = 'arac-durum ' + (gercek / hat > 0.7 ? 'ok' : 'hata');
+        durum.textContent =
+          darBogaz === 'hat'
+            ? 'Hattı doldurabiliyorsunuz — sınır kapasitenin kendisi.'
+            : darBogaz === 'pencere'
+              ? `Dar boğaz TCP penceresi. Hattın yalnızca %${kullanim}'ini kullanabiliyorsunuz.`
+              : `Dar boğaz paket kaybı. %${(kayip * 100).toFixed(2)} kayıp yüzünden hattın ` +
+                `yalnızca %${kullanim}'ini kullanabiliyorsunuz.`;
+
+        /* --- aktarım süresi --- */
+        const gb = say('#t-veri') * Number(el('#t-birim').value);
+        const saniye = (gb * 8 * 1000) / gercek;
+        const hatSaniye = (gb * 8 * 1000) / hat;
+        el('#t-sure').innerHTML =
+          `<div class="t-sure-satir"><span>Gerçekçi süre</span><b>${sureYaz(saniye)}</b></div>` +
+          `<div class="t-sure-satir t-soluk"><span>Hat tam dolsaydı</span><b>${sureYaz(hatSaniye)}</b></div>` +
+          `<div class="t-sure-satir t-soluk"><span>Kaybedilen zaman</span><b>${sureYaz(saniye - hatSaniye)}</b></div>`;
+
+        /* --- öneriler --- */
+        const oneriler = [];
+        if (pencereKB < gerekenKB) {
+          const kat = Math.ceil(gerekenKB / pencereKB);
+          oneriler.push(
+            `<b>Pencereyi büyütün.</b> Hattı doldurmak için ${Math.round(gerekenKB)} KB gerekiyor, ` +
+              `elinizde ${pencereKB} KB var — yaklaşık ${kat} kat fark. Windows'ta otomatik ayarlama ` +
+              `açık olmalı: <code>netsh int tcp show global</code> çıktısında ` +
+              `<i>Receive Window Auto-Tuning Level</i> <code>normal</code> olsun. Bir güvenlik ` +
+              `duvarı ya da eski yük dengeleyici pencere ölçekleme seçeneğini düşürüyorsa bütün ` +
+              `iyileştirme orada ölür.`
+          );
+        }
+        if (kayip > 0.001) {
+          oneriler.push(
+            `<b>Kaybı kovalayın.</b> %${(kayip * 100).toFixed(2)} kayıp tek başına verimi ` +
+              `${bicim(mathis / akis)} ile sınırlıyor. Kayıp genelde tek bir arayüzde birikir: ` +
+              `<code>netsh int ipv4 show subinterfaces</code> ve anahtar tarafında hata sayaçlarına ` +
+              `bakın. Optikte kirlilik ve yanlış çift eşleşmesi (duplex mismatch) en sık iki sebeptir.`
+          );
+        }
+        if (akis === 1 && gercek < hat * 0.7) {
+          // Tek akışın verimi doğrusal ölçeklendiği için gereken akış sayısı bu orandır
+          const tamGereken = Math.ceil(hat / gercek);
+          const oran = (gercek / hat) * 100;
+          const yuzde = oran < 1 ? oran.toFixed(1) : String(Math.round(oran));
+
+          oneriler.push(
+            tamGereken <= 64
+              ? `<b>Paralel akış kullanın.</b> Tek akış hattın %${yuzde}'ini kullanıyor; ` +
+                `${tamGereken} eşzamanlı akış hattı doldurmaya yeter. Dosya kopyalarken ` +
+                `<code>robocopy /MT:${Math.min(128, tamGereken * 2)}</code>, yedeklemede işi ` +
+                `birden çok akışa bölen bir taşıyıcı seçin.`
+              : `<b>Paralel akış kısmen yardım eder.</b> Tek akış hattın yalnızca %${yuzde}'ini ` +
+                `kullanıyor; hattı doldurmak için kabaca ${tamGereken.toLocaleString('tr-TR')} ` +
+                `eşzamanlı akış gerekirdi — bu pratikte kurulamaz. 32 akışla ` +
+                `${bicim(Math.min(hat, gercek * 32))} civarına çıkarsınız, o kadar. ` +
+                `Bu bağlantıda asıl kazanç akış sayısında değil, ${kayip > 0.001 ? 'kaybı düşürmekte' : 'pencereyi büyütmekte'}.`
+          );
+        }
+        if (mss < 8000 && gecikme < 5 && hat >= 1000) {
+          oneriler.push(
+            `<b>Jumbo çerçeve düşünülebilir.</b> Kısa gecikmeli ve yüksek kapasiteli bu bağlantıda ` +
+              `9000 baytlık MTU başlık yükünü ve kesme sayısını azaltır. Ama yol üzerindeki ` +
+              `<i>her</i> cihaz desteklemek zorundadır; tek bir eksik cihaz sessiz paket ` +
+              `düşmesine yol açar. Önce <code>ping -f -l 8972</code> ile yolu doğrulayın.`
+          );
+        }
+        if (!oneriler.length) {
+          oneriler.push(
+            '<b>Ağ tarafında yapacak bir şey görünmüyor.</b> Ölçtüğünüz hız bunun altındaysa ' +
+              'sorun ağda değil: disk hızı, şifreleme, SMB imzalama ya da güvenlik duvarı denetimi. ' +
+              'Aynı hat üzerinde <code>iperf3</code> ile ölçüp farkı görün.'
+          );
+        }
+        el('#t-oneriler').innerHTML =
+          `<ul class="t-oneriler">${oneriler.map((o) => `<li>${o}</li>`).join('')}</ul>`;
+      }
+
+      function sureYaz(saniye) {
+        if (!Number.isFinite(saniye) || saniye < 0) return '—';
+        if (saniye < 60) return `${saniye.toFixed(1)} saniye`;
+        if (saniye < 3600) return `${Math.floor(saniye / 60)} dk ${Math.round(saniye % 60)} sn`;
+        if (saniye < 86400) {
+          return `${Math.floor(saniye / 3600)} sa ${Math.round((saniye % 3600) / 60)} dk`;
+        }
+        return `${Math.floor(saniye / 86400)} gün ${Math.round((saniye % 86400) / 3600)} sa`;
+      }
+
+      document
+        .querySelectorAll('.arac-alan input, .arac-alan select')
+        .forEach((g) => g.addEventListener('input', hesapla));
+
+      document.querySelectorAll('.t-senaryo').forEach((d) => {
+        d.addEventListener('click', () => {
+          el('#t-gecikme').value = d.dataset.gecikme;
+          el('#t-kayip').value = d.dataset.kayip;
+          el('#t-hat').value = d.dataset.hat;
+          document.querySelectorAll('.t-senaryo[data-secili]').forEach((x) => {
+            delete x.dataset.secili;
+          });
+          d.dataset.secili = 'evet';
+          hesapla();
+        });
+      });
+
+      hesapla();
+    })();
+  </script>
+
+  <style>
+    .t-senaryolar {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(min(180px, 100%), 1fr));
+      gap: 10px;
+    }
+    .t-senaryo {
+      display: grid;
+      gap: 3px;
+      text-align: left;
+      border: 1px solid var(--line);
+      border-radius: 11px;
+      padding: 11px 13px;
+      background: var(--paper);
+      cursor: pointer;
+      font-family: inherit;
+      color: var(--ink);
+    }
+    .t-senaryo b {
+      font-size: 13px;
+    }
+    .t-senaryo span {
+      font-size: 12px;
+      color: var(--indigo-metin);
+      font-family: var(--mono, ui-monospace, monospace);
+    }
+    .t-senaryo em {
+      font-style: normal;
+      font-size: 11.5px;
+      color: var(--muted);
+      line-height: 1.45;
+    }
+    .t-senaryo:hover {
+      border-color: var(--indigo);
+    }
+    .t-senaryo[data-secili] {
+      border-color: var(--indigo);
+      background: var(--tint);
+      box-shadow: 0 0 0 1px var(--indigo);
+    }
+    .t-kartlar {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(min(160px, 100%), 1fr));
+      gap: 10px;
+      margin-bottom: 18px;
+    }
+    .t-kart {
+      border: 1px solid var(--line);
+      border-radius: 11px;
+      padding: 13px 15px;
+      display: grid;
+      gap: 3px;
+      background: var(--paper);
+    }
+    .t-kart-b {
+      font-size: 11.5px;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+      color: var(--muted);
+    }
+    .t-kart-d {
+      font-size: 21px;
+      letter-spacing: -0.02em;
+      font-family: var(--mono, ui-monospace, monospace);
+      color: var(--indigo-metin);
+    }
+    .t-kart-n {
+      font-size: 12px;
+      color: var(--muted);
+      line-height: 1.45;
+    }
+    .t-cubuklar {
+      display: grid;
+      gap: 13px;
+      margin-bottom: 14px;
+    }
+    .t-cubuk-ust {
+      display: flex;
+      justify-content: space-between;
+      font-size: 13px;
+      margin-bottom: 5px;
+    }
+    .t-ray {
+      height: 9px;
+      border-radius: 999px;
+      background: var(--tint);
+      overflow: hidden;
+      border: 1px solid var(--line);
+    }
+    .t-ray i {
+      display: block;
+      height: 100%;
+      background: var(--line);
+    }
+    .t-cubuk[data-vurgu] .t-ray i {
+      background: var(--indigo);
+    }
+    .t-cubuk[data-vurgu] .t-cubuk-ust b {
+      color: var(--indigo-metin);
+    }
+    .t-sure {
+      display: grid;
+      gap: 8px;
+      margin-top: 12px;
+    }
+    .t-sure-satir {
+      display: flex;
+      justify-content: space-between;
+      align-items: baseline;
+      gap: 14px;
+      border-bottom: 1px solid var(--line);
+      padding-bottom: 8px;
+      font-size: 14px;
+    }
+    .t-sure-satir b {
+      font-family: var(--mono, ui-monospace, monospace);
+    }
+    .t-soluk {
+      color: var(--muted);
+      font-size: 13px;
+    }
+    .t-oneriler,
+    .t-ipuclari {
+      list-style: none;
+      margin: 0;
+      padding: 0;
+      display: grid;
+      gap: 12px;
+    }
+    .t-oneriler li,
+    .t-ipuclari li {
+      font-size: 13.5px;
+      line-height: 1.62;
+      color: var(--ink-soft);
+      border-left: 2px solid var(--line);
+      padding-left: 13px;
+    }
+    .t-oneriler li {
+      border-left-color: var(--indigo);
+    }
+  </style>
+</Base>

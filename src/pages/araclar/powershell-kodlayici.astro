@@ -1,0 +1,419 @@
+---
+import Base from '../../layouts/Base.astro';
+---
+
+<Base
+  baslik="PowerShell komut kodlayıcı"
+  aciklama="Çok satırlı bir betiği tek satıra indirir: -EncodedCommand Base64, tırnak kaçırma, zamanlanmış görev ve GPO satırı. Kodlanmış komutu geri çözer."
+  aramaya={true}
+  kategori="Araç"
+>
+  <div class="arama-bas">
+    <div class="kap">
+      <nav class="kirinti" aria-label="Kırıntı yolu" style="padding-top:0">
+        <a href="/">Ana sayfa</a><span class="ayrac">/</span><a href="/araclar">Araçlar</a><span
+          class="ayrac">/</span
+        ><span aria-current="page">PowerShell kodlayıcı</span>
+      </nav>
+      <h1>PowerShell komut kodlayıcı</h1>
+      <p style="color:var(--muted);font-size:14px;margin-top:8px;max-width:66ch">
+        Zamanlanmış görevin argüman kutusuna, bir GPO başlangıç betiğine ya da uzak yönetim
+        aracının tek satırlık alanına çok satırlı bir betik sığdırmak gerektiğinde. Kodlama
+        tarayıcıda yapılır; betiğiniz hiçbir yere gönderilmez.
+      </p>
+    </div>
+  </div>
+
+  <div class="kap arac-sayfa">
+    <section class="arac-blok">
+      <h2 class="arac-h2"><span class="arac-no">1</span> Betik</h2>
+      <div class="arac-alan">
+        <textarea id="w-girdi" rows="9" spellcheck="false"></textarea>
+      </div>
+      <div class="arac-dugmeler">
+        <button type="button" class="dg dg-hayalet" id="w-ornek">Örnek betik</button>
+        <button type="button" class="dg dg-hayalet" id="w-temizle">Temizle</button>
+      </div>
+      <div class="w-secenekler">
+        <label class="w-sec"
+          ><input type="checkbox" id="w-nologo" checked />
+          <span>-NoProfile <i>(profil betiği çalışmasın — davranışı öngörülebilir kılar)</i></span>
+        </label>
+        <label class="w-sec"
+          ><input type="checkbox" id="w-noninteractive" checked />
+          <span>-NonInteractive <i>(sorma, bekleme)</i></span>
+        </label>
+        <label class="w-sec"
+          ><input type="checkbox" id="w-bypass" />
+          <span
+            >-ExecutionPolicy Bypass
+            <i>(yalnızca imzasız betiği bilerek çalıştırıyorsanız)</i></span
+          >
+        </label>
+        <label class="w-sec"
+          ><input type="checkbox" id="w-gizli" />
+          <span>-WindowStyle Hidden <i>(pencere açılmasın)</i></span>
+        </label>
+        <label class="w-sec"
+          ><input type="checkbox" id="w-pwsh" />
+          <span>pwsh <i>(PowerShell 7+ — öntanımlı powershell.exe yani 5.1)</i></span>
+        </label>
+      </div>
+      <p class="arac-durum" id="w-durum" role="status" aria-live="polite"></p>
+    </section>
+
+    <section class="arac-blok">
+      <h2 class="arac-h2"><span class="arac-no">2</span> Çıktılar</h2>
+      <div class="arac-olcum" id="w-olcum"></div>
+      <div class="w-ciktilar">
+        <div>
+          <span class="yan-etiket">Tam komut satırı</span>
+          <div style="position:relative">
+            <pre class="kod"><code id="w-komut"></code></pre>
+            <button class="kopyala" type="button" data-kaynak="w-komut">Kopyala</button>
+          </div>
+        </div>
+        <div>
+          <span class="yan-etiket">Yalnızca Base64 <i>(UTF-16LE)</i></span>
+          <div style="position:relative">
+            <pre class="kod w-kirp"><code id="w-base64"></code></pre>
+            <button class="kopyala" type="button" data-kaynak="w-base64">Kopyala</button>
+          </div>
+        </div>
+        <div>
+          <span class="yan-etiket">Zamanlanmış görev</span>
+          <div style="position:relative">
+            <pre class="kod"><code id="w-gorev"></code></pre>
+            <button class="kopyala" type="button" data-kaynak="w-gorev">Kopyala</button>
+          </div>
+        </div>
+        <div>
+          <span class="yan-etiket">Kaçırılmış tek satır <i>(-Command ile)</i></span>
+          <div style="position:relative">
+            <pre class="kod"><code id="w-tek"></code></pre>
+            <button class="kopyala" type="button" data-kaynak="w-tek">Kopyala</button>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="arac-blok">
+      <h2 class="arac-h2"><span class="arac-no">3</span> Kodlanmış komutu çöz</h2>
+      <p class="arac-not" style="margin-top:0">
+        Günlükte ya da bir görev tanımında karşınıza çıkan <code>-EncodedCommand</code> değerini
+        buraya yapıştırın. Ne yaptığını okumadan çalıştırmayın.
+      </p>
+      <div class="arac-alan">
+        <textarea id="w-coz-girdi" rows="4" spellcheck="false" placeholder="RwBlAHQALQBQAHIAbwBjAGUAcwBzAA=="
+        ></textarea>
+      </div>
+      <p class="arac-durum" id="w-coz-durum" role="status" aria-live="polite"></p>
+      <div style="position:relative" id="w-coz-kutu" hidden>
+        <pre class="kod"><code id="w-coz-cikti"></code></pre>
+        <button class="kopyala" type="button" data-kaynak="w-coz-cikti">Kopyala</button>
+      </div>
+    </section>
+
+    <section class="arac-blok">
+      <h2 class="arac-h2"><span class="arac-no">4</span> Neden UTF-16LE?</h2>
+      <ul class="w-ipuclari">
+        <li>
+          <b>Base64 kaynağı UTF-16 küçük sonlu olmalıdır.</b> Windows'un yerel dize biçimi budur.
+          UTF-8'i Base64'leyip verirseniz PowerShell çin alfabesine benzer bir çöp okur ve
+          anlaşılmaz bir sözdizimi hatası verir. Araç bunu doğru yapıyor; elle
+          <code>[Convert]::ToBase64String([Text.Encoding]::Unicode.GetBytes($k))</code> yazarken
+          <code>Unicode</code> demeye dikkat edin — <code>UTF8</code> değil.
+        </li>
+        <li>
+          <b>Kodlama gizleme değildir.</b> Base64 herkesin bir saniyede çözebileceği bir
+          biçimdir; güvenlik ürünleri de zaten çözüp bakar. Amaç yalnızca tırnak ve satır sonu
+          derdinden kurtulmaktır.
+        </li>
+        <li>
+          <b>Uzunluk sınırı var.</b> Komut satırı Windows'ta 8191 karakterle sınırlıdır ve Base64
+          metni büyütür: her karakter 2 bayt olur, sonra Base64 bunu ⅓ daha şişirir. Kabaca
+          <b>3000 karakterlik</b> betik sınıra dayanır. Daha uzunsa betiği bir dosyaya koyup
+          <code>-File</code> ile çağırın.
+        </li>
+        <li>
+          <b>Çıkış kodu.</b> <code>-EncodedCommand</code> ile çalışan betiğin <code>exit</code>
+          kodu dışarı yansır, ama yakalanmamış bir hata varsayılan olarak 0 döndürür. Zamanlanmış
+          görevin başarısızlığı fark etmesini istiyorsanız betiğin sonuna
+          <code>exit $LASTEXITCODE</code> ya da açık bir <code>exit 1</code> koyun.
+        </li>
+        <li>
+          <b>Tırnak kaçırma kuralı.</b> PowerShell'de tek tırnaklı dizede ikinci bir tek tırnak
+          <code>''</code> yazılarak kaçırılır — ters eğik çizgiyle değil. Çift tırnaklı dizede
+          <code>$</code> ve ters tırnak yorumlanır; sabit metin istiyorsanız tek tırnak kullanın.
+        </li>
+        <li>
+          <b>Görev olarak çalıştırırken çalışma dizini.</b> Zamanlanmış görevler
+          <code>C:\Windows\System32</code> içinde başlar. Göreli yol kullanan her betik orada
+          patlar; yolları mutlak yazın ya da betiğin başında <code>Set-Location</code> çağırın.
+        </li>
+      </ul>
+    </section>
+  </div>
+
+  <script>
+    (() => {
+      const el = (s) => document.querySelector(s);
+
+      /** Metni UTF-16LE baytlarına çevirip Base64'ler — PowerShell'in beklediği biçim. */
+      function base64le(metin) {
+        const baytlar = new Uint8Array(metin.length * 2);
+        for (let i = 0; i < metin.length; i++) {
+          const k = metin.charCodeAt(i);
+          baytlar[i * 2] = k & 0xff;
+          baytlar[i * 2 + 1] = k >> 8;
+        }
+        let ikili = '';
+        for (const b of baytlar) ikili += String.fromCharCode(b);
+        return btoa(ikili);
+      }
+
+      /** Base64'ü UTF-16LE varsayarak geri çözer. */
+      function base64leCoz(b64) {
+        const ikili = atob(b64.replace(/\s+/g, ''));
+        let metin = '';
+        for (let i = 0; i + 1 < ikili.length; i += 2) {
+          metin += String.fromCharCode(ikili.charCodeAt(i) | (ikili.charCodeAt(i + 1) << 8));
+        }
+        return metin;
+      }
+
+      function bayraklar() {
+        const b = [];
+        if (el('#w-nologo').checked) b.push('-NoProfile');
+        if (el('#w-noninteractive').checked) b.push('-NonInteractive');
+        if (el('#w-bypass').checked) b.push('-ExecutionPolicy Bypass');
+        if (el('#w-gizli').checked) b.push('-WindowStyle Hidden');
+        return b;
+      }
+
+      function uret() {
+        const betik = el('#w-girdi').value;
+        const kabuk = el('#w-pwsh').checked ? 'pwsh.exe' : 'powershell.exe';
+
+        if (!betik.trim()) {
+          el('#w-komut').textContent = '';
+          el('#w-base64').textContent = '';
+          el('#w-gorev').textContent = '';
+          el('#w-tek').textContent = '';
+          el('#w-olcum').innerHTML = '<span>Betik girin</span>';
+          el('#w-durum').textContent = '';
+          return;
+        }
+
+        const b64 = base64le(betik);
+        const bayrak = bayraklar().join(' ');
+        const tamKomut = `${kabuk} ${bayrak} -EncodedCommand ${b64}`;
+
+        el('#w-base64').textContent = b64;
+        el('#w-komut').textContent = tamKomut;
+
+        /* --- zamanlanmış görev --- */
+        el('#w-gorev').textContent =
+          `$eylem = New-ScheduledTaskAction -Execute '${kabuk}' \`\n` +
+          `    -Argument '${bayrak} -EncodedCommand ${b64}'\n` +
+          `$tetik = New-ScheduledTaskTrigger -Daily -At 03:00\n` +
+          `$kimlik = New-ScheduledTaskPrincipal -UserId 'SYSTEM' -RunLevel Highest\n` +
+          `$ayar  = New-ScheduledTaskSettingsSet -StartWhenAvailable \`\n` +
+          `    -ExecutionTimeLimit (New-TimeSpan -Hours 2)\n\n` +
+          `Register-ScheduledTask -TaskName 'bilgince-bakim' -Action $eylem \`\n` +
+          `    -Trigger $tetik -Principal $kimlik -Settings $ayar -Force`;
+
+        /* --- kaçırılmış tek satır ---
+           Satır sonları ; ile birleştirilir, tek tırnaklar ikilenerek kaçırılır. */
+        const tekSatir = betik
+          .split('\n')
+          .map((s) => s.replace(/#.*$/, '').trim()) // yorumlar tek satırda tehlikelidir
+          .filter(Boolean)
+          .join('; ');
+        el('#w-tek').textContent =
+          `${kabuk} ${bayrak} -Command "${tekSatir.replace(/"/g, '\\"')}"`;
+
+        /* --- ölçüm ve uyarılar --- */
+        const uzunluk = tamKomut.length;
+        el('#w-olcum').innerHTML =
+          `<span>Betik: <b>${betik.length}</b> karakter</span>` +
+          `<span>Base64: <b>${b64.length}</b> karakter</span>` +
+          `<span>Komut satırı: <b>${uzunluk}</b> / 8191</span>` +
+          `<span>Doluluk: <b>%${Math.round((uzunluk / 8191) * 100)}</b></span>`;
+
+        const durum = el('#w-durum');
+        const yorumVar = /^\s*#/m.test(betik);
+        if (uzunluk > 8191) {
+          durum.className = 'arac-durum hata';
+          durum.textContent =
+            `Komut satırı ${uzunluk} karakter — Windows sınırı 8191. Betiği bir dosyaya kaydedip ` +
+            `-File ile çağırın.`;
+        } else if (uzunluk > 6000) {
+          durum.className = 'arac-durum';
+          durum.textContent =
+            `Komut satırı ${uzunluk} karakter; sınıra (8191) yaklaşıyor. Betik büyümeye devam ` +
+            `edecekse şimdiden -File yaklaşımına geçin.`;
+        } else if (yorumVar) {
+          durum.className = 'arac-durum ok';
+          durum.textContent =
+            'Hazır. Not: yorum satırları kodlanmış sürümde sorunsuz çalışır, ama aşağıdaki ' +
+            '"tek satır" biçiminde temizlenir — orada # işaretinden sonrası satırın kalanını yutar.';
+        } else {
+          durum.className = 'arac-durum ok';
+          durum.textContent = 'Hazır.';
+        }
+      }
+
+      /* --- çözme ------------------------------------------------------------ */
+      function cozumle() {
+        const ham = el('#w-coz-girdi').value.trim();
+        const durum = el('#w-coz-durum');
+
+        if (!ham) {
+          el('#w-coz-kutu').hidden = true;
+          durum.textContent = '';
+          return;
+        }
+
+        // Tam bir komut satırı yapıştırılmışsa Base64 kısmını ayıkla
+        const k = /-e(?:nc|ncoded(?:command)?)?\s+([A-Za-z0-9+/=]+)/i.exec(ham);
+        const b64 = k ? k[1] : ham;
+
+        if (!/^[A-Za-z0-9+/=\s]+$/.test(b64)) {
+          durum.className = 'arac-durum hata';
+          durum.textContent = 'Bu bir Base64 dizesi değil.';
+          el('#w-coz-kutu').hidden = true;
+          return;
+        }
+
+        try {
+          const le = base64leCoz(b64);
+          // Yanlış kodlamayla üretilmiş olabilir; UTF-8 okumasını da deneyip karşılaştır
+          const ikili = atob(b64.replace(/\s+/g, ''));
+          const utf8 = new TextDecoder('utf-8').decode(
+            Uint8Array.from(ikili, (c) => c.charCodeAt(0))
+          );
+
+          const bosKarakter = (s) => [...s].filter((c) => c === '\u0000').length;
+          const secim =
+            bosKarakter(le) > le.length / 4 || (le.length && !/[\x20-\x7e]/.test(le[0]))
+              ? { metin: utf8, not: 'UTF-8 olarak çözüldü — bu değer PowerShell standardına uymuyor' }
+              : { metin: le, not: 'UTF-16LE olarak çözüldü' };
+
+          el('#w-coz-cikti').textContent = secim.metin;
+          el('#w-coz-kutu').hidden = false;
+          durum.className = 'arac-durum ok';
+          durum.textContent = `${secim.not}. ${secim.metin.length} karakter.`;
+        } catch {
+          durum.className = 'arac-durum hata';
+          durum.textContent = 'Base64 çözülemedi — dize eksik ya da bozuk.';
+          el('#w-coz-kutu').hidden = true;
+        }
+      }
+
+      /* --- olaylar ---------------------------------------------------------- */
+      el('#w-girdi').addEventListener('input', uret);
+      el('#w-coz-girdi').addEventListener('input', cozumle);
+      document
+        .querySelectorAll('#w-nologo, #w-noninteractive, #w-bypass, #w-gizli, #w-pwsh')
+        .forEach((k) => k.addEventListener('change', uret));
+
+      el('#w-ornek').addEventListener('click', () => {
+        el('#w-girdi').value = [
+          '# Disk doluluğu %85 üstündeki birimleri bildir',
+          '$esik = 85',
+          '$dolu = Get-CimInstance Win32_LogicalDisk -Filter "DriveType = 3" |',
+          '    Where-Object { $_.Size -gt 0 } |',
+          '    ForEach-Object {',
+          '        $oran = [math]::Round(100 - ($_.FreeSpace / $_.Size * 100), 1)',
+          '        if ($oran -ge $esik) { "{0} %{1}" -f $_.DeviceID, $oran }',
+          '    }',
+          '',
+          'if ($dolu) {',
+          '    $dolu | Out-File C:\\Kayit\\disk-uyari.txt -Encoding utf8',
+          '    exit 1',
+          '}',
+          'exit 0',
+        ].join('\n');
+        uret();
+      });
+
+      el('#w-temizle').addEventListener('click', () => {
+        el('#w-girdi').value = '';
+        uret();
+      });
+
+      document.querySelectorAll('.kopyala').forEach((d) => {
+        d.addEventListener('click', async () => {
+          try {
+            await navigator.clipboard.writeText(el(`#${d.dataset.kaynak}`).textContent);
+            d.textContent = 'Kopyalandı';
+            setTimeout(() => (d.textContent = 'Kopyala'), 1600);
+          } catch {
+            /* pano izni yoksa kullanıcı elle seçer */
+          }
+        });
+      });
+
+      uret();
+    })();
+  </script>
+
+  <style>
+    .arac-dugmeler {
+      display: flex;
+      gap: 10px;
+      flex-wrap: wrap;
+      margin: 4px 0 14px;
+    }
+    .w-secenekler {
+      display: grid;
+      gap: 9px;
+    }
+    .w-sec {
+      display: inline-flex;
+      align-items: baseline;
+      gap: 8px;
+      font-size: 13px;
+      color: var(--ink-soft);
+      cursor: pointer;
+      line-height: 1.5;
+    }
+    .w-sec i,
+    .yan-etiket i {
+      font-style: normal;
+      color: var(--muted);
+      font-size: 12px;
+      font-weight: 400;
+      text-transform: none;
+      letter-spacing: 0;
+    }
+    .w-ciktilar {
+      display: grid;
+      /* Tek sütunlu ızgaranın öntanımlı izi max-content'tir; uzun Base64 satırı
+         sütunu şişirir ve pre'nin kendi kaydırması hiç devreye girmez. */
+      grid-template-columns: minmax(0, 1fr);
+      gap: 18px;
+    }
+    .w-kirp {
+      max-height: 160px;
+      overflow: auto;
+      word-break: break-all;
+      white-space: pre-wrap;
+    }
+    .w-ipuclari {
+      list-style: none;
+      margin: 0;
+      padding: 0;
+      display: grid;
+      gap: 12px;
+    }
+    .w-ipuclari li {
+      font-size: 13.5px;
+      line-height: 1.62;
+      color: var(--ink-soft);
+      border-left: 2px solid var(--line);
+      padding-left: 13px;
+    }
+  </style>
+</Base>
