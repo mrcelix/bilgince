@@ -1,0 +1,650 @@
+---
+import Base from '../../layouts/Base.astro';
+---
+
+<Base
+  baslik="Saat eşitleme (NTP) planlayıcı"
+  aciklama="Etki alanında saat hiyerarşisi nasıl kurulur, Kerberos'un beş dakikalık toleransı neyi bozar, sanal makinelerde çift kaynak sorunu nasıl çözülür."
+  aramaya={true}
+  kategori="Araç"
+>
+  <div class="arama-bas">
+    <div class="kap">
+      <nav class="kirinti" aria-label="Kırıntı yolu" style="padding-top:0">
+        <a href="/">Ana sayfa</a><span class="ayrac">/</span><a href="/araclar">Araçlar</a><span
+          class="ayrac">/</span
+        ><span aria-current="page">Saat eşitleme</span>
+      </nav>
+      <h1>Saat eşitleme (NTP) planlayıcı</h1>
+      <p style="color:var(--muted);font-size:14px;margin-top:8px;max-width:66ch">
+        Saat kayması sessiz bir arıza türüdür: bir gün oturum açılmaz, sertifika geçersiz
+        görünür, günlükler birbirini tutmaz. Üçünün de sebebi aynıdır ve hiçbiri "saat"
+        diye bildirilmez. Ortamınızı seçin, hiyerarşiyi ve komutları alın.
+      </p>
+    </div>
+  </div>
+
+  <div class="kap arac-sayfa">
+    <section class="arac-blok">
+      <h2 class="arac-h2"><span class="arac-no">1</span> Ortam</h2>
+      <div class="arac-alanlar">
+        <label class="arac-alan"
+          >Etki alanı
+          <input id="n-alan" type="text" spellcheck="false" value="sirket.local" />
+        </label>
+        <label class="arac-alan"
+          >PDC öykünücüsü
+          <input id="n-pdc" type="text" spellcheck="false" value="SRV-DC-01" />
+          <small>Etki alanında saat kaynağı bu sunucudur.</small>
+        </label>
+        <label class="arac-alan"
+          >Dış saat kaynağı
+          <select id="n-kaynak">
+            <option value="tubitak">TÜBİTAK UME (Türkiye)</option>
+            <option value="pool">tr.pool.ntp.org</option>
+            <option value="google">Google (sıçrama saniyesi yumuşatılmış)</option>
+            <option value="cloudflare">Cloudflare</option>
+            <option value="donanim">Yerel donanım saati (GPS/DCF77)</option>
+          </select>
+        </label>
+        <label class="arac-alan"
+          >Kabul edilen sapma (saniye)
+          <input id="n-sapma" type="number" min="1" max="3600" value="300" />
+          <small>Kerberos öntanımlı toleransı 300 saniyedir.</small>
+        </label>
+      </div>
+      <div class="n-secenekler">
+        <label class="n-sec"
+          ><input type="checkbox" id="n-sanal" checked />
+          <span>Etki alanı denetleyicileri sanal makine <i>(ana makine saati çakışabilir)</i></span>
+        </label>
+        <label class="n-sec"
+          ><input type="checkbox" id="n-linux" checked />
+          <span>Ortamda Linux sunucular da var</span>
+        </label>
+        <label class="n-sec"
+          ><input type="checkbox" id="n-dis" />
+          <span>Dış ağa 123/UDP çıkışı kapalı <i>(güvenlik duvarı kısıtı)</i></span>
+        </label>
+      </div>
+      <p class="arac-durum" id="n-durum" role="status" aria-live="polite"></p>
+    </section>
+
+    <section class="arac-blok">
+      <h2 class="arac-h2"><span class="arac-no">2</span> Hiyerarşi</h2>
+      <ol class="n-katmanlar" id="n-katmanlar"></ol>
+    </section>
+
+    <section class="arac-blok">
+      <h2 class="arac-h2"><span class="arac-no">3</span> Sapmanın sonuçları</h2>
+      <div class="n-kaydir">
+        <table class="n-tablo">
+          <thead>
+            <tr><th>Sapma</th><th>Ne olur</th><th>Nasıl görünür</th></tr>
+          </thead>
+          <tbody id="n-tablo"></tbody>
+        </table>
+      </div>
+    </section>
+
+    <section class="arac-blok">
+      <h2 class="arac-h2"><span class="arac-no">4</span> Komutlar</h2>
+      <div class="n-ciktilar">
+        <div>
+          <span class="yan-etiket">PDC öykünücüsü — dış kaynağa bağlan</span>
+          <div style="position:relative">
+            <pre class="kod"><code id="n-pdcKomut"></code></pre>
+            <button class="kopyala" type="button" data-kaynak="n-pdcKomut">Kopyala</button>
+          </div>
+        </div>
+        <div>
+          <span class="yan-etiket">Diğer sunucular — etki alanından al</span>
+          <div style="position:relative">
+            <pre class="kod"><code id="n-uyeKomut"></code></pre>
+            <button class="kopyala" type="button" data-kaynak="n-uyeKomut">Kopyala</button>
+          </div>
+        </div>
+        <div id="n-linuxKutu">
+          <span class="yan-etiket">Linux sunucular</span>
+          <div style="position:relative">
+            <pre class="kod"><code id="n-linuxKomut"></code></pre>
+            <button class="kopyala" type="button" data-kaynak="n-linuxKomut">Kopyala</button>
+          </div>
+        </div>
+        <div>
+          <span class="yan-etiket">Denetim ve izleme</span>
+          <div style="position:relative">
+            <pre class="kod"><code id="n-denetimKomut"></code></pre>
+            <button class="kopyala" type="button" data-kaynak="n-denetimKomut">Kopyala</button>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="arac-blok">
+      <h2 class="arac-h2"><span class="arac-no">5</span> Uyarılar</h2>
+      <div id="n-bulgular"></div>
+    </section>
+
+    <section class="arac-blok">
+      <h2 class="arac-h2"><span class="arac-no">6</span> Saat hakkında</h2>
+      <ul class="n-ipuclari">
+        <li>
+          <b>Tek bir doğru saat olmalı.</b> Etki alanında hiyerarşi tektir: PDC öykünücüsü
+          rolünü taşıyan denetleyici dışarıdan alır, diğer bütün denetleyiciler ve üyeler
+          ondan alır. İki farklı kaynaktan besleyen bir ortam, birbirini tutmayan iki gerçek
+          üretir.
+        </li>
+        <li>
+          <b>Sanal makinede iki kaynak çakışır.</b> Hipervizör konuk makinenin saatini
+          eşitler; etki alanı da eşitler. İkisi aynı anda çalıştığında saat ileri geri
+          zıplar. Etki alanı denetleyicilerinde <b>hipervizör saat eşitlemesini kapatın</b> —
+          bu, sanallaştırılmış AD ortamlarında en sık atlanan adımdır.
+        </li>
+        <li>
+          <b>Kerberos beş dakika toleranslıdır.</b> Sapma bunu aştığında oturum açma
+          reddedilir ve hata mesajı saatten hiç bahsetmez: "güvenlik veri tabanında bilgi
+          yok" ya da "belirtilen ağ parolası doğru değil" der. Böyle bir şikâyette ilk
+          bakılacak yer saattir.
+        </li>
+        <li>
+          <b>Sertifika doğrulaması da saate bağlıdır.</b> Saat ileri alınmış bir makine,
+          geçerli sertifikaları "süresi dolmuş" görür; geri alınmış olan ise "henüz geçerli
+          değil" der. Bir istemcide açıklanamayan TLS hatası varsa saatine bakın.
+        </li>
+        <li>
+          <b>Günlükleri UTC tutun.</b> Farklı sunucuların kayıtlarını birleştirmenin tek yolu
+          budur. Yerel saat, yaz saati geçişinde bir saati iki kez yaşatır — olay
+          incelemesinde bu, sıralamayı doğrudan yanlış yapar.
+        </li>
+        <li>
+          <b>Sıçrama saniyesi iki farklı şekilde ele alınır.</b> Klasik NTP sunucuları
+          saniyeyi tekrarlar; Google ve Amazon gibi sağlayıcılar bunu güne yayarak
+          "yumuşatır". İkisini karıştırmak, o gün boyunca sunucular arasında saniyeye varan
+          fark üretir. Ortamın tamamında aynı yaklaşımı kullanın.
+        </li>
+      </ul>
+    </section>
+  </div>
+
+  <script>
+    (() => {
+      const el = (s) => document.querySelector(s);
+      const kacir = (s) =>
+        String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+
+      const KAYNAKLAR = {
+        tubitak: {
+          ad: 'TÜBİTAK UME',
+          sunucular: ['ulusal.zaman.tubitak.gov.tr', 'time.ume.tubitak.gov.tr'],
+          not: 'Türkiye ulusal zaman kaynağı; yurt içi gecikme düşük.',
+          yumusatma: false,
+        },
+        pool: {
+          ad: 'NTP havuzu',
+          sunucular: ['0.tr.pool.ntp.org', '1.tr.pool.ntp.org', '2.tr.pool.ntp.org'],
+          not: 'Gönüllü sunuculardan oluşur; her seferinde farklı bir sunucuya düşebilir.',
+          yumusatma: false,
+        },
+        google: {
+          ad: 'Google Public NTP',
+          sunucular: ['time1.google.com', 'time2.google.com', 'time3.google.com'],
+          not: 'Sıçrama saniyesini güne yayar (smearing).',
+          yumusatma: true,
+        },
+        cloudflare: {
+          ad: 'Cloudflare',
+          sunucular: ['time.cloudflare.com'],
+          not: 'Anycast; coğrafi olarak en yakın düğüme gider.',
+          yumusatma: true,
+        },
+        donanim: {
+          ad: 'Yerel donanım saati',
+          sunucular: ['127.127.20.0'],
+          not: 'GPS ya da radyo alıcısı; dış ağa çıkış gerektirmez, en yüksek doğruluk.',
+          yumusatma: false,
+        },
+      };
+
+      function hesapla() {
+        const alan = el('#n-alan').value.trim() || 'sirket.local';
+        const pdc = el('#n-pdc').value.trim() || 'SRV-DC-01';
+        const kaynakKod = el('#n-kaynak').value;
+        const kaynak = KAYNAKLAR[kaynakKod];
+        const sapma = Number(el('#n-sapma').value) || 300;
+        const sanal = el('#n-sanal').checked;
+        const linux = el('#n-linux').checked;
+        const disKapali = el('#n-dis').checked;
+
+        el('#n-linuxKutu').hidden = !linux;
+
+        /* --- hiyerarşi --- */
+        const katmanlar = [
+          {
+            ad: kaynak.ad,
+            rol: 'Katman 1 — dış kaynak',
+            aciklama: kaynak.not,
+            sunucular: kaynak.sunucular,
+          },
+          {
+            ad: pdc,
+            rol: 'Katman 2 — PDC öykünücüsü',
+            aciklama:
+              'Etki alanının tek dış bağlantılı saat kaynağı. Bu rol başka bir denetleyiciye ' +
+              'devredilirse saat yapılandırması da onunla birlikte taşınmalıdır — devirden sonra ' +
+              'en sık unutulan şey budur.',
+            sunucular: [],
+          },
+          {
+            ad: 'Diğer etki alanı denetleyicileri',
+            rol: 'Katman 3 — alan hiyerarşisi',
+            aciklama:
+              'Saati PDC öykünücüsünden alır. Ayrıca dış kaynak tanımlamayın; iki kaynak ' +
+              'birbiriyle yarışır.',
+            sunucular: [],
+          },
+          {
+            ad: 'Üye sunucular ve istemciler',
+            rol: 'Katman 4 — alan üyeleri',
+            aciklama:
+              'Etki alanına katıldıklarında bunu kendiliğinden yaparlar; elle yapılandırma ' +
+              'gerekmez ve genelde zarar verir.',
+            sunucular: [],
+          },
+        ];
+
+        if (linux) {
+          katmanlar.push({
+            ad: 'Linux sunucular',
+            rol: 'Etki alanı dışı',
+            aciklama:
+              'Etki alanına katılmadıysa saati doğrudan PDC öykünücüsünden ya da aynı dış ' +
+              'kaynaktan almalı. Farklı bir kaynak seçmek, Kerberos ile korunan paylaşımlarda ' +
+              'sessiz erişim sorunları üretir.',
+            sunucular: [pdc],
+          });
+        }
+
+        el('#n-katmanlar').innerHTML = katmanlar
+          .map(
+            (k, i) =>
+              `<li class="n-katman"${i === 1 ? ' data-vurgu="evet"' : ''}>` +
+              `<div class="n-katman-ust"><span class="n-rol">${kacir(k.rol)}</span>` +
+              `<b>${kacir(k.ad)}</b></div>` +
+              `<p>${k.aciklama}</p>` +
+              (k.sunucular.length
+                ? `<div class="n-sunucular">${k.sunucular.map((s) => `<code>${kacir(s)}</code>`).join('')}</div>`
+                : '') +
+              `</li>`
+          )
+          .join('');
+
+        /* --- sapma tablosu --- */
+        el('#n-tablo').innerHTML = [
+          ['1 saniyeye kadar', 'Sorun yok', 'Normal işletim; bu aralıkta kalınması hedeflenir'],
+          [
+            '1 – 30 saniye',
+            'Günlük korelasyonu bozulur',
+            'Olay incelemesinde olayların sırası yanlış görünür; sebep sonuçtan sonra gelir',
+          ],
+          [
+            `30 – ${sapma} saniye`,
+            'Kerberos hâlâ çalışır ama sınırda',
+            'Ara ara başarısız oturum açma; yeniden denendiğinde çalışır, bu yüzden bildirilmez',
+          ],
+          [
+            `${sapma} saniyeden fazla`,
+            'Kerberos kimlik doğrulaması reddedilir',
+            'Oturum açılamaz, paylaşıma erişilemez. Hata mesajı saatten bahsetmez: ' +
+              '"güvenlik veri tabanında bilgi yok" ya da parola hatası der',
+          ],
+          [
+            'Saatler / günler',
+            'Sertifikalar geçersiz görünür, çoğaltma durur',
+            'TLS hataları, AD çoğaltma başarısızlığı, zamanlanmış görevlerin yanlış saatte çalışması',
+          ],
+        ]
+          .map(
+            ([s, n, g], i) =>
+              `<tr${i >= 3 ? ' data-kritik="evet"' : ''}><td>${kacir(s)}</td>` +
+              `<td><b>${kacir(n)}</b></td><td>${kacir(g)}</td></tr>`
+          )
+          .join('');
+
+        /* --- komutlar --- */
+        const sunucuListesi = kaynak.sunucular.map((s) => `${s},0x8`).join(' ');
+
+        el('#n-pdcKomut').textContent =
+          `# ${pdc} üzerinde — yalnızca PDC öykünücüsünde çalıştırın\n` +
+          `# 0x8 bayrağı: istemci kipinde çalış, sunucuya baskın olma\n` +
+          `w32tm /config /manualpeerlist:"${sunucuListesi}" /syncfromflags:manual /reliable:yes /update\n` +
+          `Restart-Service w32time\n` +
+          `w32tm /resync /rediscover\n\n` +
+          (sanal
+            ? `# Sanal makine: hipervizör saat eşitlemesi kapatılmalı\n` +
+              `# Hyper-V: Sanal makine ayarları > Tümleştirme Hizmetleri > "Zaman eşitleme" kaldırın\n` +
+              `# VMware: VM ayarları > VMware Tools > "Synchronize guest time with host" kapatın\n` +
+              `# Kapatıldığını doğrulayın:\n` +
+              `Get-VMIntegrationService -VMName '${pdc}' -Name 'Time Synchronization'\n\n`
+            : '') +
+          `# Yapılandırmayı doğrula\n` +
+          `w32tm /query /configuration\n` +
+          `w32tm /query /status /verbose\n` +
+          `# "Stratum" 2 ya da 3 olmalı; 0 ise hiç eşitlenmemiş demektir.`;
+
+        el('#n-uyeKomut').textContent =
+          `# Etki alanı üyesi sunucular — normalde bir şey yapmaya gerek yok.\n` +
+          `# Daha önce elle yapılandırılmışsa varsayılana döndürün:\n` +
+          `w32tm /config /syncfromflags:domhier /update\n` +
+          `Restart-Service w32time\n` +
+          `w32tm /resync\n\n` +
+          `# Saati nereden aldığını gör\n` +
+          `w32tm /query /source\n` +
+          `# Çıktı ${pdc}.${alan} olmalı. "Local CMOS Clock" görüyorsanız\n` +
+          `# makine hiç eşitlenmiyor demektir.\n\n` +
+          `# Bütün sunucuları tek seferde denetle\n` +
+          `$sunucular = (Get-ADComputer -Filter { OperatingSystem -like '*Server*' }).Name\n` +
+          `Invoke-Command -ComputerName $sunucular -ScriptBlock {\n` +
+          `    [pscustomobject]@{\n` +
+          `        Sunucu = $env:COMPUTERNAME\n` +
+          `        Kaynak = (w32tm /query /source)\n` +
+          `        Saat   = (Get-Date).ToUniversalTime()\n` +
+          `    }\n` +
+          `} -ErrorAction SilentlyContinue | Format-Table -AutoSize`;
+
+        el('#n-linuxKomut').textContent =
+          `# /etc/chrony/chrony.conf — etki alanı saatini kaynak al\n` +
+          `server ${pdc}.${alan} iburst\n` +
+          (disKapali
+            ? `# Dış çıkış kapalı olduğu için yalnızca iç kaynak kullanılıyor\n`
+            : kaynak.sunucular.map((s) => `server ${s} iburst`).join('\n') + '\n') +
+          `\n` +
+          `# İlk eşitlemede büyük sıçramaya izin ver, sonrasında yumuşak düzelt\n` +
+          `makestep 1.0 3\n` +
+          `driftfile /var/lib/chrony/drift\n` +
+          `rtcsync\n\n` +
+          `# Uygula ve doğrula\n` +
+          `sudo systemctl restart chronyd\n` +
+          `chronyc sources -v\n` +
+          `chronyc tracking\n` +
+          `# "System time" satırındaki sapma milisaniye düzeyinde olmalı.\n\n` +
+          `# Sunucu saatini UTC tut — günlük korelasyonu için şart\n` +
+          `sudo timedatectl set-timezone UTC\n` +
+          `timedatectl status`;
+
+        el('#n-denetimKomut').textContent =
+          `# Bütün etki alanı denetleyicilerinin saat farkını ölç\n` +
+          `w32tm /monitor /domain:${alan}\n` +
+          `# "NTP:" satırındaki offset değeri saniye cinsindendir.\n\n` +
+          `# Belirli bir makineyle aramızdaki farkı ölç\n` +
+          `w32tm /stripchart /computer:${pdc}.${alan} /samples:5 /dataonly\n\n` +
+          `# İzlemeye eklenecek denetim: ${sapma} saniyeyi aşan sapmada uyar\n` +
+          `$fark = [math]::Abs(((w32tm /stripchart /computer:${pdc}.${alan} /samples:1 /dataonly |\n` +
+          `    Select-Object -Last 1) -replace '.*?,\\s*([-+0-9.]+)s.*', '$1'))\n` +
+          `if ($fark -gt ${sapma}) {\n` +
+          `    Write-Warning "Saat sapması $fark saniye — Kerberos toleransı aşıldı"\n` +
+          `    exit 1\n` +
+          `}\n` +
+          `exit 0\n\n` +
+          `# Saat kaynaklı kimlik doğrulama hatalarını olay günlüğünde ara\n` +
+          `Get-WinEvent -LogName System -MaxEvents 200 -ErrorAction SilentlyContinue |\n` +
+          `    Where-Object { $_.ProviderName -eq 'Microsoft-Windows-Time-Service' } |\n` +
+          `    Select-Object TimeCreated, Id, LevelDisplayName, Message |\n` +
+          `    Format-List\n` +
+          `# Olay 36 ve 47: eşitleme başarısız. Olay 50: saat çok kaymış, düzeltiliyor.`;
+
+        /* --- uyarılar --- */
+        const bulgular = [];
+
+        if (sanal) {
+          bulgular.push([
+            'hata',
+            '<b>Sanal etki alanı denetleyicisinde çift saat kaynağı.</b> Hipervizör konuk ' +
+              'makinenin saatini eşitlerken etki alanı da eşitlerse saat ileri geri zıplar ve ' +
+              'sapma hiç oturmaz. PDC öykünücüsünde hipervizör zaman eşitlemesini kapatın. ' +
+              'Diğer denetleyicilerde de kapatmak, ana makine saati kayarsa zincirin bozulmasını önler.',
+          ]);
+        }
+
+        if (disKapali && kaynakKod !== 'donanim') {
+          bulgular.push([
+            'hata',
+            '<b>Dış çıkış kapalı ama dış kaynak seçilmiş.</b> 123/UDP çıkışı yoksa PDC ' +
+              'öykünücüsü dış sunucuya ulaşamaz ve saat yerel osilatöre bırakılır — tipik olarak ' +
+              'günde birkaç saniye kayar. Ya güvenlik duvarında yalnızca PDC için 123/UDP açın ' +
+              'ya da yerel donanım saati (GPS/DCF77) kullanın.',
+          ]);
+        }
+
+        if (kaynak.sunucular.length === 1 && kaynakKod !== 'donanim') {
+          bulgular.push([
+            'uyari',
+            '<b>Tek dış kaynak.</b> O sunucu erişilemez olduğunda ya da yanlış saat ' +
+              'verdiğinde yedek yoktur. En az üç kaynak tanımlamak, NTP\'nin yanlış olanı ' +
+              'eleyebilmesini sağlar.',
+          ]);
+        }
+
+        if (sapma > 300) {
+          bulgular.push([
+            'uyari',
+            `<b>Kabul edilen sapma ${sapma} saniye.</b> Kerberos öntanımlı toleransı 300 ` +
+              `saniyedir; bunu büyütmek kimlik doğrulamayı kolaylaştırmaz, yalnızca izleme ` +
+              `eşiğinizi gerçeğin arkasına düşürür. İzleme eşiği toleranstan <i>küçük</i> olmalı ` +
+              `ki sorun oturum açma başarısız olmadan önce görünsün.`,
+          ]);
+        } else if (sapma < 60) {
+          bulgular.push([
+            'ok',
+            `<b>İzleme eşiği ${sapma} saniye.</b> Kerberos toleransının belirgin altında; ` +
+              `sorun kullanıcıya yansımadan önce görünür.`,
+          ]);
+        }
+
+        if (kaynak.yumusatma) {
+          bulgular.push([
+            'uyari',
+            `<b>${kaynak.ad} sıçrama saniyesini yumuşatıyor.</b> Bu iyi bir şeydir ama ` +
+              `ortamdaki <i>bütün</i> makineler aynı yaklaşımı kullanmalı. Bazı sunucular ` +
+              `yumuşatılmış, bazıları klasik kaynak kullanırsa sıçrama saniyesi gününde ` +
+              `aralarında bir saniyeye varan fark oluşur.`,
+          ]);
+        }
+
+        if (linux) {
+          bulgular.push([
+            'uyari',
+            '<b>Linux tarafında ntpd ve chrony birlikte çalışmasın.</b> İkisi de 123/UDP ' +
+              'portunu ister; biri sessizce başlamaz ve makine hiç eşitlenmez. ' +
+              '<code>systemd-timesyncd</code> da aynı çakışmayı yapar — birini seçip ' +
+              'diğerlerini devre dışı bırakın.',
+          ]);
+        }
+
+        el('#n-bulgular').innerHTML =
+          '<ul class="n-liste">' +
+          bulgular.map(([tip, m]) => `<li data-tip="${tip}">${m}</li>`).join('') +
+          '</ul>';
+
+        const durum = el('#n-durum');
+        const hataSayisi = bulgular.filter(([t]) => t === 'hata').length;
+        durum.className = 'arac-durum ' + (hataSayisi ? 'hata' : 'ok');
+        durum.textContent = hataSayisi
+          ? `${hataSayisi} kritik nokta var — 5. bölüme bakın.`
+          : `${kaynak.ad} kaynağıyla dört katmanlı hiyerarşi hazır.`;
+      }
+
+      document
+        .querySelectorAll('.arac-alan input, .arac-alan select, .n-sec input')
+        .forEach((g) => {
+          g.addEventListener('input', hesapla);
+          g.addEventListener('change', hesapla);
+        });
+
+      document.querySelectorAll('.kopyala').forEach((d) => {
+        d.addEventListener('click', async () => {
+          try {
+            await navigator.clipboard.writeText(el(`#${d.dataset.kaynak}`).textContent);
+            d.textContent = 'Kopyalandı';
+            setTimeout(() => (d.textContent = 'Kopyala'), 1600);
+          } catch {
+            /* pano izni yoksa kullanıcı elle seçer */
+          }
+        });
+      });
+
+      hesapla();
+    })();
+  </script>
+
+  <style>
+    .n-secenekler {
+      display: grid;
+      gap: 9px;
+      margin-top: 14px;
+    }
+    .n-sec {
+      display: inline-flex;
+      align-items: baseline;
+      gap: 8px;
+      font-size: 13px;
+      color: var(--ink-soft);
+      cursor: pointer;
+      line-height: 1.5;
+    }
+    .n-sec i {
+      font-style: normal;
+      color: var(--muted);
+      font-size: 12px;
+    }
+    .n-katmanlar {
+      list-style: none;
+      margin: 0;
+      padding: 0;
+      display: grid;
+      gap: 10px;
+    }
+    .n-katman {
+      border: 1px solid var(--line);
+      border-left: 3px solid var(--line);
+      border-radius: 10px;
+      padding: 12px 14px;
+      background: var(--paper);
+      position: relative;
+    }
+    .n-katman + .n-katman::before {
+      content: '↓';
+      position: absolute;
+      left: 20px;
+      top: -14px;
+      font-size: 12px;
+      color: var(--muted);
+    }
+    .n-katman[data-vurgu] {
+      border-left-color: var(--indigo);
+      background: var(--tint);
+    }
+    .n-katman-ust {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: baseline;
+      gap: 8px 12px;
+      margin-bottom: 5px;
+    }
+    .n-rol {
+      font-size: 10.5px;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      border: 1px solid var(--line);
+      border-radius: 999px;
+      padding: 2px 9px;
+      color: var(--muted);
+      white-space: nowrap;
+    }
+    .n-katman-ust b {
+      font-size: 14px;
+    }
+    .n-katman p {
+      margin: 0;
+      font-size: 13px;
+      line-height: 1.6;
+      color: var(--ink-soft);
+    }
+    .n-sunucular {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 7px;
+      margin-top: 8px;
+    }
+    .n-sunucular code {
+      font-size: 12px;
+      background: var(--tint);
+      border: 1px solid var(--line);
+      border-radius: 6px;
+      padding: 3px 8px;
+    }
+    .n-kaydir {
+      overflow-x: auto;
+    }
+    .n-tablo {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 13px;
+      min-width: 560px;
+    }
+    .n-tablo th,
+    .n-tablo td {
+      text-align: left;
+      padding: 10px 12px;
+      border-bottom: 1px solid var(--line);
+      vertical-align: top;
+      line-height: 1.5;
+    }
+    .n-tablo th {
+      color: var(--muted);
+      font-size: 11.5px;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+    }
+    .n-tablo td:first-child {
+      font-family: var(--mono, ui-monospace, monospace);
+      white-space: nowrap;
+    }
+    .n-tablo tr[data-kritik] {
+      background: light-dark(#fef2f2, #2a1616);
+    }
+    .n-tablo tr[data-kritik] td:nth-child(2) b {
+      color: light-dark(#991b1b, #fca5a5);
+    }
+    .n-ciktilar {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr);
+      gap: 18px;
+    }
+    .n-liste,
+    .n-ipuclari {
+      list-style: none;
+      margin: 0;
+      padding: 0;
+      display: grid;
+      gap: 12px;
+    }
+    .n-liste li,
+    .n-ipuclari li {
+      font-size: 13.5px;
+      line-height: 1.62;
+      color: var(--ink-soft);
+      border-left: 2px solid var(--line);
+      padding-left: 13px;
+    }
+    .n-liste li[data-tip='hata'] {
+      border-left-color: light-dark(#dc2626, #f87171);
+    }
+    .n-liste li[data-tip='uyari'] {
+      border-left-color: light-dark(#f0c33c, #a97f1c);
+    }
+    .n-liste li[data-tip='ok'] {
+      border-left-color: light-dark(#16a34a, #4ade80);
+    }
+  </style>
+</Base>

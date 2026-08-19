@@ -1,0 +1,642 @@
+---
+import Base from '../../layouts/Base.astro';
+---
+
+<Base
+  baslik="Erişilebilir renk paleti üreteci"
+  aciklama="Marka renginizden başlayıp her tonu WCAG kontrast eşiğine göre hesaplar; açık ve karanlık kip için hazır CSS değişkenleri üretir."
+  aramaya={true}
+  kategori="Araç"
+>
+  <div class="arama-bas">
+    <div class="kap">
+      <nav class="kirinti" aria-label="Kırıntı yolu" style="padding-top:0">
+        <a href="/">Ana sayfa</a><span class="ayrac">/</span><a href="/araclar">Araçlar</a><span
+          class="ayrac">/</span
+        ><span aria-current="page">Renk paleti</span>
+      </nav>
+      <h1>Erişilebilir renk paleti üreteci</h1>
+      <p style="color:var(--muted);font-size:14px;margin-top:8px;max-width:66ch">
+        Marka rengini alıp on tonluk bir ölçek üretmek kolaydır; hangi tonun hangi zeminde
+        okunabildiğini bilmek zordur. Bu araç her tonu hem beyaz hem siyah metinle ölçer,
+        durum renklerini de aynı ölçekte türetir ve doğrudan kullanabileceğiniz değişkenleri
+        verir.
+      </p>
+    </div>
+  </div>
+
+  <div class="kap arac-sayfa">
+    <section class="arac-blok">
+      <h2 class="arac-h2"><span class="arac-no">1</span> Marka rengi</h2>
+      <div class="p-girisler">
+        <div class="p-kutu">
+          <input type="color" id="p-secici" value="#3a45e0" aria-label="Marka rengi seç" />
+          <input type="text" id="p-renk" value="#3a45e0" spellcheck="false" aria-label="Marka rengi" />
+        </div>
+        <div class="arac-alanlar" style="flex:1">
+          <label class="arac-alan"
+            >Ton sayısı
+            <select id="p-adet">
+              <option value="9">9 ton (50–900)</option>
+              <option value="11" selected>11 ton (50–950)</option>
+            </select>
+          </label>
+          <label class="arac-alan"
+            >Doygunluk eğrisi
+            <select id="p-egri">
+              <option value="duz">Düz — doygunluk sabit</option>
+              <option value="kavis" selected>Kavisli — uçlarda doygunluk düşer</option>
+            </select>
+          </label>
+        </div>
+      </div>
+      <div class="arac-dugmeler">
+        {
+          [
+            ['#3a45e0', 'İndigo'],
+            ['#0f766e', 'Zümrüt'],
+            ['#b45309', 'Kehribar'],
+            ['#be123c', 'Gül'],
+            ['#4338ca', 'Menekşe'],
+            ['#475569', 'Kurşun'],
+          ].map(([renk, ad]) => (
+            <button type="button" class="dg dg-hayalet p-hazir" data-renk={renk}>
+              <i style={`background:${renk}`} /> {ad}
+            </button>
+          ))
+        }
+      </div>
+      <p class="arac-durum" id="p-durum" role="status" aria-live="polite"></p>
+    </section>
+
+    <section class="arac-blok">
+      <h2 class="arac-h2"><span class="arac-no">2</span> Ölçek</h2>
+      <p class="arac-not" style="margin-top:0">
+        Her tonun üzerinde beyaz ve siyah metinle kontrast oranı yazıyor. Kalın olan, o zeminde
+        kullanılması gereken metin rengidir. Numaralar hedef kontrasta göre yerleştirildi:
+        600 tonu her renkte beyaz metinle en az 4.5:1 verir.
+      </p>
+      <div class="p-olcek" id="p-olcek"></div>
+    </section>
+
+    <section class="arac-blok">
+      <h2 class="arac-h2"><span class="arac-no">3</span> Kullanım önerileri</h2>
+      <div class="p-oneriler" id="p-oneriler"></div>
+    </section>
+
+    <section class="arac-blok">
+      <h2 class="arac-h2"><span class="arac-no">4</span> Durum renkleri</h2>
+      <p class="arac-not" style="margin-top:0">
+        Başarı, uyarı ve hata renkleri aynı algısal parlaklıkta türetildi; yan yana
+        durduklarında biri diğerinden baskın görünmez.
+      </p>
+      <div class="p-durumlar" id="p-durumlar"></div>
+    </section>
+
+    <section class="arac-blok">
+      <h2 class="arac-h2"><span class="arac-no">5</span> CSS değişkenleri</h2>
+      <div style="position:relative">
+        <pre class="kod p-cikti"><code id="p-css"></code></pre>
+        <button class="kopyala" type="button" data-kaynak="p-css">Kopyala</button>
+      </div>
+    </section>
+
+    <section class="arac-blok">
+      <h2 class="arac-h2"><span class="arac-no">6</span> Palet kurarken</h2>
+      <ul class="p-ipuclari">
+        <li>
+          <b>Aynı numara, aynı iş demektir.</b> 600 tonu her renkte "birincil eylem", 100 tonu
+          "hafif zemin" olmalı. Numaralar tutarlıysa tasarımcı ve geliştirici aynı dili
+          konuşur; tutarsızsa her bileşende yeniden karar verilir.
+        </li>
+        <li>
+          <b>Aynı ton dosyası karanlık kipte ters çalışır.</b> Açık kipte zemin 50, metin 900
+          iken karanlık kipte bu tersine döner — ama birebir ayna değil: karanlık zeminde çok
+          doygun renkler titrer ve okumayı zorlaştırır. Karanlık kipte bir iki ton
+          açıp doygunluğu düşürmek gerekir.
+        </li>
+        <li>
+          <b>Ton numarası açıklık değil, kontrast demeli.</b> <code>#0000ff</code> ile
+          <code>#ffff00</code> aynı açıklıkta bile aynı "yoğunlukta" görünmez; sarı çok daha
+          parlaktır. Ölçeği açıklığa göre kuran araçlarda sarı ve turuncu paletlerin 600 tonu
+          beyaz metinle 3.5:1'de kalır — düğme yazısı okunmaz. Bu araç her numaraya bir hedef
+          kontrast verip açıklığı ona göre çözüyor, böylece 600 hangi renkte olursa olsun
+          gövde metni eşiğini geçiyor.
+        </li>
+        <li>
+          <b>Kenarlık ve ikon için 3:1 yeter.</b> Metin 4.5:1 ister ama giriş alanı kenarlığı,
+          odak halkası ve grafik çizgisi için eşik 3:1'dir. Bunu bilmek, gereksiz yere koyu
+          kenarlıklar kullanmaktan kurtarır.
+        </li>
+        <li>
+          <b>Odak halkasını paletten seçmeyin.</b> Odak göstergesi hem açık hem koyu zeminde
+          görünmeli. Marka renginin bir tonu genelde birinde kaybolur; ayrı bir renk ya da
+          çift katmanlı halka (içte beyaz, dışta koyu) daha güvenlidir.
+        </li>
+        <li>
+          <b>Bir rengin anlamı kültüre göre değişir, körlüğe göre de.</b> Kırmızı-yeşil
+          ayrımı en yaygın renk körlüğü türünde kaybolur. Durum renklerini her zaman bir
+          ikon ya da metinle destekleyin; bu araç renkleri farklı parlaklıkta üretiyor ama
+          tek başına yeterli değil.
+        </li>
+      </ul>
+    </section>
+  </div>
+
+  <script>
+    (() => {
+      const el = (s) => document.querySelector(s);
+
+      /* --- renk dönüşümleri --------------------------------------------------- */
+      function coz(metin) {
+        const t = metin.trim().toLowerCase();
+        let m = /^#?([0-9a-f]{3})$/.exec(t);
+        if (m) {
+          const [a, b, c] = m[1];
+          return [parseInt(a + a, 16), parseInt(b + b, 16), parseInt(c + c, 16)];
+        }
+        m = /^#?([0-9a-f]{6})$/.exec(t);
+        if (m) {
+          return [
+            parseInt(m[1].slice(0, 2), 16),
+            parseInt(m[1].slice(2, 4), 16),
+            parseInt(m[1].slice(4, 6), 16),
+          ];
+        }
+        return null;
+      }
+
+      const onaltiya = (r) =>
+        '#' +
+        r.map((k) => Math.round(Math.max(0, Math.min(255, k))).toString(16).padStart(2, '0')).join('');
+
+      function hsle([r, g, b]) {
+        r /= 255;
+        g /= 255;
+        b /= 255;
+        const enb = Math.max(r, g, b);
+        const enk = Math.min(r, g, b);
+        const l = (enb + enk) / 2;
+        let h = 0;
+        let s = 0;
+        if (enb !== enk) {
+          const d = enb - enk;
+          s = l > 0.5 ? d / (2 - enb - enk) : d / (enb + enk);
+          if (enb === r) h = ((g - b) / d + (g < b ? 6 : 0)) / 6;
+          else if (enb === g) h = ((b - r) / d + 2) / 6;
+          else h = ((r - g) / d + 4) / 6;
+        }
+        return [h, s, l];
+      }
+
+      function rgbye([h, s, l]) {
+        if (s === 0) {
+          const d = Math.round(l * 255);
+          return [d, d, d];
+        }
+        const q = l < 0.5 ? l * (1 + s) : l + s - l * s;
+        const p = 2 * l - q;
+        const kanal = (t) => {
+          if (t < 0) t += 1;
+          if (t > 1) t -= 1;
+          if (t < 1 / 6) return p + (q - p) * 6 * t;
+          if (t < 1 / 2) return q;
+          if (t < 2 / 3) return p + (q - p) * (2 / 3 - t) * 6;
+          return p;
+        };
+        return [kanal(h + 1 / 3) * 255, kanal(h) * 255, kanal(h - 1 / 3) * 255].map(Math.round);
+      }
+
+      function parlaklik([r, g, b]) {
+        const k = [r, g, b].map((d) => {
+          const s = d / 255;
+          return s <= 0.03928 ? s / 12.92 : ((s + 0.055) / 1.055) ** 2.4;
+        });
+        return 0.2126 * k[0] + 0.7152 * k[1] + 0.0722 * k[2];
+      }
+
+      function kontrast(a, b) {
+        const p1 = parlaklik(a);
+        const p2 = parlaklik(b);
+        return (Math.max(p1, p2) + 0.05) / (Math.min(p1, p2) + 0.05);
+      }
+
+      const BEYAZ = [255, 255, 255];
+      const SIYAH = [0, 0, 0];
+
+      /* --- ölçek üretimi ------------------------------------------------------
+         Ölçek açıklığa değil kontrasta çıpalanır. Sabit açıklık kullanılsaydı
+         ölçek ton körü olurdu: HSL'de %45 açıklıktaki kehribar, aynı
+         açıklıktaki indigodan çok daha parlak görünür ve beyaz metinle 3.6:1'de
+         kalırdı. Her numara için beyaz zemine göre bir hedef kontrast belirleyip
+         açıklığı ikili aramayla çözünce 600 tonu hangi renkte olursa olsun
+         gövde metni eşiğini geçer. */
+      const NUMARALAR_11 = [50, 100, 200, 300, 400, 500, 600, 700, 800, 900, 950];
+      const NUMARALAR_9 = [50, 100, 200, 300, 400, 500, 600, 700, 900];
+
+      // Numara -> beyaz zemine göre hedef kontrast oranı
+      const HEDEF = {
+        50: 1.05, 100: 1.15, 200: 1.45, 300: 2.0,
+        400: 2.7, 500: 3.6, 600: 5.0, 700: 7.2,
+        800: 10.0, 900: 13.5, 950: 17.0,
+      };
+
+      /** Verilen ton ve doygunlukta hedef kontrasta en yakın açıklığı bulur.
+          Kontrast açıklıkla tekdüze azaldığı için ikili arama yeterlidir. */
+      function aciklikCoz(h, s, hedef) {
+        let alt = 0;
+        let ust = 1;
+        for (let i = 0; i < 30; i++) {
+          const orta = (alt + ust) / 2;
+          if (kontrast(rgbye([h, s, orta]), BEYAZ) > hedef) alt = orta;
+          else ust = orta;
+        }
+        return (alt + ust) / 2;
+      }
+
+      function olcekUret(temel, numaralar, egri) {
+        const [h, s] = hsle(temel);
+        return numaralar.map((no) => {
+          let doygunluk = s;
+          if (egri === 'kavis') {
+            /* Uçlara yaklaştıkça doygunluğu azalt. Ölçüt numaranın 600'e
+               uzaklığı; açıklık değil, çünkü açıklık henüz çözülmedi. */
+            const uzaklik = Math.abs(Math.log(no / 600)) / Math.log(950 / 50);
+            doygunluk = s * (1 - 0.5 * uzaklik ** 1.2);
+          }
+          doygunluk = Math.max(0, Math.min(1, doygunluk));
+          const l = aciklikCoz(h, doygunluk, HEDEF[no]);
+          const renk = rgbye([h, doygunluk, l]);
+          return {
+            no,
+            renk,
+            kod: onaltiya(renk),
+            beyaz: kontrast(renk, BEYAZ),
+            siyah: kontrast(renk, SIYAH),
+          };
+        });
+      }
+
+      /** Verilen ton dizisinden, beyaz üzerinde eşiği geçen en açık tonu bulur. */
+      function metinTonu(olcek, esik) {
+        return [...olcek].reverse().find((t) => t.beyaz >= esik) ?? olcek[olcek.length - 1];
+      }
+
+      function ciz() {
+        const temel = coz(el('#p-renk').value);
+        const durum = el('#p-durum');
+
+        if (!temel) {
+          durum.className = 'arac-durum hata';
+          durum.textContent = 'Rengi #rrggbb ya da #rgb biçiminde girin.';
+          return;
+        }
+
+        el('#p-secici').value = onaltiya(temel);
+        const numaralar = el('#p-adet').value === '9' ? NUMARALAR_9 : NUMARALAR_11;
+        const egri = el('#p-egri').value;
+        const olcek = olcekUret(temel, numaralar, egri);
+
+        /* --- ölçek çizimi --- */
+        el('#p-olcek').innerHTML = olcek
+          .map((t) => {
+            const beyazIyi = t.beyaz >= t.siyah;
+            const metinRengi = beyazIyi ? '#ffffff' : '#000000';
+            const enIyi = Math.max(t.beyaz, t.siyah);
+            const gecer = enIyi >= 4.5;
+            return (
+              `<div class="p-ton" style="background:${t.kod};color:${metinRengi}">` +
+              `<span class="p-no">${t.no}</span>` +
+              `<code class="p-kod">${t.kod}</code>` +
+              `<span class="p-oranlar">` +
+              `<b${beyazIyi ? '' : ' class="p-soluk"'}>beyaz ${t.beyaz.toFixed(1)}</b>` +
+              `<b${beyazIyi ? ' class="p-soluk"' : ''}>siyah ${t.siyah.toFixed(1)}</b>` +
+              `</span>` +
+              (gecer ? '' : '<span class="p-uyari">metin için yetersiz</span>') +
+              `</div>`
+            );
+          })
+          .join('');
+
+        /* --- kullanım önerileri --- */
+        const aa = metinTonu(olcek, 4.5);
+        const aaa = metinTonu(olcek, 7);
+        const arayuz = metinTonu(olcek, 3);
+        const zemin = olcek[0];
+        const hafif = olcek[1];
+
+        const oneriler = [
+          ['Sayfa zemini', zemin, 'Beyaz üzerinde çok hafif marka tonu'],
+          ['Hafif vurgu zemini', hafif, 'Bilgi kutuları, seçili satır'],
+          ['Kenarlık ve ayraç', olcek.find((t) => t.no === 200) ?? olcek[2], 'Metin taşımayan çizgiler'],
+          ['Arayüz ögesi (3:1)', arayuz, 'Giriş alanı kenarlığı, ikon, grafik çizgisi'],
+          ['Dolgu — birincil düğme', olcek.find((t) => t.no === 600) ?? olcek[6], 'Üzerine beyaz metin'],
+          ['Metin (AA, 4.5:1)', aa, 'Beyaz zeminde gövde metni'],
+          ['Metin (AAA, 7:1)', aaa, 'Uzun okuma metni, kamu kurumu gereksinimi'],
+        ];
+
+        el('#p-oneriler').innerHTML = oneriler
+          .map(
+            ([ad, t, aciklama]) =>
+              `<div class="p-oneri">` +
+              `<div class="p-oneri-ornek" style="background:${t.kod}"></div>` +
+              `<div class="p-oneri-govde"><b>${ad}</b>` +
+              `<span>${aciklama}</span>` +
+              `<code>${t.kod} · ${t.no} · beyaz üzerinde ${t.beyaz.toFixed(2)}:1</code></div>` +
+              `</div>`
+          )
+          .join('');
+
+        /* --- durum renkleri: marka tonuyla aynı algısal parlaklıkta --- */
+        const hedefParlaklik = parlaklik(olcek.find((t) => t.no === 600)?.renk ?? temel);
+        const durumTonlari = [
+          ['Başarı', 0.34],
+          ['Uyarı', 0.11],
+          ['Hata', 0.02],
+          ['Bilgi', 0.57],
+        ].map(([ad, h]) => {
+          // Aynı parlaklığa en yakın açıklığı ara
+          let enIyi = null;
+          for (let l = 0.15; l <= 0.75; l += 0.005) {
+            const aday = rgbye([h, 0.7, l]);
+            const fark = Math.abs(parlaklik(aday) - hedefParlaklik);
+            if (!enIyi || fark < enIyi.fark) enIyi = { renk: aday, fark };
+          }
+          const kod = onaltiya(enIyi.renk);
+          return { ad, kod, renk: enIyi.renk, beyaz: kontrast(enIyi.renk, BEYAZ) };
+        });
+
+        el('#p-durumlar').innerHTML = durumTonlari
+          .map(
+            (d) =>
+              `<div class="p-durum" style="background:${d.kod}">` +
+              `<b>${d.ad}</b><code>${d.kod}</code>` +
+              `<span>beyaz üzerinde ${d.beyaz.toFixed(2)}:1</span></div>`
+          )
+          .join('');
+
+        /* --- CSS değişkenleri --- */
+        const karanlik = [...olcek].reverse();
+        el('#p-css').textContent =
+          `:root {\n` +
+          `  /* Marka ölçeği — küçük numara açık, büyük numara koyu */\n` +
+          olcek.map((t) => `  --marka-${t.no}: ${t.kod};`).join('\n') +
+          `\n\n  /* Anlamsal atamalar — bileşenlerde bu adları kullanın,\n` +
+          `     numaraları değil. Böylece palet değişince bileşen değişmez. */\n` +
+          `  --zemin: ${zemin.kod};\n` +
+          `  --zemin-vurgu: ${hafif.kod};\n` +
+          `  --cizgi: ${(olcek.find((t) => t.no === 200) ?? olcek[2]).kod};\n` +
+          `  --arayuz: ${arayuz.kod};\n` +
+          `  --dolgu: ${(olcek.find((t) => t.no === 600) ?? olcek[6]).kod};\n` +
+          `  --dolgu-metin: #ffffff;\n` +
+          `  --metin: ${aa.kod};\n` +
+          `  --metin-guclu: ${aaa.kod};\n\n` +
+          durumTonlari
+            .map((d) => `  --${d.ad.toLocaleLowerCase('tr').replace('ı', 'i')}: ${d.kod};`)
+            .join('\n') +
+          `\n}\n\n` +
+          `/* Karanlık kip: ölçek tersine döner ama birebir ayna değil —\n` +
+          `   koyu zeminde çok doygun renkler titrer, bu yüzden metin için\n` +
+          `   bir iki ton daha açığı seçilir. */\n` +
+          `@media (prefers-color-scheme: dark) {\n` +
+          `  :root:not([data-tema='aydinlik']) {\n` +
+          `    --zemin: ${karanlik[0].kod};\n` +
+          `    --zemin-vurgu: ${karanlik[1].kod};\n` +
+          `    --cizgi: ${karanlik[2].kod};\n` +
+          `    --arayuz: ${(olcek.find((t) => t.no === 400) ?? olcek[4]).kod};\n` +
+          `    --dolgu: ${(olcek.find((t) => t.no === 500) ?? olcek[5]).kod};\n` +
+          `    --metin: ${(olcek.find((t) => t.no === 300) ?? olcek[3]).kod};\n` +
+          `    --metin-guclu: ${(olcek.find((t) => t.no === 200) ?? olcek[2]).kod};\n` +
+          `  }\n` +
+          `}\n\n` +
+          `/* Elle seçim, sistem tercihini geçersiz kılabilmeli */\n` +
+          `:root[data-tema='karanlik'] {\n` +
+          `  --zemin: ${karanlik[0].kod};\n` +
+          `  --metin: ${(olcek.find((t) => t.no === 300) ?? olcek[3]).kod};\n` +
+          `}`;
+
+        /* --- durum satırı --- */
+        const yetersiz = olcek.filter((t) => Math.max(t.beyaz, t.siyah) < 4.5).length;
+        durum.className = 'arac-durum ' + (yetersiz > 2 ? 'hata' : 'ok');
+        durum.textContent =
+          yetersiz > 2
+            ? `${olcek.length} tondan ${yetersiz} tanesi hiçbir metin rengiyle AA eşiğini geçmiyor — ` +
+              `orta tonlar yalnızca dolgu olarak kullanılabilir.`
+            : `${olcek.length} ton üretildi. Gövde metni için ${aa.no}, ` +
+              `birincil dolgu için 600 tonunu kullanın.`;
+      }
+
+      /* --- olaylar --- */
+      el('#p-renk').addEventListener('input', ciz);
+      el('#p-secici').addEventListener('input', (e) => {
+        el('#p-renk').value = e.target.value;
+        ciz();
+      });
+      el('#p-adet').addEventListener('change', ciz);
+      el('#p-egri').addEventListener('change', ciz);
+
+      document.querySelectorAll('.p-hazir').forEach((d) => {
+        d.addEventListener('click', () => {
+          el('#p-renk').value = d.dataset.renk;
+          ciz();
+        });
+      });
+
+      document.querySelectorAll('.kopyala').forEach((d) => {
+        d.addEventListener('click', async () => {
+          try {
+            await navigator.clipboard.writeText(el(`#${d.dataset.kaynak}`).textContent);
+            d.textContent = 'Kopyalandı';
+            setTimeout(() => (d.textContent = 'Kopyala'), 1600);
+          } catch {
+            /* pano izni yoksa kullanıcı elle seçer */
+          }
+        });
+      });
+
+      ciz();
+    })();
+  </script>
+
+  <style>
+    .p-girisler {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 14px;
+      align-items: flex-start;
+    }
+    .p-kutu {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      border: 1px solid var(--line);
+      border-radius: 10px;
+      padding: 6px 10px 6px 6px;
+      background: var(--paper);
+      flex: 0 0 auto;
+    }
+    .p-kutu input[type='color'] {
+      width: 42px;
+      height: 38px;
+      border: 1px solid var(--line);
+      border-radius: 7px;
+      padding: 2px;
+      background: transparent;
+      cursor: pointer;
+    }
+    .p-kutu input[type='text'] {
+      width: 8em;
+      border: 0;
+      background: transparent;
+      font-family: var(--mono, ui-monospace, monospace);
+      font-size: 14px;
+      color: var(--ink);
+    }
+    .p-kutu input[type='text']:focus {
+      outline: none;
+    }
+    .p-kutu:focus-within {
+      border-color: var(--indigo);
+      box-shadow: 0 0 0 3px var(--tint);
+    }
+    .arac-dugmeler {
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+      margin-top: 14px;
+    }
+    .p-hazir {
+      display: inline-flex;
+      align-items: center;
+      gap: 7px;
+    }
+    .p-hazir i {
+      width: 12px;
+      height: 12px;
+      border-radius: 3px;
+      display: inline-block;
+      border: 1px solid rgba(0, 0, 0, 0.15);
+    }
+    .p-olcek {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(min(150px, 100%), 1fr));
+      gap: 8px;
+    }
+    .p-ton {
+      border-radius: 10px;
+      padding: 14px 13px;
+      display: grid;
+      gap: 3px;
+      min-height: 96px;
+      align-content: start;
+      border: 1px solid rgba(0, 0, 0, 0.08);
+    }
+    .p-no {
+      font-size: 16px;
+      font-weight: 700;
+    }
+    .p-kod {
+      font-size: 12px;
+      opacity: 0.9;
+    }
+    .p-oranlar {
+      display: flex;
+      flex-direction: column;
+      gap: 1px;
+      font-size: 11px;
+      margin-top: 3px;
+    }
+    .p-oranlar b {
+      font-weight: 700;
+    }
+    .p-soluk {
+      opacity: 0.55;
+      font-weight: 400;
+    }
+    .p-uyari {
+      font-size: 10.5px;
+      opacity: 0.8;
+      margin-top: 2px;
+    }
+    .p-oneriler {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(min(280px, 100%), 1fr));
+      gap: 10px;
+    }
+    .p-oneri {
+      display: flex;
+      gap: 12px;
+      align-items: center;
+      border: 1px solid var(--line);
+      border-radius: 11px;
+      padding: 11px 13px;
+      background: var(--paper);
+    }
+    .p-oneri-ornek {
+      width: 42px;
+      height: 42px;
+      border-radius: 8px;
+      flex: 0 0 auto;
+      border: 1px solid rgba(0, 0, 0, 0.12);
+    }
+    .p-oneri-govde {
+      display: grid;
+      gap: 1px;
+      min-width: 0;
+    }
+    .p-oneri-govde b {
+      font-size: 13.5px;
+    }
+    .p-oneri-govde span {
+      font-size: 12px;
+      color: var(--muted);
+      line-height: 1.4;
+    }
+    .p-oneri-govde code {
+      font-size: 11.5px;
+      color: var(--indigo-metin);
+    }
+    .p-durumlar {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(min(150px, 100%), 1fr));
+      gap: 10px;
+    }
+    .p-durum {
+      border-radius: 10px;
+      padding: 14px 13px;
+      display: grid;
+      gap: 3px;
+      color: #fff;
+      border: 1px solid rgba(0, 0, 0, 0.1);
+    }
+    .p-durum b {
+      font-size: 14px;
+    }
+    .p-durum code {
+      font-size: 12px;
+      opacity: 0.92;
+    }
+    .p-durum span {
+      font-size: 11px;
+      opacity: 0.85;
+    }
+    .p-cikti {
+      max-height: 460px;
+      overflow: auto;
+    }
+    .p-ipuclari {
+      list-style: none;
+      margin: 0;
+      padding: 0;
+      display: grid;
+      gap: 12px;
+    }
+    .p-ipuclari li {
+      font-size: 13.5px;
+      line-height: 1.62;
+      color: var(--ink-soft);
+      border-left: 2px solid var(--line);
+      padding-left: 13px;
+    }
+  </style>
+</Base>

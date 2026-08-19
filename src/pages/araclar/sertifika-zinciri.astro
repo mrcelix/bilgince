@@ -1,0 +1,562 @@
+---
+import Base from '../../layouts/Base.astro';
+---
+
+<Base
+  baslik="Sertifika zinciri doğrulayıcı"
+  aciklama="Zincirin sırası doğru mu, ara sertifika eksik mi, özel anahtar yanlışlıkla karışmış mı? PEM demetini yapıştırın, tarayıcıda çözümlensin."
+  aramaya={true}
+  kategori="Araç"
+>
+  <div class="arama-bas">
+    <div class="kap">
+      <nav class="kirinti" aria-label="Kırıntı yolu" style="padding-top:0">
+        <a href="/">Ana sayfa</a><span class="ayrac">/</span><a href="/araclar">Araçlar</a><span
+          class="ayrac">/</span
+        ><span aria-current="page">Sertifika zinciri</span>
+      </nav>
+      <h1>Sertifika zinciri doğrulayıcı</h1>
+      <p style="color:var(--muted);font-size:14px;margin-top:8px;max-width:66ch">
+        "Tarayıcıda çalışıyor ama uygulamada çalışmıyor" şikâyetinin bir numaralı sebebi eksik
+        ara sertifikadır: tarayıcılar eksik halkayı kendileri bulur, <code>curl</code> ve Java
+        istemcileri bulmaz. Demeti yapıştırın; sıra, eksik halka ve karışmış özel anahtar
+        denetlensin. <b>Hiçbir şey gönderilmez.</b>
+      </p>
+    </div>
+  </div>
+
+  <div class="kap arac-sayfa">
+    <section class="arac-blok">
+      <h2 class="arac-h2"><span class="arac-no">1</span> PEM demeti</h2>
+      <div class="arac-alan">
+        <label for="z-pem">Sunucu sertifikası ve ara sertifikalar</label>
+        <textarea id="z-pem" rows="10" spellcheck="false" placeholder="-----BEGIN CERTIFICATE-----"
+        ></textarea>
+      </div>
+      <div class="arac-dugmeler">
+        <label class="dg dg-hayalet z-dosyaEtiket">
+          Dosya seç
+          <input type="file" id="z-dosya" accept=".pem,.crt,.cer,.txt,.chain" hidden />
+        </label>
+        <button type="button" class="dg dg-hayalet" id="z-temizle">Temizle</button>
+      </div>
+      <p class="arac-durum" id="z-durum" role="status" aria-live="polite"></p>
+    </section>
+
+    <section class="arac-blok" id="z-sonuc" hidden>
+      <h2 class="arac-h2"><span class="arac-no">2</span> Zincir</h2>
+      <div class="arac-olcum" id="z-olcum"></div>
+      <ol class="z-zincir" id="z-zincir"></ol>
+    </section>
+
+    <section class="arac-blok" id="z-bulgu-blok" hidden>
+      <h2 class="arac-h2"><span class="arac-no">3</span> Bulgular</h2>
+      <div id="z-bulgular"></div>
+    </section>
+
+    <section class="arac-blok" id="z-duzelt-blok" hidden>
+      <h2 class="arac-h2"><span class="arac-no">4</span> Doğru sıralanmış demet</h2>
+      <p class="arac-not" style="margin-top:0">
+        Sunucu sertifikası önce, sonra onu imzalayan ara sertifikalar. Bu metni doğrudan
+        <code>fullchain.pem</code> olarak kullanabilirsiniz.
+      </p>
+      <div style="position:relative">
+        <pre class="kod z-cikti"><code id="z-duzeltilmis"></code></pre>
+        <button class="kopyala" type="button" data-kaynak="z-duzeltilmis">Kopyala</button>
+      </div>
+    </section>
+
+    <section class="arac-blok">
+      <h2 class="arac-h2"><span class="arac-no">5</span> Doğrulama komutları</h2>
+      <div style="position:relative">
+        <pre class="kod"><code>{`# Sunucunun gerçekte sunduğu zinciri gör
+openssl s_client -connect ornek.com.tr:443 -servername ornek.com.tr -showcerts </dev/null 2>/dev/null |
+  grep -E 's:|i:'
+# Her satırda s: konu, i: veren. Bir satırın i: değeri, bir sonrakinin s: değerine eşit olmalı.
+
+# Zincir tam mı? "Verify return code: 0 (ok)" görmelisiniz
+echo | openssl s_client -connect ornek.com.tr:443 -servername ornek.com.tr 2>/dev/null |
+  grep 'Verify return code'
+
+# Ara sertifika eksikse bunu yalnızca katı istemciler görür
+curl -sSI https://ornek.com.tr/ >/dev/null && echo "curl kabul etti" || echo "curl reddetti"
+
+# Yerel demeti doğrula
+openssl verify -untrusted ara.pem sunucu.pem
+
+# Demetteki her sertifikayı tek tek özetle
+openssl crl2pkcs7 -nocrl -certfile fullchain.pem |
+  openssl pkcs7 -print_certs -noout
+
+# Özel anahtar bu sertifikaya mı ait? (iki özet aynı olmalı)
+openssl x509 -noout -modulus -in sunucu.pem | openssl md5
+openssl rsa  -noout -modulus -in ozel.key   | openssl md5
+
+# Windows tarafında
+certutil -verify -urlfetch sunucu.cer`}</code></pre>
+        <button class="kopyala" type="button" id="z-komut-kop">Kopyala</button>
+      </div>
+    </section>
+
+    <section class="arac-blok">
+      <h2 class="arac-h2"><span class="arac-no">6</span> Zincir hakkında</h2>
+      <ul class="z-ipuclari">
+        <li>
+          <b>Sıra önemlidir.</b> Sunucu sertifikası önce gelir, sonra onu imzalayan ara
+          sertifika, sonra onu imzalayan… Kök sertifika gönderilmez; istemci zaten ona
+          güveniyordur. Yanlış sıralanmış bir demeti bazı sunucular kabul eder, bazıları
+          reddeder — çalışıyor görünmesi doğru olduğu anlamına gelmez.
+        </li>
+        <li>
+          <b>Kök sertifikayı göndermek zararsız ama gereksizdir.</b> Her el sıkışmada birkaç
+          kilobayt fazladan taşınır ve hiçbir işe yaramaz; istemci güvenmiyorsa zaten
+          gönderdiğiniz kopyaya da güvenmez.
+        </li>
+        <li>
+          <b>Eksik ara sertifikayı tarayıcılar gizler.</b> Modern tarayıcılar
+          <i>authority information access</i> alanındaki adresten eksik halkayı indirir ve
+          hata göstermez. <code>curl</code>, Java, Python ve mobil uygulamalar bunu yapmaz.
+          Bu yüzden "tarayıcıda çalışıyor" bir doğrulama değildir.
+        </li>
+        <li>
+          <b>Özel anahtar demete karışmamalı.</b> <code>fullchain.pem</code> herkese açık bir
+          dosyadır; içine <code>BEGIN PRIVATE KEY</code> bloğu girdiyse anahtar sızmış
+          demektir. Bu araç yapıştırdığınız metni hiçbir yere göndermez ama böyle bir blok
+          görürse uyarır — ve o anahtarı <b>iptal edip yenilemeniz</b> gerekir.
+        </li>
+        <li>
+          <b>Çapraz imzalı sertifikalarda iki geçerli yol olabilir.</b> Eski istemcileri
+          desteklemek için bir ara sertifikanın iki farklı kök tarafından imzalanmış sürümü
+          bulunabilir. Hangi yolun sunulacağı sunucu yapılandırmasına bağlıdır; eski cihaz
+          desteği gerekiyorsa uzun yolu seçin.
+        </li>
+      </ul>
+    </section>
+  </div>
+
+  <script>
+    import { pemAyikla, sertifikaOku, kalanGun } from '../../scripts/sertifika.js';
+
+    (() => {
+      const el = (s) => document.querySelector(s);
+      const kacir = (s) =>
+        String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+
+      /** PEM metnindeki sertifika bloklarını ham hâliyle döndürür — yeniden
+          sıralanmış demeti üretebilmek için gerekli. */
+      function blokAyikla(metin) {
+        return [...metin.matchAll(/-----BEGIN CERTIFICATE-----[\s\S]*?-----END CERTIFICATE-----/g)].map(
+          (m) => m[0]
+        );
+      }
+
+      /** Sertifikaları veren-konu ilişkisine göre uçtan köke doğru sıralar. */
+      function zinciriSirala(sertifikalar) {
+        const kalanlar = [...sertifikalar];
+
+        // Uç sertifika: CA olmayan, ya da konusu başka hiçbirinin vereni olmayan
+        const verenler = new Set(kalanlar.map((s) => s.bilgi.veren.metin));
+
+        const uc =
+          kalanlar.find((s) => !s.bilgi.caMi) ??
+          kalanlar.find((s) => !verenler.has(s.bilgi.konu.metin)) ??
+          kalanlar[0];
+
+        const sirali = [];
+        let su = uc;
+        while (su) {
+          sirali.push(su);
+          kalanlar.splice(kalanlar.indexOf(su), 1);
+          if (su.bilgi.kendindenImzali) break;
+          su = kalanlar.find((s) => s.bilgi.konu.metin === su.bilgi.veren.metin);
+        }
+
+        return { sirali, artan: kalanlar };
+      }
+
+      function rolBul(s, indis, toplam) {
+        if (s.bilgi.kendindenImzali) return 'Kök';
+        if (indis === 0 && !s.bilgi.caMi) return 'Sunucu';
+        if (s.bilgi.caMi) return 'Ara';
+        return 'Uç';
+      }
+
+      const tarihYaz = (t) =>
+        t.toLocaleDateString('tr-TR', { day: '2-digit', month: 'long', year: 'numeric' });
+
+      function coz() {
+        const metin = el('#z-pem').value.trim();
+        const durum = el('#z-durum');
+
+        if (!metin) {
+          el('#z-sonuc').hidden = true;
+          el('#z-bulgu-blok').hidden = true;
+          el('#z-duzelt-blok').hidden = true;
+          durum.textContent = '';
+          return;
+        }
+
+        const bulgular = [];
+        const ekle = (tip, baslik, aciklama) => bulgular.push({ tip, baslik, aciklama });
+
+        /* --- özel anahtar denetimi: sertifikalardan önce --- */
+        const anahtarBloklari = [
+          ...metin.matchAll(/-----BEGIN (?:RSA |EC |ENCRYPTED )?PRIVATE KEY-----/g),
+        ];
+        if (anahtarBloklari.length) {
+          ekle(
+            'hata',
+            'Demette özel anahtar var',
+            `${anahtarBloklari.length} adet <code>PRIVATE KEY</code> bloğu bulundu. Zincir ` +
+              `dosyası herkese açıktır; bu anahtar bir yere yüklendiyse ya da paylaşıldıysa ` +
+              `<b>sızmış sayılmalı</b>. Sertifikayı iptal edip yeni bir anahtar çiftiyle ` +
+              `yeniden alın. Anahtar ayrı bir dosyada, 600 izinle durmalı.`
+          );
+        }
+
+        let sertifikalar;
+        try {
+          const bloklar = blokAyikla(metin);
+          const derler = pemAyikla(metin);
+          sertifikalar = derler.map((der, i) => ({ bilgi: sertifikaOku(der), blok: bloklar[i] }));
+        } catch (h) {
+          durum.className = 'arac-durum hata';
+          durum.textContent = 'Okunamadı: ' + h.message;
+          el('#z-sonuc').hidden = true;
+          el('#z-duzelt-blok').hidden = true;
+          // Özel anahtar bulunduysa yine de göster
+          if (bulgular.length) {
+            el('#z-bulgu-blok').hidden = false;
+            el('#z-bulgular').innerHTML =
+              '<ul class="z-liste">' +
+              bulgular.map((b) => `<li data-tip="${b.tip}"><b>${b.baslik}</b><p>${b.aciklama}</p></li>`).join('') +
+              '</ul>';
+          }
+          return;
+        }
+
+        const { sirali, artan } = zinciriSirala(sertifikalar);
+        const bugun = new Date();
+
+        /* --- zincir çizimi --- */
+        el('#z-sonuc').hidden = false;
+        el('#z-zincir').innerHTML = sirali
+          .map((s, i) => {
+            const b = s.bilgi;
+            const kalan = kalanGun(b.bitis, bugun);
+            const rol = rolBul(s, i, sirali.length);
+            const suresizMi = kalan < 0;
+            const sonrakiVeren = sirali[i + 1]?.bilgi.konu.metin;
+            const baglantiTamam = b.kendindenImzali || (sonrakiVeren && sonrakiVeren === b.veren.metin);
+
+            return (
+              `<li class="z-halka" data-rol="${rol}"${suresizMi ? ' data-suresiz="evet"' : ''}>` +
+              `<div class="z-halka-ust">` +
+              `<span class="z-rol">${rol}</span>` +
+              `<b>${kacir(b.konu.CN ?? b.konu.metin)}</b>` +
+              `<span class="z-kalan"${kalan < 30 ? ' data-acil="evet"' : ''}>` +
+              `${suresizMi ? `${-kalan} gün önce doldu` : `${kalan} gün`}</span>` +
+              `</div>` +
+              `<div class="z-halka-alt">` +
+              `<span>veren: <code>${kacir(b.veren.CN ?? b.veren.metin)}</code></span>` +
+              `<span>${kacir(b.anahtar.tur)}${b.anahtar.bit ? ' ' + b.anahtar.bit + ' bit' : ''}</span>` +
+              `<span>${kacir(b.imzaAlgoritmasi)}</span>` +
+              `<span>${tarihYaz(b.baslangic)} – ${tarihYaz(b.bitis)}</span>` +
+              (b.adlar.length ? `<span>${b.adlar.length} ad</span>` : '') +
+              `</div>` +
+              (i < sirali.length - 1 && !baglantiTamam
+                ? '<div class="z-kopuk">Bu sertifikanın vereni, bir sonraki halkanın konusuyla eşleşmiyor</div>'
+                : '') +
+              `</li>`
+            );
+          })
+          .join('');
+
+        el('#z-olcum').innerHTML =
+          `<span>Sertifika: <b>${sertifikalar.length}</b></span>` +
+          `<span>Zincirde: <b>${sirali.length}</b></span>` +
+          (artan.length ? `<span>Zincir dışı: <b>${artan.length}</b></span>` : '') +
+          `<span>Uç: <b>${sirali[0] ? kacir(sirali[0].bilgi.konu.CN ?? '—') : '—'}</b></span>`;
+
+        /* --- bulgular --- */
+        const uc = sirali[0];
+
+        if (uc && uc.bilgi.caMi && !uc.bilgi.kendindenImzali) {
+          ekle('uyari', 'Uç sertifika bir CA', 'Zincirin başındaki sertifika CA olarak işaretli; sunucu sertifikası burada olmayabilir.');
+        }
+
+        // Sıra denetimi: girdideki sıra ile hesaplanan sıra aynı mı?
+        const girdiSirasi = sertifikalar.map((s) => s.bilgi.konu.metin).join('|');
+        const dogruSira = sirali.map((s) => s.bilgi.konu.metin).join('|');
+        if (sertifikalar.length > 1 && girdiSirasi !== dogruSira && artan.length === 0) {
+          ekle(
+            'hata',
+            'Zincir yanlış sıralanmış',
+            'Sertifikalar uçtan köke doğru sıralanmalı: önce sunucu sertifikası, sonra onu ' +
+              'imzalayan ara sertifika. Bazı sunucular yanlış sırayı kabul eder, bazıları ' +
+              'reddeder. Aşağıdaki doğru sıralanmış demeti kullanın.'
+          );
+        }
+
+        if (artan.length) {
+          ekle(
+            'hata',
+            `${artan.length} sertifika zincire bağlanamadı`,
+            'Bu sertifikaların vereni demetteki hiçbir sertifikanın konusuyla eşleşmiyor: ' +
+              artan.map((s) => `<code>${kacir(s.bilgi.konu.CN ?? s.bilgi.konu.metin)}</code>`).join(', ') +
+              '. Ya farklı bir zincire aitler ya da arada bir halka eksik.'
+          );
+        }
+
+        // Ara sertifika eksik mi?
+        const sonHalka = sirali[sirali.length - 1];
+        if (sonHalka && !sonHalka.bilgi.kendindenImzali) {
+          const kokMu = /root|kök/i.test(sonHalka.bilgi.veren.CN ?? '');
+          ekle(
+            kokMu ? 'ok' : 'hata',
+            kokMu ? 'Zincir köke ulaşıyor' : 'Ara sertifika eksik olabilir',
+            kokMu
+              ? `Son halkayı <code>${kacir(sonHalka.bilgi.veren.CN)}</code> imzalamış; kök ` +
+                `sertifika demete konmaz, istemci zaten ona güvenir. Zincir tam görünüyor.`
+              : `Zincirin son halkasını <code>${kacir(sonHalka.bilgi.veren.CN ?? sonHalka.bilgi.veren.metin)}</code> ` +
+                `imzalamış ama o sertifika demette yok. Bu bir kök sertifikaysa sorun değil; ` +
+                `ara sertifikaysa katı istemciler (curl, Java, mobil uygulamalar) bağlantıyı ` +
+                `reddeder. Sertifika sağlayıcınızın verdiği tam zinciri (<i>fullchain</i>) kullanın.`
+          );
+        }
+
+        // Kök sertifika demette mi?
+        const kok = sirali.find((s) => s.bilgi.kendindenImzali);
+        if (kok) {
+          ekle(
+            'uyari',
+            'Kök sertifika demette',
+            `<code>${kacir(kok.bilgi.konu.CN ?? kok.bilgi.konu.metin)}</code> kendinden ` +
+              `imzalı, yani bir kök. Zararsız ama gereksiz: her el sıkışmada boşuna taşınır. ` +
+              `İstemci bu köke güvenmiyorsa sizin gönderdiğiniz kopyaya da güvenmez.`
+          );
+        }
+
+        // Süre denetimleri
+        for (const s of sirali) {
+          const kalan = kalanGun(s.bilgi.bitis, bugun);
+          const ad = kacir(s.bilgi.konu.CN ?? s.bilgi.konu.metin);
+          if (kalan < 0) {
+            ekle('hata', 'Süresi dolmuş sertifika', `<code>${ad}</code> ${-kalan} gün önce doldu. Zincirdeki tek bir süresi dolmuş halka bütün bağlantıyı reddettirir.`);
+          } else if (kalan < 30) {
+            ekle('uyari', 'Süre dolmak üzere', `<code>${ad}</code> için ${kalan} gün kaldı.`);
+          }
+          if (s.bilgi.baslangic > bugun) {
+            ekle('hata', 'Sertifika henüz geçerli değil', `<code>${ad}</code> ${tarihYaz(s.bilgi.baslangic)} tarihinde başlıyor. Sunucu saati ileri alınmış olabilir.`);
+          }
+        }
+
+        // Zayıf imza ve anahtar
+        for (const s of sirali) {
+          const ad = kacir(s.bilgi.konu.CN ?? s.bilgi.konu.metin);
+          if (/sha1|md5/i.test(s.bilgi.imzaAlgoritmasi) && !s.bilgi.kendindenImzali) {
+            ekle('hata', 'Zayıf imza algoritması', `<code>${ad}</code> ${kacir(s.bilgi.imzaAlgoritmasi)} ile imzalanmış. Tarayıcılar bunu reddeder. (Kök sertifikalarda kendinden imza olduğu için sorun değildir.)`);
+          }
+          if (s.bilgi.anahtar.tur === 'RSA' && s.bilgi.anahtar.bit && s.bilgi.anahtar.bit < 2048) {
+            ekle('hata', 'Zayıf anahtar', `<code>${ad}</code> yalnızca ${s.bilgi.anahtar.bit} bit RSA. En az 2048 bit gerekir.`);
+          }
+        }
+
+        if (!bulgular.some((b) => b.tip === 'hata')) {
+          ekle('ok', 'Zincir yapısı sağlam', 'Sıralama doğru, kopuk halka yok ve süreler geçerli.');
+        }
+
+        el('#z-bulgu-blok').hidden = false;
+        el('#z-bulgular').innerHTML =
+          '<ul class="z-liste">' +
+          bulgular
+            .sort((a, b) => ({ hata: 0, uyari: 1, ok: 2 })[a.tip] - ({ hata: 0, uyari: 1, ok: 2 })[b.tip])
+            .map((b) => `<li data-tip="${b.tip}"><b>${b.baslik}</b><p>${b.aciklama}</p></li>`)
+            .join('') +
+          '</ul>';
+
+        /* --- düzeltilmiş demet --- */
+        const demet = sirali.filter((s) => !s.bilgi.kendindenImzali).map((s) => s.blok);
+        if (demet.length) {
+          el('#z-duzelt-blok').hidden = false;
+          el('#z-duzeltilmis').textContent = demet.join('\n') + '\n';
+        } else {
+          el('#z-duzelt-blok').hidden = true;
+        }
+
+        const hataSayisi = bulgular.filter((b) => b.tip === 'hata').length;
+        durum.className = 'arac-durum ' + (hataSayisi ? 'hata' : 'ok');
+        durum.textContent = hataSayisi
+          ? `${sertifikalar.length} sertifika okundu; ${hataSayisi} sorun var.`
+          : `${sertifikalar.length} sertifika okundu, zincir sağlam.`;
+      }
+
+      el('#z-pem').addEventListener('input', coz);
+
+      el('#z-temizle').addEventListener('click', () => {
+        el('#z-pem').value = '';
+        coz();
+      });
+
+      el('#z-dosya').addEventListener('change', async (e) => {
+        const dosya = e.target.files?.[0];
+        if (!dosya) return;
+        el('#z-pem').value = await dosya.text();
+        coz();
+      });
+
+      document.querySelectorAll('.kopyala').forEach((d) => {
+        d.addEventListener('click', async (e) => {
+          const kaynak = d.dataset.kaynak
+            ? el(`#${d.dataset.kaynak}`)
+            : e.currentTarget.previousElementSibling;
+          try {
+            await navigator.clipboard.writeText(kaynak.textContent);
+            d.textContent = 'Kopyalandı';
+            setTimeout(() => (d.textContent = 'Kopyala'), 1600);
+          } catch {
+            /* pano izni yoksa kullanıcı elle seçer */
+          }
+        });
+      });
+    })();
+  </script>
+
+  <style>
+    .arac-dugmeler {
+      display: flex;
+      gap: 10px;
+      flex-wrap: wrap;
+      margin-top: 4px;
+    }
+    .z-dosyaEtiket {
+      cursor: pointer;
+    }
+    .z-zincir {
+      list-style: none;
+      margin: 0;
+      padding: 0;
+      display: grid;
+      gap: 10px;
+    }
+    .z-halka {
+      border: 1px solid var(--line);
+      border-left: 3px solid var(--indigo);
+      border-radius: 10px;
+      padding: 12px 14px;
+      background: var(--paper);
+      position: relative;
+    }
+    .z-halka + .z-halka::before {
+      content: '↑';
+      position: absolute;
+      left: 20px;
+      top: -14px;
+      font-size: 12px;
+      color: var(--muted);
+    }
+    .z-halka[data-suresiz] {
+      border-left-color: light-dark(#dc2626, #f87171);
+      background: light-dark(#fef2f2, #2a1616);
+    }
+    .z-halka[data-rol='Kök'] {
+      border-left-color: var(--muted);
+    }
+    .z-halka-ust {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: baseline;
+      gap: 8px 12px;
+      margin-bottom: 6px;
+    }
+    .z-rol {
+      font-size: 10.5px;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      border: 1px solid var(--line);
+      border-radius: 999px;
+      padding: 2px 9px;
+      color: var(--muted);
+      white-space: nowrap;
+    }
+    .z-halka-ust b {
+      font-size: 14px;
+      word-break: break-all;
+      flex: 1 1 auto;
+    }
+    .z-kalan {
+      font-size: 12.5px;
+      color: var(--muted);
+      font-family: var(--mono, ui-monospace, monospace);
+      white-space: nowrap;
+    }
+    .z-kalan[data-acil] {
+      color: light-dark(#b45309, #fbbf24);
+      font-weight: 700;
+    }
+    .z-halka-alt {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 5px 14px;
+      font-size: 12px;
+      color: var(--muted);
+    }
+    .z-halka-alt code {
+      font-size: 11.5px;
+    }
+    .z-kopuk {
+      margin-top: 8px;
+      font-size: 12.5px;
+      color: light-dark(#991b1b, #fca5a5);
+      background: light-dark(#fef2f2, #3b1d1d);
+      border-radius: 7px;
+      padding: 7px 10px;
+    }
+    .z-cikti {
+      max-height: 320px;
+      overflow: auto;
+    }
+    .z-liste,
+    .z-ipuclari {
+      list-style: none;
+      margin: 0;
+      padding: 0;
+      display: grid;
+      gap: 12px;
+    }
+    .z-liste li {
+      border: 1px solid var(--line);
+      border-left: 3px solid var(--line);
+      border-radius: 10px;
+      padding: 12px 14px;
+      background: var(--paper);
+    }
+    .z-liste li[data-tip='hata'] {
+      border-left-color: light-dark(#dc2626, #f87171);
+    }
+    .z-liste li[data-tip='uyari'] {
+      border-left-color: light-dark(#f0c33c, #a97f1c);
+    }
+    .z-liste li[data-tip='ok'] {
+      border-left-color: light-dark(#16a34a, #4ade80);
+    }
+    .z-liste b {
+      font-size: 14px;
+      display: block;
+      margin-bottom: 5px;
+    }
+    .z-liste p {
+      margin: 0;
+      font-size: 13.5px;
+      line-height: 1.62;
+      color: var(--ink-soft);
+    }
+    .z-ipuclari li {
+      font-size: 13.5px;
+      line-height: 1.62;
+      color: var(--ink-soft);
+      border-left: 2px solid var(--line);
+      padding-left: 13px;
+    }
+  </style>
+</Base>

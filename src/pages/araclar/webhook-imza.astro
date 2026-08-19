@@ -1,0 +1,544 @@
+---
+import Base from '../../layouts/Base.astro';
+---
+
+<Base
+  baslik="Webhook imza üreteci ve doğrulayıcı"
+  aciklama="Gelen bir webhook'un imzası gerçekten sizin gizli anahtarınızla mı üretilmiş? HMAC imzasını tarayıcıda hesaplar ve karşılaştırır."
+  aramaya={true}
+  kategori="Araç"
+>
+  <div class="arama-bas">
+    <div class="kap">
+      <nav class="kirinti" aria-label="Kırıntı yolu" style="padding-top:0">
+        <a href="/">Ana sayfa</a><span class="ayrac">/</span><a href="/araclar">Araçlar</a><span
+          class="ayrac">/</span
+        ><span aria-current="page">Webhook imzası</span>
+      </nav>
+      <h1>Webhook imza üreteci ve doğrulayıcı</h1>
+      <p style="color:var(--muted);font-size:14px;margin-top:8px;max-width:66ch">
+        Webhook uç noktanız internete açıktır; onu isteyen herkes çağırabilir. Gerçekten
+        beklediğiniz servisten geldiğini anlamanın tek yolu imzayı doğrulamaktır. Burada
+        imzayı hesaplayabilir, gelen imzayla karşılaştırabilir ve doğrulama kodunu
+        alabilirsiniz. <b>Hesap tarayıcıda yapılır.</b>
+      </p>
+    </div>
+  </div>
+
+  <div class="kap arac-sayfa">
+    <section class="arac-blok">
+      <h2 class="arac-h2"><span class="arac-no">1</span> Gövde ve anahtar</h2>
+      <div class="arac-alan">
+        <label for="w-govde">İstek gövdesi <i>— tam olarak alındığı hâliyle, biçimlendirmeden</i></label>
+        <textarea id="w-govde" rows="7" spellcheck="false"></textarea>
+      </div>
+      <div class="arac-alanlar" style="margin-top:14px">
+        <label class="arac-alan"
+          >Gizli anahtar
+          <input id="w-anahtar" type="text" spellcheck="false" autocomplete="off" value="ornek-gizli-anahtar" />
+          <small>Sağlayıcının size verdiği paylaşılan sır.</small>
+        </label>
+        <label class="arac-alan"
+          >Özet algoritması
+          <select id="w-alg">
+            <option value="SHA-256" selected>SHA-256</option>
+            <option value="SHA-1">SHA-1</option>
+            <option value="SHA-512">SHA-512</option>
+          </select>
+        </label>
+        <label class="arac-alan"
+          >Sağlayıcı biçimi
+          <select id="w-bicim">
+            <option value="ham">Ham gövde (yaygın)</option>
+            <option value="zaman">Zaman damgası + gövde (Stripe biçimi)</option>
+            <option value="gitlab">Düz belirteç (GitLab biçimi)</option>
+          </select>
+        </label>
+        <label class="arac-alan" id="w-zaman-alan" hidden
+          >Zaman damgası
+          <input id="w-zaman" type="text" spellcheck="false" value="1787389462" />
+          <small>Unix saniye. İmzalanan metin <code>zaman.gövde</code> olur.</small>
+        </label>
+      </div>
+      <p class="arac-durum" id="w-durum" role="status" aria-live="polite"></p>
+    </section>
+
+    <section class="arac-blok" id="w-sonuc-blok" hidden>
+      <h2 class="arac-h2"><span class="arac-no">2</span> Hesaplanan imza</h2>
+      <div class="w-imzalar" id="w-imzalar"></div>
+    </section>
+
+    <section class="arac-blok">
+      <h2 class="arac-h2"><span class="arac-no">3</span> Gelen imzayla karşılaştır</h2>
+      <div class="arac-alan">
+        <label for="w-gelen">Başlıktaki imza</label>
+        <textarea
+          id="w-gelen"
+          rows="2"
+          spellcheck="false"
+          placeholder="sha256=abc123…  ya da  t=1787389462,v1=abc123…"
+        ></textarea>
+        <small>Tam başlık değerini yapıştırabilirsiniz; ön ekler ayıklanır.</small>
+      </div>
+      <p class="arac-durum" id="w-karsilastir" role="status" aria-live="polite"></p>
+    </section>
+
+    <section class="arac-blok">
+      <h2 class="arac-h2"><span class="arac-no">4</span> Doğrulama kodu</h2>
+      <div class="w-diller">
+        {
+          [
+            ['ps', 'PowerShell'],
+            ['node', 'Node.js'],
+            ['python', 'Python'],
+            ['csharp', 'C#'],
+          ].map(([deger, ad], i) => (
+            <label class="w-dil">
+              <input type="radio" name="w-dil" value={deger} checked={i === 0} />
+              <span>{ad}</span>
+            </label>
+          ))
+        }
+      </div>
+      <div style="position:relative">
+        <pre class="kod w-cikti"><code id="w-kod"></code></pre>
+        <button class="kopyala" type="button" data-kaynak="w-kod">Kopyala</button>
+      </div>
+    </section>
+
+    <section class="arac-blok">
+      <h2 class="arac-h2"><span class="arac-no">5</span> Webhook doğrularken</h2>
+      <ul class="w-ipuclari">
+        <li>
+          <b>Ham gövdeyi imzalayın, ayrıştırılmışı değil.</b> Çoğu çatı gövdeyi otomatik olarak
+          JSON'a çevirir; onu yeniden metne çevirdiğinizde boşluklar ve anahtar sırası
+          değişir ve imza hiçbir zaman tutmaz. Doğrulamayı gövde ayrıştırılmadan <i>önce</i>
+          yapın — bu, webhook doğrulamasının en sık takıldığı yerdir.
+        </li>
+        <li>
+          <b>Karşılaştırmayı sabit sürede yapın.</b> <code>==</code> ile karşılaştırmak ilk
+          farklı bayta kadar sürer; saldırgan bu süre farkını ölçerek imzayı bayt bayt
+          tahmin edebilir. Her dilde bunun için ayrı bir işlev vardır ve kullanılması
+          zorunludur.
+        </li>
+        <li>
+          <b>Zaman damgasını da denetleyin.</b> İmza doğru olsa bile eski bir isteği kaydedip
+          yeniden göndermek (replay) mümkündür. Zaman damgası beş dakikadan eskiyse reddedin
+          — ve zaman damgasının <i>imzaya dahil</i> olduğundan emin olun, yoksa saldırgan onu
+          değiştirebilir.
+        </li>
+        <li>
+          <b>İmzasız isteği sessizce kabul etmeyin.</b> İmza başlığı yoksa istek reddedilmeli.
+          "Başlık varsa doğrula" biçiminde yazılmış bir kod, başlığı hiç göndermeyen bir
+          saldırgan için hiç yokmuş gibidir.
+        </li>
+        <li>
+          <b>Anahtar döndürmeyi baştan planlayın.</b> Gizli anahtar sızdığında tek çare onu
+          değiştirmektir; ama tek anahtar varsa değiştirdiğiniz an bütün istekler reddedilmeye
+          başlar. İki anahtarı aynı anda kabul edebilen bir doğrulama yazmak, döndürmeyi
+          kesintisiz hâle getirir.
+        </li>
+        <li>
+          <b>Doğrulama başarısızsa 401 dönün, 200 değil.</b> Bazı ekipler "yeniden denemesin"
+          diye başarısız doğrulamada da 200 döner; bu, sağlayıcının gerçek sorunları
+          görmesini engeller ve sessizce veri kaybettirir.
+        </li>
+      </ul>
+    </section>
+  </div>
+
+  <script>
+    (() => {
+      const el = (s) => document.querySelector(s);
+
+      const onaltiya = (tampon) =>
+        [...new Uint8Array(tampon)].map((b) => b.toString(16).padStart(2, '0')).join('');
+
+      const base64a = (tampon) => {
+        let ikili = '';
+        for (const b of new Uint8Array(tampon)) ikili += String.fromCharCode(b);
+        return btoa(ikili);
+      };
+
+      /** İmzalanacak metni sağlayıcı biçimine göre kurar. */
+      function imzalanacakMetin() {
+        const govde = el('#w-govde').value;
+        const bicim = el('#w-bicim').value;
+        if (bicim === 'zaman') return `${el('#w-zaman').value.trim()}.${govde}`;
+        return govde;
+      }
+
+      async function hmacHesapla(anahtar, metin, alg) {
+        const kodlayici = new TextEncoder();
+        const anahtarNesnesi = await crypto.subtle.importKey(
+          'raw',
+          kodlayici.encode(anahtar),
+          { name: 'HMAC', hash: alg },
+          false,
+          ['sign']
+        );
+        return crypto.subtle.sign('HMAC', anahtarNesnesi, kodlayici.encode(metin));
+      }
+
+      /** Gelen başlıktan onaltılık ya da base64 imzayı ayıklar. */
+      function imzaAyikla(ham) {
+        const t = ham.trim();
+        if (!t) return null;
+        // t=…,v1=… biçimi
+        const v1 = /v1=([0-9a-fA-F]{32,128})/.exec(t);
+        if (v1) return { deger: v1[1].toLowerCase(), bicim: 'onaltilik' };
+        // sha256=… biçimi
+        const onEkli = /(?:sha1|sha256|sha512)\s*=\s*([0-9a-fA-F]{32,128})/i.exec(t);
+        if (onEkli) return { deger: onEkli[1].toLowerCase(), bicim: 'onaltilik' };
+        // düz onaltılık
+        const duz = /^[0-9a-fA-F]{32,128}$/.exec(t);
+        if (duz) return { deger: t.toLowerCase(), bicim: 'onaltilik' };
+        // base64
+        if (/^[A-Za-z0-9+/]{20,}={0,2}$/.test(t)) return { deger: t, bicim: 'base64' };
+        return null;
+      }
+
+      let sonImzalar = null;
+
+      async function hesapla() {
+        const anahtar = el('#w-anahtar').value;
+        const alg = el('#w-alg').value;
+        const bicim = el('#w-bicim').value;
+        const govde = el('#w-govde').value;
+
+        el('#w-zaman-alan').hidden = bicim !== 'zaman';
+
+        const durum = el('#w-durum');
+        if (!govde || !anahtar) {
+          el('#w-sonuc-blok').hidden = true;
+          durum.className = 'arac-durum';
+          durum.textContent = govde ? 'Gizli anahtar girin.' : 'İstek gövdesini yapıştırın.';
+          sonImzalar = null;
+          kodYaz();
+          return;
+        }
+
+        const metin = imzalanacakMetin();
+        const tampon = await hmacHesapla(anahtar, metin, alg);
+        const onaltilik = onaltiya(tampon);
+        const base64 = base64a(tampon);
+        const kisaAlg = alg.toLowerCase().replace('-', '');
+
+        sonImzalar = { onaltilik, base64 };
+
+        const satirlar = [
+          ['Onaltılık', onaltilik],
+          [`${kisaAlg}= ön ekli`, `${kisaAlg}=${onaltilik}`],
+          ['Base64', base64],
+        ];
+        if (bicim === 'zaman') {
+          satirlar.push(['Stripe biçimi', `t=${el('#w-zaman').value.trim()},v1=${onaltilik}`]);
+        }
+
+        el('#w-sonuc-blok').hidden = false;
+        el('#w-imzalar').innerHTML =
+          satirlar
+            .map(
+              ([ad, deger], i) =>
+                `<div class="w-imza"><span class="yan-etiket">${ad}</span>` +
+                `<div class="w-imza-kutu"><code id="w-imza-${i}">${deger}</code>` +
+                `<button type="button" class="w-kop" data-kaynak="w-imza-${i}">Kopyala</button></div></div>`
+            )
+            .join('') +
+          `<p class="w-not">İmzalanan metin <b>${metin.length}</b> karakter` +
+          (bicim === 'zaman'
+            ? ' (zaman damgası, nokta ve gövde birleşik).'
+            : ' — gövdenin tamamı, olduğu gibi.') +
+          `</p>`;
+
+        durum.className = 'arac-durum ok';
+        durum.textContent = `${alg} ile imza hesaplandı.`;
+
+        karsilastir();
+        kodYaz();
+      }
+
+      function karsilastir() {
+        const kutu = el('#w-karsilastir');
+        const gelen = imzaAyikla(el('#w-gelen').value);
+
+        document.querySelectorAll('.w-imza-kutu').forEach((k) => delete k.dataset.eslesme);
+
+        if (!gelen) {
+          kutu.className = 'arac-durum';
+          kutu.textContent = el('#w-gelen').value.trim()
+            ? 'Girilen metinde tanınabilir bir imza bulunamadı.'
+            : '';
+          return;
+        }
+        if (!sonImzalar) {
+          kutu.className = 'arac-durum';
+          kutu.textContent = 'Karşılaştırmak için önce gövde ve anahtarı girin.';
+          return;
+        }
+
+        const bizimki = gelen.bicim === 'base64' ? sonImzalar.base64 : sonImzalar.onaltilik;
+        const uydu = gelen.deger === (gelen.bicim === 'base64' ? bizimki : bizimki.toLowerCase());
+
+        document.querySelectorAll('.w-imza-kutu').forEach((k) => {
+          const kod = k.querySelector('code').textContent;
+          k.dataset.eslesme = kod.includes(gelen.deger) ? 'uydu' : 'uymadi';
+        });
+
+        if (uydu) {
+          kutu.className = 'arac-durum ok';
+          kutu.textContent =
+            'İmza doğrulandı — bu istek, girdiğiniz gizli anahtarı bilen biri tarafından üretilmiş.';
+        } else {
+          kutu.className = 'arac-durum hata';
+          kutu.textContent =
+            'İmza tutmuyor. En sık sebep, gövdenin alındığı hâlde olmamasıdır: ' +
+            'JSON yeniden biçimlendirilmiş, sonuna satır sonu eklenmiş ya da kodlama değişmiş olabilir. ' +
+            'Anahtar ve algoritmayı da doğrulayın.';
+        }
+      }
+
+      function kodYaz() {
+        const dil = document.querySelector('input[name="w-dil"]:checked').value;
+        const alg = el('#w-alg').value;
+        const kisaAlg = alg.toLowerCase().replace('-', '');
+        const zamanli = el('#w-bicim').value === 'zaman';
+
+        const kodlar = {
+          ps:
+            `# Webhook doğrulama — ham gövdeyi ayrıştırmadan önce yapın\n` +
+            `function Test-WebhookImza {\n` +
+            `    param(\n` +
+            `        [Parameter(Mandatory)] [string] $HamGovde,\n` +
+            `        [Parameter(Mandatory)] [string] $GelenImza,\n` +
+            `        [Parameter(Mandatory)] [string] $GizliAnahtar` +
+            (zamanli ? `,\n        [Parameter(Mandatory)] [long]   $ZamanDamgasi` : '') +
+            `\n    )\n\n` +
+            (zamanli
+              ? `    # Yeniden gönderme koruması: beş dakikadan eski istekleri reddet\n` +
+                `    $yas = [DateTimeOffset]::UtcNow.ToUnixTimeSeconds() - $ZamanDamgasi\n` +
+                `    if ([math]::Abs($yas) -gt 300) {\n` +
+                `        Write-Warning "Zaman damgası $yas saniye eski — reddedildi"\n` +
+                `        return $false\n` +
+                `    }\n` +
+                `    $imzalanacak = "$ZamanDamgasi.$HamGovde"\n\n`
+              : `    $imzalanacak = $HamGovde\n\n`) +
+            `    $hmac = [System.Security.Cryptography.HMAC${alg.replace('-', '')}]::new(\n` +
+            `        [Text.Encoding]::UTF8.GetBytes($GizliAnahtar))\n` +
+            `    $ozet = $hmac.ComputeHash([Text.Encoding]::UTF8.GetBytes($imzalanacak))\n` +
+            `    $beklenen = ($ozet | ForEach-Object { $_.ToString('x2') }) -join ''\n\n` +
+            `    # Ön ekleri temizle: "${kisaAlg}=abc..." ya da "v1=abc..."\n` +
+            `    $temiz = ($GelenImza -replace '^.*?=', '').Trim().ToLower()\n\n` +
+            `    # Sabit süreli karşılaştırma — -eq kullanmayın, zamanlama sızdırır\n` +
+            `    $a = [Text.Encoding]::ASCII.GetBytes($beklenen)\n` +
+            `    $b = [Text.Encoding]::ASCII.GetBytes($temiz)\n` +
+            `    if ($a.Length -ne $b.Length) { return $false }\n` +
+            `    $fark = 0\n` +
+            `    for ($i = 0; $i -lt $a.Length; $i++) { $fark = $fark -bor ($a[$i] -bxor $b[$i]) }\n` +
+            `    return $fark -eq 0\n` +
+            `}`,
+
+          node:
+            `import { createHmac, timingSafeEqual } from 'node:crypto';\n\n` +
+            `// Express kullanıyorsanız ham gövdeyi saklayın:\n` +
+            `//   app.use(express.json({ verify: (req, res, buf) => { req.hamGovde = buf; } }));\n` +
+            `// req.body ayrıştırılmış hâldir ve imzayı doğrulamaz.\n\n` +
+            `export function imzaDogrula(hamGovde, gelenImza, gizliAnahtar${zamanli ? ', zamanDamgasi' : ''}) {\n` +
+            (zamanli
+              ? `  const yas = Math.floor(Date.now() / 1000) - Number(zamanDamgasi);\n` +
+                `  if (Math.abs(yas) > 300) return false;   // yeniden gönderme koruması\n` +
+                `  const imzalanacak = \`\${zamanDamgasi}.\${hamGovde}\`;\n\n`
+              : `  const imzalanacak = hamGovde;\n\n`) +
+            `  const beklenen = createHmac('${kisaAlg}', gizliAnahtar)\n` +
+            `    .update(imzalanacak)\n` +
+            `    .digest('hex');\n\n` +
+            `  const temiz = String(gelenImza).replace(/^.*?=/, '').trim().toLowerCase();\n\n` +
+            `  // Uzunluk farklıysa timingSafeEqual hata fırlatır; önce denetle\n` +
+            `  if (temiz.length !== beklenen.length) return false;\n` +
+            `  return timingSafeEqual(Buffer.from(beklenen), Buffer.from(temiz));\n` +
+            `}`,
+
+          python:
+            `import hashlib\nimport hmac\nimport time\n\n\n` +
+            `def imza_dogrula(ham_govde: bytes, gelen_imza: str, gizli_anahtar: str${zamanli ? ', zaman_damgasi: int' : ''}) -> bool:\n` +
+            `    """Ham gövdeyi doğrular. Flask'ta request.get_data() kullanın,\n` +
+            `    request.json değil — ayrıştırılmış gövde imzayı bozar."""\n` +
+            (zamanli
+              ? `    yas = int(time.time()) - zaman_damgasi\n` +
+                `    if abs(yas) > 300:\n` +
+                `        return False   # yeniden gönderme koruması\n` +
+                `    imzalanacak = f"{zaman_damgasi}.".encode() + ham_govde\n\n`
+              : `    imzalanacak = ham_govde\n\n`) +
+            `    beklenen = hmac.new(\n` +
+            `        gizli_anahtar.encode(), imzalanacak, hashlib.${kisaAlg}\n` +
+            `    ).hexdigest()\n\n` +
+            `    temiz = gelen_imza.split("=")[-1].strip().lower()\n\n` +
+            `    # compare_digest sabit sürede çalışır; == kullanmayın\n` +
+            `    return hmac.compare_digest(beklenen, temiz)`,
+
+          csharp:
+            `using System.Security.Cryptography;\nusing System.Text;\n\n` +
+            `// ASP.NET Core'da ham gövdeyi okumak için:\n` +
+            `//   Request.EnableBuffering();\n` +
+            `//   using var okuyucu = new StreamReader(Request.Body, leaveOpen: true);\n` +
+            `//   var hamGovde = await okuyucu.ReadToEndAsync();\n` +
+            `//   Request.Body.Position = 0;\n\n` +
+            `public static bool ImzaDogrula(string hamGovde, string gelenImza, string gizliAnahtar${zamanli ? ', long zamanDamgasi' : ''})\n` +
+            `{\n` +
+            (zamanli
+              ? `    var yas = DateTimeOffset.UtcNow.ToUnixTimeSeconds() - zamanDamgasi;\n` +
+                `    if (Math.Abs(yas) > 300) return false;   // yeniden gönderme koruması\n` +
+                `    var imzalanacak = $"{zamanDamgasi}.{hamGovde}";\n\n`
+              : `    var imzalanacak = hamGovde;\n\n`) +
+            `    using var hmac = new HMAC${alg.replace('-', '')}(Encoding.UTF8.GetBytes(gizliAnahtar));\n` +
+            `    var ozet = hmac.ComputeHash(Encoding.UTF8.GetBytes(imzalanacak));\n` +
+            `    var beklenen = Convert.ToHexString(ozet).ToLowerInvariant();\n\n` +
+            `    var temiz = gelenImza.Split('=').Last().Trim().ToLowerInvariant();\n\n` +
+            `    // Sabit süreli karşılaştırma\n` +
+            `    return CryptographicOperations.FixedTimeEquals(\n` +
+            `        Encoding.ASCII.GetBytes(beklenen),\n` +
+            `        Encoding.ASCII.GetBytes(temiz));\n` +
+            `}`,
+        };
+
+        el('#w-kod').textContent = kodlar[dil];
+      }
+
+      /* --- olaylar --- */
+      document
+        .querySelectorAll('#w-govde, #w-anahtar, #w-zaman')
+        .forEach((g) => g.addEventListener('input', hesapla));
+      document
+        .querySelectorAll('#w-alg, #w-bicim')
+        .forEach((g) => g.addEventListener('change', hesapla));
+      el('#w-gelen').addEventListener('input', karsilastir);
+      document.querySelectorAll('input[name="w-dil"]').forEach((r) => r.addEventListener('change', kodYaz));
+
+      document.addEventListener('click', async (e) => {
+        const d = e.target.closest('.kopyala, .w-kop');
+        if (!d || !d.dataset.kaynak) return;
+        try {
+          await navigator.clipboard.writeText(el(`#${d.dataset.kaynak}`).textContent);
+          const eski = d.textContent;
+          d.textContent = 'Kopyalandı';
+          setTimeout(() => (d.textContent = eski), 1600);
+        } catch {
+          /* pano izni yoksa kullanıcı elle seçer */
+        }
+      });
+
+      el('#w-govde').value = JSON.stringify(
+        { olay: 'siparis.olusturuldu', siparisNo: 'SP-2026-004182', tutar: 1450.75, para: 'TRY' },
+        null,
+        0
+      );
+
+      hesapla();
+    })();
+  </script>
+
+  <style>
+    .arac-alan i {
+      font-style: normal;
+      color: var(--muted);
+      font-size: 12px;
+    }
+    .w-imzalar {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr);
+      gap: 12px;
+    }
+    .w-imza-kutu {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      background: var(--tint);
+      border: 1px solid var(--line);
+      border-radius: 9px;
+      padding: 9px 10px 9px 12px;
+      margin-top: 5px;
+    }
+    .w-imza-kutu code {
+      flex: 1;
+      min-width: 0;
+      font-size: 12.5px;
+      overflow-x: auto;
+      white-space: nowrap;
+    }
+    .w-imza-kutu[data-eslesme='uydu'] {
+      background: light-dark(#ecfdf5, #06301f);
+      border-color: light-dark(#a7f3d0, #12694a);
+    }
+    .w-imza-kutu[data-eslesme='uydu'] code {
+      color: light-dark(#065f46, #6ee7b7);
+    }
+    .w-imza-kutu[data-eslesme='uymadi'] {
+      opacity: 0.6;
+    }
+    .w-kop {
+      flex: 0 0 auto;
+      border: 1px solid var(--line);
+      background: var(--paper);
+      border-radius: 7px;
+      padding: 4px 10px;
+      font-size: 11.5px;
+      color: var(--muted);
+      cursor: pointer;
+      font-family: inherit;
+    }
+    .w-kop:hover {
+      border-color: var(--indigo);
+      color: var(--indigo-metin);
+    }
+    .w-not {
+      font-size: 12.5px;
+      color: var(--muted);
+      margin: 2px 0 0;
+    }
+    .w-diller {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      margin-bottom: 12px;
+    }
+    .w-dil {
+      display: inline-flex;
+      align-items: center;
+      border: 1px solid var(--line);
+      border-radius: 999px;
+      padding: 6px 14px;
+      font-size: 12.5px;
+      color: var(--muted);
+      cursor: pointer;
+      background: var(--paper);
+    }
+    .w-dil input {
+      position: absolute;
+      opacity: 0;
+      pointer-events: none;
+    }
+    .w-dil:has(input:checked) {
+      border-color: var(--indigo);
+      color: var(--indigo-metin);
+      background: var(--tint);
+    }
+    .w-cikti {
+      max-height: 460px;
+      overflow: auto;
+    }
+    .w-ipuclari {
+      list-style: none;
+      margin: 0;
+      padding: 0;
+      display: grid;
+      gap: 12px;
+    }
+    .w-ipuclari li {
+      font-size: 13.5px;
+      line-height: 1.62;
+      color: var(--ink-soft);
+      border-left: 2px solid var(--line);
+      padding-left: 13px;
+    }
+  </style>
+</Base>

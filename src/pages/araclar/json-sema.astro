@@ -1,0 +1,671 @@
+---
+import Base from '../../layouts/Base.astro';
+---
+
+<Base
+  baslik="Örnek JSON'dan şema üreteci"
+  aciklama="Elinizdeki JSON yanıtından JSON Schema, TypeScript arayüzü ve PowerShell sınıfı üretir; hangi alanların isteğe bağlı olduğunu birden çok örnekten çıkarır."
+  aramaya={true}
+  kategori="Araç"
+>
+  <div class="arama-bas">
+    <div class="kap">
+      <nav class="kirinti" aria-label="Kırıntı yolu" style="padding-top:0">
+        <a href="/">Ana sayfa</a><span class="ayrac">/</span><a href="/araclar">Araçlar</a><span
+          class="ayrac">/</span
+        ><span aria-current="page">JSON şema üreteci</span>
+      </nav>
+      <h1>Örnek JSON'dan şema üreteci</h1>
+      <p style="color:var(--muted);font-size:14px;margin-top:8px;max-width:66ch">
+        Belgelenmemiş bir API ile çalışırken elinizdeki tek şey birkaç örnek yanıttır.
+        Yapıştırın: şema, tip tanımı ve doğrulama betiği çıksın. Birden çok örnek
+        verirseniz hangi alanların her zaman geldiğini, hangilerinin isteğe bağlı olduğunu
+        da ayırt eder.
+      </p>
+    </div>
+  </div>
+
+  <div class="kap arac-sayfa">
+    <section class="arac-blok">
+      <h2 class="arac-h2"><span class="arac-no">1</span> Örnekler</h2>
+      <div class="arac-alan">
+        <label for="j-girdi">JSON — birden çok örnek için her birini ayrı satıra ya da bir dizi içine koyun</label>
+        <textarea id="j-girdi" rows="12" spellcheck="false" placeholder="{ &quot;ad&quot;: &quot;SRV-01&quot;, &quot;cpu&quot;: 8 }"
+        ></textarea>
+      </div>
+      <div class="arac-dugmeler">
+        <button type="button" class="dg" id="j-uret">Üret</button>
+        <button type="button" class="dg dg-hayalet" id="j-ornek">Örnek</button>
+        <button type="button" class="dg dg-hayalet" id="j-temizle">Temizle</button>
+      </div>
+      <label class="j-sec">
+        <input type="checkbox" id="j-kokAd" />
+        <span>Dizi gelirse elemanlarını ayrı örnek say <i>(tek bir kaydın şemasını çıkarır)</i></span>
+      </label>
+      <p class="arac-durum" id="j-durum" role="status" aria-live="polite"></p>
+    </section>
+
+    <section class="arac-blok" id="j-sonuc" hidden>
+      <h2 class="arac-h2"><span class="arac-no">2</span> Alanlar</h2>
+      <div class="arac-olcum" id="j-olcum"></div>
+      <div class="j-kaydir">
+        <table class="j-tablo">
+          <thead>
+            <tr><th>Alan</th><th>Tür</th><th>Zorunlu</th><th>Örnek değer</th></tr>
+          </thead>
+          <tbody id="j-tablo"></tbody>
+        </table>
+      </div>
+    </section>
+
+    <section class="arac-blok" id="j-cikti-blok" hidden>
+      <h2 class="arac-h2"><span class="arac-no">3</span> Çıktı</h2>
+      <div class="j-bicimler">
+        {
+          [
+            ['sema', 'JSON Schema'],
+            ['ts', 'TypeScript'],
+            ['ps', 'PowerShell'],
+            ['csharp', 'C# sınıfı'],
+          ].map(([deger, ad], i) => (
+            <label class="j-bicim">
+              <input type="radio" name="j-bicim" value={deger} checked={i === 0} />
+              <span>{ad}</span>
+            </label>
+          ))
+        }
+      </div>
+      <div style="position:relative">
+        <pre class="kod j-cikti"><code id="j-cikti"></code></pre>
+        <button class="kopyala" type="button" data-kaynak="j-cikti">Kopyala</button>
+      </div>
+    </section>
+
+    <section class="arac-blok">
+      <h2 class="arac-h2"><span class="arac-no">4</span> Örnekten şema çıkarırken</h2>
+      <ul class="j-ipuclari">
+        <li>
+          <b>Tek örnek yanıltır.</b> Bir örnekte görünen her alan zorunlu sanılır, görünmeyen
+          hiç bilinmez. En az beş on gerçek yanıt verin — özellikle boş liste, hata durumu ve
+          isteğe bağlı alanların dolu olduğu örnekleri.
+        </li>
+        <li>
+          <b><code>null</code> gördüğünüz alan aslında başka bir tür olabilir.</b> Örnekte
+          <code>null</code> gelen bir alanın gerçek türünü bilemezsiniz; araç bunu
+          "null olabilir" diye işaretler ama tipini tahmin edemez. Dolu bir örnek bulun.
+        </li>
+        <li>
+          <b>Sayı gibi görünen kimlikler metin olmalı.</b> Sipariş numarası
+          <code>00123</code> ise sayıya çevirmek baştaki sıfırı yok eder; büyük kimlikler ise
+          JavaScript'te <code>Number</code> hassasiyetini aşar. API belgesi yoksa bile
+          kimlikleri metin olarak taşımak güvenlidir.
+        </li>
+        <li>
+          <b>Boş dizi tür bilgisi taşımaz.</b> <code>[]</code> gördüğünüzde içine ne geleceğini
+          bilemezsiniz. Şema bunu "herhangi bir şey" olarak bırakır — dolu bir örnek
+          gerekir.
+        </li>
+        <li>
+          <b>Üretilen şema bir başlangıçtır.</b> Sınır değerleri, biçim kısıtları
+          (<code>format: date-time</code>), sayı aralıkları ve numaralandırmalar örneklerden
+          çıkarılamaz. Şemayı elden geçirip iş kurallarını ekleyin; aksi hâlde her şeyi kabul
+          eden bir doğrulama yazmış olursunuz.
+        </li>
+      </ul>
+    </section>
+  </div>
+
+  <script>
+    (() => {
+      const el = (s) => document.querySelector(s);
+      const kacir = (s) =>
+        String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+
+      /** Değerin JSON Schema türü. */
+      function turBul(v) {
+        if (v === null) return 'null';
+        if (Array.isArray(v)) return 'array';
+        if (typeof v === 'object') return 'object';
+        if (typeof v === 'number') return Number.isInteger(v) ? 'integer' : 'number';
+        if (typeof v === 'boolean') return 'boolean';
+        return 'string';
+      }
+
+      /** Metin değerinden tanınabilir biçim çıkarır. */
+      function bicimBul(v) {
+        if (typeof v !== 'string') return null;
+        if (/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}/.test(v)) return 'date-time';
+        if (/^\d{4}-\d{2}-\d{2}$/.test(v)) return 'date';
+        if (/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(v)) return 'email';
+        if (/^https?:\/\//.test(v)) return 'uri';
+        if (/^(\d{1,3}\.){3}\d{1,3}$/.test(v)) return 'ipv4';
+        if (/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(v)) return 'uuid';
+        return null;
+      }
+
+      /** Birden çok örnekten birleşik bir şema çıkarır.
+          Her düğümde görülen türler, kaç örnekte bulunduğu ve örnek değer tutulur. */
+      function birlestir(ornekler) {
+        const turler = new Set();
+        const bicimler = new Set();
+        let ornekDeger;
+        const alanlar = new Map();
+        const elemanOrnekleri = [];
+
+        for (const o of ornekler) {
+          const t = turBul(o);
+          turler.add(t);
+          if (t !== 'null' && ornekDeger === undefined) ornekDeger = o;
+
+          const b = bicimBul(o);
+          if (b) bicimler.add(b);
+
+          if (t === 'object') {
+            for (const [ad, deger] of Object.entries(o)) {
+              if (!alanlar.has(ad)) alanlar.set(ad, { ornekler: [], gorulme: 0 });
+              const a = alanlar.get(ad);
+              a.ornekler.push(deger);
+              a.gorulme++;
+            }
+          } else if (t === 'array') {
+            elemanOrnekleri.push(...o);
+          }
+        }
+
+        const dugum = {
+          turler: [...turler],
+          bicim: bicimler.size === 1 ? [...bicimler][0] : null,
+          ornekDeger,
+          toplam: ornekler.length,
+        };
+
+        if (turler.has('object')) {
+          const nesneSayisi = ornekler.filter((o) => turBul(o) === 'object').length;
+          dugum.alanlar = new Map(
+            [...alanlar].map(([ad, a]) => [
+              ad,
+              { ...birlestir(a.ornekler), gorulme: a.gorulme, nesneSayisi },
+            ])
+          );
+        }
+        if (turler.has('array')) {
+          dugum.eleman = elemanOrnekleri.length ? birlestir(elemanOrnekleri) : null;
+        }
+
+        return dugum;
+      }
+
+      /* --- JSON Schema ------------------------------------------------------- */
+      function semaUret(dugum) {
+        const gercekTurler = dugum.turler.filter((t) => t !== 'null');
+        const nullOlabilir = dugum.turler.includes('null');
+        const tur = gercekTurler.length === 1 ? gercekTurler[0] : gercekTurler;
+
+        const s = {};
+        if (!gercekTurler.length) s.type = 'null';
+        else s.type = nullOlabilir ? [].concat(tur, 'null') : tur;
+
+        if (dugum.bicim) s.format = dugum.bicim;
+
+        if (dugum.alanlar) {
+          s.properties = {};
+          const zorunlu = [];
+          for (const [ad, alt] of dugum.alanlar) {
+            s.properties[ad] = semaUret(alt);
+            if (alt.gorulme === alt.nesneSayisi) zorunlu.push(ad);
+          }
+          if (zorunlu.length) s.required = zorunlu;
+          s.additionalProperties = false;
+        }
+        if (dugum.eleman) s.items = semaUret(dugum.eleman);
+        else if (dugum.turler.includes('array')) s.items = {};
+
+        return s;
+      }
+
+      /* --- TypeScript -------------------------------------------------------- */
+      const TS = { string: 'string', integer: 'number', number: 'number', boolean: 'boolean', null: 'null' };
+
+      function tsTur(dugum, girinti = 0) {
+        const bosluk = '  '.repeat(girinti);
+        const ic = '  '.repeat(girinti + 1);
+        const gercek = dugum.turler.filter((t) => t !== 'null');
+        const nullOlabilir = dugum.turler.includes('null');
+
+        let temel;
+        if (dugum.alanlar) {
+          const satirlar = [...dugum.alanlar].map(([ad, alt]) => {
+            const istegeBagli = alt.gorulme < alt.nesneSayisi ? '?' : '';
+            const adYaz = /^[A-Za-z_$][\w$]*$/.test(ad) ? ad : `'${ad}'`;
+            return `${ic}${adYaz}${istegeBagli}: ${tsTur(alt, girinti + 1)};`;
+          });
+          temel = `{\n${satirlar.join('\n')}\n${bosluk}}`;
+        } else if (dugum.eleman) {
+          temel = `${tsTur(dugum.eleman, girinti)}[]`;
+        } else if (dugum.turler.includes('array')) {
+          temel = 'unknown[]';
+        } else {
+          const eslesen = [...new Set(gercek.map((t) => TS[t] ?? 'unknown'))];
+          temel = eslesen.length ? eslesen.join(' | ') : 'null';
+        }
+
+        return nullOlabilir && temel !== 'null' ? `${temel} | null` : temel;
+      }
+
+      /* --- PowerShell -------------------------------------------------------- */
+      const PS = { string: 'string', integer: 'int', number: 'double', boolean: 'bool' };
+
+      function psTur(dugum) {
+        const gercek = dugum.turler.filter((t) => t !== 'null');
+        if (dugum.alanlar) return 'psobject';
+        if (dugum.eleman) return `${psTur(dugum.eleman)}[]`;
+        if (dugum.turler.includes('array')) return 'object[]';
+        return PS[gercek[0]] ?? 'object';
+      }
+
+      function psUret(dugum) {
+        if (!dugum.alanlar) return '# Kök bir nesne değil; doğrulama için JSON Schema kullanın.';
+
+        const satirlar = [
+          '# Yanıtı doğrula: beklenen alanlar var mı, türleri tutuyor mu?',
+          'function Test-Yanit {',
+          '    param([Parameter(Mandatory)] $Yanit)',
+          '',
+          '    $eksik = @()',
+          '    $yanlisTur = @()',
+          '',
+        ];
+
+        for (const [ad, alt] of dugum.alanlar) {
+          const zorunlu = alt.gorulme === alt.nesneSayisi;
+          const tur = psTur(alt);
+          const erisim = /^[A-Za-z_][\w]*$/.test(ad) ? `.${ad}` : `.'${ad.replace(/'/g, "''")}'`;
+
+          if (zorunlu) {
+            satirlar.push(`    if ($null -eq $Yanit${erisim}) { $eksik += '${ad}' }`);
+          }
+          if (tur !== 'psobject' && tur !== 'object' && !tur.endsWith('[]')) {
+            satirlar.push(
+              `    elseif ($Yanit${erisim} -isnot [${tur}]) { $yanlisTur += '${ad} (${tur} bekleniyordu)' }`
+            );
+          }
+        }
+
+        satirlar.push(
+          '',
+          '    if ($eksik)     { Write-Warning "Eksik alan: $($eksik -join \', \')" }',
+          '    if ($yanlisTur) { Write-Warning "Tür uyuşmazlığı: $($yanlisTur -join \', \')" }',
+          '    -not ($eksik -or $yanlisTur)',
+          '}',
+          '',
+          '# Kullanımı',
+          '$y = Invoke-RestMethod https://api.ornek.com.tr/kayitlar',
+          'if (Test-Yanit $y) { "Yanıt beklenen yapıda" }'
+        );
+
+        return satirlar.join('\n');
+      }
+
+      /* --- C# ---------------------------------------------------------------- */
+      const CS = { string: 'string', integer: 'int', number: 'double', boolean: 'bool' };
+
+      function csUret(dugum, ad = 'Kayit', toplanan = []) {
+        if (!dugum.alanlar) return '// Kök bir nesne değil.';
+
+        const buyukHarf = (s) =>
+          s.replace(/[^A-Za-z0-9]+(.)?/g, (_, k) => (k ? k.toUpperCase() : '')).replace(/^./, (k) => k.toUpperCase());
+
+        const satirlar = [`public sealed class ${ad}`, '{'];
+        const altSiniflar = [];
+
+        for (const [alanAd, alt] of dugum.alanlar) {
+          const gercek = alt.turler.filter((t) => t !== 'null');
+          const nullOlabilir = alt.turler.includes('null') || alt.gorulme < alt.nesneSayisi;
+          let tur;
+
+          if (alt.alanlar) {
+            tur = buyukHarf(alanAd);
+            altSiniflar.push(csUret(alt, tur, toplanan));
+          } else if (alt.eleman) {
+            if (alt.eleman.alanlar) {
+              const altAd = buyukHarf(alanAd).replace(/s$/, '') || 'Oge';
+              altSiniflar.push(csUret(alt.eleman, altAd, toplanan));
+              tur = `List<${altAd}>`;
+            } else {
+              tur = `List<${CS[alt.eleman.turler.filter((t) => t !== 'null')[0]] ?? 'object'}>`;
+            }
+          } else {
+            tur = CS[gercek[0]] ?? 'object';
+          }
+
+          const soru = nullOlabilir && tur !== 'string' && !tur.startsWith('List') ? '?' : '';
+          const ozellikAd = buyukHarf(alanAd);
+          if (ozellikAd !== alanAd) {
+            satirlar.push(`    [JsonPropertyName("${alanAd}")]`);
+          }
+          satirlar.push(`    public ${tur}${soru} ${ozellikAd} { get; set; }`);
+          satirlar.push('');
+        }
+
+        if (satirlar[satirlar.length - 1] === '') satirlar.pop();
+        satirlar.push('}');
+
+        return [...altSiniflar, satirlar.join('\n')].join('\n\n');
+      }
+
+      /* --- alan tablosu ------------------------------------------------------ */
+      function alanlariDuzle(dugum, onEk = '', cikti = []) {
+        if (!dugum.alanlar) return cikti;
+        for (const [ad, alt] of dugum.alanlar) {
+          const yol = onEk ? `${onEk}.${ad}` : ad;
+          const gercek = alt.turler.filter((t) => t !== 'null');
+          const nullOlabilir = alt.turler.includes('null');
+          cikti.push({
+            yol,
+            tur: (gercek.join(' | ') || 'null') + (nullOlabilir && gercek.length ? ' | null' : ''),
+            bicim: alt.bicim,
+            zorunlu: alt.gorulme === alt.nesneSayisi,
+            gorulme: alt.gorulme,
+            toplam: alt.nesneSayisi,
+            ornek: alt.ornekDeger,
+          });
+          if (alt.alanlar) alanlariDuzle(alt, yol, cikti);
+          if (alt.eleman?.alanlar) alanlariDuzle(alt.eleman, `${yol}[]`, cikti);
+        }
+        return cikti;
+      }
+
+      /* --- girdiyi örneklere ayır -------------------------------------------- */
+      function ornekleriAyir(ham) {
+        const metin = ham.trim();
+        if (!metin) return [];
+
+        // Tek bir geçerli JSON belgesi mi?
+        try {
+          const tek = JSON.parse(metin);
+          if (Array.isArray(tek) && el('#j-kokAd').checked) return tek;
+          return [tek];
+        } catch {
+          /* satır satır dene */
+        }
+
+        // JSON Lines: her satır ayrı belge
+        const satirlar = metin.split('\n').map((s) => s.trim()).filter(Boolean);
+        const ornekler = [];
+        for (const s of satirlar) {
+          try {
+            ornekler.push(JSON.parse(s));
+          } catch {
+            /* çözümlenemeyen satır atlanır */
+          }
+        }
+        if (ornekler.length) return ornekler;
+
+        throw new Error('Geçerli JSON bulunamadı.');
+      }
+
+      let sonDugum = null;
+
+      function uret() {
+        const durum = el('#j-durum');
+        let ornekler;
+        try {
+          ornekler = ornekleriAyir(el('#j-girdi').value);
+        } catch (h) {
+          durum.className = 'arac-durum hata';
+          durum.textContent = h.message;
+          el('#j-sonuc').hidden = true;
+          el('#j-cikti-blok').hidden = true;
+          return;
+        }
+
+        if (!ornekler.length) {
+          durum.className = 'arac-durum';
+          durum.textContent = '';
+          el('#j-sonuc').hidden = true;
+          el('#j-cikti-blok').hidden = true;
+          return;
+        }
+
+        sonDugum = birlestir(ornekler);
+        const alanlar = alanlariDuzle(sonDugum);
+
+        el('#j-sonuc').hidden = false;
+        el('#j-cikti-blok').hidden = false;
+
+        const istegeBagli = alanlar.filter((a) => !a.zorunlu).length;
+        el('#j-olcum').innerHTML =
+          `<span>Örnek: <b>${ornekler.length}</b></span>` +
+          `<span>Alan: <b>${alanlar.length}</b></span>` +
+          `<span>İsteğe bağlı: <b>${istegeBagli}</b></span>` +
+          `<span>Kök tür: <b>${sonDugum.turler.join(' | ')}</b></span>`;
+
+        el('#j-tablo').innerHTML = alanlar
+          .map(
+            (a) =>
+              `<tr${a.zorunlu ? '' : ' data-istege="evet"'}>` +
+              `<td><code>${kacir(a.yol)}</code></td>` +
+              `<td>${kacir(a.tur)}${a.bicim ? ` <small>${a.bicim}</small>` : ''}</td>` +
+              `<td>${a.zorunlu ? 'zorunlu' : `${a.gorulme}/${a.toplam} örnekte`}</td>` +
+              `<td><code>${kacir(
+                a.ornek === undefined
+                  ? 'null'
+                  : typeof a.ornek === 'object'
+                    ? Array.isArray(a.ornek)
+                      ? `[${a.ornek.length}]`
+                      : '{…}'
+                    : JSON.stringify(a.ornek)
+              )}</code></td></tr>`
+          )
+          .join('');
+
+        ciz();
+
+        const uyarilar = [];
+        if (ornekler.length === 1) uyarilar.push('tek örnekten çıkarıldı, bütün alanlar zorunlu sayıldı');
+        const bosDizi = alanlar.filter((a) => a.tur.includes('array') && a.ornek?.length === 0).length;
+        if (bosDizi) uyarilar.push(`${bosDizi} boş dizi var, eleman türü bilinmiyor`);
+        const sadeceNull = alanlar.filter((a) => a.tur === 'null').length;
+        if (sadeceNull) uyarilar.push(`${sadeceNull} alan hep null geldi, gerçek türü bilinmiyor`);
+
+        durum.className = 'arac-durum ' + (uyarilar.length ? '' : 'ok');
+        durum.textContent =
+          `${ornekler.length} örnekten ${alanlar.length} alan çıkarıldı` +
+          (uyarilar.length ? ` — ${uyarilar.join('; ')}.` : '.');
+      }
+
+      function ciz() {
+        if (!sonDugum) return;
+        const bicim = document.querySelector('input[name="j-bicim"]:checked').value;
+
+        const cikti = {
+          sema: () =>
+            JSON.stringify({ $schema: 'https://json-schema.org/draft/2020-12/schema', ...semaUret(sonDugum) }, null, 2),
+          ts: () => `export interface Kayit ${tsTur(sonDugum)}\n`,
+          ps: () => psUret(sonDugum),
+          csharp: () =>
+            'using System.Text.Json.Serialization;\n\n' + csUret(sonDugum),
+        }[bicim]();
+
+        el('#j-cikti').textContent = cikti;
+      }
+
+      /* --- olaylar ----------------------------------------------------------- */
+      el('#j-uret').addEventListener('click', uret);
+      el('#j-girdi').addEventListener('input', () => {
+        if (el('#j-girdi').value.trim().length > 10) uret();
+      });
+      el('#j-kokAd').addEventListener('change', uret);
+      document.querySelectorAll('input[name="j-bicim"]').forEach((r) => r.addEventListener('change', ciz));
+
+      el('#j-temizle').addEventListener('click', () => {
+        el('#j-girdi').value = '';
+        sonDugum = null;
+        uret();
+      });
+
+      el('#j-ornek').addEventListener('click', () => {
+        el('#j-kokAd').checked = true;
+        el('#j-girdi').value = JSON.stringify(
+          [
+            {
+              id: 'a3f9c2e1-4b7d-4c88-9f21-0d5e6a7b8c90',
+              ad: 'SRV-UYG-03',
+              rol: 'uygulama',
+              cpu: 16,
+              bellekGb: 64,
+              etkin: true,
+              devreyeAlma: '2024-11-02T09:14:00+03:00',
+              yonetici: { ad: 'Mustafa Çelik', eposta: 'mcelik@ornek.com.tr' },
+              etiketler: ['üretim', 'iis'],
+              notlar: null,
+            },
+            {
+              id: 'b7c1d0e2-8a3f-4d19-b5e6-1f2a3b4c5d60',
+              ad: 'SRV-VT-01',
+              rol: 'veritabani',
+              cpu: 32,
+              bellekGb: 256,
+              etkin: true,
+              devreyeAlma: '2022-01-20T14:30:00+03:00',
+              yonetici: { ad: 'Mustafa Çelik', eposta: 'mcelik@ornek.com.tr' },
+              etiketler: ['üretim', 'sql'],
+              notlar: 'Yedekleme penceresi 02:00-04:00',
+              bakimPenceresi: 'salı 02:00',
+            },
+            {
+              id: 'c9e2f1a3-7b4c-4e2a-8d70-2a3b4c5d6e71',
+              ad: 'SRV-TEST-09',
+              rol: 'test',
+              cpu: 4,
+              bellekGb: 8,
+              etkin: false,
+              devreyeAlma: '2025-06-30T11:00:00+03:00',
+              yonetici: { ad: 'Ayşe Yıldız', eposta: 'ayildiz@ornek.com.tr' },
+              etiketler: [],
+              notlar: null,
+            },
+          ],
+          null,
+          2
+        );
+        uret();
+      });
+
+      document.querySelectorAll('.kopyala').forEach((d) => {
+        d.addEventListener('click', async () => {
+          try {
+            await navigator.clipboard.writeText(el(`#${d.dataset.kaynak}`).textContent);
+            d.textContent = 'Kopyalandı';
+            setTimeout(() => (d.textContent = 'Kopyala'), 1600);
+          } catch {
+            /* pano izni yoksa kullanıcı elle seçer */
+          }
+        });
+      });
+    })();
+  </script>
+
+  <style>
+    .arac-dugmeler {
+      display: flex;
+      gap: 10px;
+      flex-wrap: wrap;
+      margin-top: 4px;
+    }
+    .j-sec {
+      display: inline-flex;
+      align-items: baseline;
+      gap: 8px;
+      font-size: 13px;
+      color: var(--ink-soft);
+      cursor: pointer;
+      margin-top: 12px;
+      line-height: 1.5;
+    }
+    .j-sec i {
+      font-style: normal;
+      color: var(--muted);
+      font-size: 12px;
+    }
+    .j-kaydir {
+      overflow-x: auto;
+    }
+    .j-tablo {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 13px;
+      min-width: 520px;
+    }
+    .j-tablo th,
+    .j-tablo td {
+      text-align: left;
+      padding: 8px 11px;
+      border-bottom: 1px solid var(--line);
+    }
+    .j-tablo th {
+      color: var(--muted);
+      font-size: 11.5px;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+    }
+    .j-tablo code {
+      font-size: 12.5px;
+    }
+    .j-tablo small {
+      color: var(--indigo-metin);
+      font-size: 11px;
+    }
+    .j-tablo tr[data-istege] {
+      background: light-dark(#fffbeb, #2e2410);
+    }
+    .j-tablo tr[data-istege] td:nth-child(3) {
+      color: light-dark(#92400e, #fbbf24);
+    }
+    .j-bicimler {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      margin-bottom: 12px;
+    }
+    .j-bicim {
+      display: inline-flex;
+      align-items: center;
+      border: 1px solid var(--line);
+      border-radius: 999px;
+      padding: 6px 14px;
+      font-size: 12.5px;
+      color: var(--muted);
+      cursor: pointer;
+      background: var(--paper);
+    }
+    .j-bicim input {
+      position: absolute;
+      opacity: 0;
+      pointer-events: none;
+    }
+    .j-bicim:has(input:checked) {
+      border-color: var(--indigo);
+      color: var(--indigo-metin);
+      background: var(--tint);
+    }
+    .j-cikti {
+      max-height: 460px;
+      overflow: auto;
+    }
+    .j-ipuclari {
+      list-style: none;
+      margin: 0;
+      padding: 0;
+      display: grid;
+      gap: 12px;
+    }
+    .j-ipuclari li {
+      font-size: 13.5px;
+      line-height: 1.62;
+      color: var(--ink-soft);
+      border-left: 2px solid var(--line);
+      padding-left: 13px;
+    }
+  </style>
+</Base>

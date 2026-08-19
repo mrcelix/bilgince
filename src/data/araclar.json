@@ -506,7 +506,7 @@
   {
     "slug": "gecis-listesi",
     "ad": "Sunucu geçişi kontrol listesi üreteci",
-    "ozet": "Taşınan servise göre öncesi, anı ve sonrası için maddelenmiş liste; kritik adımlar işaretli.",
+    "ozet": "Taşınan sunucuya göre geçiş öncesi, anı ve sonrası adımları; kritik olanlar ayrı işaretli.",
     "ikon": "kutu",
     "etiket": "yeni",
     "cevrimici": false,
@@ -574,5 +574,59 @@
     "etiket": "yeni",
     "cevrimici": false,
     "grup": "Bulut & Konteyner"
+  },
+  {
+    "slug": "sertifika-zinciri",
+    "ad": "Sertifika zinciri doğrulayıcı",
+    "ozet": "Sıra doğru mu, ara halka eksik mi, özel anahtar karışmış mı? Düzeltilmiş demeti de verir.",
+    "ikon": "kalkan",
+    "etiket": "yeni",
+    "cevrimici": false,
+    "grup": "Kimlik & Sertifika"
+  },
+  {
+    "slug": "json-sema",
+    "ad": "Örnek JSON'dan şema üreteci",
+    "ozet": "Yanıt örneklerinden JSON Schema, TypeScript, C# ve PowerShell doğrulaması çıkarır.",
+    "ikon": "kutu",
+    "etiket": "yeni",
+    "cevrimici": false,
+    "grup": "Metin, Kod & Zaman"
+  },
+  {
+    "slug": "ntp-saat",
+    "ad": "Saat eşitleme (NTP) planlayıcı",
+    "ozet": "Etki alanı saat hiyerarşisi, Kerberos toleransı ve sanal makinelerde çift kaynak sorunu.",
+    "ikon": "akis",
+    "etiket": "yeni",
+    "cevrimici": false,
+    "grup": "Ağ & DNS"
+  },
+  {
+    "slug": "webhook-imza",
+    "ad": "Webhook imza üreteci ve doğrulayıcı",
+    "ozet": "HMAC imzasını hesaplar, gelen başlıkla karşılaştırır, dört dilde doğrulama kodu verir.",
+    "ikon": "kalkan",
+    "etiket": "yeni",
+    "cevrimici": false,
+    "grup": "Üretim & Paylaşım"
+  },
+  {
+    "slug": "kullanici-yasam-dongusu",
+    "ad": "İşe alım ve ayrılış kontrol listesi",
+    "ozet": "Yeni çalışana ne açılmalı, ayrılana ne kapatılmalı? Role göre erişim maddeleri.",
+    "ikon": "pencere",
+    "etiket": "yeni",
+    "cevrimici": false,
+    "grup": "Üretim & Paylaşım"
+  },
+  {
+    "slug": "renk-paleti",
+    "ad": "Erişilebilir renk paleti üreteci",
+    "ozet": "Marka renginden ölçek üretir, her tonu WCAG eşiğine göre ölçer, CSS değişkenleri verir.",
+    "ikon": "pencere",
+    "etiket": "yeni",
+    "cevrimici": false,
+    "grup": "Erişilebilirlik & Arayüz"
   }
 ]

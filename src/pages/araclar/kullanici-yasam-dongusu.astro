@@ -1,0 +1,636 @@
+---
+import Base from '../../layouts/Base.astro';
+---
+
+<Base
+  baslik="İşe alım ve ayrılış kontrol listesi"
+  aciklama="Yeni çalışan için ne açılmalı, ayrılan için ne kapatılmalı? Role göre maddelenmiş, atlanması riskli adımları işaretli bir liste üretir."
+  aramaya={true}
+  kategori="Araç"
+>
+  <div class="arama-bas">
+    <div class="kap">
+      <nav class="kirinti" aria-label="Kırıntı yolu" style="padding-top:0">
+        <a href="/">Ana sayfa</a><span class="ayrac">/</span><a href="/araclar">Araçlar</a><span
+          class="ayrac">/</span
+        ><span aria-current="page">İşe alım ve ayrılış</span>
+      </nav>
+      <h1>İşe alım ve ayrılış kontrol listesi</h1>
+      <p style="color:var(--muted);font-size:14px;margin-top:8px;max-width:66ch">
+        Ayrılan çalışanın hesabı kapatılır ama VPN sertifikası, paylaşılan posta kutusu
+        yetkisi ve kendi adına açılmış API anahtarı çoğu zaman kalır. Denetimde bulunan ilk
+        şey de budur. Rolü seçin, listeyi çıkarın.
+      </p>
+    </div>
+  </div>
+
+  <div class="kap arac-sayfa">
+    <section class="arac-blok">
+      <h2 class="arac-h2"><span class="arac-no">1</span> Durum</h2>
+      <div class="k-yonler" role="radiogroup" aria-label="İşlem yönü">
+        <label class="k-yon">
+          <input type="radio" name="k-yon" value="alim" checked />
+          <b>İşe alım</b>
+          <span>Yeni çalışan için erişim açma</span>
+        </label>
+        <label class="k-yon">
+          <input type="radio" name="k-yon" value="ayrilis" />
+          <b>Ayrılış</b>
+          <span>Erişimleri kapatma ve devretme</span>
+        </label>
+        <label class="k-yon">
+          <input type="radio" name="k-yon" value="degisim" />
+          <b>Görev değişikliği</b>
+          <span>Eski yetkileri kaldırıp yenilerini verme</span>
+        </label>
+      </div>
+
+      <span class="yan-etiket" style="margin-top:18px;display:block">Rol ve erişimler</span>
+      <div class="k-roller">
+        {
+          [
+            ['ofis', 'Ofis çalışanı', 'Posta, dosya paylaşımı, yazıcı', true],
+            ['uzak', 'Uzaktan çalışan', 'VPN, çok adımlı doğrulama', false],
+            ['yonetici', 'Sistem yöneticisi', 'Ayrıcalıklı hesaplar, sunucu erişimi', false],
+            ['gelistirici', 'Yazılım geliştirici', 'Kod deposu, derleme hattı, bulut', false],
+            ['saha', 'Saha personeli', 'Mobil cihaz, kurumsal hat', false],
+            ['dis', 'Dış kaynak / tedarikçi', 'Süreli erişim, sınırlı kapsam', false],
+          ].map(([deger, ad, aciklama, secili]) => (
+            <label class="k-rol">
+              <input type="checkbox" data-rol={deger} checked={secili} />
+              <b>{ad}</b>
+              <span>{aciklama}</span>
+            </label>
+          ))
+        }
+      </div>
+
+      <div class="arac-alanlar" style="margin-top:16px">
+        <label class="arac-alan"
+          >Kişi
+          <input id="k-kisi" type="text" spellcheck="false" value="Ayşe Yıldız" />
+        </label>
+        <label class="arac-alan"
+          >Kullanıcı adı
+          <input id="k-hesap" type="text" spellcheck="false" value="ayildiz" />
+        </label>
+        <label class="arac-alan"
+          >Tarih
+          <input id="k-tarih" type="date" />
+        </label>
+        <label class="arac-alan"
+          >Posta kutusu saklama (gün)
+          <input id="k-saklama" type="number" min="0" max="3650" value="90" />
+          <small>Ayrılıştan sonra kutunun tutulacağı süre.</small>
+        </label>
+      </div>
+      <p class="arac-durum" id="k-durum" role="status" aria-live="polite"></p>
+    </section>
+
+    <section class="arac-blok">
+      <h2 class="arac-h2"><span class="arac-no">2</span> Liste</h2>
+      <div class="arac-olcum" id="k-olcum"></div>
+      <div id="k-liste"></div>
+    </section>
+
+    <section class="arac-blok">
+      <h2 class="arac-h2"><span class="arac-no">3</span> Yardımcı komutlar</h2>
+      <div style="position:relative">
+        <pre class="kod k-cikti"><code id="k-komut"></code></pre>
+        <button class="kopyala" type="button" data-kaynak="k-komut">Kopyala</button>
+      </div>
+    </section>
+
+    <section class="arac-blok">
+      <h2 class="arac-h2"><span class="arac-no">4</span> Markdown çıktısı</h2>
+      <div style="position:relative">
+        <pre class="kod k-cikti"><code id="k-markdown"></code></pre>
+        <button class="kopyala" type="button" data-kaynak="k-markdown">Kopyala</button>
+      </div>
+      <div class="arac-dugmeler">
+        <button type="button" class="dg dg-hayalet" id="k-indir">Markdown indir</button>
+      </div>
+    </section>
+
+    <section class="arac-blok">
+      <h2 class="arac-h2"><span class="arac-no">5</span> Sahadan notlar</h2>
+      <ul class="k-ipuclari">
+        <li>
+          <b>Hesabı silmeyin, devre dışı bırakın.</b> Silinen bir hesabın SID'i kaybolur;
+          o kişinin sahibi olduğu dosyaların ve nesnelerin sahipliği çözülemez hâle gelir.
+          Devre dışı bırakıp belirlenen saklama süresi sonunda silmek, hem denetim izini
+          korur hem geri dönüşü mümkün kılar.
+        </li>
+        <li>
+          <b>Asıl risk kişisel hesapta değil, kişiye bağlı sırlarda.</b> Kendi adına
+          oluşturulmuş API anahtarları, kişisel erişim belirteçleri, otomasyonlarda kullanılan
+          hesap parolaları… Bunlar hesap kapatılınca çalışmaya devam eder. Ayrılıştan önce
+          "bu kişi hangi otomasyonlarda kimlik olarak kullanılıyor" sorusunu sorun.
+        </li>
+        <li>
+          <b>Paylaşılan posta kutusu ve takvim yetkileri ayrı yaşar.</b> Kullanıcı devre dışı
+          bırakıldığında ona verilmiş temsilci (delegate) yetkileri kalmaya devam eder ve
+          bazı kurulumlarda hâlâ kullanılabilir. Her paylaşılan kaynağı ayrı denetleyin.
+        </li>
+        <li>
+          <b>Çok adımlı doğrulama cihazını kaydedin.</b> Ayrılan kişinin telefonundaki
+          doğrulayıcı uygulaması hâlâ kod üretir. Hesap devre dışı bırakılsa bile, hesap
+          yeniden etkinleştirildiğinde o kod çalışır. MFA kayıtlarını da temizleyin.
+        </li>
+        <li>
+          <b>İşe alımda "geçici" parolayı kalıcı yapmayın.</b> İlk girişte değiştirme zorunlu
+          olmalı ve parola kişiye güvenli bir kanaldan ulaşmalı. Posta ile gönderilen ilk
+          parola, posta kutusuna erişimi olan herkesin eline geçer.
+        </li>
+        <li>
+          <b>Erişimi rolden verin, kişiden değil.</b> Kullanıcıyı doğrudan kaynaklara
+          yetkilendirmek yerine gruba ekleyin. Görev değişikliğinde tek yapılacak şey grup
+          üyeliğini değiştirmek olur; tek tek verilmiş yetkiler ise kimsenin hatırlamadığı
+          yerlerde kalır.
+        </li>
+      </ul>
+    </section>
+  </div>
+
+  <script>
+    (() => {
+      const el = (s) => document.querySelector(s);
+
+      /* Madde: [metin, önem, aşama]. Önem "kritik" ise atlanması güvenlik açığı
+         ya da veri kaybı üretir. */
+      const ORTAK = {
+        alim: [
+          ['Kimlik doğrulama tamamlandı, sözleşme ve gizlilik taahhüdü imzalandı', 'kritik', 'once'],
+          ['Etki alanı hesabı oluşturuldu (<code>New-ADUser</code>), ilk girişte parola değişimi zorunlu', 'kritik', 'gun'],
+          ['Kullanıcı doğru OU\'ya ve rol gruplarına eklendi — tekil yetki verilmedi', 'kritik', 'gun'],
+          ['Posta kutusu açıldı, dağıtım listelerine eklendi', 'normal', 'gun'],
+          ['Ana dizin ve departman paylaşımlarına erişim verildi', 'normal', 'gun'],
+          ['Bilgisayar teslim edildi, envantere kaydedildi (seri no, zimmet formu)', 'kritik', 'gun'],
+          ['Disk şifrelemesi açık, kurtarma anahtarı merkezi olarak saklanıyor', 'kritik', 'gun'],
+          ['Uç nokta koruması ve güncelleme yönetimi cihaza uygulandı', 'kritik', 'gun'],
+          ['Kabul edilebilir kullanım politikası okutuldu ve imzalatıldı', 'normal', 'gun'],
+          ['Oltalama farkındalık eğitimi planlandı', 'normal', 'sonra'],
+          ['İlk hafta sonunda erişimlerin yeterli ve fazlasız olduğu birlikte gözden geçirildi', 'normal', 'sonra'],
+        ],
+        ayrilis: [
+          ['Ayrılış tarihi ve saati İK ile netleştirildi', 'kritik', 'once'],
+          ['Kişinin sahibi olduğu sistemler, otomasyonlar ve belgeler listelendi', 'kritik', 'once'],
+          ['Devralacak kişi belirlendi ve bilgilendirildi', 'kritik', 'once'],
+          ['Etki alanı hesabı <b>devre dışı bırakıldı</b> — silinmedi', 'kritik', 'gun'],
+          ['Etkin oturumlar ve belirteçler sonlandırıldı (<code>Revoke-AzureADUserAllRefreshToken</code>)', 'kritik', 'gun'],
+          ['Çok adımlı doğrulama kayıtları kaldırıldı', 'kritik', 'gun'],
+          ['Bütün grup üyelikleri kaydedildi, sonra kaldırıldı', 'kritik', 'gun'],
+          ['Posta kutusu paylaşılan kutuya çevrildi ya da devralana yetki verildi', 'normal', 'gun'],
+          ['Otomatik yanıt kuruldu, iletme kuralı gerekiyorsa tanımlandı', 'normal', 'gun'],
+          ['Bilgisayar ve mobil cihaz teslim alındı, uzaktan silme yapıldı', 'kritik', 'gun'],
+          ['Fiziksel erişim kartı ve anahtarlar iade alındı', 'kritik', 'gun'],
+          ['Kişiye bağlı API anahtarları ve erişim belirteçleri iptal edildi', 'kritik', 'gun'],
+          ['Kişinin bildiği paylaşılan parolalar değiştirildi', 'kritik', 'gun'],
+          ['Ana dizin arşivlendi, saklama süresi belirlendi', 'normal', 'sonra'],
+          ['Saklama süresi sonunda hesap ve veri silindi, kayıt tutuldu', 'normal', 'sonra'],
+        ],
+        degisim: [
+          ['Yeni rol ve gereken erişimler yazılı olarak tanımlandı', 'kritik', 'once'],
+          ['Mevcut bütün erişimler listelendi (<code>Get-ADPrincipalGroupMembership</code>)', 'kritik', 'once'],
+          ['<b>Eski role ait yetkiler kaldırıldı</b> — en sık atlanan adım budur', 'kritik', 'gun'],
+          ['Yeni rol grupları eklendi', 'normal', 'gun'],
+          ['Eski ekibin paylaşımlarına erişim kaldırıldı', 'kritik', 'gun'],
+          ['Devredilen sistemlerin sorumluluğu belgelendi', 'normal', 'gun'],
+          ['Bir ay sonra erişimler yeniden gözden geçirildi', 'normal', 'sonra'],
+        ],
+      };
+
+      const ROLE_OZEL = {
+        uzak: {
+          ad: 'Uzaktan çalışan',
+          alim: [
+            ['VPN erişimi verildi, istemci kuruldu ve sınandı', 'normal', 'gun'],
+            ['Çok adımlı doğrulama kaydedildi ve yedek yöntemi tanımlandı', 'kritik', 'gun'],
+            ['Cihaz uyumluluk kuralına dahil edildi (şifreleme, güncellik)', 'kritik', 'gun'],
+          ],
+          ayrilis: [
+            ['VPN erişimi kaldırıldı ve etkin oturum varsa düşürüldü', 'kritik', 'gun'],
+            ['VPN istemci sertifikası iptal edildi — hesap kapatmak bunu kaldırmaz', 'kritik', 'gun'],
+            ['Cihaz uzaktan silindi ya da kurumsal veri kaldırıldı', 'kritik', 'gun'],
+          ],
+          degisim: [['VPN profili yeni role göre güncellendi', 'normal', 'gun']],
+        },
+        yonetici: {
+          ad: 'Sistem yöneticisi',
+          alim: [
+            ['Günlük iş için ayrı, ayrıcalıklı işler için ayrı hesap açıldı', 'kritik', 'gun'],
+            ['Ayrıcalıklı hesap için ayrı ve daha uzun parola politikası uygulandı', 'kritik', 'gun'],
+            ['Ayrıcalıklı erişim yalnızca yönetim ağından yapılacak şekilde sınırlandı', 'kritik', 'gun'],
+            ['Acil durum (break-glass) hesabının nerede olduğu gösterildi', 'normal', 'sonra'],
+          ],
+          ayrilis: [
+            ['Ayrıcalıklı hesap devre dışı bırakıldı', 'kritik', 'gun'],
+            ['Domain Admins ve eşdeğeri gruplardan çıkarıldı', 'kritik', 'gun'],
+            ['<b>Acil durum hesabının parolası değiştirildi</b> — kişi bunu biliyordu', 'kritik', 'gun'],
+            ['Sunuculardaki yerel yönetici hesapları gözden geçirildi', 'kritik', 'gun'],
+            ['SSH yetkili anahtarlar dosyalarından anahtarı kaldırıldı', 'kritik', 'gun'],
+            ['Zamanlanmış görevlerde bu hesap kimlik olarak kullanılıyor mu denetlendi', 'kritik', 'gun'],
+          ],
+          degisim: [
+            ['Ayrıcalıklı hesap gerekmiyorsa kapatıldı', 'kritik', 'gun'],
+            ['Sunucu erişimleri yeni role göre daraltıldı', 'kritik', 'gun'],
+          ],
+        },
+        gelistirici: {
+          ad: 'Yazılım geliştirici',
+          alim: [
+            ['Kod deposu erişimi verildi, iki adımlı doğrulama zorunlu kılındı', 'kritik', 'gun'],
+            ['Derleme hattı ve yapay depo erişimi tanımlandı', 'normal', 'gun'],
+            ['Geliştirme ortamı bulut aboneliğine okuma yetkisiyle eklendi', 'normal', 'gun'],
+            ['Üretim erişiminin ayrı onay gerektirdiği anlatıldı', 'kritik', 'gun'],
+          ],
+          ayrilis: [
+            ['Kod deposu erişimi kaldırıldı', 'kritik', 'gun'],
+            ['Kişisel erişim belirteçleri ve dağıtım anahtarları iptal edildi', 'kritik', 'gun'],
+            ['SSH anahtarları depodan kaldırıldı', 'kritik', 'gun'],
+            ['Bulut aboneliğindeki rol atamaları silindi', 'kritik', 'gun'],
+            ['Yerel kopyalarda kalan sırlar için ilgili anahtarlar döndürüldü', 'kritik', 'gun'],
+            ['Sahibi olduğu depolar ve hatlar başka birine devredildi', 'normal', 'sonra'],
+          ],
+          degisim: [['Depo ve ortam erişimleri yeni takıma göre güncellendi', 'normal', 'gun']],
+        },
+        saha: {
+          ad: 'Saha personeli',
+          alim: [
+            ['Mobil cihaz yönetimine kaydedildi', 'kritik', 'gun'],
+            ['Kurumsal hat tanımlandı, kullanım sınırları anlatıldı', 'normal', 'gun'],
+          ],
+          ayrilis: [
+            ['Mobil cihaz yönetiminden çıkarıldı ve kurumsal veri silindi', 'kritik', 'gun'],
+            ['Kurumsal hat kapatıldı ya da devredildi', 'normal', 'gun'],
+            ['Araç takip ve saha uygulaması erişimi kaldırıldı', 'normal', 'gun'],
+          ],
+          degisim: [],
+        },
+        dis: {
+          ad: 'Dış kaynak / tedarikçi',
+          alim: [
+            ['<b>Erişime bitiş tarihi konuldu</b> — süresiz dış hesap açılmaz', 'kritik', 'gun'],
+            ['Erişim yalnızca gereken sistemlerle sınırlandı', 'kritik', 'gun'],
+            ['Gizlilik sözleşmesi ve veri işleme şartları imzalandı', 'kritik', 'once'],
+            ['Hesap adlandırmasında dış kaynak olduğu belli edildi (ör. <code>dis.ayildiz</code>)', 'normal', 'gun'],
+          ],
+          ayrilis: [
+            ['Erişim kaldırıldı ve tedarikçiye yazılı bildirildi', 'kritik', 'gun'],
+            ['Tedarikçiye verilmiş paylaşılan hesap varsa parolası değiştirildi', 'kritik', 'gun'],
+            ['Kendisine gönderilmiş veriler için silme talebi iletildi', 'normal', 'sonra'],
+          ],
+          degisim: [],
+        },
+        ofis: {
+          ad: 'Ofis çalışanı',
+          alim: [
+            ['Yazıcı ve tarayıcı erişimi tanımlandı', 'normal', 'gun'],
+            ['Departman paylaşımlarına yetki verildi', 'normal', 'gun'],
+          ],
+          ayrilis: [['Yazıcı ve departman paylaşımı yetkileri kaldırıldı', 'normal', 'gun']],
+          degisim: [['Departman paylaşımı yetkileri yeni birime göre değiştirildi', 'normal', 'gun']],
+        },
+      };
+
+      const ASAMA_ADI = {
+        once: 'Öncesinde',
+        gun: 'İlk gün / ayrılış günü',
+        sonra: 'Sonrasında',
+      };
+
+      const YON_ADI = { alim: 'İşe alım', ayrilis: 'Ayrılış', degisim: 'Görev değişikliği' };
+
+      function listeUret() {
+        const yon = document.querySelector('input[name="k-yon"]:checked').value;
+        const roller = [...document.querySelectorAll('[data-rol]')]
+          .filter((k) => k.checked)
+          .map((k) => k.dataset.rol);
+
+        const asamalar = { once: [], gun: [], sonra: [] };
+        for (const [metin, onem, asama] of ORTAK[yon]) {
+          asamalar[asama].push({ metin, onem, kaynak: 'Ortak' });
+        }
+        for (const rol of roller) {
+          for (const [metin, onem, asama] of ROLE_OZEL[rol][yon]) {
+            asamalar[asama].push({ metin, onem, kaynak: ROLE_OZEL[rol].ad });
+          }
+        }
+        return { asamalar, yon, roller };
+      }
+
+      function ciz() {
+        const { asamalar, yon, roller } = listeUret();
+        const kisi = el('#k-kisi').value.trim() || '(kişi)';
+        const hesap = el('#k-hesap').value.trim() || 'kullanici';
+        const tarih = el('#k-tarih').value;
+        const saklama = Number(el('#k-saklama').value) || 90;
+
+        const toplam = Object.values(asamalar).reduce((t, a) => t + a.length, 0);
+        const kritik = Object.values(asamalar).flat().filter((m) => m.onem === 'kritik').length;
+
+        el('#k-olcum').innerHTML =
+          `<span>Durum: <b>${YON_ADI[yon]}</b></span>` +
+          `<span>Madde: <b>${toplam}</b></span>` +
+          `<span>Kritik: <b>${kritik}</b></span>` +
+          `<span>Rol: <b>${roller.length}</b></span>`;
+
+        el('#k-liste').innerHTML = ['once', 'gun', 'sonra']
+          .filter((a) => asamalar[a].length)
+          .map(
+            (a) =>
+              `<div class="k-asama"><h3>${ASAMA_ADI[a]}</h3><ul class="k-maddeler">` +
+              asamalar[a]
+                .map(
+                  (m) =>
+                    `<li data-onem="${m.onem}">` +
+                    `<label><input type="checkbox" /> <span>${m.metin}</span></label>` +
+                    `<em>${m.kaynak}</em></li>`
+                )
+                .join('') +
+              `</ul></div>`
+          )
+          .join('');
+
+        /* --- komutlar --- */
+        el('#k-komut').textContent =
+          yon === 'ayrilis'
+            ? `# ${kisi} — ayrılış işlemleri\n` +
+              `$hesap = '${hesap}'\n\n` +
+              `# 1) Önce mevcut durumu kaydet — geri dönmek gerekebilir\n` +
+              `$kullanici = Get-ADUser $hesap -Properties MemberOf, Manager, Department\n` +
+              `$kullanici.MemberOf | Get-ADGroup |\n` +
+              `    Select-Object Name, DistinguishedName |\n` +
+              `    Export-Csv "C:\\Kayit\\$hesap-gruplar.csv" -Encoding UTF8 -NoTypeInformation\n\n` +
+              `# 2) Hesabı devre dışı bırak — SILMEYIN\n` +
+              `Disable-ADAccount $hesap\n` +
+              `Set-ADUser $hesap -Description "Ayrildi ${tarih || '(tarih)'} - saklama ${saklama} gun"\n\n` +
+              `# 3) Etkin oturumları düşür\n` +
+              `# Bulut tarafında yenileme belirteçlerini iptal edin; aksi hâlde\n` +
+              `# mevcut oturumlar saatlerce çalışmaya devam eder.\n` +
+              `# Revoke-MgUserSignInSession -UserId "$hesap@ornek.com.tr"\n\n` +
+              `# 4) Grup üyeliklerini kaldır (yukarıda kaydedildi)\n` +
+              `$kullanici.MemberOf | ForEach-Object {\n` +
+              `    Remove-ADGroupMember -Identity $_ -Members $hesap -Confirm:$false\n` +
+              `}\n\n` +
+              `# 5) Devre dışı hesaplar OU'suna taşı\n` +
+              `Move-ADObject $kullanici.DistinguishedName \`\n` +
+              `    -TargetPath 'OU=Ayrilanlar,DC=ornek,DC=local'\n\n` +
+              `# 6) Bu hesap bir yerlerde kimlik olarak kullanılıyor mu?\n` +
+              `# Zamanlanmış görevler:\n` +
+              `Invoke-Command -ComputerName (Get-ADComputer -Filter { OperatingSystem -like '*Server*' }).Name {\n` +
+              `    Get-ScheduledTask | Where-Object { $_.Principal.UserId -like "*${hesap}*" } |\n` +
+              `        Select-Object @{ n='Sunucu'; e={ $env:COMPUTERNAME } }, TaskName, TaskPath\n` +
+              `} -ErrorAction SilentlyContinue\n\n` +
+              `# Servisler:\n` +
+              `Get-CimInstance Win32_Service |\n` +
+              `    Where-Object { $_.StartName -like "*${hesap}*" } |\n` +
+              `    Select-Object Name, StartName\n\n` +
+              `# 7) Sahibi olduğu dosyalar (arşivlemeden önce bilinmeli)\n` +
+              `Get-ChildItem \\\\SRV-DOSYA-01\\Ortak -Recurse -File -ErrorAction SilentlyContinue |\n` +
+              `    Where-Object { (Get-Acl $_.FullName).Owner -like "*${hesap}*" } |\n` +
+              `    Select-Object FullName, Length`
+            : `# ${kisi} — ${YON_ADI[yon].toLowerCase()} işlemleri\n` +
+              `$hesap = '${hesap}'\n` +
+              `$adSoyad = '${kisi}'\n\n` +
+              (yon === 'alim'
+                ? `# 1) Hesabı oluştur — ilk girişte parola değişimi zorunlu\n` +
+                  `$parola = ConvertTo-SecureString (Read-Host 'Ilk parola') -AsPlainText -Force\n` +
+                  `New-ADUser -Name $adSoyad -SamAccountName $hesap \`\n` +
+                  `    -UserPrincipalName "$hesap@ornek.com.tr" \`\n` +
+                  `    -Path 'OU=Kullanicilar,DC=ornek,DC=local' \`\n` +
+                  `    -AccountPassword $parola -ChangePasswordAtLogon $true \`\n` +
+                  `    -Enabled $true\n\n` +
+                  `# 2) Rol gruplarına ekle — tekil yetki verme\n` +
+                  `'Ofis-Kullanicilari', 'Yazici-Kat2' | ForEach-Object {\n` +
+                  `    Add-ADGroupMember -Identity $_ -Members $hesap\n` +
+                  `}\n\n`
+                : `# 1) Mevcut erişimleri kaydet\n` +
+                  `Get-ADPrincipalGroupMembership $hesap | Select-Object name |\n` +
+                  `    Export-Csv "C:\\Kayit\\$hesap-eski-gruplar.csv" -Encoding UTF8 -NoTypeInformation\n\n` +
+                  `# 2) Eski rol gruplarından çıkar — en sık atlanan adım\n` +
+                  `'Eski-Departman', 'Eski-Paylasim' | ForEach-Object {\n` +
+                  `    Remove-ADGroupMember -Identity $_ -Members $hesap -Confirm:$false\n` +
+                  `}\n\n` +
+                  `# 3) Yeni rol gruplarına ekle\n` +
+                  `'Yeni-Departman' | ForEach-Object {\n` +
+                  `    Add-ADGroupMember -Identity $_ -Members $hesap\n` +
+                  `}\n\n`) +
+              `# 3) Sonucu doğrula\n` +
+              `Get-ADUser $hesap -Properties MemberOf, Enabled, PasswordLastSet |\n` +
+              `    Select-Object Name, Enabled, PasswordLastSet,\n` +
+              `        @{ n = 'Gruplar'; e = { ($_.MemberOf | Get-ADGroup).Name -join ', ' } } |\n` +
+              `    Format-List\n\n` +
+              `# 4) Fazla yetki var mı? Rol dışı üyelikleri gözden geçirin.\n` +
+              `# Erişim gözden geçirmesi, verildikten sonra da düzenli tekrarlanmalı.`;
+
+        /* --- Markdown --- */
+        const sadelestir = (s) =>
+          s.replace(/<code>/g, '`').replace(/<\/code>/g, '`').replace(/<\/?b>/g, '**');
+
+        el('#k-markdown').textContent = [
+          `# ${YON_ADI[yon]} kontrol listesi — ${kisi}`,
+          '',
+          `**Kullanıcı adı:** \`${hesap}\``,
+          `**Tarih:** ${tarih || '(doldurun)'}`,
+          `**Roller:** ${roller.map((r) => ROLE_OZEL[r].ad).join(', ') || '(rol seçilmedi)'}`,
+          `**Sorumlu:** (doldurun)`,
+          '',
+          '> Kritik işaretli maddeler atlandığında güvenlik açığı ya da veri kaybı oluşur.',
+          '',
+          ...['once', 'gun', 'sonra']
+            .filter((a) => asamalar[a].length)
+            .flatMap((a) => [
+              `## ${ASAMA_ADI[a]}`,
+              '',
+              ...asamalar[a].map(
+                (m) => `- [ ] ${m.onem === 'kritik' ? '**[KRİTİK]** ' : ''}${sadelestir(m.metin)}`
+              ),
+              '',
+            ]),
+          '## Devredilenler',
+          '',
+          '| Ne | Kime | Tarih |',
+          '|---|---|---|',
+          '| | | |',
+          '',
+          '## Onay',
+          '',
+          '| Rol | Ad | Tarih |',
+          '|---|---|---|',
+          '| İşlemi yapan | | |',
+          '| İK | | |',
+          '| Yönetici | | |',
+        ].join('\n');
+
+        const durum = el('#k-durum');
+        if (!roller.length) {
+          durum.className = 'arac-durum hata';
+          durum.textContent = 'En az bir rol seçin.';
+        } else {
+          durum.className = 'arac-durum ok';
+          durum.textContent = `${toplam} maddelik liste hazır; ${kritik} tanesi kritik.`;
+        }
+      }
+
+      document
+        .querySelectorAll('input[name="k-yon"], [data-rol], .arac-alan input')
+        .forEach((g) => {
+          g.addEventListener('change', ciz);
+          g.addEventListener('input', ciz);
+        });
+
+      document.querySelectorAll('.kopyala').forEach((d) => {
+        d.addEventListener('click', async () => {
+          try {
+            await navigator.clipboard.writeText(el(`#${d.dataset.kaynak}`).textContent);
+            d.textContent = 'Kopyalandı';
+            setTimeout(() => (d.textContent = 'Kopyala'), 1600);
+          } catch {
+            /* pano izni yoksa kullanıcı elle seçer */
+          }
+        });
+      });
+
+      el('#k-indir').addEventListener('click', () => {
+        const b = new Blob([el('#k-markdown').textContent], { type: 'text/markdown;charset=utf-8' });
+        const a = document.createElement('a');
+        a.href = URL.createObjectURL(b);
+        a.download = 'kontrol-listesi.md';
+        a.click();
+        URL.revokeObjectURL(a.href);
+      });
+
+      const t = new Date();
+      const iki = (n) => String(n).padStart(2, '0');
+      el('#k-tarih').value = `${t.getFullYear()}-${iki(t.getMonth() + 1)}-${iki(t.getDate())}`;
+
+      ciz();
+    })();
+  </script>
+
+  <style>
+    .k-yonler {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(min(200px, 100%), 1fr));
+      gap: 10px;
+    }
+    .k-yon,
+    .k-rol {
+      display: grid;
+      gap: 3px;
+      border: 1px solid var(--line);
+      border-radius: 11px;
+      padding: 12px 14px;
+      cursor: pointer;
+      background: var(--paper);
+      position: relative;
+    }
+    .k-yon input,
+    .k-rol input {
+      position: absolute;
+      opacity: 0;
+      pointer-events: none;
+    }
+    .k-yon b,
+    .k-rol b {
+      font-size: 13.5px;
+    }
+    .k-yon span,
+    .k-rol span {
+      font-size: 12px;
+      color: var(--muted);
+      line-height: 1.45;
+    }
+    .k-yon:has(input:checked),
+    .k-rol:has(input:checked) {
+      border-color: var(--indigo);
+      background: var(--tint);
+      box-shadow: 0 0 0 1px var(--indigo);
+    }
+    .k-roller {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(min(190px, 100%), 1fr));
+      gap: 10px;
+      margin-top: 6px;
+    }
+    .k-asama {
+      margin-bottom: 22px;
+    }
+    .k-asama h3 {
+      font-size: 15px;
+      margin: 0 0 10px;
+      padding-bottom: 7px;
+      border-bottom: 1px solid var(--line);
+    }
+    .k-maddeler {
+      list-style: none;
+      margin: 0;
+      padding: 0;
+      display: grid;
+      gap: 6px;
+    }
+    .k-maddeler li {
+      display: flex;
+      align-items: flex-start;
+      gap: 10px;
+      border-left: 2px solid var(--line);
+      padding: 5px 0 5px 12px;
+    }
+    .k-maddeler li[data-onem='kritik'] {
+      border-left-color: light-dark(#dc2626, #f87171);
+    }
+    .k-maddeler label {
+      display: flex;
+      align-items: flex-start;
+      gap: 9px;
+      flex: 1;
+      cursor: pointer;
+      font-size: 13.5px;
+      line-height: 1.55;
+      color: var(--ink-soft);
+    }
+    .k-maddeler input {
+      margin-top: 3px;
+      flex: 0 0 auto;
+      width: 15px;
+      height: 15px;
+      cursor: pointer;
+    }
+    .k-maddeler label:has(input:checked) span {
+      text-decoration: line-through;
+      opacity: 0.55;
+    }
+    .k-maddeler em {
+      font-style: normal;
+      font-size: 11px;
+      color: var(--muted);
+      white-space: nowrap;
+      padding-top: 3px;
+    }
+    .k-cikti {
+      max-height: 420px;
+      overflow: auto;
+    }
+    .arac-dugmeler {
+      display: flex;
+      gap: 10px;
+      flex-wrap: wrap;
+      margin-top: 12px;
+    }
+    .k-ipuclari {
+      list-style: none;
+      margin: 0;
+      padding: 0;
+      display: grid;
+      gap: 12px;
+    }
+    .k-ipuclari li {
+      font-size: 13.5px;
+      line-height: 1.62;
+      color: var(--ink-soft);
+      border-left: 2px solid var(--line);
+      padding-left: 13px;
+    }
+  </style>
+</Base>
