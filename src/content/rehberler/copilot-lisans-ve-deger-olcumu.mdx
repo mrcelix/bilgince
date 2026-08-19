@@ -1,0 +1,105 @@
+---
+baslik: "Copilot lisansı: kime verilecek ve değeri nasıl ölçülecek"
+ozet: "Herkese dağıtılan lisansın yarısı kullanılmaz. Kime verileceğini işe göre seçmek ve kazancı baştan tanımlanmış bir ölçüyle izlemek, yenileme görüşmesini de kolaylaştırır."
+konu: "copilot"
+etiketler: ["copilot", "m365", "maliyet", "itsm"]
+yayin: 2026-08-18
+sure: 10
+---
+
+Bir kurum 200 Copilot lisansı aldı ve tüm beyaz yakalı çalışanlara dağıttı. Üç ay sonra kullanım raporuna bakıldığında 60 kişinin haftada birden fazla kez kullandığı, 90 kişinin hiç açmadığı görüldü.
+
+Yenileme zamanı geldiğinde kimse "değdi mi" sorusuna yanıt veremedi. Ne bir öncesi ölçüm vardı ne de neyin iyileşmesi beklendiği yazılmıştı.
+
+Bu, yeni bir araç türü olmasından değil, dağıtım biçiminden kaynaklanan bir sonuç. Lisans dağıtımı bir kapasite kararı değil, bir hedefleme kararıdır.
+
+## Kim gerçekten yararlanır
+
+Copilot'ın kazandırdığı zaman, kişinin işinin ne kadarının **metin ve toplantı** üzerinden geçtiğine bağlıdır. Kaba bir ayrım:
+
+**Yüksek fayda:** çok sayıda toplantıya katılıp not tutması gereken roller, uzun belgeleri özetlemesi gereken roller, tekrar eden yazışma üreten roller (satış, İK, hukuk, proje yönetimi), veri tablolarından hızlı özet çıkaranlar.
+
+**Orta fayda:** yazılım geliştirenler — ama onlar için ayrı bir ürün (kod asistanı) genelde daha değerlidir. Genel Copilot'ın katkısı belge ve toplantı tarafında kalır.
+
+**Düşük fayda:** işi ağırlıklı olarak uzmanlaşmış bir uygulamada geçenler (ERP, CAD, laboratuvar sistemleri), saha çalışanları, üretim hattı personeli.
+
+Pilot grubu seçerken tek bir departmanı değil, **üç farklı rolden birer küçük grup** seçin. Tek departmanla yapılan pilot, o departmanın iş akışına özgü bir sonuç verir ve genellenemez.
+
+## Ölçüyü önce tanımlayın
+
+"Verimlilik arttı" ölçülebilir bir cümle değildir. Ölçülebilir olanlar rol bazında farklıdır:
+
+| Rol | Ölçülebilir gösterge |
+| --- | --- |
+| Destek masası | Kayıt başına ortalama yanıt yazma süresi |
+| Satış | Teklif hazırlama süresi, teklif başına revizyon sayısı |
+| İK | İlan ve politika metni ilk taslak süresi |
+| Proje yönetimi | Toplantı notu ve eylem maddesi çıkarma süresi |
+| Hukuk | Sözleşme ilk okuma ve özet çıkarma süresi |
+| Yönetici | Haftalık okunması gereken belge sayısı / ayrılan süre |
+
+Kritik olan **öncesini ölçmektir.** Pilot başlamadan iki hafta boyunca mevcut süreleri kaydedin. Sonrasını ölçmek kolaydır; öncesini geriye dönük tahmin etmek güvenilmezdir ve yenileme görüşmesinde kimseyi ikna etmez.
+
+Basit bir yol: pilot katılımcılarına haftada bir, iki soruluk bir anket. "Bu hafta kaç kez kullandınız?" ve "Tahmini kaç dakika kazandırdı?" Öznel bir ölçüdür ama tutarlı toplandığında eğilimi doğru gösterir ve toplaması neredeyse bedavadır.
+
+## Kullanım verisini okumak
+
+Yönetim merkezindeki kullanım raporları uygulama bazında etkinlik verir. Ama asıl bakılacak şey **süreklilik**tir: bir kullanıcı ilk hafta merakla dener, dördüncü haftada hâlâ kullanıyorsa değer bulmuş demektir.
+
+```powershell
+Connect-MgGraph -Scopes "Reports.Read.All"
+
+# 30 günlük Copilot kullanım özeti
+Get-MgReportM365AppUserDetail -Period D30 -OutFile kullanim.csv
+```
+
+Üç grup çıkarın:
+
+**Düzenli kullananlar.** Haftada üç günden fazla. Bunlar lisansı hak ediyor; ayrıca hangi senaryoların işe yaradığını onlardan öğrenin.
+
+**Ara sıra kullananlar.** Ayda birkaç kez. Bunlar genelde eğitim eksiğinden ya da işlerine uygun senaryoyu bulamamış olmaktan böyledir; bir saatlik hedefli bir oturum çoğunu birinci gruba taşır.
+
+**Hiç kullanmayanlar.** Dört hafta üst üste hiç kullanmayan bir kullanıcının lisansı geri alınmalıdır. Bunu bir ceza gibi değil, bir havuz yönetimi olarak kurun: "kullanmıyorsan sırada bekleyene verelim, ihtiyacın olursa bir günde geri alırsın."
+
+Lisans geri alma otomatikleştirilebilir ama bildirim önce gitmelidir — habersiz kaldırılan bir lisans, güveni bir daha kurulamayacak biçimde bozar.
+
+## Eğitim, aracın kendisinden daha belirleyici
+
+Kullanmama nedeninin çoğu "işime nasıl uygulayacağımı bilmiyorum"dur. Genel bir tanıtım bunu çözmez; rol bazlı, somut senaryo gerekir.
+
+En işe yarayan biçim, her rol için üç ilâ beş **hazır istem** vermektir:
+
+```
+Destek masası — kayıt özeti:
+"Aşağıdaki yazışmayı müşteriye gönderilecek bir kapanış notuna çevir.
+ Teknik terimleri sadeleştir, yapılan işlemleri madde madde yaz,
+ sonunda tekrar yaşanmaması için bir öneri ekle."
+```
+
+Bunlar bir sayfada toplanır ve yeni kullanıcıya ilk gün verilir. Soyut bir "Copilot ne yapabilir" sunumundan çok daha etkilidir.
+
+Aynı sayfada bir de **ne için kullanılmayacağı** yazılmalı: kişisel veri içeren metinlerin işlenmesi, müşteriye doğrudan gidecek metinlerin denetimsiz gönderilmesi, karar gerektiren analizlerde kaynağa bakmadan güvenilmesi.
+
+## Maliyet karşılaştırması dürüst olsun
+
+Copilot lisansı kişi başı sabit bir aylık maliyettir. Karşılığında kazanılan süreyi paraya çevirirken iki hataya düşmemek gerekir:
+
+**Kazanılan sürenin tamamı üretime dönmez.** Haftada 90 dakika kazanan bir çalışan, o 90 dakikada aynı oranda çıktı üretmez. Muhafazakâr bir dönüşüm oranı (yarısı gibi) kullanmak, sonucun savunulabilir olmasını sağlar.
+
+**Yalnızca kazananları saymayın.** Hiç kullanmayanların lisans maliyeti de hesaba girer. Gerçek getiri, toplam lisans maliyetine bölünerek hesaplanır — kullanan kişi sayısına değil.
+
+Bu iki düzeltmeyle yapılan bir hesap, abartılı bir sunumdan daha az etkileyici görünür ama yenileme görüşmesinde ayakta kalır.
+
+## Yönetişim tarafı unutulmasın
+
+Lisans dağıtımı bir veri erişimi kararıdır da. Copilot, kullanıcının erişebildiği her şeyi arayabildiği için, geniş erişimi olan kişilere lisans vermek daha büyük bir görünürlük açar.
+
+Bu yüzden ilk lisanslar, verisi düzenli ve erişimleri gözden geçirilmiş ekiplere verilmelidir. Aşırı paylaşımın temizlenmesi bir ön koşuldur; ayrıntısı [Copilot öncesi veri hijyeni](/rehberler/copilot-m365-yayilim-oncesi-veri-hijyeni) rehberinde.
+
+Ayrıca kullanıcı işten ayrıldığında lisansın geri alınması, ayrılış kontrol listesinde bir madde olmalı — atlandığında hem maliyet devam eder hem de hesap kapatılmadıysa erişim sürer. [İşe alım ve ayrılış kontrol listesi](/araclar/kullanici-yasam-dongusu) aracı bu adımı içeriyor.
+
+## Kısa liste
+
+Üç farklı rolden küçük bir pilot seçin. Pilottan **önce** iki hafta mevcut süreleri ölçün. Rol bazlı hazır istem sayfası hazırlayın. Dört hafta kullanmayanın lisansını havuza döndürün. Getiriyi toplam lisans maliyetine bölerek hesaplayın.
+
+Bu beş adım, "herkese dağıtıp bakalım" yaklaşımına göre hem daha az lisans hem daha yüksek kullanım oranı üretir — ve yenileme zamanı geldiğinde elinizde bir rakam olur.

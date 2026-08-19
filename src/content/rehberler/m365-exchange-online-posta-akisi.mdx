@@ -1,0 +1,163 @@
+---
+baslik: "Exchange Online posta akışı: mesaj nereye gitti, neden gitmedi"
+ozet: "Bir e-posta ulaşmadığında suçlanacak beş yer var. Mesaj izlemeyi doğru okumak, hangisi olduğunu birkaç dakikada söyler."
+konu: "m365"
+etiketler: ["m365", "exchange", "eposta", "tanilama"]
+yayin: 2026-08-12
+sure: 12
+---
+
+Bir müşteri "faturalar gelmiyor" diye bildirdi. Gönderen sistem, gönderdiğini söylüyordu. Alıcı, gelen kutusunda hiçbir şey görmüyordu. Karantinaya bakıldı, boştu.
+
+Mesaj izleme raporunda durum `Delivered` yazıyordu — ama teslim edilen yer, kullanıcının yıllar önce kurduğu bir gelen kutusu kuralı yüzünden nadiren baktığı bir klasördü. Mesaj hiç kaybolmamıştı.
+
+Posta akışı sorunlarında zaman kaybı neredeyse her zaman yanlış yerde aramaktan gelir. Doğru sıra, mesajın nerede durduğunu **önce** kesinleştirmektir.
+
+## Mesaj izleme: ilk ve en önemli adım
+
+```powershell
+Connect-ExchangeOnline
+
+# Son 10 günün özeti
+Get-MessageTrace -SenderAddress fatura@tedarikci.com `
+  -RecipientAddress muhasebe@sirket.com `
+  -StartDate (Get-Date).AddDays(-7) -EndDate (Get-Date) |
+  Select-Object Received, SenderAddress, RecipientAddress, Subject, Status
+
+# Tek bir mesajın ayrıntılı yolculuğu
+Get-MessageTraceDetail -MessageTraceId <kimlik> -RecipientAddress muhasebe@sirket.com |
+  Select-Object Date, Event, Action, Detail
+```
+
+`Status` alanı aramayı doğrudan daraltır:
+
+| Durum | Anlamı | Nereye bakılır |
+| --- | --- | --- |
+| `Delivered` | Posta kutusuna bırakıldı | Gelen kutusu kuralları, odaklanmış gelen kutusu, arşiv |
+| `Quarantined` | Karantinada | Karantina politikası, iletim raporu |
+| `FilteredAsSpam` | Önemsiz olarak işaretlendi | Spam eşiği, gönderen itibarı |
+| `Failed` | Reddedildi | Ayrıntıdaki hata kodu |
+| `Pending` | Kuyrukta | Alıcı sunucu yanıt vermiyor |
+| `Expanded` | Dağıtım grubuna açıldı | Üyeleri ayrı ayrı izleyin |
+| Kayıt yok | Hizmete hiç ulaşmadı | Gönderen taraf, DNS, bağlayıcı |
+
+Son satır önemlidir: **kayıt yoksa mesaj Exchange Online'a hiç gelmemiştir.** Bu durumda Microsoft tarafında aramanın anlamı yoktur; sorun gönderende, DNS'te ya da araya giren bir ağ geçidindedir.
+
+On günden eskisi için genişletilmiş izleme gerekir:
+
+```powershell
+Start-HistoricalSearch -ReportTitle "Fatura arastirmasi" `
+  -StartDate 2026-07-01 -EndDate 2026-07-31 `
+  -ReportType MessageTrace -SenderAddress fatura@tedarikci.com `
+  -NotifyAddress yonetici@sirket.com
+```
+
+Bu iş asenkron çalışır ve sonuç e-posta ile gelir; büyük aralıklarda saatler sürebilir.
+
+## Teslim edilmiş ama görünmüyorsa
+
+`Delivered` durumunda mesaj posta kutusundadır. Beş yerden birindedir:
+
+**Gelen kutusu kuralı taşımıştır.** En yaygın neden. Kullanıcının unuttuğu bir kural, mesajı bir alt klasöre ya da doğrudan silinmiş öğelere gönderir.
+
+```powershell
+Get-InboxRule -Mailbox muhasebe@sirket.com |
+  Select-Object Name, Enabled, Priority, Description
+```
+
+`Description` alanı kuralın ne yaptığını okunur biçimde verir. Devre dışı görünen ama sunucu tarafında hâlâ çalışan kurallar için `Enabled` sütununa dikkat edin.
+
+**Odaklanmış gelen kutusu ayırmıştır.** Mesaj "Diğer" sekmesindedir. Kullanıcı bu ayrımın farkında değilse kayıp sanır.
+
+**Otomatik arşivleme taşımıştır.** Çevrimiçi arşiv etkinse ve saklama politikası kısa ayarlanmışsa mesaj arşive gitmiş olabilir.
+
+**Odak/kural yerine istemci tarafı kural vardır.** Outlook masaüstünde tanımlı "yalnızca bu bilgisayarda" çalışan kurallar sunucudan görünmez; kullanıcının kendi Outlook'undan bakılması gerekir.
+
+**Farklı bir posta kutusuna teslim edilmiştir.** Alıcı bir dağıtım grubu ya da paylaşılan posta kutusuysa mesaj beklediğiniz yerde olmayabilir.
+
+## Karantina ve filtre
+
+```powershell
+Get-QuarantineMessage -StartReceivedDate (Get-Date).AddDays(-7) `
+  -RecipientAddress muhasebe@sirket.com |
+  Select-Object ReceivedTime, SenderAddress, Subject, QuarantineTypes, PolicyName
+
+# Serbest bırak
+Release-QuarantineMessage -Identity <kimlik> -ReleaseToAll
+```
+
+Bir mesajın neden filtrelendiğini anlamak için başlıklara bakmak gerekir. Anti-spam başlığı puanı ve tetiklenen kuralları taşır:
+
+```
+X-Forefront-Antispam-Report: CIP:203.0.113.5;CTRY:TR;SFV:SPM;SCL:6;...
+X-Microsoft-Antispam: BCL:0;
+Authentication-Results: spf=fail; dkim=none; dmarc=fail action=quarantine
+```
+
+`SCL` (spam güven düzeyi) 5 ve üzeriyse önemsiz sayılmıştır. `SFV:SPM` filtrenin karar verdiğini, `SFV:SKS` bir kuralın atladığını gösterir. Ama asıl bakılacak satır `Authentication-Results`'tır: `spf=fail` ve `dmarc=fail` görüyorsanız sorun filtrede değil, gönderenin kimlik doğrulama kayıtlarındadır.
+
+Başlıkları çözümlemek için [e-posta başlığı çözümleyici](/araclar/eposta-basligi) aracını, kayıtları üretmek için [e-posta güvenlik kayıtları](/araclar/eposta-guvenlik-kayitlari) aracını kullanabilirsiniz.
+
+## Kimlik doğrulama zinciri
+
+Giden postanız reddediliyorsa üç kayıt sırayla denetlenir:
+
+**SPF** gönderen IP'sinin adınıza posta göndermeye yetkili olduğunu söyler. Exchange Online için `include:spf.protection.outlook.com` gerekir. On DNS sorgusu sınırına dikkat: çok sayıda `include` kullanan kayıtlar sessizce `permerror` verir.
+
+**DKIM** mesajı imzalar. Exchange Online'da özel etki alanları için **elle etkinleştirilmesi** gerekir; öntanımlı olarak yalnızca `onmicrosoft.com` etki alanı imzalanır.
+
+```powershell
+Get-DkimSigningConfig | Select-Object Domain, Enabled, Status
+New-DkimSigningConfig -DomainName sirket.com -Enabled $true
+```
+
+İki CNAME kaydı yayımlanmadan bu komut hata verir; sıralama önce DNS, sonra etkinleştirmedir.
+
+**DMARC** ikisinin sonucunu bir politikaya bağlar. `p=none` ile başlayıp raporları okuyun; hazır olmadan `p=reject` yayımlamak kendi postanızı engellemenin en hızlı yoludur.
+
+## Bağlayıcılar: en çok yanlış kurulan yer
+
+Bağlayıcılar (connector) posta akışının yönünü değiştirir ve yanlış kurulduklarında sorunlar aylar sonra ortaya çıkar.
+
+```powershell
+Get-OutboundConnector | Select-Object Name, Enabled, ConnectorType, RecipientDomains, SmartHosts
+Get-InboundConnector  | Select-Object Name, Enabled, ConnectorType, SenderDomains, SenderIPAddresses
+```
+
+Üç yaygın hata:
+
+**Aşırı geniş gelen bağlayıcı.** `SenderIPAddresses` alanına geniş bir blok yazılmışsa, o bloktan gelen herkes sizin adınıza içeriye posta gönderebilir ve filtreleri atlar.
+
+**Test için açılmış ve unutulmuş bağlayıcı.** Bir göç sırasında kurulan bağlayıcı, göç bitince kaldırılmalıdır. Kalırsa alternatif ve denetlenmeyen bir posta yolu bırakır.
+
+**Yerel bir aygıtın kimliksiz aktarımı.** Yazıcılar ve uygulamalar için kurulan aktarım bağlayıcıları, IP tabanlı olduğu için ele geçirilen bir iç makine spam gönderebilir. Mümkünse kimlik doğrulamalı gönderim kullanın.
+
+## Kuyrukta bekleyen giden posta
+
+Alıcı taraf yanıt vermiyorsa mesaj kuyrukta bekler ve 24–48 saat sonra geri döner. Bu durumda gönderene giden bildirim çoğu zaman ilk uyarıdır — ama gecikmelidir.
+
+Toplu gönderim yapan sistemlerde önemli bir sınır vardır: Exchange Online kullanıcı başına saatlik ve günlük alıcı sınırları uygular. Bir uygulama binlerce fatura gönderiyorsa bu sınıra takılır ve mesajlar sessizce reddedilir.
+
+```powershell
+Get-Mailbox uygulama@sirket.com | Select-Object RecipientLimits
+```
+
+Toplu gönderim için ayrı bir yol kullanmak — özel bir gönderim hizmeti ya da yüksek hacim bağlayıcısı — hem sınırı hem itibar riskini çözer. Kurumsal postanızla toplu postanızı aynı etki alanından göndermek, birinin itibar sorununun diğerini de etkilemesi demektir.
+
+## Bilgilendirme ve saklama
+
+Bir olay araştırmasında mesaj içeriğine erişmek gerekebilir. Bunun için mesaj izleme yetmez; içerik araması gerekir ve bu ayrı bir yetki ister. Yetkilendirmenin kendisi de denetlenmelidir: kimin hangi posta kutusunda arama yaptığı bir kayıt bırakmalıdır.
+
+```powershell
+Search-UnifiedAuditLog -StartDate (Get-Date).AddDays(-30) -EndDate (Get-Date) `
+  -Operations SearchQueryInitiatedExchange |
+  Select-Object CreationDate, UserIds, Operations
+```
+
+Birleşik denetim günlüğünün açık olduğundan emin olun — kapalıysa geçmişe dönük kayıt üretilemez ve bir olay incelemesinde eliniz boş kalır.
+
+## Kısa liste
+
+Şikâyet geldiğinde sıra: mesaj izlemede kayıt var mı, durumu ne, `Delivered` ise gelen kutusu kuralları ne diyor, karantinada mı, kimlik doğrulama sonuçları ne. Bu beş adım vakaların büyük çoğunluğunu kapatır.
+
+Kurulum tarafında ise üç şeyi bir kez doğru yapın: DKIM'i özel etki alanları için etkinleştirin, bağlayıcı listesini yılda bir gözden geçirip kullanılmayanları kaldırın, ve toplu gönderimi kurumsal postadan ayırın.

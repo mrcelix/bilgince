@@ -1,0 +1,149 @@
+---
+baslik: "SharePoint ve OneDrive'da paylaşım: içeriye kapalı, dışarıya açık dosyalar"
+ozet: "Aşırı paylaşım fark edilmez çünkü kimse şikâyet etmez. Bağlantı türlerini ve kimin neyi görebildiğini denetlemek, bir gün gerekeceği için değil, şimdi gerektiği için yapılır."
+konu: "m365"
+etiketler: ["m365", "sharepoint", "guvenlik", "yonetisim"]
+yayin: 2026-08-13
+sure: 12
+---
+
+Bir kurumda üç yıllık bir SharePoint sitesi vardı. İçinde ücret tabloları, sözleşmeler ve kişisel veri içeren dosyalar duruyordu. Erişim listesi "İK ekibi" olarak ayarlanmıştı.
+
+Bir denetimde şu görüldü: sitedeki 400 dosyanın 90'ı, "bağlantıya sahip herkes" biçiminde paylaşılmıştı. Bu bağlantılar yıllar içinde e-postalarda, sohbet mesajlarında ve iki dış tedarikçinin sistemlerinde dolaşmıştı. Erişim listesi doğruydu; yanında duran bağlantılar onu geçersiz kılıyordu.
+
+Aşırı paylaşımın en sinsi yanı budur: hiçbir kullanıcı şikâyet etmez, hiçbir hata üretmez, hiçbir alarm çalmaz.
+
+## Üç bağlantı türü, üç ayrı risk
+
+SharePoint ve OneDrive'da bir dosya paylaşıldığında oluşan bağlantı üç türden biridir:
+
+**"Bağlantıya sahip herkes" (anonim).** Kimlik doğrulaması yoktur. Bağlantı nereye giderse erişim de oraya gider. E-posta iletildiğinde, ekran görüntüsü alındığında, bir sohbet arşivi dışa aktarıldığında yayılır. İzlenemez: erişen kişi kayıtlarda görünmez.
+
+**"Kuruluşunuzdaki kişiler".** Kimlik doğrulaması vardır ama kapsam tüm kurumdur. İç bir dosya için makul, ücret tablosu için değil.
+
+**"Belirli kişiler".** Yalnızca adı yazılan kişiler erişir; dış kullanıcılar için tek seferlik kod ile doğrulanır. Varsayılan bu olmalıdır.
+
+Öntanımlı türü kiracı düzeyinde değiştirin:
+
+```powershell
+Connect-SPOService -Url https://sirket-admin.sharepoint.com
+
+Set-SPOTenant -DefaultSharingLinkType Direct `
+              -DefaultLinkPermission View `
+              -RequireAnonymousLinksExpireInDays 14 `
+              -FileAnonymousLinkType View `
+              -FolderAnonymousLinkType View
+```
+
+`DefaultSharingLinkType Direct` "belirli kişiler" demektir. `DefaultLinkPermission View`, paylaşımın öntanımlı olarak salt okunur olmasını sağlar — kullanıcılar düzenleme gerektiğinde bunu bilinçli olarak seçer.
+
+`RequireAnonymousLinksExpireInDays` en değerli ayardır: anonim bağlantıları geçmişte bırakır. 14 gün, çoğu iş akışı için yeterli ve unutulmuş bağlantıların ömrünü sınırlar.
+
+## Kiracı ayarı ile site ayarı ayrıdır
+
+Sık yapılan bir hata: kiracı düzeyinde dış paylaşımı kısıtlayıp iş bitti sanmak. Site düzeyindeki ayar daha kısıtlayıcı olabilir ama daha gevşek olamaz — yani kiracı tavanı belirler, siteler kendi altında kalır.
+
+```powershell
+# Kiracı tavanı
+Get-SPOTenant | Select-Object SharingCapability, DefaultSharingLinkType,
+    RequireAnonymousLinksExpireInDays, SharingDomainRestrictionMode
+
+# Site bazında gerçek durum
+Get-SPOSite -Limit All |
+  Select-Object Url, SharingCapability, DisableCompanyWideSharingLinks |
+  Where-Object SharingCapability -ne 'Disabled' |
+  Sort-Object SharingCapability
+```
+
+Hassas içerik barındıran siteleri tek tek sıkılaştırın:
+
+```powershell
+Set-SPOSite -Identity https://sirket.sharepoint.com/sites/ik `
+            -SharingCapability Disabled `
+            -DisableCompanyWideSharingLinks Disabled
+```
+
+## Dış paylaşımı etki alanına bağlayın
+
+Dış paylaşım tümüyle kapatılamıyorsa — çoğu kurumda kapatılamaz — en azından kiminle olacağını sınırlayın:
+
+```powershell
+Set-SPOTenant -SharingDomainRestrictionMode AllowList `
+              -SharingAllowedDomainList "tedarikci.com musavir.com.tr"
+```
+
+Bu, "yanlış adrese paylaştım" hatalarının çoğunu baştan keser. İzin listesini yılda bir gözden geçirmek gerekir; biten iş ilişkileri listede kalmamalı.
+
+Kimlik tarafında da bir eşleşme gerekir: dış kullanıcılar Entra ID'de konuk hesap olarak görünür ve onlara da koşullu erişim uygulanabilir. Konuk hesaplarının çok etkenli doğrulama kapsamına alınması, dış paylaşımın en zayıf halkasını kapatır; [MFA zorlama](/rehberler/entra-id-mfa-zorlama) rehberi bu tarafa bakıyor.
+
+## Mevcut durumu görmek
+
+Ayarları düzeltmek gelecek paylaşımları etkiler; geçmiştekiler durmaya devam eder. Envanteri çıkarmak gerekir.
+
+Yönetim merkezindeki raporlar ilk bakış için yeterlidir, ama dosya düzeyinde ayrıntı için içerik araması ya da Graph API gerekir. Pratik bir başlangıç:
+
+```powershell
+# Konuk kullanıcılar ve ne zamandır varlar
+Get-MgUser -Filter "userType eq 'Guest'" -All `
+  -Property DisplayName,Mail,CreatedDateTime,SignInActivity |
+  Select-Object DisplayName, Mail, CreatedDateTime,
+    @{n='SonGiris';e={$_.SignInActivity.LastSignInDateTime}} |
+  Sort-Object SonGiris
+```
+
+Hiç oturum açmamış ya da bir yıldır görünmeyen konuk hesapları, ilk temizlenecek gruptur. Her biri, bir zamanlar paylaşılmış içeriğe hâlâ erişebilen bir kimliktir.
+
+Kim neyi paylaşmış sorusunun kaydı denetim günlüğündedir:
+
+```powershell
+Search-UnifiedAuditLog -StartDate (Get-Date).AddDays(-30) -EndDate (Get-Date) `
+  -Operations AnonymousLinkCreated,SharingInvitationCreated,AddedToSecureLink `
+  -ResultSize 5000 |
+  Select-Object CreationDate, UserIds, Operations, ObjectId
+```
+
+`AnonymousLinkCreated` kayıtları, öncelik verilecek listedir.
+
+## Duyarlılık etiketleri: kalıcı olan koruma
+
+Paylaşım ayarları konuma bağlıdır; dosya siteden çıktığında geride kalır. Duyarlılık etiketi ise dosyanın kendisine yazılır ve onunla birlikte gider.
+
+Etiket üç şey yapabilir: şifreleme uygular (yalnızca yetkili kimlikler açar), görsel işaret ekler (üstbilgi, filigran), ve kapsayıcı düzeyinde ayar dayatır (etiketli bir siteye dış paylaşım kapatılır).
+
+Pratik bir başlangıç seti dörtten fazla olmamalı: `Genel`, `Kurum İçi`, `Gizli`, `Çok Gizli`. Daha fazlası kullanıcıyı yorar ve yanlış etiketleme oranını artırır.
+
+Etiketleri uygularken sıralama önemlidir:
+
+1. Etiketleri tanımlayın ama **hiçbir şey zorunlu kılmayın**; kullanıcılar isterse uygular.
+2. Otomatik etiketlemeyi **simülasyon kipinde** çalıştırın, hangi dosyaların hangi etiketi alacağını görün.
+3. Yanlış eşleşmeleri düzelttikten sonra otomatik etiketlemeyi açın.
+4. En son varsayılan etiketi ve zorunluluğu getirin.
+
+İkinci adımı atlayıp doğrudan şifreleme uygulayan bir politika, bir gecede binlerce dosyayı erişilemez hâle getirebilir — ve geri almak, uygulamaktan çok daha zordur.
+
+## Copilot bu tabloyu değiştirir
+
+Bir noktayı ayrıca belirtmek gerekir: Microsoft 365 Copilot, kullanıcının **erişebildiği** her şeyi arayabilir. Daha önce pratikte gizli kalan bir dosya — kimsenin adını bilmediği, hiçbir aramada çıkmayan — artık doğal dille sorulduğunda ortaya çıkar.
+
+Yani aşırı paylaşım, Copilot öncesinde teorik bir risktı; sonrasında günlük bir olaydır. Copilot yayılımı öncesinde paylaşım temizliği yapmak isteğe bağlı bir adım değildir; ayrıntısı [Copilot öncesi veri hijyeni](/rehberler/copilot-m365-yayilim-oncesi-veri-hijyeni) rehberinde.
+
+## Yaşam döngüsü: siteler de biter
+
+Paylaşım temizliğinin kalıcı olması için sitelerin bir ömrü olmalı. Sahipsiz kalan bir site, kimsenin gözden geçirmediği bir erişim listesidir.
+
+```powershell
+# Sahibi olmayan gruplar — sahipsiz siteler buradan çıkar
+Get-MgGroup -Filter "groupTypes/any(c:c eq 'Unified')" -All |
+  ForEach-Object {
+    $sahipler = Get-MgGroupOwner -GroupId $_.Id
+    if (-not $sahipler) { $_ | Select-Object DisplayName, Id, CreatedDateTime }
+  }
+```
+
+Grup süre sonu politikası, sahiplerden düzenli onay ister; onay gelmezse site arşivlenir. Bu, "her şeyi sonsuza kadar sakla" alışkanlığını kırar ve envanteri kendiliğinden küçültür.
+
+## Kısa liste
+
+Öntanımlı bağlantıyı "belirli kişiler" ve salt okunur yapın. Anonim bağlantılara süre sonu koyun. Dış paylaşımı etki alanı listesine bağlayın. Hassas siteleri site düzeyinde ayrıca kapatın. Konuk hesaplarını yılda iki kez gözden geçirin. Duyarlılık etiketlerini simülasyonla başlatın.
+
+Bu altı adım tamamlandığında paylaşım hâlâ kolaydır — ama artık iz bırakır, süresi vardır ve kime gittiği bilinir.

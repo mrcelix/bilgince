@@ -1,0 +1,88 @@
+---
+baslik: "BT ekibinde Claude: nerede zaman kazandırır, nerede kaybettirir"
+ozet: "Uzun günlükleri okumak, yapılandırma çevirmek ve taslak yazmak gibi işlerde belirgin kazanç var. Doğrulanamayan çıktıya güvenmek ise en pahalı hata."
+konu: "claude"
+etiketler: ["claude", "otomasyon", "powershell", "itsm"]
+yayin: 2026-08-19
+sure: 11
+---
+
+Bir olay incelemesinde 40 megabaytlık günlükten bir zaman çizelgesi çıkarmak gerekiyordu. Bir yönetici günlüğü modele verip "olayları sırala" dedi ve düzgün görünen bir çizelge aldı. Rapor yazıldı, olay kapandı.
+
+İki hafta sonra aynı sorun tekrarladı. Bu kez ham günlüğe bakıldığında, ilk çizelgede iki olayın sırasının ters olduğu görüldü — ve o sıra, hangisinin diğerini tetiklediği konusunda yanlış bir sonuca götürmüştü.
+
+Sorun aracın kullanılması değildi; **çıktının doğrulanmamasıydı.** Bu ayrım, BT işlerinde bir dil modelinden gerçekten fayda görmenin tamamıdır.
+
+## Kazandırdığı yerler
+
+**Uzun metinden yapı çıkarmak.** Yüzlerce satırlık bir yapılandırma dosyası, bir denetim raporu ya da bir sağlayıcı belgesi verip "hangi ayarlar öntanımlıdan farklı" diye sormak, elle taramaktan hızlıdır. Kaynak elinizde olduğu için doğrulaması da kolaydır.
+
+**Bir biçimden diğerine çevirmek.** Bash betiğini PowerShell'e, `iptables` kurallarını bulut güvenlik grubuna, JSON örneğini şemaya. Çeviri mekaniktir ve sonucu sınayabilirsiniz.
+
+**Taslak yazmak.** Olay sonrası rapor, değişiklik talebi, kullanıcıya gönderilecek bilgilendirme, yordam ilk sürümü. Boş sayfadan başlamak, düzeltmekten yavaştır.
+
+**Hata mesajını açmak.** Tanımadığınız bir bileşenin verdiği hatayı, olası nedenlerine ayırmak. Arama motorundan farkı, sizin bağlamınızı — hangi sürüm, hangi ortam — dikkate alabilmesidir.
+
+**Kod ve yapılandırma gözden geçirmek.** "Bu betikte hangi durumda veri kaybı olur" sorusu, ikinci bir göz işlevi görür. Bulduklarını doğrulamak yine size düşer ama gözden kaçanı hatırlatması değerlidir.
+
+## Kaybettirdiği yerler
+
+**Doğrulanamayan olgu soruları.** "Bu ürünün şu sürümünde şu ayar var mı" gibi sorularda yanlış ama kesin görünen yanıtlar gelebilir. Belgeye bakmadan bir komutu üretime uygulamayın.
+
+**Sayısal analizin sessizce kayması.** Uzun bir listeden toplam çıkarmak, olayları sıraya dizmek, yüzde hesaplamak — bunlar doğru görünüp yanlış olabilecek işlerdir. Baştaki hikâye budur. Sayı gerektiren işlerde modele **kodu yazdırın**, sonucu kendisi hesaplamasın; kodu çalıştırmak hem doğrulanabilir hem tekrarlanabilirdir.
+
+**"Neredeyse doğru" komutlar.** Üretilen bir komut çoğu zaman çalışır ama bayrağı biraz farklıdır. `Remove-Item -Recurse -Force` gibi bir satırda "biraz farklı" geri dönülemez olabilir. Yıkıcı komutları önce `-WhatIf` ile çalıştırın; [WhatIf ve Confirm ile güvenli otomasyon](/rehberler/ps-whatif-confirm-guvenli-otomasyon) rehberi bu alışkanlığı anlatıyor.
+
+**Kurumunuza özgü bağlamın varsayılması.** Model sizin ağ topolojinizi, adlandırma standardınızı ya da neden o tuhaf istisnayı koyduğunuzu bilmez. Genel doğruyu söyler; sizin ortamınızda geçerli olup olmadığı ayrı bir sorudur.
+
+## Doğrulanabilirlik ölçütü
+
+Pratik bir kural: **çıktıyı, üretmesi kadar hızlı doğrulayabiliyor musunuz?**
+
+Doğrulaması kolay olanlar: çevrilmiş bir yapılandırma (sınayın), yazılmış bir betik (kuru çalıştırın), özetlenmiş bir belge (kaynağa bakın), üretilmiş bir düzenli ifade (örneklerle deneyin).
+
+Doğrulaması zor olanlar: uzun bir günlükten çıkarılmış "bulgular", bir listenin tamamının okunduğu iddiası, bir sistemin durumu hakkında yapılan çıkarım.
+
+İkinci gruptaki işleri yaptırırken çıktıyı bir yanıt değil, **bir hipotez** olarak alın. "Şu üç şeye bakmam gerekiyor" listesi değerlidir; "sorun şuydu" cümlesi doğrulanmadan kullanılamaz.
+
+## Veriye dikkat
+
+BT işlerinde model kullanmanın en somut riski, oraya ne yapıştırdığınızdır. Günlükler, yapılandırma dosyaları ve hata çıktıları düşünülenden çok bilgi taşır: iç IP adresleri, kullanıcı adları, sunucu adları, bağlantı dizeleri, bazen belirteçler.
+
+Üç pratik önlem:
+
+**Sırları temizleyin.** Bağlantı dizesi, API anahtarı ve parola içeren satırları yapıştırmadan önce ayıklayın. Bir kez sızan sır, döndürülene kadar geçerlidir.
+
+**Kurumsal aboneliği kullanın.** Kişisel hesap ile kurumsal plan arasında, verinin nasıl işlendiği ve saklandığı açısından fark vardır. Hangi planı kullandığınızı bilmek, ne yapıştırabileceğinizi de belirler.
+
+**Kişisel veri için politika belirleyin.** Müşteri verisi ya da çalışan verisi içeren metinleri işlemek, veri koruma mevzuatı kapsamına girer. Bu, teknik bir karar değil hukuki bir karardır ve BT'nin işi, kararın var olmasını sağlamaktır.
+
+Aynı mantık Microsoft Copilot tarafında da geçerli; oradaki fark, verinin zaten kurum kiracınızda olması ve asıl riskin aşırı paylaşım olmasıdır — [Copilot öncesi veri hijyeni](/rehberler/copilot-m365-yayilim-oncesi-veri-hijyeni) rehberi o tarafa bakıyor.
+
+## Bağlam vermek çıktıyı belirler
+
+Aynı soruyu iki farklı biçimde sormak, kullanılabilirlik açısından çok farklı sonuçlar verir.
+
+Zayıf: "PowerShell'de kullanıcıları listele."
+
+Güçlü: "Windows Server 2022'de, Active Directory modülüyle, 90 günden fazla oturum açmamış ve devre dışı olmayan kullanıcıları listeleyen bir betik yaz. Sonucu CSV'ye yaz, UTF-8 kullan. Salt okunur olsun — hiçbir değişiklik yapmasın."
+
+İkincisinde ortam, kısıt ve güvenlik gereksinimi yazılıdır. "Salt okunur olsun" gibi bir sınır koymak, üretilen betiğin yıkıcı bir işlem içermemesini sağlar ve gözden geçirmeyi kolaylaştırır.
+
+Uzun bir görevde bir başka teknik işe yarar: **önce plan isteyin, sonra uygulama.** "Bu göçü hangi adımlarla yaparsın, her adımda ne yanlış gidebilir?" sorusu, doğrudan betik istemekten daha iyi bir sonuca götürür — çünkü planı okuyup düzeltebilirsiniz, uzun bir betiği okumak ise daha yorucudur.
+
+## Ekipte nasıl kurulur
+
+Bireysel kullanımdan ekip kullanımına geçerken üç şey işe yarar:
+
+**Paylaşılan istem havuzu.** İşe yarayan istemleri bir yerde toplayın: olay raporu taslağı, günlük özeti, yapılandırma çevirisi. Herkesin sıfırdan denemesi gereksiz tekrardır.
+
+**Ne için kullanılmayacağını yazın.** Kısa bir liste yeterlidir: müşteri verisi yapıştırılmaz, üretim komutu doğrulanmadan çalıştırılmaz, sayısal analiz kod olmadan kabul edilmez.
+
+**Kazancı ölçün, ama abartmayın.** Haftada birkaç saat kazanmak gerçekçi ve savunulabilir bir sonuçtur. Bunu ölçmek, bir sonraki araç kararını da kolaylaştırır; ölçüm yaklaşımı için [Copilot lisansı ve değer ölçümü](/rehberler/copilot-lisans-ve-deger-olcumu) rehberindeki yöntem burada da işler.
+
+## Özet
+
+Kazanç, doğrulaması ucuz işlerde toplanıyor: çeviri, taslak, özet, ilk sürüm. Risk, doğrulaması pahalı işlerde: uzun veriden çıkarım, sayısal analiz, ortama özgü kararlar.
+
+Bu ayrımı bilen bir ekip, aracı günde birkaç kez kullanır ve hiç sürpriz yaşamaz. Bilmeyen bir ekip ya hiç kullanmaz ya da bir gün, düzgün görünen bir çizelgeye dayanarak yanlış bir rapor yazar.

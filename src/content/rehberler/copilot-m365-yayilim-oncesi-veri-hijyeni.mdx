@@ -1,0 +1,110 @@
+---
+baslik: "Copilot'tan önce veri hijyeni: aşırı paylaşımı görünür kılan asistan"
+ozet: "Copilot yeni bir erişim açmaz; kullanıcının zaten erişebildiğini bulunabilir kılar. Aradaki fark, yıllardır fark edilmeyen paylaşım hatalarının bir haftada ortaya çıkması demektir."
+konu: "copilot"
+etiketler: ["copilot", "m365", "guvenlik", "yonetisim"]
+yayin: 2026-08-17
+sure: 11
+---
+
+Bir kurumda Copilot pilotu başladıktan üç gün sonra bir çalışan, "yıl sonu zam listesi" hakkında soru sordu ve yanıt geldi. Kaynak, iki yıl önce bir İK çalışanının "kuruluşunuzdaki kişiler" bağlantısıyla paylaştığı bir çalışma sayfasıydı.
+
+Kimse kural çiğnememişti. Dosya iki yıldır oradaydı ve teknik olarak herkes erişebiliyordu. Değişen tek şey, artık bulunabilir olmasıydı.
+
+Bu, Copilot yayılımlarında en sık yaşanan olaydır ve teknik bir arıza değildir. Copilot, kullanıcının **zaten sahip olduğu** erişimle çalışır. Yeni bir kapı açmaz; var olan kapıların önündeki perdeyi kaldırır.
+
+## "Güvenlik belirsizlikle sağlanıyordu"
+
+Copilot öncesinde aşırı paylaşım pratikte zararsız görünürdü, çünkü bir dosyayı bulmak için adını, konumunu ya da bağlantısını bilmek gerekiyordu. Arama sonuçları da genelde kullanıcının kendi çalışma alanına odaklıydı.
+
+Copilot doğal dille sorar ve anlamsal olarak eşleşen her şeyi getirir. "Şirketin gelecek yıl bütçe hedefleri neler?" sorusu, adı "Taslak-v7-son.xlsx" olan bir dosyayı bulur.
+
+Yani risk yeni değildir; **görünürlüğü** yenidir. Ve bu, aslında iyi bir haberdir: uzun süredir var olan bir sorunu artık ölçebilirsiniz.
+
+## Yayılımdan önce yapılacak dört iş
+
+### 1. Aşırı paylaşımı ölçün
+
+Önce büyüklüğü öğrenin. Yönetim merkezindeki paylaşım raporları başlangıç için yeterlidir; ayrıntı için denetim günlüğüne bakın:
+
+```powershell
+Connect-ExchangeOnline
+Search-UnifiedAuditLog -StartDate (Get-Date).AddDays(-180) -EndDate (Get-Date) `
+  -Operations AnonymousLinkCreated,SecureLinkCreated,SharingSet `
+  -ResultSize 5000 |
+  Group-Object -Property Operations |
+  Select-Object Name, Count
+```
+
+Asıl bakılacak iki sayı: kaç dosya "kuruluşunuzdaki herkes" ile paylaşılmış ve kaç anonim bağlantı yaşıyor. İkincisi Copilot'ı doğrudan ilgilendirmez (Copilot kullanıcının kimliğiyle çalışır) ama aynı temizliğin parçasıdır.
+
+Paylaşım ayarlarının nasıl sıkılaştırılacağı [SharePoint ve OneDrive'da paylaşım](/rehberler/m365-paylasim-ve-disari-erisim) rehberinde.
+
+### 2. Herkese açık grupları ve siteleri gözden geçirin
+
+En büyük kaynak, "kuruluş genelinde erişilebilir" olarak kurulmuş siteler ve genel (public) Microsoft 365 gruplarıdır. Bunlar genelde iyi niyetle açılır ve içeriği zamanla değişir.
+
+```powershell
+Connect-MgGraph -Scopes "Group.Read.All","Sites.Read.All"
+
+# Genel gruplar — içerikleri kurumdaki herkese açık
+Get-MgGroup -Filter "groupTypes/any(c:c eq 'Unified')" -All `
+  -Property DisplayName,Visibility,CreatedDateTime |
+  Where-Object Visibility -eq 'Public' |
+  Select-Object DisplayName, CreatedDateTime |
+  Sort-Object CreatedDateTime
+```
+
+Her genel grup için tek soru: içindeki en hassas belge kurumdaki herkes tarafından görülebilir mi? Yanıt hayırsa grup özel yapılmalıdır.
+
+Bir de "Herkes hariç dış kullanıcılar" adlı yerleşik güvenlik grubuna dikkat edin: bir siteye bu grup eklenmişse site fiilen kurum geneline açıktır ve bu, izin listesinde tek satır olarak görünür.
+
+### 3. Duyarlılık etiketlerini uygulayın
+
+Etiketler Copilot açısından iki iş yapar: şifreli bir dosya, kullanım hakları yoksa Copilot tarafından okunamaz; ve Copilot'ın ürettiği yanıt, kaynak dosyaların en kısıtlayıcı etiketini devralır.
+
+İkincisi önemlidir: gizli bir kaynaktan üretilen özet de gizli olarak etiketlenir, yani koruma çıktıya taşınır.
+
+Etiketleme sırasını yavaş kurun — önce isteğe bağlı, sonra simülasyon, en son zorunlu. Doğrudan şifrelemeye geçen bir politika binlerce dosyayı bir gecede erişilemez kılabilir.
+
+### 4. Sahipsiz ve atıl içeriği temizleyin
+
+Sahipsiz bir site, kimsenin gözden geçirmediği bir erişim listesidir. Copilot bu sitelerdeki içeriği de indeksler.
+
+Grup süre sonu politikası bu temizliği kendiliğinden yapar; ayrıntısı [Teams yayılması ve yaşam döngüsü](/rehberler/m365-teams-yayilimi-ve-yasam-dongusu) rehberinde.
+
+## Yayılım sırasında kısıtlama araçları
+
+Temizlik tamamlanana kadar kapsamı daraltmak mümkündür.
+
+**Kısıtlı SharePoint arama.** Copilot'ın erişebileceği siteleri bir izin listesine indirger. Kullanıcının kendi OneDrive'ı ve doğrudan üyesi olduğu siteler kapsam dışında kalır. Bu, geniş bir temizlik yapılana kadar makul bir geçici önlemdir — ama geçici olduğunu unutmayın; kalıcı bir çözüm gibi bırakılırsa Copilot'ın değeri de düşer.
+
+**Pilot grubu dar tutmak.** İlk grubu, verisi zaten düzenli olan bir ekipten seçin. BT ya da güvenlik ekibi genelde iyi bir başlangıçtır: hem sorunları tanır hem bulguları doğru raporlar.
+
+**Duyarlılık etiketiyle sınırlama.** Belirli etiketleri taşıyan içeriğin Copilot tarafından kullanılmasını engelleyebilirsiniz.
+
+## Kullanıcıya ne anlatmalı
+
+Teknik hazırlık kadar önemli olan, beklentiyi doğru kurmaktır. Üç mesaj:
+
+**"Copilot yeni erişim vermez."** Kullanıcı, kendisinin erişemediği bir şeyi Copilot üzerinden göremez. Bu, en sık sorulan soruya verilecek net yanıttır.
+
+**"Beklenmedik bir şey görürseniz bildirin."** Kullanıcılar aşırı paylaşımın en iyi sensörüdür. Bildirim için basit bir yol açın ve bildirenin sorun çıkarmadığını açıkça söyleyin.
+
+**"Çıktıyı doğrulayın."** Copilot özet üretir ve özetler yanlış olabilir. Karar verilecek bir konuda kaynağa gitmek gerekir. Yanıtların kaynak göstermesi bunu kolaylaştırır — ekiplere kaynak bağlantılarına tıklamayı öğretin.
+
+## Yayılım sonrası izleme
+
+İlk ay boyunca üç şeyi izleyin:
+
+**Bildirilen beklenmedik erişimler.** Her biri bir paylaşım hatasıdır ve düzeltilmelidir.
+
+**En çok kaynak gösterilen siteler.** Beklenmedik bir site listenin başındaysa oraya bakın.
+
+**Kullanım oranı.** Lisans alıp kullanmayan kullanıcı, hem maliyet hem de yanlış bir yaygınlık algısı üretir. Lisans dağıtımının ölçülmesi ayrı bir konu; [Copilot lisansı ve değer ölçümü](/rehberler/copilot-lisans-ve-deger-olcumu) rehberinde ele alınıyor.
+
+## Sıralama
+
+Doğru sıra şu: önce ölç, sonra genel grupları kapat, sonra etiketle, sonra dar bir pilotla başla, sonuçlara göre genişlet.
+
+Yanlış sıra ise yaygın olanı: lisansları al, herkese dağıt, sonra çıkan olayları tek tek çöz. Bu yol teknik olarak da işler — ama ilk olayı bir çalışanın ücret tablosu olduğunda, projenin güvenilirliği yayılım hızından çok daha pahalıya mal olur.

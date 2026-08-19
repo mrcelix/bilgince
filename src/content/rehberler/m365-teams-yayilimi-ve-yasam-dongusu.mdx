@@ -1,0 +1,140 @@
+---
+baslik: "Teams yayılması: her ekip bir SharePoint sitesi, her site bir erişim listesi"
+ozet: "Teams'te bir ekip oluşturmak birkaç saniye sürer ve arkasında altı nesne yaratır. Yaşam döngüsü tanımlanmadığında iki yılda binlerce sahipsiz kapsayıcı birikir."
+konu: "m365"
+etiketler: ["m365", "teams", "yonetisim", "itsm"]
+yayin: 2026-08-14
+sure: 11
+---
+
+Bir kurumda 1.900 Teams ekibi vardı ve çalışan sayısı 600'dü. Ekiplerin yarısında son altı ayda hiç mesaj yazılmamıştı. Yüzden fazlasının hiç sahibi yoktu — kuranlar işten ayrılmıştı.
+
+Her biri arkasında bir SharePoint sitesi, bir posta kutusu ve bir Entra ID grubu taşıyordu. Yani 1.900 ayrı erişim listesi, kimsenin gözden geçirmediği 1.900 depolama alanı.
+
+Kimse yanlış bir şey yapmamıştı. Ekip kurmak birkaç saniye sürüyordu ve silmek için bir neden yoktu.
+
+## Bir ekip aslında kaç nesne
+
+Teams'te bir ekip oluşturduğunuzda arkada şunlar yaratılır:
+
+- **Microsoft 365 grubu** — üyelik ve kimliğin merkezi
+- **SharePoint sitesi** — dosyaların gerçekte durduğu yer
+- **Paylaşılan posta kutusu ve takvim**
+- **OneNote defteri**
+- **Planner planı** (istenirse)
+- **Kanal başına bir SharePoint klasörü**; özel kanallar için **ayrı bir site**
+
+Bu yapı, yönetim açısından üç sonuç doğurur. Birincisi: Teams'te silinen bir ekip, arkasındaki siteyi de siler — ve o sitede Teams dışından paylaşılmış dosyalar olabilir. İkincisi: SharePoint tarafında verilen izinler Teams üyeliğinden bağımsızdır, yani ekip üyesi olmayan biri dosyalara erişebilir. Üçüncüsü: özel kanal ayrı bir site olduğu için ayrı bir erişim listesi ve ayrı bir yedekleme kapsamı demektir.
+
+## Kim ekip kurabilir
+
+Öntanımlı olarak herkes kurabilir. Bu, benimsenmeyi hızlandırır — ve yayılmayı da.
+
+İki uç arasında seçim yapmak gerekmez. Orta yol, **kurmayı serbest bırakıp adlandırma ve yaşam döngüsünü zorlamaktır.**
+
+Tam kısıtlama isteniyorsa:
+
+```powershell
+Connect-MgGraph -Scopes "Directory.ReadWrite.All"
+
+# Yalnızca belirli bir güvenlik grubunun üyeleri grup oluşturabilsin
+$ayarlar = Get-MgBetaDirectorySetting | Where-Object DisplayName -eq "Group.Unified"
+($ayarlar.Values | Where-Object Name -eq 'EnableGroupCreation').Value = "false"
+($ayarlar.Values | Where-Object Name -eq 'GroupCreationAllowedGroupId').Value = "<grup-kimligi>"
+Update-MgBetaDirectorySetting -DirectorySettingId $ayarlar.Id -BodyParameter $ayarlar
+```
+
+Kısıtlamanın bedeli, kullanıcıların Teams yerine başka araçlara kaymasıdır. Gölge BT, sahipsiz Teams ekibinden daha kötü bir sonuçtur. Bu yüzden kısıtlama, hızlı bir talep süreciyle birlikte kurulmalı — bir günü geçen onay, kısıtlamayı bir engele dönüştürür.
+
+## Adlandırma politikası
+
+Ad kuralı olmadan envanter okunamaz hâle gelir: "Proje", "Proje Yeni", "Proje Son" gibi adlar birikir.
+
+```powershell
+# Ön ek olarak departman, sonra serbest ad
+($ayarlar.Values | Where-Object Name -eq 'PrefixSuffixNamingRequirement').Value =
+  "[Departman]-[GroupName]"
+# Yasaklı kelimeler
+($ayarlar.Values | Where-Object Name -eq 'CustomBlockedWordsList').Value =
+  "CEO,Yonetim,IK,Bordro"
+```
+
+Yasaklı kelime listesi, taklit ekiplerin önüne geçer: "İK Duyuruları" adlı bir ekip herkesin kurabildiği bir şey olmamalıdır.
+
+Adlandırma politikası Entra ID P1 lisansı gerektirir — envanter yönetimi açısından bu lisansın en somut karşılıklarından biridir.
+
+## Süre sonu politikası: tek gerçek çözüm
+
+Yayılmayı durduran şey kurmayı zorlaştırmak değil, **kullanılmayanın kendiliğinden gitmesidir.**
+
+```powershell
+New-MgGroupLifecyclePolicy -GroupLifetimeInDays 365 `
+  -ManagedGroupTypes "All" `
+  -AlternateNotificationEmails "bt-yonetisim@sirket.com"
+```
+
+Nasıl çalıştığı önemli: süre dolmadan 30, 15 ve 1 gün önce sahiplere yenileme isteği gider. Ekip aktif kullanılıyorsa (mesaj, dosya, toplantı) **kendiliğinden yenilenir** — sahibin bir şey yapması gerekmez. Yalnızca gerçekten atıl ekipler için onay istenir.
+
+Sahibi olmayan gruplarda bildirim `AlternateNotificationEmails` adresine gider; bu adres olmadan sahipsiz ekipler sessizce silinir.
+
+Silinen grup 30 gün geri getirilebilir durumda kalır:
+
+```powershell
+Get-MgDirectoryDeletedItemAsGroup -All |
+  Select-Object DisplayName, DeletedDateTime
+Restore-MgDirectoryDeletedItem -DirectoryObjectId <kimlik>
+```
+
+Politikayı yayına almadan önce mevcut ekipleri gözden geçirin: bir yıllık ömür, iki yıldır dokunulmamış 900 ekibi aynı anda süreye sokar. Aşamalı gitmek — önce iki yıl, sonra bir yıl — bildirim seliini önler.
+
+## Sahipsiz ekipleri bulmak
+
+Süre sonu politikası öncesinde temizlik gerekir:
+
+```powershell
+Get-MgGroup -Filter "groupTypes/any(c:c eq 'Unified')" -All -Property Id,DisplayName,CreatedDateTime |
+  ForEach-Object {
+    $sahipler = Get-MgGroupOwner -GroupId $_.Id -ErrorAction SilentlyContinue
+    [pscustomobject]@{
+      Ad          = $_.DisplayName
+      Kuruldu     = $_.CreatedDateTime
+      SahipSayisi = ($sahipler | Measure-Object).Count
+    }
+  } | Where-Object SahipSayisi -lt 2 | Sort-Object Kuruldu
+```
+
+Eşiği **iki** sahip olarak koyun. Tek sahipli bir ekip, o kişi ayrıldığında sahipsiz kalır — yani sorun ertelenmiş demektir. Her ekipte en az iki sahip olması, envanterin kendiliğinden bakılabilir kalmasını sağlar.
+
+Kullanım verisi için yönetim merkezindeki Teams etkinlik raporları yeterlidir; son etkinlik tarihi altı aydan eskiyse ekip arşiv adayıdır.
+
+## Konuk erişimi
+
+Teams'te konuklar ekibin dosyalarına, sohbetine ve toplantılarına erişir. Bu, dış paylaşımın en geniş biçimidir ve genelde en az denetlenenidir.
+
+İki ayar önemli:
+
+**Konukların ekip oluşturamaması.** Öntanımlı budur, doğrulayın.
+
+**Konuk hesaplarının koşullu erişime dahil olması.** Konuk kimliği de bir kimliktir; MFA ve cihaz koşulları onlara da uygulanmalıdır.
+
+Ayrıca ekip düzeyinde konuk erişimi kapatılabilir. Hassas ekiplerde bunu açıkça kapatın — kiracı genelinde açık olması, her ekipte açık olmasını gerektirmez.
+
+Paylaşım tarafının bütünü için [SharePoint ve OneDrive'da paylaşım](/rehberler/m365-paylasim-ve-disari-erisim) rehberine bakabilirsiniz.
+
+## Saklama ve keşif
+
+Teams sohbetleri Exchange'de gizli klasörlerde tutulur; kanal mesajları grup posta kutusunda, özel sohbetler kullanıcı posta kutusunda. Bu ayrım, saklama politikası yazarken önemlidir: iki ayrı konum, iki ayrı kural.
+
+Saklama politikası yoksa öntanımlı davranış "sonsuza kadar sakla"dır. Bu hem depolama maliyeti hem hukuki risk üretir — istenmeyen bir mesaj beş yıl sonra bir keşif talebinde ortaya çıkabilir.
+
+Ne kadar saklanacağı bir hukuk ve iş kararıdır; BT'nin işi kararı uygulamak ve **kararın olmadığını görünür kılmaktır.**
+
+## Yönetişimin çalışan hâli
+
+Kâğıt üzerinde iyi görünen ama uygulanmayan politikalardan kaçının. Çalışan bir düzen şuna benzer:
+
+Ekip kurmak serbesttir ama ad kuralı zorunludur. Her ekipte en az iki sahip olmalıdır ve bu aylık bir raporla denetlenir. Kullanılmayan ekipler bir yıl sonra sahibine sorulur; yanıt gelmezse arşivlenir. Konuk erişimi hassas ekiplerde kapalıdır. Yılda bir, en büyük yirmi sitenin erişim listesi gözden geçirilir.
+
+Bu beş maddenin hiçbiri kullanıcıyı yavaşlatmaz — ama iki yıl sonra 1.900 değil, kullandığınız kadar ekibiniz olur.
+
+Kullanıcı ayrıldığında ekiplerdeki sahipliğinin devri ayrı bir konu; [işe alım ve ayrılış kontrol listesi](/araclar/kullanici-yasam-dongusu) aracı bu adımı içeriyor.

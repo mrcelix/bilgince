@@ -1,0 +1,94 @@
+---
+baslik: "Kurumsal Mac yönetimi: MDM olmadan kurulan filo geri alınamaz"
+ozet: "Mac'i elle kurup sonra yönetime almak, Windows'taki gibi çalışmaz. Cihazın gözetimli olup olmadığı kutudan çıkmadan belirlenir ve sonradan değiştirilemez."
+konu: "macos"
+etiketler: ["macos", "mdm", "guvenlik", "cihaz-yonetimi"]
+yayin: 2026-08-15
+sure: 11
+---
+
+Bir kurum kırk Mac aldı, BT ekibi hepsini elle kurdu, kullanıcı hesaplarını açtı ve dağıttı. Altı ay sonra bir cihaz yönetim çözümü alındı ve cihazlar kaydedildi.
+
+Ama beklenen denetimlerin çoğu çalışmadı: uygulamalar sessizce yüklenemiyordu, kullanıcı kaydı kaldırabiliyordu, kayıp cihaz uzaktan kilitlenemiyordu. Nedeni tek bir kavramdı: cihazlar **gözetimli (supervised)** değildi.
+
+Windows'ta bir makine her zaman etki alanına sonradan katılabilir. macOS'ta bazı yetenekler yalnızca cihaz doğru yoldan kaydedildiğinde açılır — ve o yol, cihaz ilk kez açılmadan önce başlar.
+
+## Otomatik cihaz kaydı: her şeyin başlangıcı
+
+Apple'ın otomatik cihaz kaydı (Automated Device Enrollment) şöyle çalışır: cihaz satın alındığında seri numarası kurumunuzun Apple Business Manager hesabına bağlanır. Cihaz ilk açıldığında kurulum asistanı Apple sunucularına sorar, cihazın bir kuruma ait olduğunu öğrenir ve MDM sunucunuza yönlendirir.
+
+Bu yoldan kaydedilen cihaz iki özellik kazanır:
+
+**Gözetimli olur.** Uygulama yükleme, ayar kilitleme, etkinleştirme kilidi yönetimi, silme gibi denetimler yalnızca gözetimli cihazlarda tam çalışır.
+
+**Kayıt kaldırılamaz.** Kullanıcı yönetim profilini silemez. Elle kaydedilen bir cihazda kullanıcı istediği an profili kaldırıp yönetimden çıkabilir — ve bunu yaptığında haberiniz bile olmaz.
+
+Kritik nokta şu: **satın alma yolu belirleyicidir.** Cihaz doğrudan Apple'dan ya da yetkili bir kurumsal satıcıdan alınmalı ve satıcı, seri numarasını kurumunuzun hesabına eklemelidir. Perakendeden alınan bir Mac bu listeye giremez.
+
+Elinizde zaten dağıtılmış cihazlar varsa tek yol, cihazı tümüyle silip yeniden kurmaktır. Apple Configurator ile elle gözetimli hâle getirmek mümkündür ama cihazın silinmesini gerektirir — yani kullanıcıya geri dönmek ve makineyi almak demektir. Bu, "önce kur sonra yönet" yaklaşımının gerçek maliyetidir.
+
+## Kurulum akışını tasarlayın
+
+Otomatik kayıtla gelen cihaz, kullanıcıya ilk açılışta ne göstereceğinize bağlıdır. Kararlar:
+
+**Kurulum adımlarını atlayın.** Apple Kimliği, Siri, ekran süresi, analiz gönderimi gibi adımlar kurumsal cihazda gereksizdir ve kullanıcıyı yanlış seçime iter.
+
+**Yerel yönetici hakkını kim alacak?** Öntanımlı olarak ilk kullanıcı yönetici olur. Kurumsal düzende doğrusu, gizli bir BT yönetici hesabı oluşturup kullanıcıyı standart hesap yapmaktır — ya da geçici yükseltme sağlayan bir araç kullanmaktır. Tüm kullanıcıları yönetici yapmak, uygulama kurulumunu kolaylaştırır ve denetimi ortadan kaldırır.
+
+**FileVault ne zaman açılacak?** Kurulum sırasında zorunlu kılın ve kurtarma anahtarını MDM'e emanet edin. Anahtar emanet edilmeden şifreleme başlarsa, kullanıcı parolasını unuttuğunda veri kurtarılamaz.
+
+Bu, BitLocker tarafındaki "anahtar yedeklenene kadar şifreleme başlamasın" kuralının macOS karşılığıdır; benzerlikleri görmek için [BitLocker dağıtım planlayıcı](/araclar/bitlocker-planlayici) aracına bakabilirsiniz.
+
+## Kullanıcı onayı gerektiren yetkiler
+
+macOS'ta bazı yetenekler, cihaz gözetimli olsa bile açıkça izin ister. Bunlar sık gözden kaçar ve "profil uygulandı ama çalışmıyor" durumunun nedenidir:
+
+**Gizlilik ve güvenlik izinleri (PPPC).** Bir ajanın disk erişimi, ekran kaydı ya da erişilebilirlik yetkisi kullanması için MDM tarafından açıkça verilmesi gerekir. Verilmezse uygulama sessizce çalışmaz.
+
+**Sistem uzantıları ve çekirdek uzantıları.** Uç nokta güvenlik ürünleri bunları kullanır; MDM profilinde takım kimliğiyle önceden onaylanmalıdır. Onaylanmazsa kullanıcıya bir uyarı çıkar ve çoğu kullanıcı onu kapatır.
+
+**İçerik filtresi ve VPN yapılandırması.** Ağ uzantıları da aynı biçimde önceden izin ister.
+
+Bu profillerin cihaza **ajan yüklenmeden önce** ulaşması gerekir. Sıra ters olduğunda ajan izinsiz kurulur, çalışmaz ve teşhisi zordur — çünkü kurulum başarılı görünür.
+
+## Güncelleme yönetimi
+
+macOS güncellemeleri, Windows'takinden farklı bir modelle yönetilir. Bildirim tabanlı bir yaklaşım kullanılır: MDM güncellemeyi planlar, cihaz uygun olduğunda uygular.
+
+İki gerçeklik kabul edilmelidir:
+
+**Büyük sürüm yükseltmeleri kullanıcıyı bekler.** Cihaz kapalıysa, pil düşükse ya da kullanıcı erteliyorsa güncelleme gecikir. Zorunlu tarih koymak mümkündür ama kullanıcıya makul bir pencere bırakmak gerekir.
+
+**Yeni büyük sürümü hemen dayatmayın.** macOS'un yeni ana sürümü, kurumsal ajanlar ve VPN istemcileri uyumlu hâle gelene kadar beklemeyi hak eder. Ama süresiz ertelemek de doğru değildir: güvenlik güncellemeleri yalnızca son üç sürüme gelir ve eski sürümde kalan cihaz zamanla korumasız kalır.
+
+Pratik düzen: küçük güvenlik güncellemeleri gecikmesiz, büyük sürüm yükseltmesi 30–60 gün ertelemeli ve bir pilot grupla önden denenmiş.
+
+## Uygulama dağıtımı
+
+Üç yol vardır ve karışımı normaldir:
+
+**Apple Business Manager üzerinden App Store uygulamaları.** Lisanslar kuruma aittir, cihaza atanır, kullanıcı Apple Kimliği gerektirmez. Kurumsal düzende tercih edilen yol budur.
+
+**Paket (pkg) dağıtımı.** Kendi imzalanmış paketlerinizi MDM ile itersiniz. İmzasız paketler Gatekeeper'a takılır.
+
+**Paket yöneticisi.** Homebrew gibi araçlar geliştirici makinelerinde yaygındır. Kurumsal filoda tek başına bir dağıtım yöntemi olarak güvenilir değildir: sürüm kontrolü zayıftır ve kullanıcı yetkisi gerektirir.
+
+Kullanıcının Apple Kimliğiyle uygulama kurmasına dayanan bir model, cihaz devredildiğinde lisansların kullanıcıda kalması demektir. Cihaz tabanlı atama bu sorunu ortadan kaldırır.
+
+## Etkinleştirme kilidi: en sık yaşanan sürpriz
+
+Kullanıcı kendi Apple Kimliğiyle "Mac'imi Bul" özelliğini açtıysa cihaz, etkinleştirme kilidine takılır. Cihaz silinse bile o Apple Kimliği olmadan kurulamaz.
+
+Kullanıcı ayrıldığında ve hesabını kapattığında elinizde kullanılamaz bir cihaz kalır.
+
+Gözetimli cihazlarda MDM bir baypas kodu tutabilir ve kilidi açabilir — ama bu **yalnızca gözetimli cihazlarda** işler. Bir kez daha, kayıt yoluna geri dönüyoruz.
+
+Ayrılış sürecinde cihazın toplanmadan önce Apple Kimliğinden çıkarılması bir kontrol maddesi olmalıdır; [işe alım ve ayrılış kontrol listesi](/araclar/kullanici-yasam-dongusu) aracında bu adım yer alıyor.
+
+## Kısa liste
+
+Cihazları kurumsal satıcıdan alın ve seri numaralarının Apple Business Manager hesabınıza eklendiğini **teslim almadan önce** doğrulayın. Kurulum asistanını yapılandırın, kullanıcıyı standart hesap yapın. FileVault'u kurtarma anahtarı emaneti şartıyla zorunlu kılın. Gizlilik ve sistem uzantısı izinlerini ajanlardan önce dağıtın. Ayrılış sürecine Apple Kimliği çıkışını ekleyin.
+
+Bu beş madde baştan yapıldığında Mac filosu yönetilebilir olur. Sonradan yapıldığında ise çoğu, cihazı kullanıcıdan geri almayı gerektirir — ve bu, teknik bir sorun olmaktan çıkıp bir organizasyon sorununa dönüşür.
+
+Etki alanına katma kararı ayrı bir konu; [Mac'i etki alanına katmalı mı](/rehberler/mac-etki-alanina-katmali-mi) rehberinde ele alınıyor.

@@ -1,0 +1,88 @@
+---
+baslik: "Mac'i etki alanına katmalı mı? Bağlamanın çözdüğü ve çözmediği şeyler"
+ozet: "Etki alanına bağlama, Mac'e Windows gibi davranma isteğinden doğar. Çoğu kurumda çözdüğü tek sorun kimlik doğrulamadır ve bunun daha az kırılgan yolları var."
+konu: "macos"
+etiketler: ["macos", "active-directory", "kimlik", "entra-id"]
+yayin: 2026-08-16
+sure: 11
+---
+
+Bir kurum Mac'leri etki alanına bağladı. İlk aylarda sorun çıkmadı. Sonra kullanıcılar evden çalışmaya başladı ve şikâyetler geldi: parola değiştirildikten sonra Mac'e girilemiyor, açılış çok uzun sürüyor, bazı sabahlar oturum açma penceresi takılıyor.
+
+Nedeni tek bir varsayımdı: bağlı bir Mac, oturum açarken etki alanı denetleyicisine ulaşmayı bekler. Ofiste bu birkaç milisaniyedir. VPN kurulmadan önce, evde, hiçbir zaman gerçekleşmez.
+
+Etki alanına bağlama macOS'ta desteklenen bir özelliktir ve çalışır. Sorun, çözdüğü sorunun bugün genelde başka yollarla — ve daha az kırılganlıkla — çözülüyor olmasıdır.
+
+## Bağlama ne verir, ne vermez
+
+**Verdiği:** etki alanı kimlik bilgileriyle oturum açma, ağ paylaşımlarına tek oturumla erişim, kullanıcı hesaplarının merkezî yönetimi.
+
+**Vermediği:** grup ilkesi. Bu, en sık yanlış beklenen şeydir. macOS grup ilkesini uygulamaz; ayarları dayatmak isteyen bir kurum yine bir MDM'e ihtiyaç duyar. Bağlama, yapılandırma yönetimi sağlamaz.
+
+Yani bağlama tek başına yeterli değildir: MDM zaten gerekecektir. Soru şu hâle gelir: **MDM zaten varken bağlamaya ne kalıyor?** Yanıt genelde yalnızca kimlik doğrulamadır.
+
+## Bağlamanın maliyeti
+
+Bağlı bir Mac, birkaç kırılganlığı yanında getirir:
+
+**Oturum açma ağa bağımlıdır.** Önbelleğe alınmış kimlik bilgileri işe yarar, ama parola değişikliklerinde ayrışma başlar: kullanıcı Windows'ta parolasını değiştirir, Mac'te eski parolayla girer, anahtar zinciri kilidi açılmaz ve her uygulama ayrı ayrı parola sorar.
+
+**Anahtar zinciri ile hesap parolası ayrışır.** Bu tek konu, Mac destek çağrılarının önemli bir bölümünü üretir ve kullanıcı açısından anlaşılmazdır.
+
+**Saat kayması Kerberos'u kırar.** Beş dakikayı aşan sapma bilet almayı engeller. Saat kaynağı yanlış yapılandırılmış bir Mac'te belirti "bazen giriş yapamıyorum" olur.
+
+**Bilgisayar hesabı parolası düşer.** Uzun süre ağdan uzak kalan cihazın güven ilişkisi bozulur ve yeniden bağlama gerekir.
+
+**Sürüm yükseltmeleri riskli hâle gelir.** Apple, dizin hizmetleri eklentisini her sürümde yeniden ele alır; büyük yükseltmelerden sonra bağlama sorunları yaygındır.
+
+Bunların hiçbiri aşılamaz değildir. Ama hepsi, çözülen tek soruna — kimlik doğrulama — göre pahalıdır.
+
+## Bağlamadan kimlik doğrulama
+
+Bugün yaygın olan yaklaşım, cihazı bağlamadan yerel bir hesap kullanmak ve o hesabın parolasını kurumsal kimlikle **eşitlemektir.**
+
+**Platform SSO (Entra ID ile).** Kullanıcı yerel bir hesapla oturum açar; parola Entra ID ile eşitlenir ya da güvenli bir kimlik doğrulayıcı (Secure Enclave anahtarı) kullanılır. Oturum açtıktan sonra Microsoft 365 ve SAML uygulamalarına tek oturumla erişilir. Cihaz Entra ID'ye kayıtlı olduğu için koşullu erişim politikaları uygulanabilir.
+
+**Kerberos SSO uzantısı (Active Directory ile).** Cihaz bağlanmaz ama Kerberos bilet alır. Şirket içi dosya paylaşımlarına ve iç web uygulamalarına tek oturumla erişim sağlar; parola süresi dolduğunda kullanıcıyı uyarır ve yerel parolayı eşitler.
+
+İkisi de MDM tarafından bir profil olarak dağıtılır. Cihaz bağlı olmadığı için yukarıdaki kırılganlıkların çoğu ortadan kalkar: oturum açma ağa bağımlı değildir, anahtar zinciri ayrışması yönetilir, bilgisayar hesabı diye bir şey yoktur.
+
+## Hangi durumda hâlâ bağlanır
+
+Bağlama tümüyle geçersiz değildir. Şu koşullarda hâlâ savunulabilir:
+
+- Kullanıcılar cihazları **ofiste ve sürekli ağda** kullanıyorsa (laboratuvar, stüdyo, üretim alanı).
+- Erişilen sistemler yalnızca Kerberos/NTLM destekliyorsa ve SSO uzantısı yetmiyorsa.
+- Kurumda bulut kimlik altyapısı yoksa ve kurulacak durumda değilse.
+
+Bu üçünden hiçbiri geçerli değilse, bağlamanın getirdiği yükü taşımanın karşılığı yoktur.
+
+## Geçiş yaparken
+
+Bağlı bir filodan bağsız modele geçmek, tek tek cihaz dokunuşu gerektirir ama silme gerektirmez:
+
+1. **MDM kaydını doğrulayın.** Cihazlar MDM'de yönetiliyor olmalı; değilse önce o çözülür. Kayıt yolunun önemi için [kurumsal Mac yönetimi](/rehberler/mac-kurumsal-yonetim-mdm) rehberine bakın.
+2. **SSO uzantısı profilini dağıtın** ve bir pilot grupta çalıştığını doğrulayın.
+3. **Yerel hesap ile etki alanı hesabını eşleyin.** Kullanıcı zaten etki alanı hesabıyla oturum açıyorsa, hesabı mobil hesaptan yerel hesaba çevirmek gerekir. Bu adım veri kaybına açıktır; ev dizini yedeklenmeden yapılmamalıdır.
+4. **Bağlamayı kaldırın** ve kullanıcının hâlâ oturum açabildiğini doğrulayın.
+5. **FileVault kurtarma anahtarının** MDM'de emanet olduğunu denetleyin — parola akışı değiştiği için bu adım atlanmamalı.
+
+Sırayı bozmayın: bağlamayı önce kaldırıp SSO'yu sonra kurmak, kullanıcıyı arada kimliksiz bırakır.
+
+## Yerel yönetici sorusu
+
+Bağlama tartışmasının yanında hep bu soru gelir: kullanıcı yerel yönetici olmalı mı?
+
+macOS'ta pek çok günlük iş — uygulama kurmak, yazıcı eklemek, bazı ayarları değiştirmek — yönetici yetkisi ister. Tüm kullanıcıları yönetici yapmak bu sürtünmeyi kaldırır ve denetimi de kaldırır.
+
+Orta yol, **geçici yükseltme**dir: kullanıcı gerektiğinde bir araç üzerinden belirli bir süre için yönetici olur, gerekçe kaydedilir, süre dolunca hak geri alınır. Bu, Windows tarafındaki ayrıcalıklı erişim yönetimiyle aynı mantıktır; [ayrıcalıklı hesap yönetimi](/rehberler/guv-ayricalikli-hesap-yonetimi) rehberi bu tarafa bakıyor.
+
+Hangi yolu seçerseniz seçin, **gizli bir BT yönetici hesabı** her cihazda bulunmalıdır. Kullanıcı hesabı bozulduğunda ya da cihaz devredildiğinde tek erişim yolu odur.
+
+## Karar özeti
+
+MDM'iniz varsa ve kullanıcılar ofis dışında çalışıyorsa: **bağlamayın**, SSO uzantısı kullanın.
+
+MDM'iniz varsa ve cihazlar hep ağdaysa: bağlamak zarar vermez ama ek bir fayda da getirmez; yeni kurulumlarda bağlamamak daha az bakım demektir.
+
+MDM'iniz yoksa: önce o kurulur. Bağlama, MDM'in yerini tutmaz — ve bu rehberin en kısa özeti budur.
