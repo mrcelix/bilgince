@@ -1,0 +1,529 @@
+---
+import Base from '../../layouts/Base.astro';
+---
+
+<Base
+  baslik="HTTP önbellek başlığı planlayıcı"
+  aciklama="Hangi içerik türü ne kadar önbelleklenmeli? Cache-Control değerini üretir, sunucu yapılandırmasını verir ve sık yapılan hataları gösterir."
+  aramaya={true}
+  kategori="Araç"
+>
+  <div class="arama-bas">
+    <div class="kap">
+      <nav class="kirinti" aria-label="Kırıntı yolu" style="padding-top:0">
+        <a href="/">Ana sayfa</a><span class="ayrac">/</span><a href="/araclar">Araçlar</a><span
+          class="ayrac">/</span
+        ><span aria-current="page">Önbellek başlıkları</span>
+      </nav>
+      <h1>HTTP önbellek başlığı planlayıcı</h1>
+      <p style="color:var(--muted);font-size:14px;margin-top:8px;max-width:66ch">
+        Önbellek yanlış ayarlandığında iki şeyden biri olur: ya site gereksiz yavaş kalır, ya
+        da kullanıcılar günlerce eski sürümü görür. İkisi de aynı başlıktan çıkar. İçerik
+        türünü seçin, doğru değeri ve gerekçesini alın.
+      </p>
+    </div>
+  </div>
+
+  <div class="kap arac-sayfa">
+    <section class="arac-blok">
+      <h2 class="arac-h2"><span class="arac-no">1</span> İçerik türü</h2>
+      <div class="n-turler" role="radiogroup" aria-label="İçerik türü">
+        {
+          [
+            ['parmakizi', 'Parmak izli varlık', 'app.a3f9c2.js — adı içeriğe göre değişiyor'],
+            ['sabit', 'Sabit adlı varlık', 'logo.png — adı hiç değişmiyor'],
+            ['html', 'HTML sayfası', 'Her istekte güncel olmalı'],
+            ['api', 'API yanıtı', 'JSON, sık değişen veri'],
+            ['ozel', 'Kullanıcıya özel', 'Oturum açmış kullanıcının verisi'],
+            ['indirme', 'Büyük indirme', 'ISO, kurulum paketi, medya'],
+          ].map(([deger, ad, aciklama], i) => (
+            <label class="n-tur">
+              <input type="radio" name="n-tur" value={deger} checked={i === 0} />
+              <b>{ad}</b>
+              <span>{aciklama}</span>
+            </label>
+          ))
+        }
+      </div>
+
+      <div class="n-secenekler">
+        <label class="n-sec"
+          ><input type="checkbox" id="n-cdn" checked />
+          <span>Önünde CDN ya da ters vekil var</span>
+        </label>
+        <label class="n-sec"
+          ><input type="checkbox" id="n-etag" checked />
+          <span>ETag üretiliyor <i>(değişmediyse 304 dönebilsin)</i></span>
+        </label>
+        <label class="n-sec"
+          ><input type="checkbox" id="n-sikistirma" checked />
+          <span>Sıkıştırma açık <i>(gzip / brotli)</i></span>
+        </label>
+      </div>
+      <p class="arac-durum" id="n-durum" role="status" aria-live="polite"></p>
+    </section>
+
+    <section class="arac-blok">
+      <h2 class="arac-h2"><span class="arac-no">2</span> Önerilen başlıklar</h2>
+      <div class="n-basliklar" id="n-basliklar"></div>
+      <div id="n-aciklama"></div>
+    </section>
+
+    <section class="arac-blok">
+      <h2 class="arac-h2"><span class="arac-no">3</span> Sunucu yapılandırması</h2>
+      <div class="n-sunucular">
+        {
+          [
+            ['nginx', 'nginx'],
+            ['apache', 'Apache'],
+            ['iis', 'IIS'],
+            ['cdn', 'CDN / kenar'],
+          ].map(([deger, ad], i) => (
+            <label class="n-radyo">
+              <input type="radio" name="n-sunucu" value={deger} checked={i === 0} />
+              <span>{ad}</span>
+            </label>
+          ))
+        }
+      </div>
+      <div style="position:relative">
+        <pre class="kod"><code id="n-yapilandirma"></code></pre>
+        <button class="kopyala" type="button" data-kaynak="n-yapilandirma">Kopyala</button>
+      </div>
+      <span class="yan-etiket" style="margin-top:18px;display:block">Doğrulama</span>
+      <div style="position:relative">
+        <pre class="kod"><code id="n-dogrulama"></code></pre>
+        <button class="kopyala" type="button" data-kaynak="n-dogrulama">Kopyala</button>
+      </div>
+    </section>
+
+    <section class="arac-blok">
+      <h2 class="arac-h2"><span class="arac-no">4</span> Önbellekte sık yapılan hatalar</h2>
+      <ul class="n-ipuclari">
+        <li>
+          <b>HTML'i uzun önbelleklemek.</b> En çok acıtan hatadır: kullanıcı eski HTML'i
+          görür, o HTML eski varlık adlarını ister ve siz sunucuda ne yaparsanız yapın kimse
+          yeni sürümü görmez. Ziyaretçinin önbelleğini uzaktan temizleyemezsiniz. HTML her
+          zaman doğrulanmalıdır.
+        </li>
+        <li>
+          <b><code>immutable</code> yalnızca parmak izli dosyalarda.</b> Bu bayrak tarayıcıya
+          "bu dosya asla değişmeyecek, sorma bile" der. Adı sabit bir dosyada kullanırsanız
+          güncellemeniz kullanıcıya bir yıl boyunca ulaşmaz.
+        </li>
+        <li>
+          <b><code>no-cache</code> "önbellekleme" demek değildir.</b> "Önbellekle ama
+          kullanmadan önce sor" demektir. Gerçekten saklanmasını istemiyorsanız
+          <code>no-store</code> gerekir. Kişisel veride bu ayrım önemlidir.
+        </li>
+        <li>
+          <b>Kişiye özel içeriği paylaşılan önbelleğe düşürmek.</b> CDN ya da vekil, bir
+          kullanıcının sayfasını başka kullanıcıya sunabilir. Oturuma bağlı her yanıtta
+          <code>Cache-Control: private</code> olmalı — bu, gerçekleşmiş en ciddi veri sızıntısı
+          türlerinden biridir.
+        </li>
+        <li>
+          <b><code>Vary</code> başlığını unutmak.</b> Sıkıştırılmış ve sıkıştırılmamış sürümü
+          aynı anahtarla saklayan bir önbellek, sıkıştırmayı desteklemeyen istemciye bozuk
+          içerik verir. Sıkıştırma varsa <code>Vary: Accept-Encoding</code> zorunludur.
+        </li>
+        <li>
+          <b>Parmak izi yerine sorgu dizesine güvenmek.</b> <code>app.js?v=3</code> çoğu yerde
+          çalışır ama bazı vekiller sorgu dizesini yok sayar ya da hiç önbelleklemez. Dosya
+          adının kendisini değiştirmek her zaman güvenlidir.
+        </li>
+      </ul>
+    </section>
+  </div>
+
+  <script>
+    (() => {
+      const el = (s) => document.querySelector(s);
+
+      const TURLER = {
+        parmakizi: {
+          ad: 'Parmak izli varlık',
+          cacheControl: 'public, max-age=31536000, immutable',
+          ornekYol: '/_astro/app.a3f9c2.js',
+          uzanti: 'js|css|woff2|png|jpg|svg',
+          notlar: [
+            ['ok', '<b>Bir yıl + immutable.</b> Dosya adı içeriğin özetini taşıdığı için içerik değişince ad da değişir; eski adı sonsuza kadar önbelleklemek tamamen güvenlidir.'],
+            ['ok', '<b><code>immutable</code> yeniden doğrulamayı da keser.</b> Kullanıcı sayfayı yenilese bile tarayıcı sunucuya sormaz. Parmak izli dosyalarda alınabilecek en büyük hız kazancı budur.'],
+            ['uyari', '<b>Koşul:</b> derleme aracınız gerçekten içerik özetine göre ad üretmeli. <code>app.v3.js</code> gibi elle verilen sürüm numaraları parmak izi sayılmaz — birini güncellemeyi unuttuğunuz gün kullanıcı bir yıl eski dosyada kalır.'],
+          ],
+        },
+        sabit: {
+          ad: 'Sabit adlı varlık',
+          cacheControl: 'public, max-age=86400, stale-while-revalidate=604800',
+          ornekYol: '/logo.png',
+          uzanti: 'png|jpg|svg|ico',
+          notlar: [
+            ['uyari', '<b>Bir gün, sonra taze tutma.</b> Adı değişmeyen bir dosyayı uzun önbelleklemek riskli: logo değişirse kullanıcı eskisini görmeye devam eder. Bir gün, çoğu durumda makul dengedir.'],
+            ['ok', '<b><code>stale-while-revalidate</code></b> süre dolduğunda kullanıcıyı bekletmez: eski sürümü hemen verir, yenisini arka planda çeker. Algılanan hız neredeyse <code>immutable</code> kadar iyi olur.'],
+            ['uyari', '<b>Daha iyisi:</b> bu dosyaları da parmak izli hâle getirin. O zaman bir yıl önbellekleyebilirsiniz ve güncelleme anında ulaşır.'],
+          ],
+        },
+        html: {
+          ad: 'HTML sayfası',
+          cacheControl: 'public, max-age=0, must-revalidate',
+          ornekYol: '/index.html',
+          uzanti: 'html',
+          notlar: [
+            ['ok', '<b>Her istekte doğrula.</b> <code>max-age=0</code> ile tarayıcı her seferinde sorar; içerik değişmediyse sunucu 304 döner ve gövde hiç aktarılmaz. Yani "önbelleksiz" değil, "ucuz doğrulamalı" bir yapıdır.'],
+            ['hata', '<b>HTML\'i uzun önbelleklemeyin.</b> Eski HTML eski varlık adlarını ister; dağıtım yaptığınızda kullanıcı yine de eski sürümü görür ve bunu uzaktan düzeltemezsiniz.'],
+            ['ok', '<b>ETag ya da Last-Modified şart.</b> Doğrulama ancak bunlarla ucuzlar; yoksa her istekte tüm sayfa yeniden iner.'],
+          ],
+        },
+        api: {
+          ad: 'API yanıtı',
+          cacheControl: 'public, max-age=60, stale-while-revalidate=300',
+          ornekYol: '/api/urunler',
+          uzanti: null,
+          notlar: [
+            ['ok', '<b>Kısa önbellek bile çok şey kazandırır.</b> Saniyede yüz istek alan bir uç nokta, altmış saniyelik önbellekle veri tabanına dakikada bir gider. Yükün tamamı kaybolur.'],
+            ['uyari', '<b>Yalnızca herkese aynı olan veride.</b> Yanıt kullanıcıya göre değişiyorsa <code>public</code> kullanmayın — CDN bir kullanıcının verisini başkasına sunar.'],
+            ['uyari', '<b>Yazma işlemleri önbelleklenmez.</b> Bu başlıkları yalnızca <code>GET</code> için verin; <code>POST</code> ve <code>PUT</code> yanıtlarına <code>no-store</code> koyun.'],
+          ],
+        },
+        ozel: {
+          ad: 'Kullanıcıya özel',
+          cacheControl: 'private, no-cache, no-store, max-age=0',
+          ornekYol: '/hesabim',
+          uzanti: null,
+          notlar: [
+            ['hata', '<b><code>private</code> zorunlu.</b> Bu olmadan CDN ya da kurumsal vekil, bir kullanıcının sayfasını başkasına sunabilir. Gerçekleşmiş en ciddi sızıntı türlerinden biridir.'],
+            ['ok', '<b><code>no-store</code> diske yazmayı da engeller.</b> <code>no-cache</code> tek başına yeterli değildir; o yalnızca "kullanmadan önce sor" demektir, saklamayı engellemez.'],
+            ['uyari', '<b>Geri düğmesi.</b> Bu başlıklarla kullanıcı geri gittiğinde sayfa yeniden yüklenir; oturum kapandıysa hassas veri ekranda kalmaz. İstenen davranış budur.'],
+          ],
+        },
+        indirme: {
+          ad: 'Büyük indirme',
+          cacheControl: 'public, max-age=2592000',
+          ornekYol: '/indir/kurulum-3.2.1.iso',
+          uzanti: 'iso|zip|msi|exe|pkg',
+          notlar: [
+            ['ok', '<b>Bir ay.</b> Sürüm numarası dosya adında olduğu için içerik değişmez; uzun önbellek güvenlidir ve bant genişliğinden ciddi tasarruf sağlar.'],
+            ['ok', '<b>Menzil isteklerini destekleyin.</b> <code>Accept-Ranges: bytes</code> olmadan kesilen bir indirme baştan başlar. Büyük dosyalarda bu, kullanıcının en çok şikâyet ettiği şeydir.'],
+            ['uyari', '<b>Sıkıştırmayı kapatın.</b> ISO ve ZIP zaten sıkıştırılmıştır; tekrar sıkıştırmak boşuna işlemci harcar ve dosyayı bazen büyütür.'],
+          ],
+        },
+      };
+
+      function basliklar(t, cdn, etag, sikistirma) {
+        const liste = [['Cache-Control', t.cacheControl]];
+
+        if (cdn && !t.cacheControl.includes('private')) {
+          // Kenar önbelleğini tarayıcıdan ayrı yönetmek daha esnektir
+          if (t.ad === 'HTML sayfası') {
+            liste.push(['CDN-Cache-Control', 'public, max-age=300, stale-while-revalidate=86400']);
+          } else if (t.ad === 'API yanıtı') {
+            liste.push(['CDN-Cache-Control', 'public, max-age=300']);
+          }
+        }
+
+        if (etag) liste.push(['ETag', '"a3f9c2e1"']);
+        if (sikistirma) liste.push(['Vary', 'Accept-Encoding']);
+        if (t.ad === 'Büyük indirme') liste.push(['Accept-Ranges', 'bytes']);
+        if (t.cacheControl.includes('private')) liste.push(['Pragma', 'no-cache']);
+
+        return liste;
+      }
+
+      function yapilandirmaUret(t, sunucu, basliklarListesi) {
+        const desen = t.uzanti ? `\\.(${t.uzanti})$` : null;
+
+        if (sunucu === 'nginx') {
+          const govde = basliklarListesi
+            .filter(([ad]) => ad !== 'ETag')
+            .map(([ad, deger]) => `        add_header ${ad} "${deger}" always;`)
+            .join('\n');
+          return desen
+            ? `location ~* ${desen} {\n${govde}\n${t.ad === 'Büyük indirme' ? '        gzip off;\n' : ''}    }`
+            : `location ${t.ornekYol} {\n${govde}\n    }`;
+        }
+
+        if (sunucu === 'apache') {
+          const govde = basliklarListesi
+            .filter(([ad]) => ad !== 'ETag')
+            .map(([ad, deger]) => `    Header set ${ad} "${deger}"`)
+            .join('\n');
+          return desen
+            ? `<FilesMatch "${desen}">\n${govde}\n</FilesMatch>`
+            : `<Location "${t.ornekYol}">\n${govde}\n</Location>`;
+        }
+
+        if (sunucu === 'iis') {
+          return (
+            `<!-- web.config -->\n` +
+            `<configuration>\n` +
+            `  <location path="${t.ornekYol.replace(/^\//, '')}">\n` +
+            `    <system.webServer>\n` +
+            `      <httpProtocol>\n` +
+            `        <customHeaders>\n` +
+            basliklarListesi
+              .filter(([ad]) => ad !== 'ETag')
+              .map(
+                ([ad, deger]) =>
+                  `          <add name="${ad}" value="${deger.replace(/"/g, '&quot;')}" />`
+              )
+              .join('\n') +
+            `\n        </customHeaders>\n` +
+            `      </httpProtocol>\n` +
+            `    </system.webServer>\n` +
+            `  </location>\n` +
+            `</configuration>`
+          );
+        }
+
+        // CDN / kenar
+        return (
+          `# Kenar kuralı — yol eşleşmesi\n` +
+          `${t.ornekYol}\n\n` +
+          basliklarListesi.map(([ad, deger]) => `${ad}: ${deger}`).join('\n') +
+          `\n\n# Not: Kenar önbelleğini temizleyebildiğiniz için orada daha uzun süre\n` +
+          `# tutabilirsiniz. Tarayıcı önbelleğini temizleyemezsiniz — bu yüzden\n` +
+          `# Cache-Control (tarayıcı) kısa, CDN-Cache-Control (kenar) uzun tutulur.`
+        );
+      }
+
+      function ciz() {
+        const tur = TURLER[document.querySelector('input[name="n-tur"]:checked').value];
+        const sunucu = document.querySelector('input[name="n-sunucu"]:checked').value;
+        const cdn = el('#n-cdn').checked;
+        const etag = el('#n-etag').checked;
+        const sikistirma = el('#n-sikistirma').checked;
+
+        const liste = basliklar(tur, cdn, etag, sikistirma);
+
+        el('#n-basliklar').innerHTML = liste
+          .map(
+            ([ad, deger]) =>
+              `<div class="n-baslik"><span class="n-baslik-ad">${ad}</span>` +
+              `<code>${deger}</code></div>`
+          )
+          .join('');
+
+        const notlar = [...tur.notlar];
+
+        if (sikistirma && !liste.some(([a]) => a === 'Vary')) {
+          notlar.push([
+            'hata',
+            '<b>Vary eksik.</b> Sıkıştırma açıkken <code>Vary: Accept-Encoding</code> ' +
+              'olmazsa önbellek, sıkıştırılmış içeriği desteklemeyen istemciye verebilir.',
+          ]);
+        }
+        if (!etag && tur.ad === 'HTML sayfası') {
+          notlar.push([
+            'hata',
+            '<b>ETag yok.</b> Doğrulama ancak ETag ya da <code>Last-Modified</code> ile ' +
+              'ucuzlar. İkisi de yoksa <code>max-age=0</code> her istekte tüm sayfanın ' +
+              'yeniden inmesi demektir — önbellek hiç yokmuş gibi davranırsınız.',
+          ]);
+        }
+        if (cdn && tur.cacheControl.includes('private')) {
+          notlar.push([
+            'uyari',
+            '<b>CDN varken kişiye özel içerik.</b> <code>private</code> başlığına saygı ' +
+              'gösterildiğini varsaymayın; kenar yapılandırmanızda bu yolun hiç ' +
+              'önbelleklenmediğini ayrıca doğrulayın.',
+          ]);
+        }
+
+        el('#n-aciklama').innerHTML =
+          '<ul class="n-liste">' +
+          notlar.map(([tip, m]) => `<li data-tip="${tip}">${m}</li>`).join('') +
+          '</ul>';
+
+        el('#n-yapilandirma').textContent = yapilandirmaUret(tur, sunucu, liste);
+
+        el('#n-dogrulama').textContent =
+          `# Gerçekte hangi başlıklar dönüyor?\n` +
+          `curl -sSI https://ornek.com.tr${tur.ornekYol} | grep -iE 'cache|etag|vary|age|expires'\n\n` +
+          `# İkinci istek önbellekten mi geldi? (304 bekliyoruz)\n` +
+          `etiket=$(curl -sSI https://ornek.com.tr${tur.ornekYol} | grep -i '^etag' | cut -d' ' -f2- | tr -d '\\r')\n` +
+          `curl -sS -o /dev/null -w '%{http_code}\\n' -H "If-None-Match: $etiket" \\\n` +
+          `  https://ornek.com.tr${tur.ornekYol}\n\n` +
+          `# CDN önbelleğe aldı mı? (Age başlığı sıfırdan büyük olmalı)\n` +
+          `curl -sSI https://ornek.com.tr${tur.ornekYol} | grep -iE '^(age|x-cache|cf-cache-status)'\n\n` +
+          `# Windows tarafında\n` +
+          `(Invoke-WebRequest -Uri 'https://ornek.com.tr${tur.ornekYol}' -Method Head).Headers |\n` +
+          `    Format-Table -AutoSize`;
+
+        /* --- durum --- */
+        const durum = el('#n-durum');
+        if (tur.ad === 'Kullanıcıya özel' && cdn) {
+          durum.className = 'arac-durum hata';
+          durum.textContent =
+            'Kişiye özel içerik + CDN: kenar yapılandırmasını ayrıca doğrulayın.';
+        } else if (tur.ad === 'HTML sayfası' && !etag) {
+          durum.className = 'arac-durum hata';
+          durum.textContent = 'HTML için ETag olmadan doğrulama ucuz olmaz.';
+        } else {
+          durum.className = 'arac-durum ok';
+          durum.textContent = `${tur.ad} için önerilen başlıklar hazır.`;
+        }
+      }
+
+      document
+        .querySelectorAll('input[name="n-tur"], input[name="n-sunucu"], #n-cdn, #n-etag, #n-sikistirma')
+        .forEach((g) => g.addEventListener('change', ciz));
+
+      document.querySelectorAll('.kopyala').forEach((d) => {
+        d.addEventListener('click', async () => {
+          try {
+            await navigator.clipboard.writeText(el(`#${d.dataset.kaynak}`).textContent);
+            d.textContent = 'Kopyalandı';
+            setTimeout(() => (d.textContent = 'Kopyala'), 1600);
+          } catch {
+            /* pano izni yoksa kullanıcı elle seçer */
+          }
+        });
+      });
+
+      ciz();
+    })();
+  </script>
+
+  <style>
+    .n-turler {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(min(200px, 100%), 1fr));
+      gap: 10px;
+    }
+    .n-tur {
+      display: grid;
+      gap: 3px;
+      border: 1px solid var(--line);
+      border-radius: 11px;
+      padding: 12px 14px;
+      cursor: pointer;
+      background: var(--paper);
+      position: relative;
+    }
+    .n-tur input {
+      position: absolute;
+      opacity: 0;
+      pointer-events: none;
+    }
+    .n-tur b {
+      font-size: 13.5px;
+    }
+    .n-tur span {
+      font-size: 12px;
+      color: var(--muted);
+      line-height: 1.45;
+    }
+    .n-tur:has(input:checked) {
+      border-color: var(--indigo);
+      background: var(--tint);
+      box-shadow: 0 0 0 1px var(--indigo);
+    }
+    .n-secenekler {
+      display: grid;
+      gap: 9px;
+      margin-top: 14px;
+    }
+    .n-sec {
+      display: inline-flex;
+      align-items: baseline;
+      gap: 8px;
+      font-size: 13px;
+      color: var(--ink-soft);
+      cursor: pointer;
+      line-height: 1.5;
+    }
+    .n-sec i,
+    .yan-etiket i {
+      font-style: normal;
+      color: var(--muted);
+      font-size: 12px;
+      font-weight: 400;
+      text-transform: none;
+      letter-spacing: 0;
+    }
+    .n-basliklar {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr);
+      gap: 8px;
+      margin-bottom: 18px;
+    }
+    .n-baslik {
+      display: grid;
+      grid-template-columns: minmax(0, 165px) minmax(0, 1fr);
+      gap: 4px 14px;
+      align-items: baseline;
+      background: var(--tint);
+      border: 1px solid var(--line);
+      border-radius: 9px;
+      padding: 10px 12px;
+    }
+    @media (max-width: 620px) {
+      .n-baslik {
+        grid-template-columns: minmax(0, 1fr);
+      }
+    }
+    .n-baslik-ad {
+      font-size: 11.5px;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+      color: var(--muted);
+    }
+    .n-baslik code {
+      font-size: 13px;
+      color: var(--indigo-metin);
+      word-break: break-word;
+    }
+    .n-sunucular {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      margin-bottom: 12px;
+    }
+    .n-radyo {
+      display: inline-flex;
+      align-items: center;
+      border: 1px solid var(--line);
+      border-radius: 999px;
+      padding: 6px 14px;
+      font-size: 12.5px;
+      color: var(--muted);
+      cursor: pointer;
+      background: var(--paper);
+    }
+    .n-radyo input {
+      position: absolute;
+      opacity: 0;
+      pointer-events: none;
+    }
+    .n-radyo:has(input:checked) {
+      border-color: var(--indigo);
+      color: var(--indigo-metin);
+      background: var(--tint);
+    }
+    .n-liste,
+    .n-ipuclari {
+      list-style: none;
+      margin: 0;
+      padding: 0;
+      display: grid;
+      gap: 12px;
+    }
+    .n-liste li,
+    .n-ipuclari li {
+      font-size: 13.5px;
+      line-height: 1.62;
+      color: var(--ink-soft);
+      border-left: 2px solid var(--line);
+      padding-left: 13px;
+    }
+    .n-liste li[data-tip='hata'] {
+      border-left-color: light-dark(#dc2626, #f87171);
+    }
+    .n-liste li[data-tip='uyari'] {
+      border-left-color: light-dark(#f0c33c, #a97f1c);
+    }
+    .n-liste li[data-tip='ok'] {
+      border-left-color: light-dark(#16a34a, #4ade80);
+    }
+  </style>
+</Base>

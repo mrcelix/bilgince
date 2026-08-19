@@ -1,0 +1,543 @@
+---
+import Base from '../../layouts/Base.astro';
+---
+
+<Base
+  baslik="Kabin gücü, UPS ve soğutma hesaplayıcı"
+  aciklama="Sunucu odasının çektiği gücü, UPS'in kaç dakika dayanacağını, gereken soğutma kapasitesini ve sigorta yükünü hesaplar."
+  aramaya={true}
+  kategori="Araç"
+>
+  <div class="arama-bas">
+    <div class="kap">
+      <nav class="kirinti" aria-label="Kırıntı yolu" style="padding-top:0">
+        <a href="/">Ana sayfa</a><span class="ayrac">/</span><a href="/araclar">Araçlar</a><span
+          class="ayrac">/</span
+        ><span aria-current="page">Güç ve soğutma</span>
+      </nav>
+      <h1>Kabin gücü, UPS ve soğutma hesaplayıcı</h1>
+      <p style="color:var(--muted);font-size:14px;margin-top:8px;max-width:66ch">
+        Sunucu odasında üç sayı birbirine bağlıdır: çekilen güç, UPS'in dayanma süresi ve
+        atılması gereken ısı. Birini büyütünce diğeri sıkışır. Cihazları girin, üçünü birden
+        görün.
+      </p>
+    </div>
+  </div>
+
+  <div class="kap arac-sayfa">
+    <section class="arac-blok">
+      <h2 class="arac-h2"><span class="arac-no">1</span> Cihazlar</h2>
+      <div class="g-kurallar" id="g-cihazlar"></div>
+      <div class="arac-dugmeler">
+        <button type="button" class="dg dg-hayalet" id="g-ekle">Cihaz ekle</button>
+        <button type="button" class="dg dg-hayalet" id="g-ornek">Örnek oda</button>
+      </div>
+    </section>
+
+    <section class="arac-blok">
+      <h2 class="arac-h2"><span class="arac-no">2</span> Elektrik ve UPS</h2>
+      <div class="arac-alanlar">
+        <label class="arac-alan"
+          >Şebeke gerilimi (V)
+          <input id="g-gerilim" type="number" min="100" max="480" value="230" />
+        </label>
+        <label class="arac-alan"
+          >Sigorta akımı (A)
+          <input id="g-sigorta" type="number" min="1" max="400" value="32" />
+        </label>
+        <label class="arac-alan"
+          >UPS kapasitesi (kVA)
+          <input id="g-kva" type="number" min="0.5" step="0.5" max="500" value="10" />
+        </label>
+        <label class="arac-alan"
+          >UPS güç çarpanı
+          <input id="g-carpan" type="number" min="0.5" step="0.05" max="1" value="0.9" />
+          <small>Etiket üzerinde yazar; modern UPS'lerde 0,9 ya da 1,0.</small>
+        </label>
+        <label class="arac-alan"
+          >Akü grubu (Ah)
+          <input id="g-ah" type="number" min="1" max="10000" value="180" />
+        </label>
+        <label class="arac-alan"
+          >Akü gerilimi (V)
+          <input id="g-akuGerilim" type="number" min="12" max="600" value="240" />
+          <small>Tek akü değil, seri bağlı grubun toplamı.</small>
+        </label>
+      </div>
+      <p class="arac-durum" id="g-durum" role="status" aria-live="polite"></p>
+    </section>
+
+    <section class="arac-blok">
+      <h2 class="arac-h2"><span class="arac-no">3</span> Sonuç</h2>
+      <div class="g-kartlar" id="g-kartlar"></div>
+      <div class="g-cubuklar" id="g-cubuklar"></div>
+    </section>
+
+    <section class="arac-blok">
+      <h2 class="arac-h2"><span class="arac-no">4</span> Değerlendirme</h2>
+      <div id="g-bulgular"></div>
+    </section>
+
+    <section class="arac-blok">
+      <h2 class="arac-h2"><span class="arac-no">5</span> Sunucu odası hesabı</h2>
+      <ul class="g-ipuclari">
+        <li>
+          <b>Elektriğe giren güç, ısı olarak çıkar.</b> Bir sunucunun çektiği 500 watt'ın
+          neredeyse tamamı ısıya dönüşür; çok küçük bir kısmı ışık ve ses olur. Bu yüzden
+          soğutma ihtiyacı, çekilen gücün kendisidir — ayrı bir hesap değil.
+          <b>1 kW ≈ 3412 BTU/saat</b>.
+        </li>
+        <li>
+          <b>Etiket gücü, gerçek güç değildir.</b> Güç kaynağının üzerindeki değer üst
+          sınırdır; tipik bir sunucu bunun %40-60'ını çeker. Etikete göre hesap yaparsanız
+          gereğinden büyük UPS ve klima alırsınız — bu da düşük yükte verimsiz çalışan bir
+          sistem demektir. Gerçek değeri akıllı prizden ya da <code>ipmitool</code> ile ölçün.
+        </li>
+        <li>
+          <b>Yedekli güç kaynağı çift yük değildir.</b> İki kaynaklı bir sunucu, toplamda tek
+          sunucu kadar güç çeker; yük iki kaynağa paylaştırılır. Ama <i>her iki hattın da</i>
+          tek başına toplam yükü taşıyabilmesi gerekir — biri arızalandığında diğeri hepsini
+          üstlenir.
+        </li>
+        <li>
+          <b>Sigortayı %80'in üstüne yüklemeyin.</b> Sürekli yük için kabul edilen sınır
+          budur; ayrıca cihazların açılış anındaki ani akımı (inrush) anlık olarak kat kat
+          yükselir. 32 A'lik bir hattan sürekli 25 A'den fazla çekmeyi planlamayın.
+        </li>
+        <li>
+          <b>Akü süresi doğrusal değildir.</b> Peukert etkisi yüzünden yükü iki katına
+          çıkarmak süreyi yarıya değil, daha fazlasına indirir. Ayrıca aküler yaşlandıkça
+          kapasite kaybeder — üç yıllık bir akü grubu genelde etiket değerinin %70-80'ini
+          verir. Hesap yeni akü içindir; gerçek süreyi yılda bir yük testiyle ölçün.
+        </li>
+        <li>
+          <b>UPS süresi, düzgün kapanma süresidir.</b> Amaç elektrik gelene kadar dayanmak
+          değil, sanal makineleri ve veri tabanlarını düzgün kapatabilmektir. On dakika çoğu
+          ortam için yeterlidir — yeter ki otomatik kapatma gerçekten yapılandırılmış ve
+          sınanmış olsun. Sınanmamış bir kapatma betiği, olmayan bir UPS'ten farksızdır.
+        </li>
+      </ul>
+    </section>
+  </div>
+
+  <script>
+    (() => {
+      const el = (s) => document.querySelector(s);
+      const say = (s) => Number(el(s).value) || 0;
+
+      let sayac = 0;
+      let cihazlar = [];
+
+      function cihazEkle(on = {}) {
+        cihazlar.push({
+          kimlik: ++sayac,
+          ad: on.ad ?? 'Sunucu',
+          adet: on.adet ?? 1,
+          watt: on.watt ?? 450,
+          u: on.u ?? 2,
+        });
+        ciz();
+      }
+
+      function ciz() {
+        el('#g-cihazlar').innerHTML = cihazlar
+          .map(
+            (c) =>
+              `<div class="g-kural" data-kimlik="${c.kimlik}">` +
+              `<input type="text" class="g-ad" value="${c.ad.replace(/"/g, '&quot;')}" aria-label="Cihaz adı" />` +
+              `<label class="g-mini">adet<input type="number" class="g-adet" min="1" max="500" value="${c.adet}" /></label>` +
+              `<label class="g-mini">watt<input type="number" class="g-watt" min="1" max="20000" value="${c.watt}" /></label>` +
+              `<label class="g-mini">U<input type="number" class="g-u" min="0" max="48" value="${c.u}" /></label>` +
+              `<button type="button" class="g-sil" aria-label="Cihazı sil">×</button>` +
+              `</div>`
+          )
+          .join('');
+        hesapla();
+      }
+
+      /** Peukert etkisi: yük arttıkça akünün verebildiği kapasite düşer. */
+      function akuSuresi(wattSaat, cekilenWatt) {
+        if (cekilenWatt <= 0) return Infinity;
+        const saat = wattSaat / cekilenWatt;
+        // Kurşun asit aküler için yaygın kullanılan yaklaşım: üs 1,15
+        const duzeltilmis = saat * (saat < 1 ? saat ** 0.15 : 1);
+        return duzeltilmis * 60; // dakika
+      }
+
+      function hesapla() {
+        const gerilim = say('#g-gerilim');
+        const sigorta = say('#g-sigorta');
+        const kva = say('#g-kva');
+        const carpan = say('#g-carpan');
+        const ah = say('#g-ah');
+        const akuGerilim = say('#g-akuGerilim');
+
+        const toplamWatt = cihazlar.reduce((t, c) => t + c.watt * c.adet, 0);
+        const toplamU = cihazlar.reduce((t, c) => t + c.u * c.adet, 0);
+        const toplamCihaz = cihazlar.reduce((t, c) => t + c.adet, 0);
+
+        // UPS'in kendi verimi ve dönüştürme kaybı
+        const upsVerim = 0.94;
+        const sebekedenWatt = toplamWatt / upsVerim;
+        const akim = gerilim > 0 ? sebekedenWatt / gerilim : 0;
+
+        const upsWatt = kva * 1000 * carpan;
+        const upsYuk = upsWatt > 0 ? (toplamWatt / upsWatt) * 100 : 0;
+        const sigortaYuk = sigorta > 0 ? (akim / sigorta) * 100 : 0;
+
+        // Akü enerjisi; kurşun asitte %50'den fazla boşaltma ömrü kısaltır
+        const akuWattSaat = ah * akuGerilim * 0.5;
+        const dakika = akuSuresi(akuWattSaat, toplamWatt / upsVerim);
+
+        const btu = toplamWatt * 3.412;
+        const soğutmaKw = toplamWatt / 1000;
+        // Klima kapasitesi yaygın olarak BTU ile satılır; 12000 BTU = 1 ton
+        const ton = btu / 12000;
+
+        el('#g-kartlar').innerHTML = [
+          { b: 'Toplam güç', d: `${(toplamWatt / 1000).toFixed(2)} kW`, n: `${toplamCihaz} cihaz, ${toplamU}U` },
+          { b: 'Şebeke akımı', d: `${akim.toFixed(1)} A`, n: `${gerilim} V, UPS verimi dahil` },
+          { b: 'UPS yükü', d: `%${Math.round(upsYuk)}`, n: `${kva} kVA × ${carpan} = ${(upsWatt / 1000).toFixed(1)} kW` },
+          {
+            b: 'Akü süresi',
+            d: Number.isFinite(dakika) ? `${Math.round(dakika)} dk` : '—',
+            n: 'Yeni akü, %50 boşaltma',
+          },
+          { b: 'Isı yükü', d: `${Math.round(btu).toLocaleString('tr-TR')} BTU/sa`, n: `${soğutmaKw.toFixed(2)} kW soğutma` },
+          { b: 'Klima', d: `${ton.toFixed(1)} ton`, n: 'Yedeklilik payı hariç' },
+        ]
+          .map(
+            (k) =>
+              `<div class="g-kart"><span class="g-kart-b">${k.b}</span>` +
+              `<b class="g-kart-d">${k.d}</b><span class="g-kart-n">${k.n}</span></div>`
+          )
+          .join('');
+
+        el('#g-cubuklar').innerHTML = [
+          ['UPS doluluğu', upsYuk, `${(toplamWatt / 1000).toFixed(2)} / ${(upsWatt / 1000).toFixed(1)} kW`, 80],
+          ['Sigorta yükü', sigortaYuk, `${akim.toFixed(1)} / ${sigorta} A`, 80],
+        ]
+          .map(([ad, yuzde, alt, esik]) => {
+            const tip = yuzde > 100 ? 'kritik' : yuzde > esik ? 'uyari' : 'ok';
+            return (
+              `<div class="g-cubuk" data-durum="${tip}">` +
+              `<div class="g-cubuk-ust"><span>${ad}</span><b>%${Math.round(yuzde)}</b></div>` +
+              `<div class="g-ray"><i style="width:${Math.min(100, yuzde)}%"></i>` +
+              `<u style="left:${esik}%"></u></div>` +
+              `<span class="g-cubuk-alt">${alt} · güvenli sınır %${esik}</span></div>`
+            );
+          })
+          .join('');
+
+        /* --- değerlendirme --- */
+        const bulgular = [];
+
+        if (sigortaYuk > 100) {
+          bulgular.push([
+            'hata',
+            `<b>Sigorta kapasitesi aşılıyor.</b> ${akim.toFixed(1)} A çekiliyor, sigorta ` +
+              `${sigorta} A. Bu hat açılıştaki ani akımda atacaktır — hem de en kötü anda, ` +
+              `elektrik geri geldiğinde her şey aynı anda kalkarken.`,
+          ]);
+        } else if (sigortaYuk > 80) {
+          bulgular.push([
+            'uyari',
+            `<b>Sigorta %${Math.round(sigortaYuk)} yüklü.</b> Sürekli yük için kabul edilen ` +
+              `sınır %80'dir. Bir cihaz daha eklemeyi düşünüyorsanız önce hattı büyütün.`,
+          ]);
+        }
+
+        if (upsYuk > 100) {
+          bulgular.push([
+            'hata',
+            `<b>UPS kapasitesi yetersiz.</b> Yük ${(toplamWatt / 1000).toFixed(2)} kW, UPS ` +
+              `${(upsWatt / 1000).toFixed(1)} kW verebiliyor. Elektrik kesildiğinde UPS aşırı ` +
+              `yükten kendini kapatır ve hiçbir şey korunmaz.`,
+          ]);
+        } else if (upsYuk > 80) {
+          bulgular.push([
+            'uyari',
+            `<b>UPS %${Math.round(upsYuk)} yüklü.</b> Yedekli bir kurulumda (iki UPS) bir ` +
+              `tanesi arızalandığında diğeri toplam yükü üstlenemez. Ayrıca akü süresi bu ` +
+              `yükte belirgin kısalır.`,
+          ]);
+        } else if (upsYuk < 20 && toplamWatt > 0) {
+          bulgular.push([
+            'uyari',
+            `<b>UPS gereğinden büyük (%${Math.round(upsYuk)} yüklü).</b> Çok düşük yükte UPS ` +
+              `verimi düşer ve boşa elektrik harcarsınız. Büyümeyi planlıyorsanız sorun yok; ` +
+              `değilse küçük bir birim daha ekonomik olurdu.`,
+          ]);
+        }
+
+        if (Number.isFinite(dakika)) {
+          if (dakika < 5) {
+            bulgular.push([
+              'hata',
+              `<b>Akü süresi ${Math.round(dakika)} dakika.</b> Bu süre düzgün kapanmaya ` +
+                `yetmez; büyük bir veri tabanının kapanması tek başına dakikalar alır. ` +
+                `Akü grubunu büyütün ya da kapatmayı elektrik kesilir kesilmez başlatın.`,
+            ]);
+          } else if (dakika < 10) {
+            bulgular.push([
+              'uyari',
+              `<b>Akü süresi ${Math.round(dakika)} dakika — sınırda.</b> Otomatik kapatmanın ` +
+                `gerçekten çalıştığını sınayın. Aküler yaşlandıkça bu süre düşer; üç yıl sonra ` +
+                `${Math.round(dakika * 0.75)} dakikaya inmesini bekleyin.`,
+            ]);
+          } else {
+            bulgular.push([
+              'ok',
+              `<b>Akü süresi ${Math.round(dakika)} dakika.</b> Düzgün kapanma için yeterli ` +
+                `görünüyor — otomatik kapatma yapılandırılmışsa.`,
+            ]);
+          }
+        }
+
+        if (toplamWatt > 0) {
+          bulgular.push([
+            'uyari',
+            `<b>Soğutmada yedeklilik unutulmasın.</b> ${Math.round(btu).toLocaleString('tr-TR')} ` +
+              `BTU/saat atılması gerekiyor. Tek klima ile çalışan bir oda, o klima arızalandığında ` +
+              `yaz günü yarım saatte kritik sıcaklığa çıkar. İki birimi dönüşümlü çalıştırmak ` +
+              `hem yedeklilik verir hem ikisinin de ömrünü uzatır.`,
+          ]);
+        }
+
+        if (toplamU > 42) {
+          bulgular.push([
+            'uyari',
+            `<b>${toplamU}U tek kabine sığmaz.</b> Standart kabin 42U'dur ve anahtar, kablo ` +
+              `düzenleyici ve hava akışı için boşluk da gerekir. İkinci kabin planlayın.`,
+          ]);
+        }
+
+        el('#g-bulgular').innerHTML =
+          '<ul class="g-liste">' +
+          (bulgular.length
+            ? bulgular.map(([tip, m]) => `<li data-tip="${tip}">${m}</li>`).join('')
+            : '<li data-tip="ok">Cihaz ekleyin.</li>') +
+          '</ul>';
+
+        const durum = el('#g-durum');
+        const hataSayisi = bulgular.filter(([t]) => t === 'hata').length;
+        durum.className = 'arac-durum ' + (hataSayisi ? 'hata' : 'ok');
+        durum.textContent = hataSayisi
+          ? `${hataSayisi} kritik sorun var.`
+          : `${(toplamWatt / 1000).toFixed(2)} kW yük, %${Math.round(upsYuk)} UPS doluluğu.`;
+      }
+
+      /* --- olaylar --- */
+      document.addEventListener('input', (e) => {
+        const satir = e.target.closest('.g-kural');
+        if (satir) {
+          const c = cihazlar.find((x) => x.kimlik === Number(satir.dataset.kimlik));
+          if (c) {
+            c.ad = satir.querySelector('.g-ad').value;
+            c.adet = Number(satir.querySelector('.g-adet').value) || 1;
+            c.watt = Number(satir.querySelector('.g-watt').value) || 0;
+            c.u = Number(satir.querySelector('.g-u').value) || 0;
+          }
+          hesapla();
+          return;
+        }
+        if (e.target.closest('.arac-alan')) hesapla();
+      });
+
+      document.addEventListener('click', (e) => {
+        if (e.target.closest('#g-ekle')) {
+          cihazEkle();
+          return;
+        }
+        const sil = e.target.closest('.g-sil');
+        if (sil) {
+          const satir = sil.closest('.g-kural');
+          cihazlar = cihazlar.filter((x) => x.kimlik !== Number(satir.dataset.kimlik));
+          ciz();
+        }
+      });
+
+      el('#g-ornek').addEventListener('click', () => {
+        cihazlar = [];
+        sayac = 0;
+        cihazEkle({ ad: 'Sanallaştırma sunucusu', adet: 4, watt: 520, u: 2 });
+        cihazEkle({ ad: 'Depolama ünitesi', adet: 1, watt: 780, u: 4 });
+        cihazEkle({ ad: 'Yedekleme sunucusu', adet: 1, watt: 380, u: 2 });
+        cihazEkle({ ad: 'Omurga anahtar', adet: 2, watt: 150, u: 1 });
+        cihazEkle({ ad: 'Güvenlik duvarı', adet: 2, watt: 90, u: 1 });
+      });
+
+      cihazEkle({ ad: 'Sanallaştırma sunucusu', adet: 3, watt: 520, u: 2 });
+      cihazEkle({ ad: 'Depolama ünitesi', adet: 1, watt: 780, u: 4 });
+      cihazEkle({ ad: 'Omurga anahtar', adet: 2, watt: 150, u: 1 });
+    })();
+  </script>
+
+  <style>
+    .arac-dugmeler {
+      display: flex;
+      gap: 10px;
+      flex-wrap: wrap;
+      margin-top: 4px;
+    }
+    .g-kurallar {
+      display: grid;
+      gap: 9px;
+      margin-bottom: 12px;
+    }
+    .g-kural {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      gap: 10px;
+      border: 1px solid var(--line);
+      border-radius: 10px;
+      padding: 9px 11px;
+      background: var(--paper);
+    }
+    .g-ad {
+      flex: 1 1 160px;
+      min-width: 0;
+      border: 1px solid var(--line);
+      border-radius: 7px;
+      padding: 6px 9px;
+      font: inherit;
+      font-size: 13px;
+      background: var(--bg);
+      color: var(--ink);
+    }
+    .g-mini {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      font-size: 12px;
+      color: var(--muted);
+    }
+    .g-mini input {
+      width: 5.5em;
+      border: 1px solid var(--line);
+      border-radius: 7px;
+      padding: 6px 8px;
+      font: inherit;
+      font-size: 13px;
+      background: var(--bg);
+      color: var(--ink);
+    }
+    .g-sil {
+      margin-left: auto;
+      border: 1px solid var(--line);
+      background: transparent;
+      border-radius: 7px;
+      width: 28px;
+      height: 28px;
+      cursor: pointer;
+      color: var(--muted);
+      font-size: 16px;
+      line-height: 1;
+    }
+    .g-sil:hover {
+      border-color: light-dark(#dc2626, #f87171);
+      color: light-dark(#dc2626, #f87171);
+    }
+    .g-kartlar {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(min(160px, 100%), 1fr));
+      gap: 10px;
+      margin-bottom: 18px;
+    }
+    .g-kart {
+      border: 1px solid var(--line);
+      border-radius: 11px;
+      padding: 13px 15px;
+      display: grid;
+      gap: 3px;
+      background: var(--paper);
+    }
+    .g-kart-b {
+      font-size: 11.5px;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+      color: var(--muted);
+    }
+    .g-kart-d {
+      font-size: 22px;
+      letter-spacing: -0.02em;
+      font-family: var(--mono, ui-monospace, monospace);
+      color: var(--indigo-metin);
+    }
+    .g-kart-n {
+      font-size: 12px;
+      color: var(--muted);
+      line-height: 1.45;
+    }
+    .g-cubuklar {
+      display: grid;
+      gap: 15px;
+    }
+    .g-cubuk-ust {
+      display: flex;
+      justify-content: space-between;
+      font-size: 13px;
+      margin-bottom: 5px;
+    }
+    .g-ray {
+      height: 10px;
+      border-radius: 999px;
+      background: var(--tint);
+      overflow: hidden;
+      border: 1px solid var(--line);
+      position: relative;
+    }
+    .g-ray i {
+      display: block;
+      height: 100%;
+      background: var(--indigo);
+    }
+    .g-ray u {
+      position: absolute;
+      top: -2px;
+      bottom: -2px;
+      width: 2px;
+      background: var(--muted);
+      opacity: 0.7;
+      text-decoration: none;
+    }
+    .g-cubuk[data-durum='kritik'] .g-ray i {
+      background: light-dark(#dc2626, #f87171);
+    }
+    .g-cubuk[data-durum='uyari'] .g-ray i {
+      background: light-dark(#f0c33c, #a97f1c);
+    }
+    .g-cubuk-alt {
+      font-size: 12px;
+      color: var(--muted);
+      margin-top: 4px;
+      display: block;
+    }
+    .g-liste,
+    .g-ipuclari {
+      list-style: none;
+      margin: 0;
+      padding: 0;
+      display: grid;
+      gap: 12px;
+    }
+    .g-liste li,
+    .g-ipuclari li {
+      font-size: 13.5px;
+      line-height: 1.62;
+      color: var(--ink-soft);
+      border-left: 2px solid var(--line);
+      padding-left: 13px;
+    }
+    .g-liste li[data-tip='hata'] {
+      border-left-color: light-dark(#dc2626, #f87171);
+    }
+    .g-liste li[data-tip='uyari'] {
+      border-left-color: light-dark(#f0c33c, #a97f1c);
+    }
+    .g-liste li[data-tip='ok'] {
+      border-left-color: light-dark(#16a34a, #4ade80);
+    }
+  </style>
+</Base>

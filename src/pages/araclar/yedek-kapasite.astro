@@ -3,8 +3,8 @@ import Base from '../../layouts/Base.astro';
 ---
 
 <Base
-  baslik="Yedekleme kapasitesi planlayıcı"
-  aciklama="Veri boyutu, değişim oranı ve saklama politikasından gereken yedek deposu kapasitesini hesaplar; günlük, haftalık, aylık ve yıllık kopyaların payını ayrı ayrı gösterir."
+  baslik="Yedekleme kapasitesi ve saklama planlayıcı"
+  aciklama="Büyükbaba-baba-oğul saklama planından kaç kopya, ne kadar disk ve hangi geri dönüş noktaları çıkacağını hesaplar. 3-2-1 kuralı denetimiyle."
   aramaya={true}
   kategori="Araç"
 >
@@ -15,10 +15,11 @@ import Base from '../../layouts/Base.astro';
           class="ayrac">/</span
         ><span aria-current="page">Yedek kapasitesi</span>
       </nav>
-      <h1>Yedekleme kapasitesi planlayıcı</h1>
-      <p style="color:var(--muted);font-size:14px;margin-top:8px;max-width:64ch">
-        "Ne kadar disk alalım?" sorusunun cevabı veri boyutunda değil, <strong>saklama
-        politikasında</strong> saklıdır. Politikayı girin, gereken alan çıksın.
+      <h1>Yedekleme kapasitesi ve saklama planlayıcı</h1>
+      <p style="color:var(--muted);font-size:14px;margin-top:8px;max-width:66ch">
+        "Günlük 14, haftalık 8, aylık 12" yazmak kolay; bunun kaç kopya ve kaç terabayt ettiğini
+        kestirmek değil. Verinizi ve saklama planınızı girin, araç alanı, geri dönebileceğiniz
+        noktaları ve planın 3-2-1 kuralına uyup uymadığını çıkarsın.
       </p>
     </div>
   </div>
@@ -28,215 +29,451 @@ import Base from '../../layouts/Base.astro';
       <h2 class="arac-h2"><span class="arac-no">1</span> Veri</h2>
       <div class="arac-alanlar">
         <label class="arac-alan"
-          >Yedeklenecek veri (TB)
-          <input id="y-veri" type="number" min="0.1" step="0.5" value="5" />
+          >Tam yedek boyutu (GB)
+          <input id="y-boyut" type="number" min="1" max="1000000" value="800" />
+          <small>Sıkıştırma ve tekilleştirme <b>sonrası</b> gerçekleşen boyut.</small>
         </label>
         <label class="arac-alan"
           >Günlük değişim oranı (%)
-          <span class="arac-kaydirac">
-            <input id="y-degisim" type="range" min="1" max="20" step="1" value="3" />
-            <output for="y-degisim" id="y-degisim-deger">3</output>
-          </span>
-        </label>
-        <label class="arac-alan"
-          >Sıkıştırma + tekilleştirme kazancı (%)
-          <span class="arac-kaydirac">
-            <input id="y-kazanc" type="range" min="0" max="80" step="5" value="50" />
-            <output for="y-kazanc" id="y-kazanc-deger">50</output>
-          </span>
+          <input id="y-degisim" type="number" min="0.1" step="0.1" max="100" value="3" />
+          <small>Artımlı yedeğin tam yedeğe oranı. Dosya sunucusunda 1-3, veri tabanında 5-15.</small>
         </label>
         <label class="arac-alan"
           >Yıllık veri büyümesi (%)
-          <span class="arac-kaydirac">
-            <input id="y-buyume" type="range" min="0" max="60" step="5" value="20" />
-            <output for="y-buyume" id="y-buyume-deger">20</output>
-          </span>
+          <input id="y-buyume" type="number" min="0" max="200" value="25" />
+        </label>
+        <label class="arac-alan"
+          >Yedek türü
+          <select id="y-tur">
+            <option value="artimli">Tam + artımlı (haftada bir tam)</option>
+            <option value="fark">Tam + farksal (haftada bir tam)</option>
+            <option value="hep-tam">Her seferinde tam</option>
+            <option value="sonsuz">Sonsuz artımlı (sentetik tam)</option>
+          </select>
         </label>
       </div>
     </section>
 
     <section class="arac-blok">
-      <h2 class="arac-h2"><span class="arac-no">2</span> Saklama politikası (GFS)</h2>
+      <h2 class="arac-h2"><span class="arac-no">2</span> Saklama planı</h2>
       <div class="arac-alanlar">
         <label class="arac-alan"
           >Günlük kopya
-          <input id="y-gunluk" type="number" min="0" max="90" value="14" />
+          <input id="y-gun" type="number" min="0" max="365" value="14" />
         </label>
         <label class="arac-alan"
           >Haftalık kopya
-          <input id="y-haftalik" type="number" min="0" max="52" value="4" />
+          <input id="y-hafta" type="number" min="0" max="104" value="8" />
         </label>
         <label class="arac-alan"
           >Aylık kopya
-          <input id="y-aylik" type="number" min="0" max="36" value="12" />
+          <input id="y-ay" type="number" min="0" max="120" value="12" />
         </label>
         <label class="arac-alan"
           >Yıllık kopya
-          <input id="y-yillik" type="number" min="0" max="10" value="2" />
+          <input id="y-yil" type="number" min="0" max="30" value="7" />
+          <small>Mevzuat gereği saklama genelde buradan çıkar.</small>
         </label>
       </div>
-      <div class="arac-onaylar">
-        <label class="arac-onay"
-          ><input type="checkbox" id="y-sentetik" checked />
-          <span>Sentetik tam yedek (günlükler artımlı tutulur)</span></label
-        >
+
+      <span class="yan-etiket" style="margin-top:16px;display:block">Kopya konumları</span>
+      <div class="y-konumlar">
+        <label class="y-konum">
+          <input type="checkbox" id="y-yerel" checked />
+          <b>Yerel disk</b>
+          <span>Aynı bina, hızlı geri dönüş</span>
+        </label>
+        <label class="y-konum">
+          <input type="checkbox" id="y-ikinci" checked />
+          <b>İkinci ortam</b>
+          <span>NAS, teyp, farklı depolama ailesi</span>
+        </label>
+        <label class="y-konum">
+          <input type="checkbox" id="y-disari" />
+          <b>Bina dışı</b>
+          <span>Bulut ya da başka lokasyon</span>
+        </label>
+        <label class="y-konum">
+          <input type="checkbox" id="y-degismez" />
+          <b>Değişmez kopya</b>
+          <span>Silinemeyen, fidye yazılımına dirençli</span>
+        </label>
       </div>
-      <p class="arac-not">
-        Sentetik kipte günlük kopyalar yalnızca değişimi tutar; haftalık, aylık ve yıllık kopyalar
-        tam boyuttadır. Kapalıyken her kopya tam yedek sayılır — geleneksel kaset düzeni budur.
-      </p>
+      <p class="arac-durum" id="y-durum" role="status" aria-live="polite"></p>
     </section>
 
     <section class="arac-blok">
-      <h2 class="arac-h2"><span class="arac-no">3</span> Gereken kapasite</h2>
-      <output class="arac-cikti" id="y-cikti"></output>
-      <table class="y-tablo" id="y-dagilim" style="margin-top:16px"></table>
-      <div id="y-uyari" style="margin-top:16px"></div>
+      <h2 class="arac-h2"><span class="arac-no">3</span> Sonuç</h2>
+      <div class="arac-olcum" id="y-olcum"></div>
+      <div class="y-kaydir">
+        <table class="y-tablo">
+          <thead>
+            <tr>
+              <th>Katman</th><th>Kopya</th><th>Kapsanan süre</th><th>Alan</th><th>Payı</th>
+            </tr>
+          </thead>
+          <tbody id="y-tablo"></tbody>
+        </table>
+      </div>
+      <div class="y-yillar" id="y-yillar"></div>
     </section>
 
     <section class="arac-blok">
-      <h2 class="arac-h2"><span class="arac-no">4</span> Kapasite tek başına yetmez</h2>
-      <div class="arac-kutu">
-        <ul style="margin:0">
-          <li><b>3-2-1:</b> üç kopya, iki farklı ortam, biri dışarıda. Bu hesap tek bir deponun kapasitesidir; ikinci kopyanın yerini ayrıca planlayın.</li>
-          <li><b>Değişmezlik (immutability).</b> Fidye yazılımının ilk hedefi yedeklerdir. Silinemeyen kopya olmadan kapasite planı, saldırgana ne kadar veri sunduğunuzu ölçmekten ibarettir.</li>
-          <li><b>Geri dönüş süresi.</b> 5 TB'ı yazmak, okumaktan yavaştır. Kurtarma süresini <a href="/araclar/aktarim-suresi">aktarım süresi hesaplayıcıyla</a> ayrıca ölçün.</li>
-          <li><b>Tekilleştirme oranı garanti değildir.</b> Sanal makine imajlarında yüksektir; şifreli, sıkıştırılmış ya da medya ağırlıklı verilerde neredeyse sıfırdır.</li>
-        </ul>
-      </div>
+      <h2 class="arac-h2"><span class="arac-no">4</span> Denetim</h2>
+      <div id="y-denetim"></div>
+    </section>
+
+    <section class="arac-blok">
+      <h2 class="arac-h2"><span class="arac-no">5</span> Planı yazarken</h2>
+      <ul class="y-ipuclari">
+        <li>
+          <b>3-2-1 hâlâ geçerli.</b> Üç kopya, iki farklı ortam, biri bina dışı. Fidye
+          yazılımından sonra buna bir madde daha eklendi: kopyalardan en az biri
+          <b>değişmez</b> olmalı. Yönetici hesabı ele geçirilmiş bir ortamda silinebilen yedek,
+          yedek sayılmaz.
+        </li>
+        <li>
+          <b>Saklama süresi RPO değildir.</b> Kaç kopya tuttuğunuz, ne kadar veri kaybedeceğinizi
+          belirlemez — <i>yedek sıklığı</i> belirler. Günde bir yedekle RPO'nuz 24 saattir, 14
+          kopya tutmanız bunu değiştirmez.
+        </li>
+        <li>
+          <b>Sessiz bozulmayı hesaba katın.</b> Yıllarca duran bir yedek, okunmadıkça
+          bozulduğunu söylemez. Aylık bir doğrulama işi (checksum ya da otomatik geri yükleme
+          sınaması) saklama planının ayrılmaz parçasıdır.
+        </li>
+        <li>
+          <b>Geri yükleme süresi ölçülmeden bilinmez.</b> 12 aylık zincirin ortasındaki bir
+          artımlıdan geri dönmek, tam yedekten dönmekten kat kat uzun sürer. Yılda bir kez
+          gerçekten geri yükleyip süreyi kaydedin; RTO taahhüdünüz o sayıdır.
+        </li>
+        <li>
+          <b>Mevzuat saklamayı silme yasağına çevirir.</b> Vergi ve iş hukuku kaynaklı saklama
+          süreleri genelde beş ila on yıldır. Bu kopyaların günlük havuzla aynı yerde durması
+          hem pahalı hem risklidir; ayrı, ucuz ve değişmez bir katmana taşıyın.
+        </li>
+      </ul>
     </section>
   </div>
 
   <script>
-    const el = (s) => document.querySelector(s);
-    const sayi = (n, b = 1) => new Intl.NumberFormat('tr-TR', { maximumFractionDigits: b }).format(n);
+    (() => {
+      const el = (s) => document.querySelector(s);
+      const say = (s) => Number(el(s).value) || 0;
 
-    function hesapla() {
-      const veri = +el('#y-veri').value;
-      const degisim = +el('#y-degisim').value / 100;
-      const kazanc = +el('#y-kazanc').value / 100;
-      const buyume = +el('#y-buyume').value / 100;
-      const gunluk = +el('#y-gunluk').value;
-      const haftalik = +el('#y-haftalik').value;
-      const aylik = +el('#y-aylik').value;
-      const yillik = +el('#y-yillik').value;
-      const sentetik = el('#y-sentetik').checked;
+      const alan = (gb) =>
+        gb >= 1024 ? `${(gb / 1024).toFixed(2)} TB` : `${Math.round(gb)} GB`;
 
-      for (const [k, g] of [['#y-degisim', '#y-degisim-deger'], ['#y-kazanc', '#y-kazanc-deger'], ['#y-buyume', '#y-buyume-deger']]) {
-        el(g).textContent = el(k).value;
+      function hesapla() {
+        const tam = say('#y-boyut');
+        const degisim = say('#y-degisim') / 100;
+        const buyume = say('#y-buyume') / 100;
+        const tur = el('#y-tur').value;
+
+        const gun = say('#y-gun');
+        const hafta = say('#y-hafta');
+        const ay = say('#y-ay');
+        const yil = say('#y-yil');
+
+        const artimli = tam * degisim;
+
+        /* --- katman başına alan ------------------------------------------
+           Günlük katmanda yedek türü belirleyicidir; haftalık ve üstü
+           katmanlar pratikte tam (ya da sentetik tam) kopyadır. */
+        let gunlukAlan;
+        let gunlukNot;
+        if (tur === 'hep-tam') {
+          gunlukAlan = gun * tam;
+          gunlukNot = 'her kopya tam';
+        } else if (tur === 'fark') {
+          // Farksal, son tam yedekten bu yana biriken değişimdir; hafta içinde büyür
+          const ortalamaFark = (artimli * Math.min(gun, 7)) / 2;
+          gunlukAlan = gun * ortalamaFark;
+          gunlukNot = 'farksal, hafta içinde büyür';
+        } else if (tur === 'sonsuz') {
+          // Tek sentetik tam + artımlı zincir
+          gunlukAlan = tam + gun * artimli;
+          gunlukNot = 'bir sentetik tam + zincir';
+        } else {
+          // Haftada bir tam + günlük artımlı
+          const tamSayisi = Math.max(1, Math.ceil(gun / 7));
+          gunlukAlan = tamSayisi * tam + gun * artimli;
+          gunlukNot = `${tamSayisi} tam + ${gun} artımlı`;
+        }
+
+        const haftalikAlan = hafta * tam;
+        const aylikAlan = ay * tam;
+        // Yıllık kopyalar geçmişte alındığı için o günkü (daha küçük) boyutu taşır
+        let yillikAlan = 0;
+        for (let i = 1; i <= yil; i++) yillikAlan += tam / (1 + buyume) ** i;
+
+        const toplam = gunlukAlan + haftalikAlan + aylikAlan + yillikAlan;
+
+        const katmanlar = [
+          ['Günlük', gun, gun ? `${gun} gün` : '—', gunlukAlan, gunlukNot],
+          ['Haftalık', hafta, hafta ? `${hafta} hafta (${Math.round(hafta * 7)} gün)` : '—', haftalikAlan, 'tam kopya'],
+          ['Aylık', ay, ay ? `${ay} ay` : '—', aylikAlan, 'tam kopya'],
+          ['Yıllık', yil, yil ? `${yil} yıl` : '—', yillikAlan, 'büyüme geriye doğru hesaplandı'],
+        ];
+
+        el('#y-tablo').innerHTML = katmanlar
+          .map(
+            ([ad, adet, sure, a, not]) =>
+              `<tr${adet === 0 ? ' class="y-bos"' : ''}>` +
+              `<td><b>${ad}</b><br><small>${not}</small></td>` +
+              `<td>${adet}</td>` +
+              `<td>${sure}</td>` +
+              `<td>${adet ? alan(a) : '—'}</td>` +
+              `<td>${toplam > 0 && adet ? '%' + Math.round((a / toplam) * 100) : '—'}</td>` +
+              `</tr>`
+          )
+          .join('');
+
+        const toplamKopya = gun + hafta + ay + yil;
+        const enEski =
+          yil > 0 ? `${yil} yıl` : ay > 0 ? `${ay} ay` : hafta > 0 ? `${hafta * 7} gün` : `${gun} gün`;
+
+        const konumSayisi = ['#y-yerel', '#y-ikinci', '#y-disari', '#y-degismez'].filter(
+          (k) => el(k).checked
+        ).length;
+
+        el('#y-olcum').innerHTML =
+          `<span>Toplam kopya: <b>${toplamKopya}</b></span>` +
+          `<span>Toplam alan: <b>${alan(toplam)}</b></span>` +
+          `<span>Kopya konumu: <b>${konumSayisi}</b></span>` +
+          `<span>En eski nokta: <b>${enEski}</b></span>` +
+          `<span>Alan çarpanı: <b>${(toplam / tam).toFixed(1)}×</b></span>`;
+
+        /* --- büyüme projeksiyonu --- */
+        const yillar = [1, 2, 3, 5];
+        el('#y-yillar').innerHTML =
+          '<span class="yan-etiket" style="display:block;margin-bottom:8px">Büyümeyle birlikte alan ihtiyacı</span>' +
+          '<div class="y-proje">' +
+          yillar
+            .map((n) => {
+              const carpan = (1 + buyume) ** n;
+              return (
+                `<div class="y-proje-kart"><span>${n}. yıl</span><b>${alan(toplam * carpan)}</b>` +
+                `<em>${alan(tam * carpan)} tam yedek</em></div>`
+              );
+            })
+            .join('') +
+          '</div>';
+
+        /* --- denetim --- */
+        const bulgular = [];
+        const kopyaSayisi = konumSayisi;
+
+        if (kopyaSayisi < 3) {
+          bulgular.push([
+            'hata',
+            `<b>3-2-1 sağlanmıyor.</b> Şu an ${kopyaSayisi} konum işaretli; kural en az üç kopya ister. ` +
+              `Eksik olan genelde bina dışı kopyadır — yangın, su baskını ve hırsızlık tek lokasyondaki ` +
+              `bütün kopyaları aynı anda götürür.`,
+          ]);
+        } else {
+          bulgular.push(['ok', '<b>Kopya sayısı yeterli.</b> Üç ya da daha fazla konum işaretli.']);
+        }
+
+        if (!el('#y-disari').checked) {
+          bulgular.push([
+            'hata',
+            '<b>Bina dışı kopya yok.</b> Yerel kopyalar aynı olayda birlikte kaybolur. ' +
+              'Bulut ya da ikinci lokasyon şart.',
+          ]);
+        }
+
+        if (!el('#y-degismez').checked) {
+          bulgular.push([
+            'hata',
+            '<b>Değişmez kopya yok.</b> Fidye yazılımı bulaşmalarının çoğu önce yedekleri siler. ' +
+              'Nesne kilidi, WORM teyp ya da sağlayıcı tarafında silme koruması olan en az bir katman ekleyin.',
+          ]);
+        }
+
+        if (gun > 0 && gun < 7) {
+          bulgular.push([
+            'uyari',
+            `<b>Günlük katman kısa.</b> ${gun} gün, sessiz bir bozulmanın ya da fark edilmeyen bir ` +
+              `silmenin ortaya çıkması için genelde yetmez. Kullanıcı hatasının ortalama fark edilme ` +
+              `süresi haftalarla ölçülür; günlük katmanı en az 14 güne çıkarmayı düşünün.`,
+          ]);
+        }
+
+        if (tur === 'artimli' && gun >= 14) {
+          bulgular.push([
+            'uyari',
+            `<b>Uzun artımlı zincir.</b> ${gun} günlük artımlı zincirde geri dönüş, zincirin ` +
+              `tamamının okunmasını gerektirir; hem yavaştır hem de tek bir bozuk halka sonrasını ` +
+              `kullanılamaz kılar. Sentetik tam yedek üreten bir yapı bu riski kaldırır.`,
+          ]);
+        }
+
+        if (yil > 0 && ay >= 12 && yil >= 5) {
+          bulgular.push([
+            'uyari',
+            `<b>Uzun süreli saklama pahalı katmanda.</b> ${yil} yıllık kopya toplam alanın ` +
+              `%${Math.round((yillikAlan / toplam) * 100)}'ini tutuyor. Bu kopyaları soğuk ` +
+              `depolamaya taşımak maliyeti belirgin düşürür; geri dönüş süresi uzar ama bu ` +
+              `kopyalardan zaten nadiren dönülür.`,
+          ]);
+        }
+
+        if (toplam / tam > 30) {
+          bulgular.push([
+            'uyari',
+            `<b>Alan çarpanı yüksek.</b> Tam yedeğin ${(toplam / tam).toFixed(0)} katı alan ` +
+              `gerekiyor. Tekilleştirme ve sentetik tam yedek bu sayıyı genelde yarıya indirir.`,
+          ]);
+        }
+
+        el('#y-denetim').innerHTML =
+          `<ul class="y-bulgular">` +
+          bulgular.map(([tip, m]) => `<li data-tip="${tip}">${m}</li>`).join('') +
+          `</ul>`;
+
+        const durum = el('#y-durum');
+        const hataSayisi = bulgular.filter(([t]) => t === 'hata').length;
+        if (hataSayisi) {
+          durum.className = 'arac-durum hata';
+          durum.textContent = `${hataSayisi} kritik eksik var — 4. bölüme bakın.`;
+        } else {
+          durum.className = 'arac-durum ok';
+          durum.textContent = 'Kopya ve konum yapısı sağlam görünüyor.';
+        }
       }
-      if (!veri) return;
 
-      const carpan = 1 - kazanc;
-      const tam = veri * carpan;
-      const artimli = veri * degisim * carpan;
+      document
+        .querySelectorAll('.arac-alan input, .arac-alan select, .y-konum input')
+        .forEach((g) => g.addEventListener('input', hesapla));
 
-      // İlk tam kopya her zaman vardır; sentetik kipte günlükler yalnızca değişim
-      const ilkTam = tam;
-      const gunlukAlan = sentetik ? gunluk * artimli : gunluk * tam;
-      const haftalikAlan = haftalik * tam;
-      const aylikAlan = aylik * tam;
-      const yillikAlan = yillik * tam;
-
-      const toplam = ilkTam + gunlukAlan + haftalikAlan + aylikAlan + yillikAlan;
-      const birYilSonra = toplam * (1 + buyume);
-      const ucYilSonra = toplam * Math.pow(1 + buyume, 3);
-
-      el('#y-cikti').textContent = `${sayi(toplam)} TB — bugünkü ihtiyaç · ${sayi(ucYilSonra)} TB — üç yıl sonra`;
-
-      const satirlar = [
-        ['Temel tam kopya', ilkTam, '1 adet'],
-        ['Günlük kopyalar', gunlukAlan, `${gunluk} adet${sentetik ? ' (artımlı)' : ' (tam)'}`],
-        ['Haftalık kopyalar', haftalikAlan, `${haftalik} adet (tam)`],
-        ['Aylık kopyalar', aylikAlan, `${aylik} adet (tam)`],
-        ['Yıllık kopyalar', yillikAlan, `${yillik} adet (tam)`],
-        ['TOPLAM (bugün)', toplam, ''],
-        ['Bir yıl sonra', birYilSonra, `%${el('#y-buyume').value} büyüme ile`],
-        ['Üç yıl sonra', ucYilSonra, ''],
-      ];
-
-      el('#y-dagilim').innerHTML = satirlar
-        .map(
-          ([ad, deger, not], i) =>
-            `<tr${i === 5 ? ' class="vurgu"' : ''}><th>${ad}</th><td>${sayi(deger)} TB</td><td>${not}</td></tr>`
-        )
-        .join('');
-
-      /* --- uyarılar --------------------------------------------------------- */
-      const uyarilar = [];
-      const enEskiGun = gunluk + haftalik * 7 + aylik * 30 + yillik * 365;
-      uyarilar.push({
-        sinif: 'iyi',
-        metin: `Bu politikayla en eski kurtarma noktanız yaklaşık <b>${Math.round(enEskiGun / 30)} ay</b> öncesine gidiyor.`,
-      });
-
-      if (!sentetik && gunluk > 7) {
-        uyarilar.push({
-          sinif: 'uyari',
-          metin: `${gunluk} günlük <b>tam</b> kopya çok yer tutuyor. Artımlı/sentetik tam yedeğe geçmek kapasiteyi ${sayi((gunluk * tam - gunluk * artimli))} TB azaltır.`,
-        });
-      }
-      if (kazanc >= 0.6) {
-        uyarilar.push({
-          sinif: 'uyari',
-          metin: '%60 üstü tekilleştirme kazancı yalnızca çok sayıda benzer sanal makinede görülür. Satın alma kararını bu varsayıma dayandırmayın.',
-        });
-      }
-      if (gunluk < 7) {
-        uyarilar.push({
-          sinif: 'uyari',
-          metin: `Günlük kopya sayısı ${gunluk}. Fidye yazılımı ortalama olarak fark edilene kadar günlerce sessiz kalır; ${gunluk} günlük geçmiş yetmeyebilir.`,
-        });
-      }
-      if (yillik === 0 && aylik < 12) {
-        uyarilar.push({
-          sinif: 'uyari',
-          metin: 'Bir yıldan eski kurtarma noktası yok. Yasal saklama yükümlülüğünüz varsa bu politika onu karşılamıyor.',
-        });
-      }
-      uyarilar.push({
-        sinif: 'iyi',
-        metin: `Depoyu <b>%75 doluluk</b> üstünde çalıştırmayın: ${sayi(toplam / 0.75)} TB'lık bir alanla bugünkü politika rahat çalışır.`,
-      });
-
-      el('#y-uyari').innerHTML = uyarilar
-        .map((u) => `<div class="arac-kutu ${u.sinif}" style="margin-bottom:10px">${u.metin}</div>`)
-        .join('');
-    }
-
-    document
-      .querySelectorAll('#y-veri, #y-degisim, #y-kazanc, #y-buyume, #y-gunluk, #y-haftalik, #y-aylik, #y-yillik, #y-sentetik')
-      .forEach((d) => d.addEventListener('input', hesapla));
-    hesapla();
+      hesapla();
+    })();
   </script>
 
   <style>
+    .y-konumlar {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(min(200px, 100%), 1fr));
+      gap: 10px;
+      margin-top: 6px;
+    }
+    .y-konum {
+      display: grid;
+      gap: 3px;
+      border: 1px solid var(--line);
+      border-radius: 11px;
+      padding: 12px 14px;
+      cursor: pointer;
+      background: var(--paper);
+      position: relative;
+    }
+    .y-konum input {
+      position: absolute;
+      opacity: 0;
+      pointer-events: none;
+    }
+    .y-konum b {
+      font-size: 13.5px;
+    }
+    .y-konum span {
+      font-size: 12px;
+      color: var(--muted);
+      line-height: 1.45;
+    }
+    .y-konum:has(input:checked) {
+      border-color: var(--indigo);
+      background: var(--tint);
+      box-shadow: 0 0 0 1px var(--indigo);
+    }
+    .y-kaydir {
+      overflow-x: auto;
+    }
     .y-tablo {
       width: 100%;
       border-collapse: collapse;
-      font-size: 14.5px;
+      font-size: 13px;
+      min-width: 480px;
     }
-    .y-tablo :is(th, td) {
+    .y-tablo th,
+    .y-tablo td {
       text-align: left;
-      padding: 9px 10px;
+      padding: 10px 12px;
       border-bottom: 1px solid var(--line);
+      vertical-align: top;
     }
     .y-tablo th {
+      color: var(--muted);
+      font-size: 11.5px;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+    }
+    .y-tablo small {
+      color: var(--muted);
+      font-size: 11.5px;
+    }
+    .y-tablo td:nth-child(4) {
+      font-family: var(--mono, ui-monospace, monospace);
+      color: var(--indigo-metin);
+      white-space: nowrap;
+    }
+    .y-bos {
+      opacity: 0.45;
+    }
+    .y-yillar {
+      margin-top: 20px;
+    }
+    .y-proje {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(min(130px, 100%), 1fr));
+      gap: 10px;
+    }
+    .y-proje-kart {
+      border: 1px solid var(--line);
+      border-radius: 10px;
+      padding: 11px 13px;
+      display: grid;
+      gap: 2px;
+    }
+    .y-proje-kart span {
+      font-size: 11.5px;
+      color: var(--muted);
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+    }
+    .y-proje-kart b {
+      font-size: 17px;
+      font-family: var(--mono, ui-monospace, monospace);
+    }
+    .y-proje-kart em {
+      font-style: normal;
+      font-size: 11.5px;
+      color: var(--muted);
+    }
+    .y-bulgular,
+    .y-ipuclari {
+      list-style: none;
+      margin: 0;
+      padding: 0;
+      display: grid;
+      gap: 12px;
+    }
+    .y-bulgular li,
+    .y-ipuclari li {
+      font-size: 13.5px;
+      line-height: 1.62;
       color: var(--ink-soft);
-      font-weight: 700;
-      width: 42%;
+      border-left: 2px solid var(--line);
+      padding-left: 13px;
     }
-    .y-tablo td {
-      font-family: var(--mono);
-      font-size: 14px;
+    .y-bulgular li[data-tip='hata'] {
+      border-left-color: light-dark(#dc2626, #f87171);
     }
-    .y-tablo tr.vurgu {
-      background: var(--tint);
-      font-weight: 800;
+    .y-bulgular li[data-tip='uyari'] {
+      border-left-color: light-dark(#f0c33c, #a97f1c);
     }
-    .y-tablo tr.vurgu th,
-    .y-tablo tr.vurgu td {
-      color: var(--indigo-d);
+    .y-bulgular li[data-tip='ok'] {
+      border-left-color: light-dark(#16a34a, #4ade80);
     }
   </style>
 </Base>

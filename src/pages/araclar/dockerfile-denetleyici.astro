@@ -1,0 +1,516 @@
+---
+import Base from '../../layouts/Base.astro';
+---
+
+<Base
+  baslik="Dockerfile ve Compose denetleyici"
+  aciklama="Dockerfile'ınızı yapıştırın: kök kullanıcı, sabitlenmemiş etiket, katman sırası, sızan sır ve eksik sağlık yoklaması gibi sık hataları bulur."
+  aramaya={true}
+  kategori="Araç"
+>
+  <div class="arama-bas">
+    <div class="kap">
+      <nav class="kirinti" aria-label="Kırıntı yolu" style="padding-top:0">
+        <a href="/">Ana sayfa</a><span class="ayrac">/</span><a href="/araclar">Araçlar</a><span
+          class="ayrac">/</span
+        ><span aria-current="page">Dockerfile denetleyici</span>
+      </nav>
+      <h1>Dockerfile ve Compose denetleyici</h1>
+      <p style="color:var(--muted);font-size:14px;margin-top:8px;max-width:66ch">
+        Çalışan bir Dockerfile ile iyi bir Dockerfile arasındaki fark, genelde sekiz on satırlık
+        alışkanlıktır: kök kullanıcı, <code>latest</code> etiketi, yanlış katman sırası, imaja
+        gömülmüş bir parola. Yapıştırın, hepsini gerekçesiyle listeleyeyim.
+      </p>
+    </div>
+  </div>
+
+  <div class="kap arac-sayfa">
+    <section class="arac-blok">
+      <h2 class="arac-h2"><span class="arac-no">1</span> Dosya</h2>
+      <div class="arac-alan">
+        <textarea id="k-girdi" rows="14" spellcheck="false" placeholder="FROM node:20&#10;WORKDIR /app&#10;..."
+        ></textarea>
+      </div>
+      <div class="arac-dugmeler">
+        <button type="button" class="dg" id="k-denetle">Denetle</button>
+        <button type="button" class="dg dg-hayalet" id="k-ornek">Sorunlu örnek</button>
+        <button type="button" class="dg dg-hayalet" id="k-iyi">İyi örnek</button>
+        <button type="button" class="dg dg-hayalet" id="k-temizle">Temizle</button>
+      </div>
+      <p class="arac-durum" id="k-durum" role="status" aria-live="polite"></p>
+    </section>
+
+    <section class="arac-blok" id="k-sonuc" hidden>
+      <h2 class="arac-h2"><span class="arac-no">2</span> Bulgular</h2>
+      <div class="arac-olcum" id="k-olcum"></div>
+      <div id="k-bulgular"></div>
+    </section>
+
+    <section class="arac-blok">
+      <h2 class="arac-h2"><span class="arac-no">3</span> Neden bu kurallar?</h2>
+      <ul class="k-ipuclari">
+        <li>
+          <b>Katman sırası önbelleği belirler.</b> Docker her komutu bir katman yapar ve bir
+          katman değiştiğinde <i>sonraki hepsini</i> yeniden kurar. Bu yüzden bağımlılık
+          dosyasını (<code>package.json</code>, <code>requirements.txt</code>) kaynak koddan
+          <b>önce</b> kopyalayıp kurmak gerekir: kod her değiştiğinde bağımlılıkları yeniden
+          indirmezsiniz. Tek satırlık bu değişiklik derleme süresini dakikalardan saniyelere
+          indirir.
+        </li>
+        <li>
+          <b>Silinen dosya imajdan silinmez.</b> Bir katmanda sır ekleyip sonraki katmanda
+          <code>rm</code> ile silmek işe yaramaz; dosya önceki katmanda durur ve
+          <code>docker history</code> ile çıkarılabilir. Sırlar derleme zamanında
+          <code>--secret</code>, çalışma zamanında ortam değişkeniyle verilir.
+        </li>
+        <li>
+          <b><code>latest</code> yeniden üretilebilirliği bitirir.</b> Bugün çalışan derleme,
+          yarın farklı bir temel imajla farklı davranır ve neyin değiştiğini bilemezsiniz. En
+          azından ana sürümü sabitleyin; kritik yerlerde özet (digest) ile sabitleyin.
+        </li>
+        <li>
+          <b>Kök kullanıcı gereksiz bir risktir.</b> Konteynerden kaçış açıkları çoğunlukla
+          kök ayrıcalığı gerektirir. <code>USER</code> ile ayrıcalıksız bir kullanıcıya geçmek,
+          bir satırla alınan en büyük güvenlik kazancıdır.
+        </li>
+        <li>
+          <b>Çok aşamalı derleme imajı küçültür.</b> Derleyici, test araçları ve kaynak kod
+          nihai imajda durmak zorunda değil. Küçük imaj hem hızlı dağıtılır hem daha az saldırı
+          yüzeyi taşır.
+        </li>
+        <li>
+          <b>Sağlık yoklaması olmadan orkestratör kör kalır.</b> Süreç ayakta ama uygulama
+          yanıt vermiyorsa Docker bunu bilemez ve trafiği göndermeye devam eder.
+          <code>HEALTHCHECK</code> ya da Kubernetes'te <code>readinessProbe</code> bu boşluğu
+          kapatır.
+        </li>
+      </ul>
+    </section>
+  </div>
+
+  <script>
+    (() => {
+      const el = (s) => document.querySelector(s);
+      const kacir = (s) =>
+        String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+
+      /* --- satırları ayrıştır -------------------------------------------------
+         Ters eğik çizgiyle devam eden satırlar birleştirilir. */
+      function satirlariAyir(ham) {
+        const satirlar = ham.replace(/\r\n?/g, '\n').split('\n');
+        const cikti = [];
+        let birikim = null;
+
+        for (let i = 0; i < satirlar.length; i++) {
+          const ham2 = satirlar[i];
+          const t = ham2.trim();
+
+          if (birikim) {
+            birikim.metin += ' ' + t.replace(/\\$/, '');
+            if (!t.endsWith('\\')) {
+              cikti.push(birikim);
+              birikim = null;
+            }
+            continue;
+          }
+
+          if (!t || t.startsWith('#')) continue;
+
+          const kayit = { no: i + 1, metin: t.replace(/\\$/, '') };
+          if (t.endsWith('\\')) birikim = kayit;
+          else cikti.push(kayit);
+        }
+        if (birikim) cikti.push(birikim);
+        return cikti;
+      }
+
+      const komutAl = (metin) => (/^([A-Za-z]+)\s/.exec(metin)?.[1] ?? '').toUpperCase();
+
+      function denetle(ham) {
+        const satirlar = satirlariAyir(ham);
+        const bulgular = [];
+        const ekle = (tip, baslik, metin, no = null) =>
+          bulgular.push({ tip, baslik, metin, no });
+
+        const komutlar = satirlar.map((s) => ({ ...s, komut: komutAl(s.metin) }));
+        const varMi = (k) => komutlar.some((s) => s.komut === k);
+        const hepsi = (k) => komutlar.filter((s) => s.komut === k);
+
+        const composeMu = /^\s*(services|version)\s*:/m.test(ham) && !varMi('FROM');
+
+        /* --- Compose dosyası --- */
+        if (composeMu) {
+          if (/:latest\b|image:\s*[^\s:]+\s*$/m.test(ham)) {
+            ekle('uyari', 'Sabitlenmemiş imaj etiketi',
+              'Bir ya da daha fazla servis <code>latest</code> kullanıyor ya da etiket vermiyor. ' +
+              'Aynı dosya farklı zamanlarda farklı imaj çeker.');
+          }
+          if (/privileged:\s*true/.test(ham)) {
+            ekle('hata', 'Ayrıcalıklı konteyner',
+              '<code>privileged: true</code> konteynere neredeyse tam ana makine yetkisi verir. ' +
+              'Gerçekten gerekliyse hangi yeteneğe (capability) ihtiyaç duyduğunuzu bulup ' +
+              'yalnızca onu <code>cap_add</code> ile verin.');
+          }
+          if (/\/var\/run\/docker\.sock/.test(ham)) {
+            ekle('hata', 'Docker soketi bağlanmış',
+              'Docker soketine erişebilen bir konteyner, ana makinede kök yetkisiyle istediği ' +
+              'konteyneri başlatabilir. Bu, ayrıcalık yükseltmesine açık kapıdır.');
+          }
+          if (!/restart:\s*/.test(ham)) {
+            ekle('uyari', 'Yeniden başlatma politikası yok',
+              'Servisler <code>restart: unless-stopped</code> almazsa makine yeniden başladığında ' +
+              'kalkmaz.');
+          }
+          if (!/(deploy:|mem_limit|cpus:)/.test(ham)) {
+            ekle('uyari', 'Kaynak sınırı yok',
+              'Bellek ve CPU sınırı olmayan bir konteyner, kaçak bir süreçle ana makinenin ' +
+              'tamamını tüketebilir.');
+          }
+          if (/(password|passwd|secret|token|api[_-]?key)\s*[:=]\s*["']?[^\s"'$]{6,}/i.test(ham)) {
+            ekle('hata', 'Dosyaya gömülü sır',
+              'Compose dosyasında düz metin parola ya da anahtar görünüyor. Bu dosya sürüm ' +
+              'kontrolüne girerse sır kalıcı olarak sızar. <code>env_file</code> ya da ' +
+              '<code>secrets</code> kullanın.');
+          }
+          return { bulgular, satirSayisi: satirlar.length, tur: 'compose' };
+        }
+
+        /* --- Dockerfile --- */
+        if (!varMi('FROM')) {
+          ekle('hata', 'FROM yok', 'Dockerfile bir <code>FROM</code> ile başlamalıdır.');
+          return { bulgular, satirSayisi: satirlar.length, tur: 'bilinmiyor' };
+        }
+
+        const fromlar = hepsi('FROM');
+        const cokAsamali = fromlar.length > 1;
+
+        // Etiket sabitleme
+        for (const f of fromlar) {
+          const imaj = f.metin.replace(/^FROM\s+/i, '').split(/\s+AS\s+/i)[0].trim();
+          if (/@sha256:/.test(imaj)) continue;
+          if (/:latest$/i.test(imaj)) {
+            ekle('uyari', 'latest etiketi', `<code>${kacir(imaj)}</code> — derleme yeniden ` +
+              `üretilebilir değil. Sürüm sabitleyin.`, f.no);
+          } else if (!imaj.includes(':') && imaj !== 'scratch') {
+            ekle('uyari', 'Etiket verilmemiş', `<code>${kacir(imaj)}</code> etiketsiz; Docker ` +
+              `<code>latest</code> varsayar.`, f.no);
+          }
+        }
+
+        // Kök kullanıcı
+        const userlar = hepsi('USER');
+        const sonUser = userlar[userlar.length - 1];
+        if (!sonUser) {
+          ekle('hata', 'Kök kullanıcı olarak çalışıyor',
+            '<code>USER</code> komutu yok; konteyner kök olarak başlar. Ayrıcalıksız bir ' +
+            'kullanıcı ekleyip ona geçin — bu, tek satırla alınan en büyük güvenlik kazancıdır.');
+        } else if (/^USER\s+(root|0)\s*$/i.test(sonUser.metin)) {
+          ekle('hata', 'Son USER kök', 'Son <code>USER</code> komutu köke dönüyor.', sonUser.no);
+        }
+
+        // Katman sırası: bağımlılık kurulumu tüm kaynağı kopyalamadan önce olmalı
+        // Kaynağın tamamını kopyalama COPY ile de ADD ile de yapılabilir
+        const tumKopya = komutlar.find(
+          (s) =>
+            (s.komut === 'COPY' || s.komut === 'ADD') &&
+            /^(COPY|ADD)\s+(--\S+\s+)*\.\s+/i.test(s.metin)
+        );
+        const bagimlilikKurulumu = komutlar.find(
+          (s) =>
+            s.komut === 'RUN' &&
+            /(npm (ci|install)|yarn install|pnpm install|pip install|composer install|go mod download|dotnet restore|bundle install)/i.test(s.metin)
+        );
+        if (tumKopya && bagimlilikKurulumu && tumKopya.no < bagimlilikKurulumu.no) {
+          ekle('uyari', 'Katman sırası önbelleği boşa çıkarıyor',
+            `${tumKopya.no}. satırda tüm kaynak kopyalanıyor, bağımlılıklar ise ` +
+            `${bagimlilikKurulumu.no}. satırda kuruluyor. Kaynak her değiştiğinde bağımlılıklar ` +
+            `baştan indirilir. Önce yalnızca bağımlılık dosyasını kopyalayıp kurun, kaynağı ` +
+            `sonra kopyalayın.`, tumKopya.no);
+        }
+
+        // ADD yerine COPY
+        for (const a of hepsi('ADD')) {
+          if (/^ADD\s+(https?:|git@)/i.test(a.metin)) {
+            ekle('uyari', 'ADD ile uzaktan indirme',
+              'Uzaktan indirilen dosya doğrulanmıyor ve önbelleği kirletiyor. ' +
+              '<code>RUN curl</code> ile indirip özetini denetlemek daha güvenlidir.', a.no);
+          } else if (!/\.(tar|tgz|tar\.gz|tar\.bz2|tar\.xz|zip)\b/i.test(a.metin)) {
+            ekle('uyari', 'ADD yerine COPY',
+              '<code>ADD</code> arşivleri kendiliğinden açar ve URL indirir; beklenmedik ' +
+              'davranışa yol açar. Düz kopyalama için <code>COPY</code> kullanın.', a.no);
+          }
+        }
+
+        // apt önbelleği
+        const aptler = komutlar.filter((s) => /apt-get\s+install|apt\s+install/i.test(s.metin));
+        for (const a of aptler) {
+          if (!/rm\s+-rf\s+\/var\/lib\/apt\/lists/i.test(a.metin)) {
+            ekle('uyari', 'Paket önbelleği imajda kalıyor',
+              'Aynı <code>RUN</code> içinde <code>rm -rf /var/lib/apt/lists/*</code> ' +
+              'eklenmezse paket listesi imajda kalır ve boyutu gereksiz büyütür. ' +
+              'Ayrı bir katmanda silmek işe yaramaz.', a.no);
+          }
+          if (!/--no-install-recommends/i.test(a.metin)) {
+            ekle('uyari', 'Önerilen paketler de kuruluyor',
+              '<code>--no-install-recommends</code> eklemek imaj boyutunu ve saldırı yüzeyini ' +
+              'belirgin düşürür.', a.no);
+          }
+        }
+
+        // Sızan sır
+        for (const s of komutlar) {
+          if (s.komut !== 'ENV' && s.komut !== 'ARG' && s.komut !== 'RUN') continue;
+          const m = /(PASSWORD|PASSWD|SECRET|TOKEN|API[_-]?KEY|PRIVATE[_-]?KEY)\s*[=:]\s*["']?([^\s"'$]{6,})/i.exec(s.metin);
+          if (m && !/\$\{|\$[A-Z]/.test(m[2])) {
+            ekle('hata', 'İmaja gömülü sır',
+              `<code>${kacir(m[1])}</code> düz metin bir değerle ayarlanıyor. Bu değer imaj ` +
+              `katmanında kalıcıdır; sonradan silseniz bile <code>docker history</code> ile ` +
+              `çıkarılabilir. Derleme sırrı için <code>--secret</code>, çalışma zamanı için ` +
+              `ortam değişkeni kullanın.`, s.no);
+          }
+        }
+
+        // Sağlık yoklaması
+        if (!varMi('HEALTHCHECK')) {
+          ekle('uyari', 'Sağlık yoklaması yok',
+            'Süreç ayakta ama uygulama yanıt vermiyorsa Docker bunu göremez. ' +
+            '<code>HEALTHCHECK</code> ekleyin (Kubernetes kullanıyorsanız orada ' +
+            '<code>readinessProbe</code> yeterlidir).');
+        }
+
+        // Giriş noktası
+        if (!varMi('CMD') && !varMi('ENTRYPOINT')) {
+          ekle('hata', 'CMD ya da ENTRYPOINT yok',
+            'Konteynerin ne çalıştıracağı belirtilmemiş.');
+        }
+        const cmdler = [...hepsi('CMD'), ...hepsi('ENTRYPOINT')];
+        for (const c of cmdler) {
+          if (!/\[\s*".*"\s*\]/.test(c.metin)) {
+            ekle('uyari', 'Kabuk biçiminde giriş noktası',
+              `<code>${kacir(c.komut)} komut</code> biçimi süreci bir kabuğun altında ` +
+              `çalıştırır; <code>SIGTERM</code> uygulamaya ulaşmaz ve konteyner düzgün ` +
+              `kapanmaz. Dizi biçimini kullanın: <code>${c.komut} ["komut", "arg"]</code>.`, c.no);
+          }
+        }
+
+        // Çok aşamalı derleme
+        const derlemeIzi = komutlar.some((s) =>
+          /(npm run build|mvn |gradle |go build|dotnet publish|cargo build|make\b|webpack|tsc\b)/i.test(s.metin)
+        );
+        if (derlemeIzi && !cokAsamali) {
+          ekle('uyari', 'Çok aşamalı derleme kullanılmıyor',
+            'İmajda derleme yapılıyor ama tek aşama var; derleyici, geliştirme bağımlılıkları ' +
+            've kaynak kod nihai imajda kalıyor. İkinci bir <code>FROM</code> ile yalnızca ' +
+            'çalıştırılabilir çıktıyı taşıyın.');
+        }
+
+        // WORKDIR
+        if (!varMi('WORKDIR')) {
+          ekle('uyari', 'WORKDIR yok',
+            'Çalışma dizini belirtilmemiş; komutlar <code>/</code> içinde çalışır. ' +
+            '<code>RUN cd ...</code> ile çözmeye çalışmayın, bir sonraki komutta etkisi kalmaz.');
+        }
+
+        // EXPOSE
+        if (!varMi('EXPOSE')) {
+          ekle('uyari', 'EXPOSE yok',
+            'Belgeleme amaçlıdır ama önemlidir: imajı kullanan kişi hangi portu ' +
+            'yayımlayacağını buradan öğrenir.');
+        }
+
+        // .dockerignore hatırlatması
+        if (tumKopya) {
+          ekle('ok', '.dockerignore dosyanız var mı?',
+            'Tüm dizini kopyalıyorsunuz. <code>.dockerignore</code> yoksa ' +
+            '<code>.git</code>, <code>node_modules</code>, yerel <code>.env</code> ve derleme ' +
+            'çıktıları da imaja girer — hem boyutu şişirir hem sır sızdırabilir.');
+        }
+
+        if (cokAsamali) {
+          ekle('ok', 'Çok aşamalı derleme kullanılıyor',
+            `${fromlar.length} aşama bulundu. Nihai imajda yalnızca gereken dosyaların ` +
+            `kaldığından emin olun.`);
+        }
+        if (sonUser && !/^USER\s+(root|0)\s*$/i.test(sonUser.metin)) {
+          ekle('ok', 'Ayrıcalıksız kullanıcıya geçiliyor',
+            `<code>${kacir(sonUser.metin)}</code>`, sonUser.no);
+        }
+
+        return { bulgular, satirSayisi: satirlar.length, tur: 'dockerfile', asama: fromlar.length };
+      }
+
+      const SIRA = { hata: 0, uyari: 1, ok: 2 };
+
+      function calistir() {
+        const ham = el('#k-girdi').value;
+        const durum = el('#k-durum');
+
+        if (!ham.trim()) {
+          el('#k-sonuc').hidden = true;
+          durum.textContent = '';
+          return;
+        }
+
+        const { bulgular, satirSayisi, tur, asama } = denetle(ham);
+        bulgular.sort((a, b) => SIRA[a.tip] - SIRA[b.tip] || (a.no ?? 0) - (b.no ?? 0));
+
+        const hata = bulgular.filter((b) => b.tip === 'hata').length;
+        const uyari = bulgular.filter((b) => b.tip === 'uyari').length;
+
+        el('#k-sonuc').hidden = false;
+        el('#k-olcum').innerHTML =
+          `<span>Tür: <b>${tur === 'compose' ? 'Compose' : 'Dockerfile'}</b></span>` +
+          `<span>Komut satırı: <b>${satirSayisi}</b></span>` +
+          (asama ? `<span>Aşama: <b>${asama}</b></span>` : '') +
+          `<span>Sorun: <b>${hata}</b></span>` +
+          `<span>Uyarı: <b>${uyari}</b></span>`;
+
+        el('#k-bulgular').innerHTML =
+          '<ul class="k-liste">' +
+          bulgular
+            .map(
+              (b) =>
+                `<li data-tip="${b.tip}">` +
+                `<div class="k-bulgu-ust"><b>${b.baslik}</b>` +
+                (b.no ? `<span class="k-satir">satır ${b.no}</span>` : '') +
+                `</div><p>${b.metin}</p></li>`
+            )
+            .join('') +
+          '</ul>';
+
+        durum.className = 'arac-durum ' + (hata ? 'hata' : uyari ? '' : 'ok');
+        durum.textContent = hata
+          ? `${hata} ciddi sorun, ${uyari} uyarı bulundu.`
+          : uyari
+            ? `Ciddi sorun yok; ${uyari} iyileştirme önerisi var.`
+            : 'Denetimden temiz geçti.';
+      }
+
+      el('#k-denetle').addEventListener('click', calistir);
+      el('#k-girdi').addEventListener('input', () => {
+        if (el('#k-girdi').value.trim().length > 20) calistir();
+      });
+
+      el('#k-temizle').addEventListener('click', () => {
+        el('#k-girdi').value = '';
+        calistir();
+      });
+
+      el('#k-ornek').addEventListener('click', () => {
+        el('#k-girdi').value = [
+          'FROM node:latest',
+          '',
+          'ADD . /app',
+          'WORKDIR /app',
+          '',
+          'RUN apt-get update && apt-get install -y curl git',
+          'RUN npm install',
+          'RUN npm run build',
+          '',
+          'ENV DB_PASSWORD=Sirket2026!',
+          'ENV NODE_ENV=production',
+          '',
+          'EXPOSE 3000',
+          'CMD npm start',
+        ].join('\n');
+        calistir();
+      });
+
+      el('#k-iyi').addEventListener('click', () => {
+        el('#k-girdi').value = [
+          '# --- derleme aşaması ---',
+          'FROM node:20.11-alpine AS derleme',
+          'WORKDIR /app',
+          '',
+          '# Önce yalnızca bağımlılık dosyaları: kaynak değişince bunlar yeniden kurulmaz',
+          'COPY package.json package-lock.json ./',
+          'RUN npm ci',
+          '',
+          'COPY . .',
+          'RUN npm run build',
+          '',
+          '# --- çalışma aşaması ---',
+          'FROM node:20.11-alpine',
+          'WORKDIR /app',
+          '',
+          'RUN addgroup -S uygulama && adduser -S uygulama -G uygulama',
+          '',
+          'COPY --from=derleme --chown=uygulama:uygulama /app/dist ./dist',
+          'COPY --from=derleme --chown=uygulama:uygulama /app/node_modules ./node_modules',
+          '',
+          'USER uygulama',
+          'EXPOSE 3000',
+          '',
+          'HEALTHCHECK --interval=30s --timeout=3s --start-period=10s \\',
+          '  CMD wget -qO- http://localhost:3000/saglik || exit 1',
+          '',
+          'CMD ["node", "dist/sunucu.js"]',
+        ].join('\n');
+        calistir();
+      });
+    })();
+  </script>
+
+  <style>
+    .arac-dugmeler {
+      display: flex;
+      gap: 10px;
+      flex-wrap: wrap;
+      margin-top: 4px;
+    }
+    .k-liste,
+    .k-ipuclari {
+      list-style: none;
+      margin: 0;
+      padding: 0;
+      display: grid;
+      gap: 12px;
+    }
+    .k-liste li {
+      border: 1px solid var(--line);
+      border-left: 3px solid var(--line);
+      border-radius: 10px;
+      padding: 12px 14px;
+      background: var(--paper);
+    }
+    .k-liste li[data-tip='hata'] {
+      border-left-color: light-dark(#dc2626, #f87171);
+    }
+    .k-liste li[data-tip='uyari'] {
+      border-left-color: light-dark(#f0c33c, #a97f1c);
+    }
+    .k-liste li[data-tip='ok'] {
+      border-left-color: light-dark(#16a34a, #4ade80);
+    }
+    .k-bulgu-ust {
+      display: flex;
+      justify-content: space-between;
+      gap: 12px;
+      align-items: baseline;
+      flex-wrap: wrap;
+      margin-bottom: 5px;
+    }
+    .k-bulgu-ust b {
+      font-size: 14px;
+    }
+    .k-satir {
+      font-size: 11.5px;
+      color: var(--muted);
+      font-family: var(--mono, ui-monospace, monospace);
+      white-space: nowrap;
+    }
+    .k-liste p {
+      margin: 0;
+      font-size: 13.5px;
+      line-height: 1.62;
+      color: var(--ink-soft);
+    }
+    .k-ipuclari li {
+      font-size: 13.5px;
+      line-height: 1.62;
+      color: var(--ink-soft);
+      border-left: 2px solid var(--line);
+      padding-left: 13px;
+    }
+  </style>
+</Base>

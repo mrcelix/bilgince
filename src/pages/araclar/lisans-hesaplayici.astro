@@ -1,0 +1,527 @@
+---
+import Base from '../../layouts/Base.astro';
+---
+
+<Base
+  baslik="Windows ve SQL Server lisans hesaplayıcı"
+  aciklama="Çekirdek lisansı mı CAL mi? Sanallaştırmada kaç Datacenter gerekir? Kurulumunuzu girin, hangi modelin gerçekten ucuz olduğunu görün."
+  aramaya={true}
+  kategori="Araç"
+>
+  <div class="arama-bas">
+    <div class="kap">
+      <nav class="kirinti" aria-label="Kırıntı yolu" style="padding-top:0">
+        <a href="/">Ana sayfa</a><span class="ayrac">/</span><a href="/araclar">Araçlar</a><span
+          class="ayrac">/</span
+        ><span aria-current="page">Lisans hesaplayıcı</span>
+      </nav>
+      <h1>Windows ve SQL Server lisans hesaplayıcı</h1>
+      <p style="color:var(--muted);font-size:14px;margin-top:8px;max-width:66ch">
+        Lisanslama kuralları sezgiye aykırıdır: iki çekirdekli bir sunucu bile en az on altı
+        çekirdek lisansı ister, sekiz sanal makineden sonra Standard yerine Datacenter ucuza
+        gelir. Kurulumunuzu girin, kaç lisans gerektiğini ve neden gerektiğini görün.
+      </p>
+      <p style="color:var(--muted);font-size:13px;margin-top:10px;max-width:66ch">
+        <b>Not:</b> Bu araç lisans <i>adedini</i> hesaplar, fiyat vermez ve hukuki tavsiye
+        değildir. Kurallar sürümlere ve sözleşme türüne göre değişir; satın almadan önce
+        çözüm ortağınızla doğrulayın.
+      </p>
+    </div>
+  </div>
+
+  <div class="kap arac-sayfa">
+    <section class="arac-blok">
+      <h2 class="arac-h2"><span class="arac-no">1</span> Ürün</h2>
+      <div class="s-urunler" role="radiogroup" aria-label="Ürün">
+        {
+          [
+            ['windows', 'Windows Server', 'Çekirdek lisansı + CAL'],
+            ['sql', 'SQL Server', 'Çekirdek lisansı ya da Sunucu + CAL'],
+          ].map(([deger, ad, aciklama], i) => (
+            <label class="s-urun">
+              <input type="radio" name="s-urun" value={deger} checked={i === 0} />
+              <b>{ad}</b>
+              <span>{aciklama}</span>
+            </label>
+          ))
+        }
+      </div>
+    </section>
+
+    <section class="arac-blok">
+      <h2 class="arac-h2"><span class="arac-no">2</span> Donanım</h2>
+      <div class="arac-alanlar">
+        <label class="arac-alan"
+          >Fiziksel sunucu sayısı
+          <input id="s-sunucu" type="number" min="1" max="1000" value="3" />
+        </label>
+        <label class="arac-alan"
+          >Sunucu başına yuva
+          <input id="s-yuva" type="number" min="1" max="8" value="2" />
+        </label>
+        <label class="arac-alan"
+          >Yuva başına çekirdek
+          <input id="s-cekirdek" type="number" min="1" max="128" value="16" />
+        </label>
+        <label class="arac-alan"
+          >Sunucu başına sanal makine
+          <input id="s-vm" type="number" min="0" max="500" value="12" />
+        </label>
+        <label class="arac-alan" id="s-kullanici-alan"
+          >Kullanıcı sayısı
+          <input id="s-kullanici" type="number" min="0" max="100000" value="80" />
+        </label>
+        <label class="arac-alan" id="s-cihaz-alan"
+          >Cihaz sayısı
+          <input id="s-cihaz" type="number" min="0" max="100000" value="120" />
+          <small>Vardiyalı çalışmada cihaz sayısı kullanıcıdan az olabilir.</small>
+        </label>
+      </div>
+      <label class="s-sec" id="s-yuksek-alan">
+        <input type="checkbox" id="s-yuksek" checked />
+        <span
+          >Sanal makineler sunucular arasında taşınabiliyor
+          <i>(canlı göç, yüksek erişilebilirlik)</i></span
+        >
+      </label>
+      <p class="arac-durum" id="s-durum" role="status" aria-live="polite"></p>
+    </section>
+
+    <section class="arac-blok">
+      <h2 class="arac-h2"><span class="arac-no">3</span> Sonuç</h2>
+      <div class="s-kartlar" id="s-kartlar"></div>
+      <div class="s-kaydir">
+        <table class="s-tablo">
+          <thead>
+            <tr><th>Seçenek</th><th>Ne gerekir</th><th>Kapsam</th><th>Not</th></tr>
+          </thead>
+          <tbody id="s-tablo"></tbody>
+        </table>
+      </div>
+    </section>
+
+    <section class="arac-blok">
+      <h2 class="arac-h2"><span class="arac-no">4</span> Değerlendirme</h2>
+      <div id="s-bulgular"></div>
+    </section>
+
+    <section class="arac-blok">
+      <h2 class="arac-h2"><span class="arac-no">5</span> Kuralların özeti</h2>
+      <ul class="s-ipuclari">
+        <li>
+          <b>Alt sınırlar her şeyi belirler.</b> Windows Server'da <b>yuva başına en az 8</b>,
+          <b>sunucu başına en az 16</b> çekirdek lisanslanır. Dört çekirdekli iki yuvalı bir
+          sunucu da on altı lisans ister. SQL Server'da alt sınır <b>yuva başına 4</b>,
+          toplamda gerçekleşen çekirdek kadardır.
+        </li>
+        <li>
+          <b>Standard iki sanal makine verir, üst üste bindirilebilir.</b> Sunucuyu tam
+          lisanslamak iki Windows sanal makinesi hakkı verir; dört makine istiyorsanız aynı
+          sunucuyu ikinci kez tam lisanslarsınız. Bu yığma, sekiz on makineden sonra
+          Datacenter'ı ucuz hâle getirir.
+        </li>
+        <li>
+          <b>Datacenter sınırsızdır ama yalnızca o sunucuda.</b> Lisans fiziksel sunucuya
+          bağlıdır, sanal makineye değil. Kümede canlı göç varsa makinelerin gidebileceği
+          <i>her</i> sunucu lisanslı olmalıdır — bu, kümeyi olduğu gibi lisanslamak demektir.
+        </li>
+        <li>
+          <b>CAL'ler sunucu tarafında sayılmaz.</b> Erişen her kullanıcı ya da her cihaz için
+          bir CAL gerekir; hangisi daha az ise onu seçersiniz. Üç vardiyada aynı bilgisayarı
+          kullanan altmış kişi varsa cihaz CAL'i çok daha ucuzdur.
+        </li>
+        <li>
+          <b>SQL Server'da Sunucu+CAL modeli sınırlıdır.</b> Yalnızca Standard sürümde vardır
+          ve iç kullanıcı sayısı azken avantajlıdır. İnternete açık, kullanıcı sayısı
+          bilinmeyen bir uygulama varsa çekirdek lisansı zorunlu hâle gelir.
+        </li>
+        <li>
+          <b>Pasif yedek her zaman bedava değildir.</b> Yük devretme kopyası ancak Software
+          Assurance varsa lisanssız çalışabilir. SA yoksa yedek düğüm de tam lisans ister —
+          bu, felaket kurtarma planlarında en sık atlanan kalemdir.
+        </li>
+      </ul>
+    </section>
+  </div>
+
+  <script>
+    (() => {
+      const el = (s) => document.querySelector(s);
+      const say = (s) => Number(el(s).value) || 0;
+
+      /** Windows Server: yuva başına en az 8, sunucu başına en az 16 çekirdek. */
+      function windowsCekirdek(yuva, cekirdek) {
+        const gercek = yuva * cekirdek;
+        const yuvaTabani = yuva * 8;
+        return Math.max(gercek, yuvaTabani, 16);
+      }
+
+      /** SQL Server: yuva başına en az 4 çekirdek, ikişerli paketlerle satılır. */
+      function sqlCekirdek(yuva, cekirdek) {
+        const gercek = yuva * cekirdek;
+        const taban = yuva * 4;
+        return Math.max(gercek, taban);
+      }
+
+      function hesapla() {
+        const urun = document.querySelector('input[name="s-urun"]:checked').value;
+        const sunucu = say('#s-sunucu');
+        const yuva = say('#s-yuva');
+        const cekirdek = say('#s-cekirdek');
+        const vm = say('#s-vm');
+        const kullanici = say('#s-kullanici');
+        const cihaz = say('#s-cihaz');
+        const yuksek = el('#s-yuksek').checked;
+
+        const windowsMu = urun === 'windows';
+        el('#s-cihaz-alan').hidden = !windowsMu;
+        el('#s-yuksek-alan').hidden = false;
+
+        const cekirdekBasina = windowsMu
+          ? windowsCekirdek(yuva, cekirdek)
+          : sqlCekirdek(yuva, cekirdek);
+        const gercekCekirdek = yuva * cekirdek;
+        const tabanFarki = cekirdekBasina - gercekCekirdek;
+
+        const satirlar = [];
+        const bulgular = [];
+
+        if (windowsMu) {
+          // Standard: iki sanal makine hakkı; fazlası için lisans yığılır
+          const yigin = Math.max(1, Math.ceil(vm / 2));
+          const standardCekirdek = cekirdekBasina * yigin * sunucu;
+          const datacenterCekirdek = cekirdekBasina * sunucu;
+          // Çekirdek lisansları ikişerli paketlerle satılır
+          const paket = (n) => Math.ceil(n / 2);
+
+          const enAzCal = Math.min(kullanici || Infinity, cihaz || Infinity);
+          const calTuru = (kullanici || Infinity) <= (cihaz || Infinity) ? 'kullanıcı' : 'cihaz';
+
+          satirlar.push([
+            'Standard',
+            `${standardCekirdek} çekirdek lisansı<br><small>${paket(standardCekirdek)} adet 2\'li paket</small>`,
+            `Sunucu başına ${vm} sanal makine`,
+            vm > 2
+              ? `${yigin} kat lisans yığılıyor — ${vm} makine için sunucu ${yigin} kez tam lisanslanmalı`
+              : 'Tek kat lisans yeterli',
+          ]);
+          satirlar.push([
+            'Datacenter',
+            `${datacenterCekirdek} çekirdek lisansı<br><small>${paket(datacenterCekirdek)} adet 2\'li paket</small>`,
+            'Sınırsız sanal makine',
+            'Sunucu başına tek kat; sanal makine sayısı önemsiz',
+          ]);
+          satirlar.push([
+            'CAL',
+            enAzCal === Infinity ? '—' : `${enAzCal} adet ${calTuru} CAL`,
+            'Sunucuya erişen her kullanıcı ya da cihaz',
+            `${calTuru === 'kullanıcı' ? 'Kullanıcı' : 'Cihaz'} CAL daha az sayıda — ` +
+              `kullanıcı ${kullanici}, cihaz ${cihaz}`,
+          ]);
+
+          const kazanc = standardCekirdek - datacenterCekirdek;
+          if (vm > 2 && kazanc > 0) {
+            bulgular.push([
+              vm >= 8 ? 'hata' : 'uyari',
+              `<b>Datacenter ${kazanc} çekirdek lisansı daha az istiyor.</b> Standard'da ` +
+                `${vm} sanal makine için lisansı ${yigin} kez yığmanız gerekiyor ` +
+                `(${standardCekirdek} çekirdek), Datacenter'da tek kat yetiyor ` +
+                `(${datacenterCekirdek} çekirdek). ${vm >= 8 ? 'Bu sayıda makinede Datacenter neredeyse her zaman ucuzdur.' : 'Birim fiyatları karşılaştırın; Datacenter çekirdeği daha pahalıdır.'}`,
+            ]);
+          }
+
+          if (yuksek && sunucu > 1) {
+            bulgular.push([
+              'hata',
+              `<b>Canlı göç varsa küme tamamen lisanslanmalı.</b> Sanal makineler ` +
+                `${sunucu} sunucu arasında taşınabiliyorsa, her birinin gidebileceği <i>her</i> ` +
+                `sunucu lisanslı olmalıdır. Yukarıdaki sayılar bunu zaten kapsıyor — ama ` +
+                `"nasılsa hepsi aynı anda orada olmuyor" diye eksik lisanslamak, denetimde ` +
+                `en sık bulunan uygunsuzluktur.`,
+            ]);
+          }
+
+          if (kullanici && cihaz) {
+            const fark = Math.abs(kullanici - cihaz);
+            if (fark > Math.min(kullanici, cihaz) * 0.3) {
+              bulgular.push([
+                'ok',
+                `<b>${calTuru === 'kullanıcı' ? 'Kullanıcı' : 'Cihaz'} CAL seçin.</b> ` +
+                  `${enAzCal} adetle diğerinden ${fark} adet daha az. ` +
+                  `${calTuru === 'cihaz' ? 'Vardiyalı çalışmada cihaz CAL genelde çok daha ucuzdur.' : 'Herkesin kendi cihazı ve ayrıca telefonu varsa kullanıcı CAL doğru seçimdir.'}`,
+              ]);
+            }
+          }
+        } else {
+          // SQL Server
+          const toplamCekirdek = cekirdekBasina * sunucu;
+          const paket = Math.ceil(toplamCekirdek / 2);
+
+          satirlar.push([
+            'Çekirdek lisansı',
+            `${toplamCekirdek} çekirdek<br><small>${paket} adet 2\'li paket</small>`,
+            'Sınırsız kullanıcı',
+            'İnternete açık uygulamalarda tek geçerli model',
+          ]);
+          satirlar.push([
+            'Sunucu + CAL',
+            `${sunucu} sunucu lisansı + ${kullanici} CAL`,
+            `${kullanici} kullanıcı`,
+            'Yalnızca Standard sürümde; kullanıcı sayısı az ve belliyse avantajlı',
+          ]);
+
+          // Sanal makine başına lisanslama seçeneği
+          if (vm > 0) {
+            const vmCekirdek = Math.max(4, cekirdek) * vm * sunucu;
+            satirlar.push([
+              'Sanal makine başına',
+              `${vmCekirdek} çekirdek`,
+              `${vm * sunucu} sanal makine`,
+              'Her sanal makineye en az 4 çekirdek; az sayıda makinede ucuzdur',
+            ]);
+
+            if (vmCekirdek > toplamCekirdek) {
+              bulgular.push([
+                'ok',
+                `<b>Fiziksel lisanslama daha ucuz.</b> Sanal makine başına lisanslamak ` +
+                  `${vmCekirdek} çekirdek isterken, fiziksel sunucuyu tam lisanslamak ` +
+                  `${toplamCekirdek} çekirdek yetiyor ve o sunucuda sınırsız SQL örneği ` +
+                  `çalıştırabilirsiniz.`,
+              ]);
+            }
+          }
+
+          if (kullanici > 25) {
+            bulgular.push([
+              'uyari',
+              `<b>${kullanici} kullanıcıda Sunucu+CAL modeli genelde pahalılaşır.</b> ` +
+                `Kabaca yirmi beş kullanıcıdan sonra çekirdek lisansı öne geçer; ayrıca ` +
+                `kullanıcı sayısı büyüdükçe takip yükü de artar.`,
+            ]);
+          }
+
+          if (yuksek) {
+            bulgular.push([
+              'hata',
+              `<b>Pasif yedek düğüm bedava değildir.</b> Yük devretme kopyasının lisanssız ` +
+                `çalışabilmesi Software Assurance gerektirir. SA yoksa yedek düğüm de tam ` +
+                `lisans ister ve bu, hesabı ikiye katlar. Felaket kurtarma planlarında en sık ` +
+                `atlanan kalem budur.`,
+            ]);
+          }
+        }
+
+        /* --- ortak bulgular --- */
+        if (tabanFarki > 0) {
+          bulgular.push([
+            'uyari',
+            `<b>Alt sınır yüzünden ${tabanFarki} çekirdek fazladan lisanslanıyor.</b> ` +
+              `Sunucuda gerçekte ${gercekCekirdek} çekirdek var ama en az ${cekirdekBasina} ` +
+              `lisanslanmak zorunda. ${windowsMu ? 'Windows Server yuva başına 8, sunucu başına 16 çekirdek alt sınırı uygular.' : 'SQL Server yuva başına 4 çekirdek alt sınırı uygular.'} ` +
+              `Yeni donanım alırken az yuvalı ve çok çekirdekli seçmek bu israfı ortadan kaldırır.`,
+          ]);
+        }
+
+        if (yuva > 2 && cekirdek <= 8) {
+          bulgular.push([
+            'uyari',
+            `<b>Çok yuvalı ve az çekirdekli yapılandırma lisans açısından pahalıdır.</b> ` +
+              `${yuva} yuva × ${cekirdek} çekirdek yerine daha az yuvalı ve daha çok ` +
+              `çekirdekli bir sunucu, aynı işlem gücünü daha az lisansla verir.`,
+          ]);
+        }
+
+        el('#s-tablo').innerHTML = satirlar
+          .map(
+            ([ad, gerek, kapsam, not]) =>
+              `<tr><td><b>${ad}</b></td><td>${gerek}</td><td>${kapsam}</td>` +
+              `<td class="s-not">${not}</td></tr>`
+          )
+          .join('');
+
+        el('#s-kartlar').innerHTML = [
+          { b: 'Sunucu başına', d: `${cekirdekBasina}`, n: 'lisanslanacak çekirdek' },
+          { b: 'Gerçek çekirdek', d: `${gercekCekirdek}`, n: `${yuva} yuva × ${cekirdek}` },
+          {
+            b: 'Alt sınır farkı',
+            d: tabanFarki > 0 ? `+${tabanFarki}` : '0',
+            n: tabanFarki > 0 ? 'fazladan lisans' : 'israf yok',
+          },
+          { b: 'Toplam sunucu', d: `${sunucu}`, n: windowsMu && vm ? `${vm * sunucu} sanal makine` : '' },
+        ]
+          .map(
+            (k) =>
+              `<div class="s-kart"><span class="s-kart-b">${k.b}</span>` +
+              `<b class="s-kart-d">${k.d}</b><span class="s-kart-n">${k.n}</span></div>`
+          )
+          .join('');
+
+        el('#s-bulgular').innerHTML =
+          '<ul class="s-liste">' +
+          (bulgular.length
+            ? bulgular.map(([tip, m]) => `<li data-tip="${tip}">${m}</li>`).join('')
+            : '<li data-tip="ok">Dikkat çeken bir durum yok.</li>') +
+          '</ul>';
+
+        const durum = el('#s-durum');
+        const hataSayisi = bulgular.filter(([t]) => t === 'hata').length;
+        durum.className = 'arac-durum ' + (hataSayisi ? 'hata' : 'ok');
+        durum.textContent = hataSayisi
+          ? `${hataSayisi} nokta özellikle dikkat ister — 4. bölüme bakın.`
+          : `Sunucu başına ${cekirdekBasina} çekirdek lisansı gerekiyor.`;
+      }
+
+      document
+        .querySelectorAll('.arac-alan input, input[name="s-urun"], #s-yuksek')
+        .forEach((g) => {
+          g.addEventListener('input', hesapla);
+          g.addEventListener('change', hesapla);
+        });
+
+      hesapla();
+    })();
+  </script>
+
+  <style>
+    .s-urunler {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(min(230px, 100%), 1fr));
+      gap: 10px;
+    }
+    .s-urun {
+      display: grid;
+      gap: 3px;
+      border: 1px solid var(--line);
+      border-radius: 11px;
+      padding: 13px 15px;
+      cursor: pointer;
+      background: var(--paper);
+      position: relative;
+    }
+    .s-urun input {
+      position: absolute;
+      opacity: 0;
+      pointer-events: none;
+    }
+    .s-urun b {
+      font-size: 14px;
+    }
+    .s-urun span {
+      font-size: 12.5px;
+      color: var(--muted);
+    }
+    .s-urun:has(input:checked) {
+      border-color: var(--indigo);
+      background: var(--tint);
+      box-shadow: 0 0 0 1px var(--indigo);
+    }
+    .s-sec {
+      display: inline-flex;
+      align-items: baseline;
+      gap: 8px;
+      font-size: 13px;
+      color: var(--ink-soft);
+      cursor: pointer;
+      line-height: 1.5;
+      margin-top: 12px;
+    }
+    .s-sec i {
+      font-style: normal;
+      color: var(--muted);
+      font-size: 12px;
+    }
+    .s-kartlar {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(min(150px, 100%), 1fr));
+      gap: 10px;
+      margin-bottom: 18px;
+    }
+    .s-kart {
+      border: 1px solid var(--line);
+      border-radius: 11px;
+      padding: 13px 15px;
+      display: grid;
+      gap: 3px;
+      background: var(--paper);
+    }
+    .s-kart-b {
+      font-size: 11.5px;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+      color: var(--muted);
+    }
+    .s-kart-d {
+      font-size: 24px;
+      letter-spacing: -0.02em;
+      font-family: var(--mono, ui-monospace, monospace);
+      color: var(--indigo-metin);
+    }
+    .s-kart-n {
+      font-size: 12px;
+      color: var(--muted);
+      line-height: 1.45;
+    }
+    .s-kaydir {
+      overflow-x: auto;
+    }
+    .s-tablo {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 13px;
+      min-width: 620px;
+    }
+    .s-tablo th,
+    .s-tablo td {
+      text-align: left;
+      padding: 10px 12px;
+      border-bottom: 1px solid var(--line);
+      vertical-align: top;
+      line-height: 1.5;
+    }
+    .s-tablo th {
+      color: var(--muted);
+      font-size: 11.5px;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+    }
+    .s-tablo td:nth-child(2) {
+      font-family: var(--mono, ui-monospace, monospace);
+      color: var(--indigo-metin);
+      white-space: nowrap;
+    }
+    .s-tablo small {
+      color: var(--muted);
+      font-size: 11.5px;
+      font-family: var(--font, inherit);
+    }
+    .s-not {
+      color: var(--muted);
+      font-size: 12.5px;
+    }
+    .s-liste,
+    .s-ipuclari {
+      list-style: none;
+      margin: 0;
+      padding: 0;
+      display: grid;
+      gap: 12px;
+    }
+    .s-liste li,
+    .s-ipuclari li {
+      font-size: 13.5px;
+      line-height: 1.62;
+      color: var(--ink-soft);
+      border-left: 2px solid var(--line);
+      padding-left: 13px;
+    }
+    .s-liste li[data-tip='hata'] {
+      border-left-color: light-dark(#dc2626, #f87171);
+    }
+    .s-liste li[data-tip='uyari'] {
+      border-left-color: light-dark(#f0c33c, #a97f1c);
+    }
+    .s-liste li[data-tip='ok'] {
+      border-left-color: light-dark(#16a34a, #4ade80);
+    }
+  </style>
+</Base>

@@ -1,0 +1,551 @@
+---
+import Base from '../../layouts/Base.astro';
+---
+
+<Base
+  baslik="Kesinti sonrası rapor üreteci"
+  aciklama="Olay zaman çizelgesini girin: tespit, müdahale ve çözüm sürelerini hesaplayıp yönetime sunulabilir bir kesinti raporu üretir."
+  aramaya={true}
+  kategori="Araç"
+>
+  <div class="arama-bas">
+    <div class="kap">
+      <nav class="kirinti" aria-label="Kırıntı yolu" style="padding-top:0">
+        <a href="/">Ana sayfa</a><span class="ayrac">/</span><a href="/araclar">Araçlar</a><span
+          class="ayrac">/</span
+        ><span aria-current="page">Kesinti raporu</span>
+      </nav>
+      <h1>Kesinti sonrası rapor üreteci</h1>
+      <p style="color:var(--muted);font-size:14px;margin-top:8px;max-width:66ch">
+        Kesinti bittikten sonra en zor iş, olanı yazıya dökmektir. Zaman çizelgesini girin;
+        araç tespit, müdahale ve çözüm sürelerini hesaplasın, SLA etkisini çıkarsın ve
+        paylaşılabilir bir rapor taslağı üretsin. Suçlu arayan değil, tekrarını önleyen bir
+        biçim.
+      </p>
+    </div>
+  </div>
+
+  <div class="kap arac-sayfa">
+    <section class="arac-blok">
+      <h2 class="arac-h2"><span class="arac-no">1</span> Olay</h2>
+      <div class="arac-alanlar">
+        <label class="arac-alan"
+          >Başlık
+          <input id="o-baslik" type="text" spellcheck="false" value="Sipariş servisi yanıt vermedi" />
+        </label>
+        <label class="arac-alan"
+          >Etkilenen servis
+          <input id="o-servis" type="text" spellcheck="false" value="siparis-api, web mağaza" />
+        </label>
+        <label class="arac-alan"
+          >Şiddet
+          <select id="o-siddet">
+            <option value="1">S1 — Tam kesinti, iş duruyor</option>
+            <option value="2" selected>S2 — Ciddi bozulma, kısmi çalışıyor</option>
+            <option value="3">S3 — Sınırlı etki, geçici çözüm var</option>
+            <option value="4">S4 — Küçük sorun, kullanıcı fark etmedi</option>
+          </select>
+        </label>
+        <label class="arac-alan"
+          >Etkilenen kullanıcı
+          <input id="o-kullanici" type="number" min="0" max="10000000" value="1200" />
+        </label>
+        <label class="arac-alan"
+          >Aylık SLA taahhüdü (%)
+          <input id="o-sla" type="number" min="90" step="0.01" max="100" value="99.9" />
+        </label>
+        <label class="arac-alan"
+          >Bu ay önceki kesinti (dk)
+          <input id="o-onceki" type="number" min="0" max="44640" value="0" />
+        </label>
+      </div>
+    </section>
+
+    <section class="arac-blok">
+      <h2 class="arac-h2"><span class="arac-no">2</span> Zaman çizelgesi</h2>
+      <div class="arac-alanlar">
+        <label class="arac-alan"
+          >Sorun başladı
+          <input id="o-basladi" type="datetime-local" />
+          <small>Günlüklerdeki ilk anormallik — fark edildiği an değil.</small>
+        </label>
+        <label class="arac-alan"
+          >Fark edildi
+          <input id="o-fark" type="datetime-local" />
+          <small>İzleme uyardı ya da kullanıcı bildirdi.</small>
+        </label>
+        <label class="arac-alan"
+          >Müdahale başladı
+          <input id="o-mudahale" type="datetime-local" />
+          <small>Birileri gerçekten bakmaya başladı.</small>
+        </label>
+        <label class="arac-alan"
+          >Sebep bulundu
+          <input id="o-sebep" type="datetime-local" />
+        </label>
+        <label class="arac-alan"
+          >Servis düzeldi
+          <input id="o-duzeldi" type="datetime-local" />
+        </label>
+        <label class="arac-alan"
+          >Nasıl fark edildi?
+          <select id="o-tespit">
+            <option value="izleme">İzleme sistemi uyardı</option>
+            <option value="kullanici" selected>Kullanıcı bildirdi</option>
+            <option value="tesadüf">Tesadüfen görüldü</option>
+            <option value="musteri">Müşteri şikâyet etti</option>
+          </select>
+        </label>
+      </div>
+      <p class="arac-durum" id="o-durum" role="status" aria-live="polite"></p>
+    </section>
+
+    <section class="arac-blok">
+      <h2 class="arac-h2"><span class="arac-no">3</span> Ölçümler</h2>
+      <div class="o-kartlar" id="o-kartlar"></div>
+      <div class="o-serit" id="o-serit"></div>
+    </section>
+
+    <section class="arac-blok">
+      <h2 class="arac-h2"><span class="arac-no">4</span> Anlatı</h2>
+      <div class="arac-alanlar">
+        <label class="arac-alan" style="grid-column:1/-1"
+          >Ne oldu?
+          <textarea id="o-neOldu" rows="3" spellcheck="false"
+            >Sipariş servisinin veri tabanı bağlantı havuzu doldu; yeni istekler bağlantı bekleyip zaman aşımına uğradı.</textarea
+          >
+        </label>
+        <label class="arac-alan" style="grid-column:1/-1"
+          >Kök neden
+          <textarea id="o-kok" rows="3" spellcheck="false"
+            >Bir raporlama işi, işlem kapatmadan uzun süren sorgular açtı ve havuzdaki bağlantıları tuttu. Havuz sınırı yeni sürümde düşürülmüştü ama raporlama işi buna göre gözden geçirilmemişti.</textarea
+          >
+        </label>
+        <label class="arac-alan" style="grid-column:1/-1"
+          >Nasıl çözüldü?
+          <textarea id="o-cozum" rows="2" spellcheck="false"
+            >Raporlama işi durduruldu, havuz sıfırlandı, servis yeniden başlatıldı.</textarea
+          >
+        </label>
+      </div>
+    </section>
+
+    <section class="arac-blok">
+      <h2 class="arac-h2"><span class="arac-no">5</span> Rapor</h2>
+      <div style="position:relative">
+        <pre class="kod o-rapor"><code id="o-rapor"></code></pre>
+        <button class="kopyala" type="button" id="o-kopyala">Kopyala</button>
+      </div>
+      <div class="arac-dugmeler">
+        <button type="button" class="dg dg-hayalet" id="o-indir">Markdown indir</button>
+      </div>
+    </section>
+
+    <section class="arac-blok">
+      <h2 class="arac-h2"><span class="arac-no">6</span> İyi bir kesinti raporu</h2>
+      <ul class="o-ipuclari">
+        <li>
+          <b>Kişi değil sistem sorumludur.</b> "Ahmet yanlış komutu çalıştırdı" bir kök neden
+          değildir; asıl soru şudur: yanlış komutun üretimi durdurabilmesi nasıl mümkün oldu?
+          İnsanı suçlayan raporlar, bir sonraki sefere insanların bir şey anlatmamasına yol
+          açar — ve bu, kesintiden daha pahalıdır.
+        </li>
+        <li>
+          <b>Tespit süresi çözüm süresinden önemlidir.</b> İki saatlik bir kesintinin bir buçuk
+          saati "kimse fark etmedi" ise, sorun teknik değil izlemededir. Bu iki süreyi ayrı
+          ölçmek, nereye yatırım yapılacağını doğrudan söyler.
+        </li>
+        <li>
+          <b>Beş kere "neden" diye sorun.</b> İlk cevap hep belirtidir. Havuz doldu → neden?
+          Uzun sorgular tuttu → neden? İşlem kapatılmadı → neden? Kod incelemesinde
+          yakalanmadı → neden? Bu tür bir denetim listesi yok → <i>işte eylem maddesi burada</i>.
+        </li>
+        <li>
+          <b>Eylem maddesinin sahibi ve tarihi olmalı.</b> "İzleme iyileştirilecek" bir eylem
+          maddesi değil, bir temennidir. "Bağlantı havuzu doluluğu için uyarı eşiği eklenecek —
+          Ayşe, 5 Eylül" eylem maddesidir. Sahipsiz maddeler bir sonraki kesintide aynen
+          tekrar yazılır.
+        </li>
+        <li>
+          <b>SLA hesabını dürüst tutun.</b> Kesinti süresini kısa göstermek kimseye fayda
+          sağlamaz; ay sonunda taahhüdü aşıp aşmadığınızı bilmek, müşteriye önce sizin haber
+          vermenizi sağlar. Rapordaki en değerli cümle çoğu zaman "bu ay kalan payımız şu
+          kadar" cümlesidir.
+        </li>
+      </ul>
+    </section>
+  </div>
+
+  <script>
+    (() => {
+      const el = (s) => document.querySelector(s);
+
+      const SIDDET_ADI = {
+        1: 'S1 — Tam kesinti',
+        2: 'S2 — Ciddi bozulma',
+        3: 'S3 — Sınırlı etki',
+        4: 'S4 — Küçük sorun',
+      };
+
+      const TESPIT_ADI = {
+        izleme: 'İzleme sistemi uyardı',
+        kullanici: 'Kullanıcı bildirdi',
+        tesadüf: 'Tesadüfen görüldü',
+        musteri: 'Müşteri şikâyet etti',
+      };
+
+      function sureYaz(dk) {
+        if (!Number.isFinite(dk) || dk < 0) return '—';
+        if (dk < 60) return `${Math.round(dk)} dk`;
+        const sa = Math.floor(dk / 60);
+        const kalan = Math.round(dk % 60);
+        return kalan ? `${sa} sa ${kalan} dk` : `${sa} sa`;
+      }
+
+      const zamanAl = (kimlik) => {
+        const v = el(kimlik).value;
+        if (!v) return null;
+        const t = new Date(v);
+        return Number.isNaN(t.getTime()) ? null : t;
+      };
+
+      const zamanYaz = (t) =>
+        t
+          ? t.toLocaleString('tr-TR', {
+              day: '2-digit',
+              month: '2-digit',
+              year: 'numeric',
+              hour: '2-digit',
+              minute: '2-digit',
+            })
+          : '—';
+
+      function hesapla() {
+        const basladi = zamanAl('#o-basladi');
+        const fark = zamanAl('#o-fark');
+        const mudahale = zamanAl('#o-mudahale');
+        const sebep = zamanAl('#o-sebep');
+        const duzeldi = zamanAl('#o-duzeldi');
+
+        const dk = (a, b) => (a && b ? (b - a) / 60000 : null);
+
+        const tespitSuresi = dk(basladi, fark);
+        const mudahaleSuresi = dk(fark, mudahale);
+        const teshisSuresi = dk(mudahale, sebep);
+        const cozumSuresi = dk(sebep, duzeldi);
+        const toplamKesinti = dk(basladi, duzeldi);
+
+        /* --- SLA --- */
+        const slaYuzde = Number(el('#o-sla').value) || 99.9;
+        const onceki = Number(el('#o-onceki').value) || 0;
+        // Ay ortalaması 30,44 gün
+        const ayDakika = 30.44 * 24 * 60;
+        const izinVerilen = ayDakika * (1 - slaYuzde / 100);
+        const kullanilan = onceki + (toplamKesinti ?? 0);
+        const kalanPay = izinVerilen - kullanilan;
+        const payYuzde = izinVerilen > 0 ? (kullanilan / izinVerilen) * 100 : 0;
+
+        el('#o-kartlar').innerHTML = [
+          { b: 'Toplam kesinti', d: sureYaz(toplamKesinti), n: 'Başlangıçtan düzelmeye' },
+          { b: 'Tespit süresi', d: sureYaz(tespitSuresi), n: 'Fark edilene kadar geçen' },
+          { b: 'Müdahale süresi', d: sureYaz(mudahaleSuresi), n: 'Fark edildi → bakılmaya başlandı' },
+          { b: 'Teşhis süresi', d: sureYaz(teshisSuresi), n: 'Sebep bulunana kadar' },
+          { b: 'Çözüm süresi', d: sureYaz(cozumSuresi), n: 'Sebep bulundu → düzeldi' },
+          {
+            b: 'SLA payı',
+            d: `%${Math.round(payYuzde)}`,
+            n: kalanPay >= 0 ? `${sureYaz(kalanPay)} kaldı` : `${sureYaz(-kalanPay)} aşıldı`,
+          },
+        ]
+          .map(
+            (k) =>
+              `<div class="o-kart"><span class="o-kart-b">${k.b}</span>` +
+              `<b class="o-kart-d">${k.d}</b><span class="o-kart-n">${k.n}</span></div>`
+          )
+          .join('');
+
+        /* --- şerit --- */
+        if (toplamKesinti && toplamKesinti > 0) {
+          const dilimler = [
+            ['Fark edilmedi', tespitSuresi, 'tespit'],
+            ['Müdahale bekledi', mudahaleSuresi, 'bekleme'],
+            ['Teşhis', teshisSuresi, 'teshis'],
+            ['Düzeltme', cozumSuresi, 'cozum'],
+          ].filter(([, d]) => d !== null && d > 0);
+
+          el('#o-serit').innerHTML =
+            '<span class="yan-etiket" style="display:block;margin-bottom:8px">Süre nereye gitti?</span>' +
+            '<div class="o-bar">' +
+            dilimler
+              .map(
+                ([ad, d, sinif]) =>
+                  `<i data-dilim="${sinif}" style="flex:${d}" title="${ad}: ${sureYaz(d)}"></i>`
+              )
+              .join('') +
+            '</div><div class="o-efsane">' +
+            dilimler
+              .map(
+                ([ad, d, sinif]) =>
+                  `<span><u data-dilim="${sinif}"></u>${ad} — <b>${sureYaz(d)}</b> ` +
+                  `(%${Math.round((d / toplamKesinti) * 100)})</span>`
+              )
+              .join('') +
+            '</div>';
+        } else {
+          el('#o-serit').innerHTML = '';
+        }
+
+        /* --- durum --- */
+        const durum = el('#o-durum');
+        const sirali =
+          basladi && fark && mudahale && sebep && duzeldi
+            ? basladi <= fark && fark <= mudahale && mudahale <= sebep && sebep <= duzeldi
+            : true;
+
+        if (!sirali) {
+          durum.className = 'arac-durum hata';
+          durum.textContent =
+            'Zaman çizelgesi sıralı değil — her adım bir öncekinden sonra olmalı.';
+        } else if (tespitSuresi !== null && toplamKesinti && tespitSuresi / toplamKesinti > 0.5) {
+          durum.className = 'arac-durum hata';
+          durum.textContent =
+            `Kesintinin %${Math.round((tespitSuresi / toplamKesinti) * 100)}'i fark edilmeden ` +
+            `geçmiş. Asıl sorun burada — teknik çözümden önce izlemeye bakın.`;
+        } else if (kalanPay < 0) {
+          durum.className = 'arac-durum hata';
+          durum.textContent = `Aylık SLA taahhüdü ${sureYaz(-kalanPay)} aşıldı.`;
+        } else {
+          durum.className = 'arac-durum ok';
+          durum.textContent = `${sureYaz(toplamKesinti)} kesinti; aylık paydan ${sureYaz(kalanPay)} kaldı.`;
+        }
+
+        raporYaz({
+          basladi, fark, mudahale, sebep, duzeldi,
+          tespitSuresi, mudahaleSuresi, teshisSuresi, cozumSuresi, toplamKesinti,
+          izinVerilen, kullanilan, kalanPay,
+        });
+      }
+
+      function raporYaz(o) {
+        const baslik = el('#o-baslik').value.trim() || 'Kesinti';
+        const servis = el('#o-servis').value.trim() || '—';
+        const siddet = SIDDET_ADI[el('#o-siddet').value];
+        const kullanici = Number(el('#o-kullanici').value) || 0;
+        const tespit = TESPIT_ADI[el('#o-tespit').value];
+        const slaYuzde = Number(el('#o-sla').value) || 99.9;
+
+        const satirlar = [
+          `# Kesinti raporu — ${baslik}`,
+          '',
+          `| | |`,
+          `|---|---|`,
+          `| **Şiddet** | ${siddet} |`,
+          `| **Etkilenen servis** | ${servis} |`,
+          `| **Etkilenen kullanıcı** | ${kullanici.toLocaleString('tr-TR')} |`,
+          `| **Toplam kesinti** | ${sureYaz(o.toplamKesinti)} |`,
+          `| **Nasıl fark edildi** | ${tespit} |`,
+          '',
+          '## Zaman çizelgesi',
+          '',
+          '| Saat | Olay | Geçen süre |',
+          '|---|---|---|',
+          `| ${zamanYaz(o.basladi)} | Sorun başladı (günlüklerdeki ilk anormallik) | — |`,
+          `| ${zamanYaz(o.fark)} | Fark edildi — ${tespit.toLowerCase()} | ${sureYaz(o.tespitSuresi)} |`,
+          `| ${zamanYaz(o.mudahale)} | Müdahale başladı | ${sureYaz(o.mudahaleSuresi)} |`,
+          `| ${zamanYaz(o.sebep)} | Kök neden bulundu | ${sureYaz(o.teshisSuresi)} |`,
+          `| ${zamanYaz(o.duzeldi)} | Servis normale döndü | ${sureYaz(o.cozumSuresi)} |`,
+          '',
+          '## Ne oldu?',
+          '',
+          el('#o-neOldu').value.trim() || '(doldurun)',
+          '',
+          '## Kök neden',
+          '',
+          el('#o-kok').value.trim() || '(doldurun)',
+          '',
+          '## Nasıl çözüldü?',
+          '',
+          el('#o-cozum').value.trim() || '(doldurun)',
+          '',
+          '## SLA etkisi',
+          '',
+          `Aylık taahhüt **%${slaYuzde}** — ayda ${sureYaz(o.izinVerilen)} kesinti hakkı.`,
+          `Bu ay kullanılan: **${sureYaz(o.kullanilan)}**.`,
+          o.kalanPay >= 0
+            ? `Kalan pay: **${sureYaz(o.kalanPay)}**.`
+            : `**Taahhüt ${sureYaz(-o.kalanPay)} aşıldı.**`,
+          '',
+          '## Ne iyi gitti?',
+          '',
+          '- (doldurun — iyi giden şeyleri yazmak, onları korumanın tek yoludur)',
+          '',
+          '## Ne kötü gitti?',
+          '',
+          o.tespitSuresi !== null && o.toplamKesinti && o.tespitSuresi / o.toplamKesinti > 0.3
+            ? `- Kesintinin %${Math.round((o.tespitSuresi / o.toplamKesinti) * 100)}'i fark edilmeden geçti; izleme bu durumu yakalamadı.`
+            : '- (doldurun)',
+          '',
+          '## Eylem maddeleri',
+          '',
+          '| Ne yapılacak | Sahibi | Tarih |',
+          '|---|---|---|',
+          '| (doldurun) | | |',
+          '| (doldurun) | | |',
+          '',
+          '---',
+          '',
+          '*Bu rapor suçlu aramaz. Amaç, aynı olayın tekrar etmesini sistemsel olarak',
+          'imkânsız kılmaktır. Bir kişinin hatası bulunuyorsa, asıl soru o hatanın üretime',
+          'ulaşabilmesinin nasıl mümkün olduğudur.*',
+        ];
+
+        el('#o-rapor').textContent = satirlar.join('\n');
+      }
+
+      document
+        .querySelectorAll('.arac-alan input, .arac-alan select, .arac-alan textarea')
+        .forEach((g) => {
+          g.addEventListener('input', hesapla);
+          g.addEventListener('change', hesapla);
+        });
+
+      el('#o-kopyala').addEventListener('click', async (e) => {
+        try {
+          await navigator.clipboard.writeText(el('#o-rapor').textContent);
+          e.currentTarget.textContent = 'Kopyalandı';
+          setTimeout(() => (e.currentTarget.textContent = 'Kopyala'), 1600);
+        } catch {
+          /* pano izni yoksa kullanıcı elle seçer */
+        }
+      });
+
+      el('#o-indir').addEventListener('click', () => {
+        const b = new Blob([el('#o-rapor').textContent], { type: 'text/markdown;charset=utf-8' });
+        const a = document.createElement('a');
+        a.href = URL.createObjectURL(b);
+        a.download = 'kesinti-raporu.md';
+        a.click();
+        URL.revokeObjectURL(a.href);
+      });
+
+      // Öntanımlı: dün 14:05'te başlayan iki saatlik bir olay
+      const iki = (n) => String(n).padStart(2, '0');
+      const yaz = (t) =>
+        `${t.getFullYear()}-${iki(t.getMonth() + 1)}-${iki(t.getDate())}T${iki(t.getHours())}:${iki(t.getMinutes())}`;
+      const dun = new Date();
+      dun.setDate(dun.getDate() - 1);
+      dun.setHours(14, 5, 0, 0);
+
+      const dakikaEkle = (t, d) => new Date(t.getTime() + d * 60000);
+      el('#o-basladi').value = yaz(dun);
+      el('#o-fark').value = yaz(dakikaEkle(dun, 38));
+      el('#o-mudahale').value = yaz(dakikaEkle(dun, 46));
+      el('#o-sebep').value = yaz(dakikaEkle(dun, 92));
+      el('#o-duzeldi').value = yaz(dakikaEkle(dun, 104));
+
+      hesapla();
+    })();
+  </script>
+
+  <style>
+    .arac-dugmeler {
+      display: flex;
+      gap: 10px;
+      flex-wrap: wrap;
+      margin-top: 12px;
+    }
+    .o-kartlar {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(min(160px, 100%), 1fr));
+      gap: 10px;
+      margin-bottom: 20px;
+    }
+    .o-kart {
+      border: 1px solid var(--line);
+      border-radius: 11px;
+      padding: 13px 15px;
+      display: grid;
+      gap: 3px;
+      background: var(--paper);
+    }
+    .o-kart-b {
+      font-size: 11.5px;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+      color: var(--muted);
+    }
+    .o-kart-d {
+      font-size: 22px;
+      letter-spacing: -0.02em;
+      font-family: var(--mono, ui-monospace, monospace);
+      color: var(--indigo-metin);
+    }
+    .o-kart-n {
+      font-size: 12px;
+      color: var(--muted);
+      line-height: 1.45;
+    }
+    .o-bar {
+      display: flex;
+      height: 26px;
+      border-radius: 8px;
+      overflow: hidden;
+      border: 1px solid var(--line);
+    }
+    .o-bar i {
+      display: block;
+      min-width: 3px;
+    }
+    [data-dilim='tespit'] {
+      background: light-dark(#dc2626, #b91c1c);
+    }
+    [data-dilim='bekleme'] {
+      background: light-dark(#f59e0b, #b45309);
+    }
+    [data-dilim='teshis'] {
+      background: light-dark(#6366f1, #4f46e5);
+    }
+    [data-dilim='cozum'] {
+      background: light-dark(#16a34a, #15803d);
+    }
+    .o-efsane {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px 18px;
+      margin-top: 10px;
+      font-size: 12.5px;
+      color: var(--ink-soft);
+    }
+    .o-efsane span {
+      display: inline-flex;
+      align-items: center;
+      gap: 7px;
+    }
+    .o-efsane u {
+      width: 11px;
+      height: 11px;
+      border-radius: 3px;
+      display: inline-block;
+      text-decoration: none;
+      flex: 0 0 auto;
+    }
+    .o-rapor {
+      max-height: 480px;
+      overflow: auto;
+    }
+    .o-ipuclari {
+      list-style: none;
+      margin: 0;
+      padding: 0;
+      display: grid;
+      gap: 12px;
+    }
+    .o-ipuclari li {
+      font-size: 13.5px;
+      line-height: 1.62;
+      color: var(--ink-soft);
+      border-left: 2px solid var(--line);
+      padding-left: 13px;
+    }
+  </style>
+</Base>

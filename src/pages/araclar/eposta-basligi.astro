@@ -1,0 +1,681 @@
+---
+import Base from '../../layouts/Base.astro';
+---
+
+<Base
+  baslik="E-posta başlığı çözümleyici"
+  aciklama="Ham e-posta başlıklarını yapıştırın: teslim zincirini, her durakta geçen süreyi, SPF/DKIM/DMARC sonuçlarını ve spam işaretlerini okunur hâle getirir."
+  aramaya={true}
+  kategori="Araç"
+>
+  <div class="arama-bas">
+    <div class="kap">
+      <nav class="kirinti" aria-label="Kırıntı yolu" style="padding-top:0">
+        <a href="/">Ana sayfa</a><span class="ayrac">/</span><a href="/araclar">Araçlar</a><span
+          class="ayrac">/</span
+        ><span aria-current="page">E-posta başlığı</span>
+      </nav>
+      <h1>E-posta başlığı çözümleyici</h1>
+      <p style="color:var(--muted);font-size:14px;margin-top:8px;max-width:66ch">
+        "Posta geç geldi", "spam'e düştü", "gönderen sahte mi?" — üçünün de cevabı başlıklarda
+        yazar, ama ham hâliyle okunmaz. Yapıştırın: araç teslim zincirini sıraya koysun, her
+        durakta kaybedilen süreyi ve kimlik doğrulama sonuçlarını göstersin.
+        <b>Başlıklar tarayıcıdan çıkmaz.</b>
+      </p>
+    </div>
+  </div>
+
+  <div class="kap arac-sayfa">
+    <section class="arac-blok">
+      <h2 class="arac-h2"><span class="arac-no">1</span> Ham başlıklar</h2>
+      <p class="arac-not" style="margin-top:0">
+        Outlook'ta: iletiyi açın → <b>Dosya → Özellikler → İnternet üstbilgileri</b>.
+        Web arayüzünde: <b>Orijinali göster</b> ya da <b>Kaynağı görüntüle</b>.
+      </p>
+      <div class="arac-alan">
+        <textarea id="p-girdi" rows="10" spellcheck="false" placeholder="Received: from ..."></textarea>
+      </div>
+      <div class="arac-dugmeler">
+        <button type="button" class="dg" id="p-coz">Çözümle</button>
+        <button type="button" class="dg dg-hayalet" id="p-ornek">Örnek</button>
+        <button type="button" class="dg dg-hayalet" id="p-temizle">Temizle</button>
+      </div>
+      <p class="arac-durum" id="p-durum" role="status" aria-live="polite"></p>
+    </section>
+
+    <section class="arac-blok" id="p-ozet-blok" hidden>
+      <h2 class="arac-h2"><span class="arac-no">2</span> Özet</h2>
+      <div class="arac-olcum" id="p-olcum"></div>
+      <div class="p-satirlar" id="p-ozet"></div>
+    </section>
+
+    <section class="arac-blok" id="p-kimlik-blok" hidden>
+      <h2 class="arac-h2"><span class="arac-no">3</span> Kimlik doğrulama</h2>
+      <div class="p-rozetler" id="p-kimlik"></div>
+      <div id="p-kimlikNot"></div>
+    </section>
+
+    <section class="arac-blok" id="p-yol-blok" hidden>
+      <h2 class="arac-h2"><span class="arac-no">4</span> Teslim zinciri</h2>
+      <p class="arac-not" style="margin-top:0">
+        En eski durak en üstte. <code>Received</code> başlıkları her sunucu tarafından
+        <b>başa</b> eklenir; araç sırayı ters çevirip gönderimden teslime doğru diziyor.
+      </p>
+      <ol class="p-duraklar" id="p-duraklar"></ol>
+    </section>
+
+    <section class="arac-blok" id="p-bulgu-blok" hidden>
+      <h2 class="arac-h2"><span class="arac-no">5</span> Dikkat çekenler</h2>
+      <div id="p-bulgular"></div>
+    </section>
+
+    <section class="arac-blok">
+      <h2 class="arac-h2"><span class="arac-no">6</span> Başlıkları okurken</h2>
+      <ul class="p-ipuclari">
+        <li>
+          <b>Sadece en alttaki <code>Received</code> güvenilirdir.</b> Zinciri sizin sunucunuz
+          yukarıdan aşağı ekler; alt kısımdakileri gönderen taraf uydurmuş olabilir. Kimin
+          gerçekten bağlandığını, <i>sizin</i> sunucunuzun yazdığı en üstteki kayıt söyler.
+        </li>
+        <li>
+          <b><code>From</code> ile zarf göndereni farklı olabilir.</b> Kullanıcının gördüğü
+          <code>From</code> başlığıdır; SPF ise <code>Return-Path</code>'i (zarf göndereni)
+          denetler. Sahtecilikte tam olarak bu boşluk kullanılır — DMARC'ın çözdüğü sorun budur.
+        </li>
+        <li>
+          <b>Gecikme genelde tek bir durakta olur.</b> Toplam süreye değil, duraklar arası en
+          büyük farka bakın. Gri listeleme (greylisting) tipik olarak 5-15 dakikalık tek bir
+          gecikme yaratır ve bu normaldir.
+        </li>
+        <li>
+          <b>Saatler uyumsuz olabilir.</b> Her sunucu kendi saatini yazar; senkron değilse
+          negatif gecikme bile görürsünüz. Bir durak eksi süre gösteriyorsa o sunucunun saati
+          kaymış demektir, gerçekten zaman yolculuğu olmamıştır.
+        </li>
+        <li>
+          <b><code>Message-ID</code> yoksa şüphelenin.</b> Meşru posta sunucularının hepsi ekler.
+          Yokluğu ya da alan adıyla uyuşmaması, iletinin bir betikten ya da yanlış
+          yapılandırılmış bir aygıttan geldiğini gösterir.
+        </li>
+        <li>
+          <b>Spam puanı mutlak değildir.</b> <code>X-Spam-Score</code> alıcı sistemin kendi
+          eşiğine göre anlamlıdır. Kendi eşiğinizi bilmeden "5 puan yüksek mi?" sorusunun cevabı
+          yoktur.
+        </li>
+      </ul>
+    </section>
+  </div>
+
+  <script>
+    (() => {
+      const el = (s) => document.querySelector(s);
+      const kacir = (s) =>
+        String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+
+      /* --- başlıkları ayrıştır ------------------------------------------------
+         Katlanmış satırlar (boşlukla başlayanlar) bir öncekine eklenir. */
+      function basliklariAyir(ham) {
+        const satirlar = ham.replace(/\r\n?/g, '\n').split('\n');
+        const basliklar = [];
+        for (const s of satirlar) {
+          if (/^[ \t]/.test(s) && basliklar.length) {
+            basliklar[basliklar.length - 1].deger += ' ' + s.trim();
+            continue;
+          }
+          const i = s.indexOf(':');
+          if (i === -1) continue;
+          const ad = s.slice(0, i).trim();
+          if (!/^[\x21-\x39\x3b-\x7e]+$/.test(ad)) continue; // geçerli başlık adı
+          basliklar.push({ ad, deger: s.slice(i + 1).trim() });
+        }
+        return basliklar;
+      }
+
+      const bul = (basliklar, ad) =>
+        basliklar.find((b) => b.ad.toLowerCase() === ad.toLowerCase())?.deger ?? null;
+      const tumu = (basliklar, ad) =>
+        basliklar.filter((b) => b.ad.toLowerCase() === ad.toLowerCase()).map((b) => b.deger);
+
+      /* --- Received satırını çözümle ------------------------------------------
+         Biçim serbesttir, bu yüzden parça parça yakalanır. */
+      function receivedCoz(deger) {
+        const zamanKismi = deger.lastIndexOf(';');
+        const zamanMetni = zamanKismi === -1 ? null : deger.slice(zamanKismi + 1).trim();
+        const zaman = zamanMetni ? new Date(zamanMetni) : null;
+
+        const kimden = /\bfrom\s+([^\s;]+)/i.exec(deger);
+        const kime = /\bby\s+([^\s;]+)/i.exec(deger);
+
+        /* Bağlanan istemcinin IP'si "from" ile "by" arasında yazılır; asıl aranan
+           budur. Arama bu aralıkla sınırlanmazsa alıcı sunucunun IP'si yakalanır
+           ve zincir yanlış okunur. */
+        const fromBas = kimden ? kimden.index : 0;
+        const byBas = kime ? kime.index : deger.length;
+        const aralik = byBas > fromBas ? deger.slice(fromBas, byBas) : deger;
+        const ip = /[\[(]\s*(?:IPv6:)?((?:\d{1,3}\.){3}\d{1,3}|[0-9a-fA-F]{0,4}:[0-9a-fA-F:.]{4,})\s*[\])]/i.exec(aralik);
+
+        const protokol = /\bwith\s+(E?SMTPS?A?|LMTP|HTTP|HTTPS|local)\b/i.exec(deger);
+        const tls = /\b(TLS|SSL)\w*\s|\busing\s+TLS|version=TLS/i.test(deger);
+
+        return {
+          kimden: kimden ? kimden[1] : null,
+          kime: kime ? kime[1] : null,
+          ip: ip ? ip[1] : null,
+          protokol: protokol ? protokol[1].toUpperCase() : null,
+          tls,
+          zaman: zaman && !Number.isNaN(zaman.getTime()) ? zaman : null,
+          ham: deger,
+        };
+      }
+
+      /* --- kimlik doğrulama sonuçları ----------------------------------------- */
+      function kimlikCoz(basliklar) {
+        const kaynaklar = [
+          ...tumu(basliklar, 'Authentication-Results'),
+          ...tumu(basliklar, 'ARC-Authentication-Results'),
+          ...tumu(basliklar, 'X-MS-Exchange-Organization-AuthAs'),
+        ].join(' ; ');
+
+        const oku = (ad) => {
+          const m = new RegExp(`\\b${ad}=(\\w+)`, 'i').exec(kaynaklar);
+          return m ? m[1].toLowerCase() : null;
+        };
+
+        return {
+          spf: oku('spf'),
+          dkim: oku('dkim'),
+          dmarc: oku('dmarc'),
+          compauth: oku('compauth'),
+          ham: kaynaklar || null,
+        };
+      }
+
+      const SONUC_ACIKLAMA = {
+        pass: ['ok', 'Doğrulandı'],
+        fail: ['hata', 'Başarısız'],
+        softfail: ['uyari', 'Yumuşak başarısızlık'],
+        neutral: ['uyari', 'Tarafsız'],
+        none: ['uyari', 'Kayıt yok'],
+        permerror: ['hata', 'Kalıcı hata'],
+        temperror: ['uyari', 'Geçici hata'],
+        bestguesspass: ['uyari', 'Tahmini geçti'],
+      };
+
+      function sureYaz(ms) {
+        const sn = Math.round(ms / 1000);
+        if (Math.abs(sn) < 60) return `${sn} sn`;
+        if (Math.abs(sn) < 3600) return `${Math.round(sn / 60)} dk`;
+        return `${(sn / 3600).toFixed(1)} sa`;
+      }
+
+      function coz() {
+        const ham = el('#p-girdi').value;
+        const durum = el('#p-durum');
+
+        if (!ham.trim()) {
+          durum.className = 'arac-durum hata';
+          durum.textContent = 'Önce başlıkları yapıştırın.';
+          for (const k of ['#p-ozet-blok', '#p-kimlik-blok', '#p-yol-blok', '#p-bulgu-blok']) {
+            el(k).hidden = true;
+          }
+          return;
+        }
+
+        const basliklar = basliklariAyir(ham);
+        if (!basliklar.length) {
+          durum.className = 'arac-durum hata';
+          durum.textContent = 'Hiçbir başlık tanınmadı. "Ad: değer" biçiminde satırlar bekleniyor.';
+          return;
+        }
+
+        /* --- özet --- */
+        const alanlar = [
+          ['Konu', bul(basliklar, 'Subject')],
+          ['Gönderen', bul(basliklar, 'From')],
+          ['Zarf göndereni', bul(basliklar, 'Return-Path')],
+          ['Yanıt adresi', bul(basliklar, 'Reply-To')],
+          ['Alıcı', bul(basliklar, 'To')],
+          ['Tarih', bul(basliklar, 'Date')],
+          ['İleti kimliği', bul(basliklar, 'Message-ID')],
+          ['İstemci', bul(basliklar, 'X-Mailer') ?? bul(basliklar, 'User-Agent')],
+        ].filter(([, d]) => d);
+
+        el('#p-ozet-blok').hidden = false;
+        el('#p-ozet').innerHTML = alanlar
+          .map(
+            ([ad, deger]) =>
+              `<div class="p-satir"><span class="p-etiket">${ad}</span>` +
+              `<span class="p-deger">${kacir(deger)}</span></div>`
+          )
+          .join('');
+
+        /* --- teslim zinciri --- */
+        // Received başlıkları başa eklenir; en eski durak listenin sonundadır
+        const duraklar = tumu(basliklar, 'Received').map(receivedCoz).reverse();
+
+        const zamanli = duraklar.filter((d) => d.zaman);
+        const toplamSure =
+          zamanli.length >= 2 ? zamanli[zamanli.length - 1].zaman - zamanli[0].zaman : null;
+
+        el('#p-olcum').innerHTML =
+          `<span>Başlık: <b>${basliklar.length}</b></span>` +
+          `<span>Durak: <b>${duraklar.length}</b></span>` +
+          (toplamSure !== null ? `<span>Toplam süre: <b>${sureYaz(toplamSure)}</b></span>` : '') +
+          `<span>Boyut: <b>${(new Blob([ham]).size / 1024).toFixed(1)} KB</b></span>`;
+
+        if (duraklar.length) {
+          el('#p-yol-blok').hidden = false;
+          let oncekiZaman = null;
+          el('#p-duraklar').innerHTML = duraklar
+            .map((d, i) => {
+              const gecikme = d.zaman && oncekiZaman ? d.zaman - oncekiZaman : null;
+              if (d.zaman) oncekiZaman = d.zaman;
+              const yavas = gecikme !== null && gecikme > 60000;
+              const negatif = gecikme !== null && gecikme < -1000;
+
+              return (
+                `<li class="p-durak"${yavas ? ' data-yavas="evet"' : ''}${negatif ? ' data-negatif="evet"' : ''}>` +
+                `<div class="p-durak-ust">` +
+                `<b>${i + 1}. ${kacir(d.kime ?? 'bilinmeyen sunucu')}</b>` +
+                (gecikme !== null
+                  ? `<span class="p-gecikme">${gecikme >= 0 ? '+' : ''}${sureYaz(gecikme)}</span>`
+                  : '') +
+                `</div>` +
+                `<div class="p-durak-alt">` +
+                (d.kimden ? `<span>kimden <code>${kacir(d.kimden)}</code></span>` : '') +
+                (d.ip ? `<span>gönderen IP <code>${kacir(d.ip)}</code></span>` : '') +
+                (d.protokol ? `<span>${kacir(d.protokol)}</span>` : '') +
+                `<span class="${d.tls ? 'p-tls' : 'p-tlsyok'}">${d.tls ? 'şifreli' : 'şifresiz'}</span>` +
+                (d.zaman
+                  ? `<span>${d.zaman.toLocaleString('tr-TR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit', second: '2-digit' })}</span>`
+                  : '<span>zaman yok</span>') +
+                `</div></li>`
+              );
+            })
+            .join('');
+        } else {
+          el('#p-yol-blok').hidden = true;
+        }
+
+        /* --- kimlik doğrulama --- */
+        const kimlik = kimlikCoz(basliklar);
+        const kimlikVar = kimlik.spf || kimlik.dkim || kimlik.dmarc;
+
+        el('#p-kimlik-blok').hidden = false;
+        el('#p-kimlik').innerHTML = [
+          ['SPF', kimlik.spf, 'Gönderen sunucu bu alan adı için yetkili mi?'],
+          ['DKIM', kimlik.dkim, 'İleti imzalı mı ve imza geçerli mi?'],
+          ['DMARC', kimlik.dmarc, 'From alanı SPF ya da DKIM ile hizalı mı?'],
+        ]
+          .map(([ad, sonuc, aciklama]) => {
+            const [tip, yazi] = SONUC_ACIKLAMA[sonuc] ?? ['bilinmiyor', 'Bilgi yok'];
+            return (
+              `<div class="p-rozet" data-tip="${tip}">` +
+              `<b>${ad}</b><span class="p-sonuc">${yazi}</span>` +
+              `<span class="p-aciklama">${aciklama}</span></div>`
+            );
+          })
+          .join('');
+
+        /* --- bulgular --- */
+        const bulgular = [];
+
+        if (!kimlikVar) {
+          bulgular.push([
+            'uyari',
+            '<b>Kimlik doğrulama başlığı yok.</b> <code>Authentication-Results</code> bulunamadı. ' +
+              'İleti kurum içinden geliyorsa bu normaldir; dışarıdan geliyorsa posta ağ geçidiniz ' +
+              'SPF/DKIM/DMARC denetimi yapmıyor demektir — bu ciddi bir eksiktir.',
+          ]);
+        }
+
+        if (kimlik.dmarc === 'fail') {
+          bulgular.push([
+            'hata',
+            '<b>DMARC başarısız.</b> <code>From</code> alanındaki alan adı, SPF ya da DKIM ile ' +
+              'hizalanamıyor. Bu, iletinin görünen göndereni taklit ettiğinin en güçlü ' +
+              'göstergesidir. Alan adı sahibinin politikası <code>reject</code> olsaydı ileti ' +
+              'hiç teslim edilmeyecekti.',
+          ]);
+        }
+
+        if (kimlik.spf === 'fail' || kimlik.spf === 'softfail') {
+          bulgular.push([
+            kimlik.spf === 'fail' ? 'hata' : 'uyari',
+            `<b>SPF ${kimlik.spf}.</b> Gönderen sunucunun IP adresi, alan adının SPF kaydında ` +
+              `yetkili değil. Meşru bir sebebi olabilir — ileti yönlendirilmişse SPF doğal olarak ` +
+              `bozulur; bu yüzden tek başına SPF ile karar vermeyin, DKIM'e bakın.`,
+          ]);
+        }
+
+        // From ile Return-Path uyuşmazlığı
+        const from = bul(basliklar, 'From');
+        const donusYolu = bul(basliklar, 'Return-Path');
+        const alanCikar = (s) => {
+          const m = /@([A-Za-z0-9.-]+)/.exec(s ?? '');
+          return m ? m[1].toLowerCase().replace(/[>\s]+$/, '') : null;
+        };
+        const fromAlan = alanCikar(from);
+        const donusAlan = alanCikar(donusYolu);
+        if (fromAlan && donusAlan && fromAlan !== donusAlan) {
+          bulgular.push([
+            'uyari',
+            `<b>Görünen gönderen ile zarf göndereni farklı:</b> <code>${kacir(fromAlan)}</code> ` +
+              `karşısında <code>${kacir(donusAlan)}</code>. Bu tek başına sahtecilik demek değildir — ` +
+              `bülten servisleri ve biletleme sistemleri normalde böyle çalışır. Ama kişisel ` +
+              `görünen bir iletide bu fark varsa dikkat edin.`,
+          ]);
+        }
+
+        // Reply-To farklı
+        const yanit = bul(basliklar, 'Reply-To');
+        const yanitAlan = alanCikar(yanit);
+        if (yanitAlan && fromAlan && yanitAlan !== fromAlan) {
+          bulgular.push([
+            'uyari',
+            `<b>Yanıt adresi farklı bir alan adına gidiyor:</b> <code>${kacir(yanitAlan)}</code>. ` +
+              `İş e-postası dolandırıcılığında (BEC) en sık kullanılan yöntemlerden biri budur: ` +
+              `ileti gerçek görünür ama yanıtınız saldırgana gider.`,
+          ]);
+        }
+
+        // Message-ID eksik ya da uyumsuz
+        const iletiKimligi = bul(basliklar, 'Message-ID');
+        if (!iletiKimligi) {
+          bulgular.push([
+            'uyari',
+            '<b>Message-ID yok.</b> Meşru posta sunucuları her zaman ekler. Yokluğu, iletinin ' +
+              'bir betikten ya da yanlış yapılandırılmış bir aygıttan (tarayıcı, kamera, ' +
+              'izleme sistemi) gönderildiğini düşündürür.',
+          ]);
+        }
+
+        // Gecikmeler
+        if (zamanli.length >= 2) {
+          let enBuyuk = 0;
+          let enBuyukIndis = -1;
+          for (let i = 1; i < zamanli.length; i++) {
+            const fark = zamanli[i].zaman - zamanli[i - 1].zaman;
+            if (fark > enBuyuk) {
+              enBuyuk = fark;
+              enBuyukIndis = i;
+            }
+          }
+          if (enBuyuk > 300000) {
+            bulgular.push([
+              'uyari',
+              `<b>${sureYaz(enBuyuk)} gecikme.</b> ${enBuyukIndis + 1}. durakta ` +
+                `(<code>${kacir(zamanli[enBuyukIndis].kime ?? 'bilinmiyor')}</code>) beklenmiş. ` +
+                `5-15 dakikalık tek bir gecikme genelde gri listelemedir ve normaldir; ` +
+                `daha uzunsa kuyruk birikmesi ya da yeniden deneme döngüsü vardır.`,
+            ]);
+          }
+
+          const negatifVar = zamanli.some(
+            (d, i) => i > 0 && d.zaman - zamanli[i - 1].zaman < -60000
+          );
+          if (negatifVar) {
+            bulgular.push([
+              'uyari',
+              '<b>Zaman damgaları geriye gidiyor.</b> Bir sunucunun saati kaymış. Süre ' +
+                'hesaplarına güvenmeyin ve o sunucuda NTP eşitlemesini kontrol edin.',
+            ]);
+          }
+        }
+
+        // Şifresiz duraklar
+        const sifresiz = duraklar.filter((d) => !d.tls && d.protokol && d.protokol !== 'LOCAL');
+        if (sifresiz.length) {
+          bulgular.push([
+            'uyari',
+            `<b>${sifresiz.length} durakta şifreleme görünmüyor.</b> Received satırında TLS ` +
+              `bilgisi yoksa ileti o atlamada açık taşınmış olabilir. Bazı sunucular TLS ` +
+              `kullandığı hâlde bunu yazmaz; kesin bilgi için kendi sunucunuzun günlüğüne bakın.`,
+          ]);
+        }
+
+        // Spam puanı
+        const spamPuan = bul(basliklar, 'X-Spam-Score') ?? bul(basliklar, 'X-Spam-Status');
+        if (spamPuan) {
+          bulgular.push([
+            'ok',
+            `<b>Spam değerlendirmesi:</b> <code>${kacir(spamPuan)}</code>. Bu puan alıcı ` +
+              `sistemin kendi eşiğine göre yorumlanır; eşiğinizi bilmeden yüksek ya da düşük ` +
+              `diyemezsiniz.`,
+          ]);
+        }
+
+        if (!bulgular.length) {
+          bulgular.push(['ok', '<b>Dikkat çeken bir şey bulunamadı.</b>']);
+        }
+
+        el('#p-bulgu-blok').hidden = false;
+        el('#p-bulgular').innerHTML =
+          '<ul class="p-liste">' +
+          bulgular.map(([tip, m]) => `<li data-tip="${tip}">${m}</li>`).join('') +
+          '</ul>';
+
+        /* --- durum --- */
+        const hataSayisi = bulgular.filter(([t]) => t === 'hata').length;
+        durum.className = 'arac-durum ' + (hataSayisi ? 'hata' : kimlikVar ? 'ok' : '');
+        durum.textContent = hataSayisi
+          ? `${basliklar.length} başlık çözümlendi — ${hataSayisi} ciddi bulgu var.`
+          : `${basliklar.length} başlık, ${duraklar.length} durak çözümlendi.`;
+      }
+
+      /* --- olaylar --- */
+      el('#p-coz').addEventListener('click', coz);
+      el('#p-girdi').addEventListener('input', () => {
+        if (el('#p-girdi').value.trim().length > 40) coz();
+      });
+
+      el('#p-temizle').addEventListener('click', () => {
+        el('#p-girdi').value = '';
+        coz();
+      });
+
+      el('#p-ornek').addEventListener('click', () => {
+        el('#p-girdi').value = [
+          'Return-Path: <bounce-1a2b@pazarlama.ornek-servis.com>',
+          'Received: from posta.sirket.com.tr (10.20.0.25) by SRV-POSTA-01.sirket.local',
+          '\t(10.20.0.30) with Microsoft SMTP Server (version=TLS1_2) id 15.2.1258.12;',
+          '\tTue, 18 Aug 2026 09:41:07 +0300',
+          'Received: from mx3.ornek-servis.com (203.0.113.44) by posta.sirket.com.tr',
+          '\t(10.20.0.25) with ESMTPS id 4x9Kd2; Tue, 18 Aug 2026 09:40:52 +0300',
+          'Received: from gonderim-7.ornek-servis.com (198.51.100.17) by',
+          '\tmx3.ornek-servis.com with ESMTP id 8bQ1; Tue, 18 Aug 2026 09:26:14 +0300',
+          'Authentication-Results: posta.sirket.com.tr;',
+          '\tspf=softfail smtp.mailfrom=ornek-servis.com;',
+          '\tdkim=pass header.d=ornek-servis.com;',
+          '\tdmarc=fail action=quarantine header.from=banka-ornek.com.tr',
+          'From: "Banka Bilgilendirme" <bildirim@banka-ornek.com.tr>',
+          'Reply-To: destek@guvenli-dogrulama-merkezi.net',
+          'To: mcelik@sirket.com.tr',
+          'Subject: Hesabinizda olagandisi hareket tespit edildi',
+          'Date: Tue, 18 Aug 2026 09:26:10 +0300',
+          'Message-ID: <20260818062610.8bQ1@gonderim-7.ornek-servis.com>',
+          'X-Mailer: PHPMailer 6.8.0',
+          'X-Spam-Score: 6.2',
+          'Content-Type: text/html; charset=UTF-8',
+        ].join('\n');
+        coz();
+      });
+    })();
+  </script>
+
+  <style>
+    .arac-dugmeler {
+      display: flex;
+      gap: 10px;
+      flex-wrap: wrap;
+      margin-top: 4px;
+    }
+    .p-satirlar {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr);
+      gap: 7px;
+    }
+    .p-satir {
+      display: grid;
+      grid-template-columns: minmax(0, 130px) minmax(0, 1fr);
+      gap: 4px 14px;
+      align-items: baseline;
+      border-bottom: 1px solid var(--line);
+      padding-bottom: 7px;
+    }
+    @media (max-width: 560px) {
+      .p-satir {
+        grid-template-columns: minmax(0, 1fr);
+      }
+    }
+    .p-etiket {
+      font-size: 11.5px;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+      color: var(--muted);
+    }
+    .p-deger {
+      font-size: 13.5px;
+      word-break: break-word;
+      font-family: var(--mono, ui-monospace, monospace);
+    }
+    .p-rozetler {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(min(180px, 100%), 1fr));
+      gap: 10px;
+      margin-bottom: 16px;
+    }
+    .p-rozet {
+      border: 1px solid var(--line);
+      border-radius: 11px;
+      padding: 13px 15px;
+      display: grid;
+      gap: 3px;
+      background: var(--paper);
+    }
+    .p-rozet b {
+      font-size: 12px;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      color: var(--muted);
+    }
+    .p-sonuc {
+      font-size: 17px;
+      font-weight: 700;
+    }
+    .p-aciklama {
+      font-size: 12px;
+      color: var(--muted);
+      line-height: 1.45;
+    }
+    .p-rozet[data-tip='ok'] {
+      background: light-dark(#ecfdf5, #06301f);
+      border-color: light-dark(#a7f3d0, #12694a);
+    }
+    .p-rozet[data-tip='ok'] .p-sonuc {
+      color: light-dark(#065f46, #6ee7b7);
+    }
+    .p-rozet[data-tip='hata'] {
+      background: light-dark(#fef2f2, #2a1616);
+      border-color: light-dark(#fecaca, #7f2b2b);
+    }
+    .p-rozet[data-tip='hata'] .p-sonuc {
+      color: light-dark(#991b1b, #fca5a5);
+    }
+    .p-rozet[data-tip='uyari'] .p-sonuc {
+      color: light-dark(#b45309, #fbbf24);
+    }
+    .p-rozet[data-tip='bilinmiyor'] .p-sonuc {
+      color: var(--muted);
+      font-weight: 400;
+      font-size: 15px;
+    }
+    .p-duraklar {
+      list-style: none;
+      margin: 0;
+      padding: 0;
+      display: grid;
+      gap: 9px;
+    }
+    .p-durak {
+      border: 1px solid var(--line);
+      border-left: 3px solid var(--line);
+      border-radius: 10px;
+      padding: 11px 13px;
+      background: var(--paper);
+    }
+    .p-durak[data-yavas] {
+      border-left-color: light-dark(#f0c33c, #a97f1c);
+    }
+    .p-durak[data-negatif] {
+      border-left-color: light-dark(#dc2626, #f87171);
+    }
+    .p-durak-ust {
+      display: flex;
+      justify-content: space-between;
+      gap: 12px;
+      align-items: baseline;
+      flex-wrap: wrap;
+      margin-bottom: 5px;
+    }
+    .p-durak-ust b {
+      font-size: 13.5px;
+      word-break: break-all;
+    }
+    .p-gecikme {
+      font-family: var(--mono, ui-monospace, monospace);
+      font-size: 12.5px;
+      color: var(--muted);
+      white-space: nowrap;
+    }
+    .p-durak[data-yavas] .p-gecikme {
+      color: light-dark(#b45309, #fbbf24);
+      font-weight: 700;
+    }
+    .p-durak[data-negatif] .p-gecikme {
+      color: light-dark(#dc2626, #f87171);
+      font-weight: 700;
+    }
+    .p-durak-alt {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px 14px;
+      font-size: 12px;
+      color: var(--muted);
+    }
+    .p-durak-alt code {
+      font-size: 11.5px;
+    }
+    .p-tls {
+      color: light-dark(#166534, #6ee7b7);
+    }
+    .p-tlsyok {
+      color: light-dark(#b45309, #fbbf24);
+    }
+    .p-liste,
+    .p-ipuclari {
+      list-style: none;
+      margin: 0;
+      padding: 0;
+      display: grid;
+      gap: 12px;
+    }
+    .p-liste li,
+    .p-ipuclari li {
+      font-size: 13.5px;
+      line-height: 1.62;
+      color: var(--ink-soft);
+      border-left: 2px solid var(--line);
+      padding-left: 13px;
+    }
+    .p-liste li[data-tip='hata'] {
+      border-left-color: light-dark(#dc2626, #f87171);
+    }
+    .p-liste li[data-tip='uyari'] {
+      border-left-color: light-dark(#f0c33c, #a97f1c);
+    }
+    .p-liste li[data-tip='ok'] {
+      border-left-color: light-dark(#16a34a, #4ade80);
+    }
+  </style>
+</Base>

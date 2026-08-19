@@ -83,7 +83,7 @@
   {
     "slug": "raid-hesaplayici",
     "ad": "RAID kapasite hesaplayıcı",
-    "ozet": "Kullanılabilir kapasite, tolere edilen arıza, yazma cezası ve yeniden yapılandırma süresi.",
+    "ozet": "Disk sayısı ve seviyeden kullanılabilir alanı ve dayanıklılığı bulur.",
     "ikon": "kutu",
     "etiket": "yeni",
     "cevrimici": false,
@@ -110,7 +110,7 @@
   {
     "slug": "hash-hesaplayici",
     "ad": "Özet (hash) hesaplayıcı",
-    "ozet": "Dosya ve metnin SHA-256/384/512 özeti; yayıncının verdiği özetle karşılaştırır.",
+    "ozet": "Dosya ve metin özeti; sürükle bırak, çoklu dosya ve yayımlanan değerle karşılaştırma.",
     "ikon": "kalkan",
     "etiket": "yeni",
     "cevrimici": false,
@@ -190,8 +190,8 @@
   },
   {
     "slug": "yedek-kapasite",
-    "ad": "Yedek kapasitesi planlayıcı",
-    "ozet": "Saklama politikasından gereken depolama; günlük, haftalık, aylık ve yıllık kopyaların payı.",
+    "ad": "Yedekleme kapasitesi ve saklama planlayıcı",
+    "ozet": "Saklama planından kopya sayısı, alan ve büyüme projeksiyonu; 3-2-1 ve değişmez kopya denetimiyle.",
     "ikon": "kutu",
     "etiket": "yeni",
     "cevrimici": false,
@@ -315,15 +315,6 @@
     "grup": "Ağ & DNS"
   },
   {
-    "slug": "yedek-saklama",
-    "ad": "Yedek saklama ve alan planlayıcı",
-    "ozet": "Saklama planından kaç kopya ve kaç terabayt çıkacağını hesaplar; 3-2-1 denetimiyle.",
-    "ikon": "kutu",
-    "etiket": "yeni",
-    "cevrimici": false,
-    "grup": "Kapasite & Süre"
-  },
-  {
     "slug": "etkin-izin",
     "ad": "Paylaşım ve NTFS etkin izin hesaplayıcı",
     "ozet": "İki izin listesi kesişince kullanıcı gerçekte ne yapabilir? Gerekçesini adım adım gösterir.",
@@ -387,18 +378,9 @@
     "grup": "Ağ & DNS"
   },
   {
-    "slug": "ozet-hesaplayici",
-    "ad": "Dosya ve metin özeti hesaplayıcı",
-    "ozet": "İndirdiğiniz dosyanın SHA-256 özetini tarayıcıda hesaplar ve beklenen değerle karşılaştırır.",
-    "ikon": "kalkan",
-    "etiket": "yeni",
-    "cevrimici": false,
-    "grup": "Kimlik & Sertifika"
-  },
-  {
     "slug": "iops-hesaplayici",
     "ad": "RAID IOPS hesaplayıcı",
-    "ozet": "Yazma cezasını hesaba katarak gerçek IOPS'u verir; RAID seviyelerini yan yana karşılaştırır.",
+    "ozet": "Aynı dizinin performansı: yazma cezasıyla gerçek IOPS ve tepe yükü karşılama.",
     "ikon": "sunucu",
     "etiket": "yeni",
     "cevrimici": false,
@@ -430,5 +412,59 @@
     "etiket": "yeni",
     "cevrimici": false,
     "grup": "Üretim & Paylaşım"
+  },
+  {
+    "slug": "eposta-basligi",
+    "ad": "E-posta başlığı çözümleyici",
+    "ozet": "Teslim zincirini sıraya koyar, durak sürelerini ve SPF/DKIM/DMARC sonucunu okunur hâle getirir.",
+    "ikon": "akis",
+    "etiket": "yeni",
+    "cevrimici": false,
+    "grup": "Ağ & DNS"
+  },
+  {
+    "slug": "dockerfile-denetleyici",
+    "ad": "Dockerfile ve Compose denetleyici",
+    "ozet": "Kök kullanıcı, sabitlenmemiş etiket, katman sırası ve gömülü sır gibi sık hataları bulur.",
+    "ikon": "kutu",
+    "etiket": "yeni",
+    "cevrimici": false,
+    "grup": "Bulut & Konteyner"
+  },
+  {
+    "slug": "guc-sogutma",
+    "ad": "Kabin gücü, UPS ve soğutma hesaplayıcı",
+    "ozet": "Çekilen güç, UPS dayanma süresi, sigorta yükü ve atılması gereken ısı bir arada.",
+    "ikon": "sunucu",
+    "etiket": "yeni",
+    "cevrimici": false,
+    "grup": "Kapasite & Süre"
+  },
+  {
+    "slug": "kesinti-raporu",
+    "ad": "Kesinti sonrası rapor üreteci",
+    "ozet": "Tespit, müdahale ve çözüm sürelerini ayırır; SLA etkisiyle birlikte rapor taslağı çıkarır.",
+    "ikon": "pencere",
+    "etiket": "yeni",
+    "cevrimici": false,
+    "grup": "Üretim & Paylaşım"
+  },
+  {
+    "slug": "onbellek-basliklari",
+    "ad": "HTTP önbellek başlığı planlayıcı",
+    "ozet": "İçerik türüne göre Cache-Control değeri, sunucu yapılandırması ve sık düşülen tuzaklar.",
+    "ikon": "kure",
+    "etiket": "yeni",
+    "cevrimici": false,
+    "grup": "Ağ & DNS"
+  },
+  {
+    "slug": "lisans-hesaplayici",
+    "ad": "Windows ve SQL Server lisans hesaplayıcı",
+    "ozet": "Çekirdek alt sınırları, CAL seçimi ve sanallaştırmada Standard mı Datacenter mı sorusu.",
+    "ikon": "terminal",
+    "etiket": "yeni",
+    "cevrimici": false,
+    "grup": "Windows & Operasyon"
   }
 ]
