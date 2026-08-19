@@ -1,0 +1,676 @@
+---
+import Base from '../../layouts/Base.astro';
+---
+
+<Base
+  baslik="TLS yapılandırma danışmanı"
+  aciklama="Desteklemeniz gereken en eski istemciyi seçin: hangi protokol ve şifre paketlerini açacağınızı, neyi kapatacağınızı ve hazır sunucu yapılandırmasını verir."
+  aramaya={true}
+  kategori="Araç"
+>
+  <div class="arama-bas">
+    <div class="kap">
+      <nav class="kirinti" aria-label="Kırıntı yolu" style="padding-top:0">
+        <a href="/">Ana sayfa</a><span class="ayrac">/</span><a href="/araclar">Araçlar</a><span
+          class="ayrac">/</span
+        ><span aria-current="page">TLS yapılandırma</span>
+      </nav>
+      <h1>TLS yapılandırma danışmanı</h1>
+      <p style="color:var(--muted);font-size:14px;margin-top:8px;max-width:66ch">
+        TLS yapılandırmasında tek gerçek soru şudur: <b>desteklemek zorunda olduğunuz en eski
+        istemci hangisi?</b> Cevap her şeyi belirler. Seçin; araç açılacak protokolleri, şifre
+        paketlerini, bunun bedelini ve hazır yapılandırmayı versin.
+      </p>
+    </div>
+  </div>
+
+  <div class="kap arac-sayfa">
+    <section class="arac-blok">
+      <h2 class="arac-h2"><span class="arac-no">1</span> En eski istemci</h2>
+      <div class="s-profiller" role="radiogroup" aria-label="Uyumluluk profili">
+        <label class="s-profil">
+          <input type="radio" name="s-profil" value="modern" checked />
+          <b>Modern</b>
+          <span>Son beş yılın tarayıcıları, mobil uygulamalar, API istemcileri</span>
+          <em>TLS 1.3 + 1.2</em>
+        </label>
+        <label class="s-profil">
+          <input type="radio" name="s-profil" value="orta" />
+          <b>Orta</b>
+          <span>Kurumsal masaüstleri, biraz eski Android, .NET Framework istemcileri</span>
+          <em>TLS 1.2 ağırlıklı</em>
+        </label>
+        <label class="s-profil">
+          <input type="radio" name="s-profil" value="eski" />
+          <b>Eski</b>
+          <span>Windows 7, Java 7, eski gömülü cihaz ve POS terminalleri</span>
+          <em>TLS 1.0/1.1 gerekebilir</em>
+        </label>
+      </div>
+
+      <span class="yan-etiket" style="margin-top:18px;display:block">Ek gereksinimler</span>
+      <div class="s-secenekler">
+        <label class="s-sec"
+          ><input type="checkbox" id="s-hsts" checked />
+          <span>HSTS <i>(tarayıcı bir daha hiç HTTP denemesin)</i></span>
+        </label>
+        <label class="s-sec"
+          ><input type="checkbox" id="s-ocsp" checked />
+          <span>OCSP zımbalama <i>(iptal denetimini hızlandırır ve gizliliği korur)</i></span>
+        </label>
+        <label class="s-sec"
+          ><input type="checkbox" id="s-mtls" />
+          <span>Karşılıklı TLS <i>(istemci de sertifika sunsun)</i></span>
+        </label>
+        <label class="s-sec"
+          ><input type="checkbox" id="s-pci" />
+          <span>PCI DSS kapsamında <i>(kart verisi işleniyor)</i></span>
+        </label>
+      </div>
+
+      <div class="arac-alanlar" style="margin-top:16px">
+        <label class="arac-alan"
+          >Sunucu
+          <select id="s-sunucu">
+            <option value="nginx">nginx</option>
+            <option value="apache">Apache httpd</option>
+            <option value="iis">IIS / Windows (kayıt defteri)</option>
+            <option value="haproxy">HAProxy</option>
+          </select>
+        </label>
+        <label class="arac-alan"
+          >Alan adı
+          <input id="s-alan" type="text" spellcheck="false" value="ornek.com.tr" />
+        </label>
+      </div>
+      <p class="arac-durum" id="s-durum" role="status" aria-live="polite"></p>
+    </section>
+
+    <section class="arac-blok">
+      <h2 class="arac-h2"><span class="arac-no">2</span> Protokoller</h2>
+      <div class="s-protokoller" id="s-protokoller"></div>
+    </section>
+
+    <section class="arac-blok">
+      <h2 class="arac-h2"><span class="arac-no">3</span> Bedeli</h2>
+      <div id="s-bedel"></div>
+    </section>
+
+    <section class="arac-blok">
+      <h2 class="arac-h2"><span class="arac-no">4</span> Yapılandırma</h2>
+      <div style="position:relative">
+        <pre class="kod"><code id="s-yapilandirma"></code></pre>
+        <button class="kopyala" type="button" data-kaynak="s-yapilandirma">Kopyala</button>
+      </div>
+      <span class="yan-etiket" style="margin-top:18px;display:block">Doğrulama</span>
+      <div style="position:relative">
+        <pre class="kod"><code id="s-dogrulama"></code></pre>
+        <button class="kopyala" type="button" data-kaynak="s-dogrulama">Kopyala</button>
+      </div>
+    </section>
+
+    <section class="arac-blok">
+      <h2 class="arac-h2"><span class="arac-no">5</span> Sık yapılan hatalar</h2>
+      <ul class="s-ipuclari">
+        <li>
+          <b>Ara sertifikayı unutmak.</b> Sunucu yalnızca kendi sertifikasını sunarsa çoğu
+          tarayıcı eksik halkayı kendisi bulup çalışır, ama <code>curl</code>, Java istemcileri ve
+          mobil uygulamalar hata verir. "Tarayıcıda çalışıyor ama uygulamada çalışmıyor"
+          şikâyetlerinin bir numaralı sebebi budur. Zinciri
+          <code>openssl s_client</code> ile doğrulayın.
+        </li>
+        <li>
+          <b>Şifre paketi sırası sunucuda belirlenmeli.</b> İstemcinin tercihine bırakırsanız
+          eski bir istemci zayıf bir paketi seçebilir. TLS 1.2'de sunucu tercihini açık edin;
+          TLS 1.3'te bu tartışma bitmiştir, tüm paketler zaten güvenlidir.
+        </li>
+        <li>
+          <b>HSTS geri alınamaz.</b> <code>max-age</code> süresince tarayıcı sitenize HTTP ile
+          hiç bağlanmaz. Sertifikanız bozulursa kullanıcı siteye <i>hiç</i> giremez ve uyarıyı
+          atlayamaz. Önce küçük bir <code>max-age</code> (300) ile deneyin, güvendikten sonra bir
+          yıla çıkarın. <code>preload</code> listesinden çıkmak aylar sürer.
+        </li>
+        <li>
+          <b>Sertifika yenilendi ama yüklenmedi.</b> Yenileme betiği sertifikayı diske yazar,
+          servisi yeniden yüklemeyi unutur. Kesinti tam olarak son geçerlilik gününde başlar.
+          Yenileme kancasına <code>reload</code> koyduğunuzdan emin olun.
+        </li>
+        <li>
+          <b>Süre takibi bir kişiye bırakılmaz.</b> Sertifika süresi dolmasından kaynaklı
+          kesintiler, teknik olarak en kolay önlenebilecek kesintilerdir. İzleme sisteminize 30,
+          14 ve 7 gün kala uyaran bir denetim ekleyin — takvim hatırlatması yeterli değildir.
+        </li>
+      </ul>
+    </section>
+  </div>
+
+  <script>
+    (() => {
+      const el = (s) => document.querySelector(s);
+
+      const PROFILLER = {
+        modern: {
+          ad: 'Modern',
+          protokoller: [
+            ['TLS 1.3', 'ok', 'Açık — en hızlı ve en güvenli. El sıkışma tek gidiş dönüşte biter.'],
+            ['TLS 1.2', 'ok', 'Açık — hâlâ yaygın olarak gerekli, güvenli paketlerle sorun yok.'],
+            ['TLS 1.1', 'kapali', 'Kapalı — 2021\'de bütün büyük tarayıcılar desteği kaldırdı.'],
+            ['TLS 1.0', 'kapali', 'Kapalı — PCI DSS 2018\'den beri yasaklıyor.'],
+            ['SSL 3.0 ve altı', 'kapali', 'Kapalı — POODLE saldırısıyla kırıldı, tartışmasız.'],
+          ],
+          paketler: [
+            'TLS_AES_128_GCM_SHA256',
+            'TLS_AES_256_GCM_SHA384',
+            'TLS_CHACHA20_POLY1305_SHA256',
+            'ECDHE-ECDSA-AES128-GCM-SHA256',
+            'ECDHE-RSA-AES128-GCM-SHA256',
+            'ECDHE-ECDSA-AES256-GCM-SHA384',
+            'ECDHE-RSA-AES256-GCM-SHA384',
+            'ECDHE-ECDSA-CHACHA20-POLY1305',
+            'ECDHE-RSA-CHACHA20-POLY1305',
+          ],
+          kaybedilen: [
+            'Windows 7 üzerindeki Internet Explorer 11 (TLS 1.2 varsayılan kapalı gelir)',
+            'Android 4.4 ve öncesi',
+            'Java 7 (ek yapılandırma olmadan)',
+            'OpenSSL 1.0.1 öncesi kullanan eski betikler',
+          ],
+          not: 'Bu, bugün varsayılan olması gereken yapılandırmadır.',
+        },
+        orta: {
+          ad: 'Orta',
+          protokoller: [
+            ['TLS 1.3', 'ok', 'Açık — destekleyen istemciler bunu kullanır.'],
+            ['TLS 1.2', 'ok', 'Açık — trafiğin çoğu burada olacak.'],
+            ['TLS 1.1', 'kapali', 'Kapalı — 1.2 desteklemeyen istemci pratikte kalmadı.'],
+            ['TLS 1.0', 'kapali', 'Kapalı.'],
+            ['SSL 3.0 ve altı', 'kapali', 'Kapalı.'],
+          ],
+          paketler: [
+            'TLS_AES_128_GCM_SHA256',
+            'TLS_AES_256_GCM_SHA384',
+            'TLS_CHACHA20_POLY1305_SHA256',
+            'ECDHE-ECDSA-AES128-GCM-SHA256',
+            'ECDHE-RSA-AES128-GCM-SHA256',
+            'ECDHE-ECDSA-AES256-GCM-SHA384',
+            'ECDHE-RSA-AES256-GCM-SHA384',
+            'DHE-RSA-AES128-GCM-SHA256',
+            'DHE-RSA-AES256-GCM-SHA384',
+          ],
+          kaybedilen: [
+            'Windows 7 varsayılan kurulumları (kayıt defteri değişikliğiyle çalışır)',
+            'Android 4.3 ve öncesi',
+            'Çok eski gömülü cihazlar',
+          ],
+          not: 'Kurumsal ortamlarda güvenli tarafta kalan makul denge.',
+        },
+        eski: {
+          ad: 'Eski',
+          protokoller: [
+            ['TLS 1.3', 'ok', 'Açık.'],
+            ['TLS 1.2', 'ok', 'Açık.'],
+            ['TLS 1.1', 'uyari', 'Zorunluysa açık — ama bu bir borçtur, kapatma tarihi belirleyin.'],
+            ['TLS 1.0', 'uyari', 'Zorunluysa açık — CBC zayıflıkları biliniyor.'],
+            ['SSL 3.0 ve altı', 'kapali', 'Kapalı — bu asla açılmaz.'],
+          ],
+          paketler: [
+            'TLS_AES_128_GCM_SHA256',
+            'TLS_AES_256_GCM_SHA384',
+            'ECDHE-ECDSA-AES128-GCM-SHA256',
+            'ECDHE-RSA-AES128-GCM-SHA256',
+            'ECDHE-RSA-AES256-GCM-SHA384',
+            'DHE-RSA-AES128-GCM-SHA256',
+            'ECDHE-RSA-AES128-SHA',
+            'ECDHE-RSA-AES256-SHA',
+            'AES128-SHA',
+          ],
+          kaybedilen: ['Yalnızca SSL 3.0 konuşabilen cihazlar'],
+          not: 'Bu yapılandırma bilerek verilmiş bir ödündür; kalıcı olmamalıdır.',
+        },
+      };
+
+      function yapilandirmaUret(p, profilAd) {
+        const sunucu = el('#s-sunucu').value;
+        const alan = el('#s-alan').value.trim() || 'ornek.com.tr';
+        const hsts = el('#s-hsts').checked;
+        const ocsp = el('#s-ocsp').checked;
+        const mtls = el('#s-mtls').checked;
+
+        const acikProtokoller = p.protokoller
+          .filter(([, d]) => d !== 'kapali')
+          .map(([ad]) => ad.replace('TLS ', 'TLSv'));
+
+        const paketler = p.paketler.filter((x) => !x.startsWith('TLS_')).join(':');
+
+        if (sunucu === 'nginx') {
+          return [
+            `server {`,
+            `    listen 443 ssl;`,
+            `    http2 on;`,
+            `    server_name ${alan};`,
+            ``,
+            `    ssl_certificate     /etc/ssl/${alan}/tam-zincir.pem;   # sunucu + ara sertifikalar`,
+            `    ssl_certificate_key /etc/ssl/${alan}/ozel.key;`,
+            ``,
+            `    ssl_protocols ${acikProtokoller.join(' ')};`,
+            `    ssl_ciphers ${paketler};`,
+            `    ssl_prefer_server_ciphers ${profilAd === 'modern' ? 'off' : 'on'};   # TLS 1.3'te anlamsız`,
+            `    ssl_ecdh_curve X25519:secp384r1;`,
+            ``,
+            `    ssl_session_cache shared:TLS:10m;`,
+            `    ssl_session_timeout 1d;`,
+            `    ssl_session_tickets off;   # ileri gizlilik için kapalı`,
+            ...(ocsp
+              ? [
+                  ``,
+                  `    ssl_stapling on;`,
+                  `    ssl_stapling_verify on;`,
+                  `    ssl_trusted_certificate /etc/ssl/${alan}/ara.pem;`,
+                  `    resolver 1.1.1.1 8.8.8.8 valid=300s;`,
+                ]
+              : []),
+            ...(mtls
+              ? [
+                  ``,
+                  `    ssl_client_certificate /etc/ssl/${alan}/istemci-ca.pem;`,
+                  `    ssl_verify_client on;`,
+                  `    ssl_verify_depth 2;`,
+                ]
+              : []),
+            ...(hsts
+              ? [
+                  ``,
+                  `    # Önce max-age=300 ile deneyin; emin olduktan sonra bir yıla çıkarın`,
+                  `    add_header Strict-Transport-Security "max-age=31536000; includeSubDomains" always;`,
+                ]
+              : []),
+            `}`,
+            ``,
+            `# HTTP'yi yönlendir`,
+            `server {`,
+            `    listen 80;`,
+            `    server_name ${alan};`,
+            `    return 301 https://$host$request_uri;`,
+            `}`,
+          ].join('\n');
+        }
+
+        if (sunucu === 'apache') {
+          return [
+            `<VirtualHost *:443>`,
+            `    ServerName ${alan}`,
+            ``,
+            `    SSLEngine on`,
+            `    SSLCertificateFile      /etc/ssl/${alan}/sunucu.pem`,
+            `    SSLCertificateKeyFile   /etc/ssl/${alan}/ozel.key`,
+            `    SSLCertificateChainFile /etc/ssl/${alan}/ara.pem`,
+            ``,
+            `    SSLProtocol ${p.protokoller
+              .map(([ad, d]) => (d === 'kapali' ? `-${ad.replace('TLS ', 'TLSv').replace(' ve altı', '')}` : `+${ad.replace('TLS ', 'TLSv')}`))
+              .filter((x) => !x.includes('SSL'))
+              .join(' ')} -SSLv3`,
+            `    SSLCipherSuite ${paketler}`,
+            `    SSLHonorCipherOrder ${profilAd === 'modern' ? 'off' : 'on'}`,
+            `    SSLSessionTickets off`,
+            ...(ocsp ? [``, `    SSLUseStapling on`, `    SSLStaplingCache "shmcb:/var/run/ocsp(128000)"`] : []),
+            ...(mtls
+              ? [``, `    SSLCACertificateFile /etc/ssl/${alan}/istemci-ca.pem`, `    SSLVerifyClient require`, `    SSLVerifyDepth 2`]
+              : []),
+            ...(hsts
+              ? [``, `    Header always set Strict-Transport-Security "max-age=31536000; includeSubDomains"`]
+              : []),
+            `</VirtualHost>`,
+          ].join('\n');
+        }
+
+        if (sunucu === 'haproxy') {
+          return [
+            `global`,
+            `    ssl-default-bind-ciphers ${paketler}`,
+            `    ssl-default-bind-ciphersuites ${p.paketler.filter((x) => x.startsWith('TLS_')).join(':')}`,
+            `    ssl-default-bind-options ${p.protokoller
+              .filter(([, d]) => d === 'kapali')
+              .map(([ad]) => `no-${ad.replace('TLS ', 'tlsv').replace('.', '').replace(' ve altı', '').replace('SSL 30', 'sslv3')}`)
+              .join(' ')}`,
+            ``,
+            `frontend web`,
+            `    bind :443 ssl crt /etc/ssl/${alan}/birlesik.pem alpn h2,http/1.1`,
+            ...(mtls ? [`    bind :443 ssl crt /etc/ssl/${alan}/birlesik.pem ca-file /etc/ssl/${alan}/istemci-ca.pem verify required`] : []),
+            ...(hsts
+              ? [`    http-response set-header Strict-Transport-Security "max-age=31536000; includeSubDomains"`]
+              : []),
+            `    default_backend uygulamalar`,
+            ``,
+            `# Not: birlesik.pem içinde sırasıyla özel anahtar, sunucu sertifikası`,
+            `# ve ara sertifikalar bulunmalıdır.`,
+          ].join('\n');
+        }
+
+        // IIS — protokoller kayıt defterinden yönetilir
+        return [
+          `# IIS'te protokoller kayıt defterinden yönetilir; her değişiklik yeniden başlatma ister.`,
+          `# Aşağıdaki betiği çalıştırmadan önce uzak masaüstü erişiminizin`,
+          `# kapanmayacağından emin olun — RDP de bu ayarları kullanır.`,
+          ``,
+          `$kok = 'HKLM:\\SYSTEM\\CurrentControlSet\\Control\\SecurityProviders\\SCHANNEL\\Protocols'`,
+          ``,
+          `function Ayarla($protokol, $acik) {`,
+          `    foreach ($taraf in 'Server', 'Client') {`,
+          `        $yol = "$kok\\$protokol\\$taraf"`,
+          `        New-Item -Path $yol -Force | Out-Null`,
+          `        Set-ItemProperty -Path $yol -Name 'Enabled' -Value ([int]$acik) -Type DWord`,
+          `        Set-ItemProperty -Path $yol -Name 'DisabledByDefault' -Value ([int](-not $acik)) -Type DWord`,
+          `    }`,
+          `}`,
+          ``,
+          ...p.protokoller
+            .filter(([ad]) => !ad.includes('ve altı'))
+            .map(([ad, d]) => `Ayarla '${ad}' $${d !== 'kapali' ? 'true' : 'false'}`),
+          `Ayarla 'SSL 3.0' $false`,
+          `Ayarla 'SSL 2.0' $false`,
+          ``,
+          `# .NET uygulamalarının güçlü şifrelemeyi kullanması için`,
+          `foreach ($k in 'HKLM:\\SOFTWARE\\Microsoft\\.NETFramework\\v4.0.30319',`,
+          `               'HKLM:\\SOFTWARE\\WOW6432Node\\Microsoft\\.NETFramework\\v4.0.30319') {`,
+          `    Set-ItemProperty -Path $k -Name 'SchUseStrongCrypto' -Value 1 -Type DWord`,
+          `    Set-ItemProperty -Path $k -Name 'SystemDefaultTlsVersions' -Value 1 -Type DWord`,
+          `}`,
+          ``,
+          `Write-Host 'Değişiklikler yeniden başlatmadan sonra geçerli olur.' -ForegroundColor Yellow`,
+        ].join('\n');
+      }
+
+      function ciz() {
+        const profilAd = document.querySelector('input[name="s-profil"]:checked').value;
+        const p = PROFILLER[profilAd];
+        const pci = el('#s-pci').checked;
+        const alan = el('#s-alan').value.trim() || 'ornek.com.tr';
+
+        /* --- protokoller --- */
+        el('#s-protokoller').innerHTML = p.protokoller
+          .map(
+            ([ad, durum, aciklama]) =>
+              `<div class="s-protokol" data-durum="${durum}">` +
+              `<span class="s-rozet">${durum === 'ok' ? 'açık' : durum === 'uyari' ? 'ödün' : 'kapalı'}</span>` +
+              `<b>${ad}</b><span class="s-aciklama">${aciklama}</span></div>`
+          )
+          .join('');
+
+        /* --- bedel --- */
+        const bulgular = [];
+
+        if (pci && profilAd === 'eski') {
+          bulgular.push([
+            'hata',
+            '<b>PCI DSS ile çelişiyor.</b> PCI DSS 30 Haziran 2018\'den beri TLS 1.0\'ı ve ' +
+              'pratikte 1.1\'i yasaklıyor. Kart verisi işleyen bir ortamda bu profil ' +
+              'denetimden geçmez. Eski cihazları kart akışının dışına çıkarmak, tek ' +
+              'sürdürülebilir çözümdür.',
+          ]);
+        }
+
+        if (profilAd === 'eski') {
+          bulgular.push([
+            'hata',
+            '<b>Bu bir teknik borçtur.</b> TLS 1.0/1.1 açık kalan her gün bilinen zayıflıkları ' +
+              'kabul ediyorsunuz demektir. Hangi cihazın bunu gerektirdiğini yazın, bir ' +
+              'kapatma tarihi belirleyin ve o tarihi izleyin. Aksi hâlde bu ayar sonsuza kadar kalır.',
+          ]);
+          bulgular.push([
+            'uyari',
+            '<b>Ayrıştırmayı düşünün.</b> Eski cihazları ayrı bir uç noktaya (ör. ' +
+              `<code>eski.${alan}</code>) alıp asıl siteyi modern tutmak, tek bir zayıf ` +
+              'yapılandırmayı herkese dayatmaktan iyidir.',
+          ]);
+        }
+
+        if (profilAd === 'modern') {
+          bulgular.push([
+            'ok',
+            '<b>Ödün yok.</b> Bugün internete açık bir servis için doğru varsayılan budur. ' +
+              'Aşağıdaki kaybedilen istemci listesine bakın; içlerinde gerçekten desteklemek ' +
+              'zorunda olduğunuz biri yoksa bu profilde kalın.',
+          ]);
+        }
+
+        bulgular.push([
+          'uyari',
+          `<b>Kaybedilen istemciler:</b> ${p.kaybedilen.join('; ')}. ` +
+            `Bunlar arasında sizi ilgilendiren varsa bir üst profile geçmeden önce erişim ` +
+            `günlüklerinize bakıp gerçekten kaç istek geldiğini ölçün — genelde tahmin edilenden azdır.`,
+        ]);
+
+        if (el('#s-mtls').checked) {
+          bulgular.push([
+            'uyari',
+            '<b>Karşılıklı TLS sertifika yönetimi getirir.</b> İstemci sertifikalarının da ' +
+              'süresi dolar ve yenilenmesi gerekir. Bir istemci sertifikası süresi dolduğunda ' +
+              'bağlantı tamamen kesilir; yenileme sürecini kurmadan bu özelliği açmayın.',
+          ]);
+        }
+
+        if (el('#s-hsts').checked) {
+          bulgular.push([
+            'uyari',
+            '<b>HSTS geri alınamaz.</b> Bir yıllık <code>max-age</code> ile sertifikanız ' +
+              'bozulursa kullanıcılar siteye giremez ve uyarıyı atlayamaz. Önce ' +
+              '<code>max-age=300</code> ile başlayın.',
+          ]);
+        }
+
+        el('#s-bedel').innerHTML =
+          '<ul class="s-liste">' +
+          bulgular.map(([tip, m]) => `<li data-tip="${tip}">${m}</li>`).join('') +
+          '</ul>';
+
+        /* --- durum --- */
+        const durum = el('#s-durum');
+        if (pci && profilAd === 'eski') {
+          durum.className = 'arac-durum hata';
+          durum.textContent = 'Bu profil PCI DSS gereksinimleriyle çelişiyor.';
+        } else if (profilAd === 'eski') {
+          durum.className = 'arac-durum hata';
+          durum.textContent = p.not;
+        } else {
+          durum.className = 'arac-durum ok';
+          durum.textContent = p.not;
+        }
+
+        /* --- yapılandırma --- */
+        el('#s-yapilandirma').textContent = yapilandirmaUret(p, profilAd);
+
+        el('#s-dogrulama').textContent =
+          `# Hangi protokoller açık? (kapalıysa "handshake failure" döner)\n` +
+          `for v in tls1 tls1_1 tls1_2 tls1_3; do\n` +
+          `  printf '%-8s ' "$v"\n` +
+          `  echo | openssl s_client -connect ${alan}:443 -$v 2>/dev/null |\n` +
+          `    grep -q 'Verify return code: 0' && echo AÇIK || echo kapalı\n` +
+          `done\n\n` +
+          `# Sertifika zinciri tam mı? (en sık atlanan denetim)\n` +
+          `echo | openssl s_client -connect ${alan}:443 -servername ${alan} -showcerts 2>/dev/null |\n` +
+          `  grep -E 's:|i:'\n\n` +
+          `# Kalan gün sayısı\n` +
+          `echo | openssl s_client -connect ${alan}:443 -servername ${alan} 2>/dev/null |\n` +
+          `  openssl x509 -noout -enddate -subject\n\n` +
+          `# OCSP zımbalaması çalışıyor mu?\n` +
+          `echo | openssl s_client -connect ${alan}:443 -status 2>/dev/null |\n` +
+          `  grep -A1 'OCSP Response Status'\n\n` +
+          `# Windows tarafında\n` +
+          `$b = [Net.Security.SslStream]::new(([Net.Sockets.TcpClient]::new('${alan}', 443)).GetStream())\n` +
+          `$b.AuthenticateAsClient('${alan}')\n` +
+          `$b | Select-Object SslProtocol, CipherAlgorithm, HashAlgorithm\n\n` +
+          `# Süre takibi — izlemeye bunu ekleyin, takvim hatırlatması yeterli değil\n` +
+          `$kalan = ([datetime]$b.RemoteCertificate.GetExpirationDateString() - (Get-Date)).Days\n` +
+          `if ($kalan -lt 30) { Write-Warning "Sertifikaya $kalan gün kaldı" }`;
+      }
+
+      document
+        .querySelectorAll('input[name="s-profil"], #s-hsts, #s-ocsp, #s-mtls, #s-pci, #s-sunucu, #s-alan')
+        .forEach((g) => {
+          g.addEventListener('change', ciz);
+          g.addEventListener('input', ciz);
+        });
+
+      document.querySelectorAll('.kopyala').forEach((d) => {
+        d.addEventListener('click', async () => {
+          try {
+            await navigator.clipboard.writeText(el(`#${d.dataset.kaynak}`).textContent);
+            d.textContent = 'Kopyalandı';
+            setTimeout(() => (d.textContent = 'Kopyala'), 1600);
+          } catch {
+            /* pano izni yoksa kullanıcı elle seçer */
+          }
+        });
+      });
+
+      ciz();
+    })();
+  </script>
+
+  <style>
+    .s-profiller {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(min(230px, 100%), 1fr));
+      gap: 10px;
+    }
+    .s-profil {
+      display: grid;
+      gap: 4px;
+      border: 1px solid var(--line);
+      border-radius: 11px;
+      padding: 13px 15px;
+      cursor: pointer;
+      background: var(--paper);
+      position: relative;
+    }
+    .s-profil input {
+      position: absolute;
+      opacity: 0;
+      pointer-events: none;
+    }
+    .s-profil b {
+      font-size: 14px;
+    }
+    .s-profil span {
+      font-size: 12.5px;
+      color: var(--muted);
+      line-height: 1.5;
+    }
+    .s-profil em {
+      font-style: normal;
+      font-size: 11.5px;
+      color: var(--indigo-metin);
+      font-family: var(--mono, ui-monospace, monospace);
+    }
+    .s-profil:has(input:checked) {
+      border-color: var(--indigo);
+      background: var(--tint);
+      box-shadow: 0 0 0 1px var(--indigo);
+    }
+    .s-secenekler {
+      display: grid;
+      gap: 9px;
+      margin-top: 6px;
+    }
+    .s-sec {
+      display: inline-flex;
+      align-items: baseline;
+      gap: 8px;
+      font-size: 13px;
+      color: var(--ink-soft);
+      cursor: pointer;
+      line-height: 1.5;
+    }
+    .s-sec i,
+    .yan-etiket i {
+      font-style: normal;
+      color: var(--muted);
+      font-size: 12px;
+      font-weight: 400;
+      text-transform: none;
+      letter-spacing: 0;
+    }
+    .s-protokoller {
+      display: grid;
+      gap: 9px;
+    }
+    .s-protokol {
+      display: grid;
+      grid-template-columns: 64px minmax(0, 130px) minmax(0, 1fr);
+      gap: 12px;
+      align-items: baseline;
+      border: 1px solid var(--line);
+      border-radius: 10px;
+      padding: 11px 13px;
+      background: var(--paper);
+    }
+    @media (max-width: 560px) {
+      .s-protokol {
+        grid-template-columns: 64px minmax(0, 1fr);
+      }
+      .s-protokol .s-aciklama {
+        grid-column: 1 / -1;
+      }
+    }
+    .s-rozet {
+      font-size: 10.5px;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      border-radius: 999px;
+      padding: 3px 8px;
+      text-align: center;
+      border: 1px solid var(--line);
+      color: var(--muted);
+    }
+    .s-protokol[data-durum='ok'] .s-rozet {
+      background: light-dark(#ecfdf5, #06301f);
+      border-color: light-dark(#a7f3d0, #12694a);
+      color: light-dark(#065f46, #6ee7b7);
+    }
+    .s-protokol[data-durum='uyari'] .s-rozet {
+      background: light-dark(#fffbeb, #2e2410);
+      border-color: light-dark(#fde68a, #7c5b12);
+      color: light-dark(#92400e, #fbbf24);
+    }
+    .s-protokol[data-durum='uyari'] {
+      border-color: light-dark(#fde68a, #7c5b12);
+    }
+    .s-protokol[data-durum='kapali'] {
+      opacity: 0.6;
+    }
+    .s-protokol b {
+      font-size: 13.5px;
+      font-family: var(--mono, ui-monospace, monospace);
+    }
+    .s-aciklama {
+      font-size: 12.5px;
+      color: var(--muted);
+      line-height: 1.55;
+    }
+    .s-liste,
+    .s-ipuclari {
+      list-style: none;
+      margin: 0;
+      padding: 0;
+      display: grid;
+      gap: 12px;
+    }
+    .s-liste li,
+    .s-ipuclari li {
+      font-size: 13.5px;
+      line-height: 1.62;
+      color: var(--ink-soft);
+      border-left: 2px solid var(--line);
+      padding-left: 13px;
+    }
+    .s-liste li[data-tip='hata'] {
+      border-left-color: light-dark(#dc2626, #f87171);
+    }
+    .s-liste li[data-tip='uyari'] {
+      border-left-color: light-dark(#f0c33c, #a97f1c);
+    }
+    .s-liste li[data-tip='ok'] {
+      border-left-color: light-dark(#16a34a, #4ade80);
+    }
+  </style>
+</Base>

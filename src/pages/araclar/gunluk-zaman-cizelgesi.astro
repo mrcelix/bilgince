@@ -1,0 +1,579 @@
+---
+import Base from '../../layouts/Base.astro';
+---
+
+<Base
+  baslik="Günlük zaman çizelgesi çıkarıcı"
+  aciklama="Ham günlük metnini yapıştırın: zaman damgalarını bulur, olay yoğunluğunu çizer, sessiz boşlukları ve ani sıçramaları işaretler."
+  aramaya={true}
+  kategori="Araç"
+>
+  <div class="arama-bas">
+    <div class="kap">
+      <nav class="kirinti" aria-label="Kırıntı yolu" style="padding-top:0">
+        <a href="/">Ana sayfa</a><span class="ayrac">/</span><a href="/araclar">Araçlar</a><span
+          class="ayrac">/</span
+        ><span aria-current="page">Günlük zaman çizelgesi</span>
+      </nav>
+      <h1>Günlük zaman çizelgesi çıkarıcı</h1>
+      <p style="color:var(--muted);font-size:14px;margin-top:8px;max-width:66ch">
+        Olayın ne zaman başladığını bulmak, günlüğü okumaktan daha önemlidir. Ham metni
+        yapıştırın: araç zaman damgalarını tanır, yoğunluğu çizer ve iki şeyi işaretler —
+        <b>sessiz kalan boşluklar</b> (servis durmuş olabilir) ve <b>ani sıçramalar</b> (olay
+        burada başlamış olabilir). Yapıştırdığınız günlük tarayıcıdan çıkmaz.
+      </p>
+    </div>
+  </div>
+
+  <div class="kap arac-sayfa">
+    <section class="arac-blok">
+      <h2 class="arac-h2"><span class="arac-no">1</span> Günlük</h2>
+      <div class="arac-alan">
+        <textarea id="g-girdi" rows="10" spellcheck="false" placeholder="Günlük satırlarını buraya yapıştırın…"
+        ></textarea>
+      </div>
+      <div class="arac-dugmeler">
+        <button type="button" class="dg" id="g-coz">Çözümle</button>
+        <button type="button" class="dg dg-hayalet" id="g-ornek">Örnek günlük</button>
+        <button type="button" class="dg dg-hayalet" id="g-temizle">Temizle</button>
+      </div>
+      <p class="arac-durum" id="g-durum" role="status" aria-live="polite"></p>
+    </section>
+
+    <section class="arac-blok" id="g-sonuc" hidden>
+      <h2 class="arac-h2"><span class="arac-no">2</span> Yoğunluk</h2>
+      <div class="arac-olcum" id="g-olcum"></div>
+      <div class="g-histogram" id="g-histogram"></div>
+      <div class="g-eksen" id="g-eksen"></div>
+    </section>
+
+    <section class="arac-blok" id="g-bulgu-blok" hidden>
+      <h2 class="arac-h2"><span class="arac-no">3</span> Dikkat çekenler</h2>
+      <div id="g-bulgular"></div>
+    </section>
+
+    <section class="arac-blok" id="g-seviye-blok" hidden>
+      <h2 class="arac-h2"><span class="arac-no">4</span> Seviye dağılımı</h2>
+      <div class="g-seviyeler" id="g-seviyeler"></div>
+      <p class="arac-not" id="g-ilkHata"></p>
+    </section>
+
+    <section class="arac-blok">
+      <h2 class="arac-h2"><span class="arac-no">5</span> Tanınan zaman biçimleri</h2>
+      <div class="g-kaydir">
+        <table class="g-tablo">
+          <thead>
+            <tr><th>Biçim</th><th>Örnek</th><th>Nerede</th></tr>
+          </thead>
+          <tbody>
+            <tr><td>ISO 8601</td><td><code>2026-08-19T09:14:22+03:00</code></td><td>Modern uygulamalar, systemd, bulut</td></tr>
+            <tr><td>Tarih ve saat</td><td><code>2026-08-19 09:14:22</code></td><td>Veri tabanları, çoğu uygulama günlüğü</td></tr>
+            <tr><td>Ortak günlük biçimi</td><td><code>[19/Aug/2026:09:14:22 +0300]</code></td><td>Apache, Nginx erişim günlükleri</td></tr>
+            <tr><td>Syslog</td><td><code>Aug 19 09:14:22</code></td><td>Klasik syslog, sshd, cron</td></tr>
+            <tr><td>Türkçe yerel</td><td><code>19.08.2026 09:14:22</code></td><td>Türkçe Windows araçları, Excel dışa aktarımı</td></tr>
+            <tr><td>Unix zaman damgası</td><td><code>1787389: 1787389462</code></td><td>Bazı gömülü sistemler ve API günlükleri</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <p class="arac-not">
+        <b>Yıl bilgisi olmayan biçimler</b> (syslog) için içinde bulunulan yıl varsayılır. Yıl
+        sonuna denk gelen bir olayı incelerken bu ayrımı elle kontrol edin.
+      </p>
+    </section>
+  </div>
+
+  <script>
+    (() => {
+      const el = (s) => document.querySelector(s);
+      const kacir = (s) =>
+        String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+
+      const AYLAR = {
+        jan: 0, feb: 1, mar: 2, apr: 3, may: 4, jun: 5,
+        jul: 6, aug: 7, sep: 8, oct: 9, nov: 10, dec: 11,
+        oca: 0, şub: 1, sub: 1, nis: 3, haz: 5, tem: 6, ağu: 7, agu: 7, eyl: 8, eki: 9, kas: 10, ara: 11,
+      };
+
+      /* --- zaman damgası tanıma ----------------------------------------------
+         Sıra önemli: daha uzun ve daha belirgin biçimler önce denenir, yoksa
+         "2026-08-19" içindeki "08:19" gibi yanlış eşleşmeler olur. */
+      const BICIMLER = [
+        {
+          ad: 'ISO 8601',
+          desen: /(\d{4})-(\d{2})-(\d{2})[T ](\d{2}):(\d{2}):(\d{2})(?:[.,]\d+)?(Z|[+-]\d{2}:?\d{2})?/,
+          coz: (m) => {
+            const temel = `${m[1]}-${m[2]}-${m[3]}T${m[4]}:${m[5]}:${m[6]}`;
+            if (!m[7]) return new Date(temel);
+            const dilim = m[7] === 'Z' ? 'Z' : m[7].includes(':') ? m[7] : `${m[7].slice(0, 3)}:${m[7].slice(3)}`;
+            return new Date(temel + dilim);
+          },
+        },
+        {
+          ad: 'Ortak günlük biçimi',
+          desen: /\[(\d{2})\/([A-Za-z]{3})\/(\d{4}):(\d{2}):(\d{2}):(\d{2})\s*([+-]\d{4})?\]/,
+          coz: (m) => {
+            const ay = AYLAR[m[2].toLowerCase()];
+            if (ay === undefined) return null;
+            const dilim = m[7] ? `${m[7].slice(0, 3)}:${m[7].slice(3)}` : '';
+            return new Date(
+              `${m[3]}-${String(ay + 1).padStart(2, '0')}-${m[1]}T${m[4]}:${m[5]}:${m[6]}${dilim}`
+            );
+          },
+        },
+        {
+          ad: 'Türkçe yerel',
+          desen: /(\d{2})\.(\d{2})\.(\d{4})[ T](\d{2}):(\d{2})(?::(\d{2}))?/,
+          coz: (m) => new Date(`${m[3]}-${m[2]}-${m[1]}T${m[4]}:${m[5]}:${m[6] ?? '00'}`),
+        },
+        {
+          ad: 'Syslog',
+          desen: /\b([A-Za-zĞÜŞİÖÇğüşıöç]{3})\s+(\d{1,2})\s+(\d{2}):(\d{2}):(\d{2})\b/,
+          coz: (m) => {
+            const ay = AYLAR[m[1].toLowerCase()];
+            if (ay === undefined) return null;
+            // Syslog yıl yazmaz; içinde bulunulan yıl varsayılır
+            const yil = new Date().getFullYear();
+            return new Date(
+              yil,
+              ay,
+              Number(m[2]),
+              Number(m[3]),
+              Number(m[4]),
+              Number(m[5])
+            );
+          },
+        },
+        {
+          ad: 'Unix zaman damgası',
+          desen: /\b(1[6-9]\d{8}|20\d{8})\b/,
+          coz: (m) => new Date(Number(m[1]) * 1000),
+        },
+      ];
+
+      function zamanBul(satir) {
+        for (const b of BICIMLER) {
+          const m = b.desen.exec(satir);
+          if (!m) continue;
+          const t = b.coz(m);
+          if (t && !Number.isNaN(t.getTime())) return { zaman: t, bicim: b.ad };
+        }
+        return null;
+      }
+
+      /* --- seviye tanıma ------------------------------------------------------ */
+      function seviyeBul(satir) {
+        const s = satir.toUpperCase();
+        if (/\b(FATAL|CRITICAL|CRIT|PANIC|EMERG)\b/.test(s)) return 'kritik';
+        if (/\b(ERROR|ERR|EXCEPTION|FAIL(ED|URE)?|DENIED|REFUSED|TIMEOUT|TIMED OUT)\b/.test(s)) return 'hata';
+        if (/\b(WARN(ING)?|RETRY|RETRYING|DEPRECATED|SLOW)\b/.test(s)) return 'uyari';
+        if (/\b(DEBUG|TRACE|VERBOSE)\b/.test(s)) return 'ayrinti';
+        return 'bilgi';
+      }
+
+      const SEVIYE_ADI = {
+        kritik: 'Kritik',
+        hata: 'Hata',
+        uyari: 'Uyarı',
+        bilgi: 'Bilgi',
+        ayrinti: 'Ayrıntı',
+      };
+
+      function zamanYaz(t, kisa = false) {
+        return t.toLocaleString('tr-TR', {
+          day: kisa ? undefined : '2-digit',
+          month: kisa ? undefined : '2-digit',
+          hour: '2-digit',
+          minute: '2-digit',
+          second: kisa ? undefined : '2-digit',
+        });
+      }
+
+      function sureYaz(ms) {
+        const sn = ms / 1000;
+        if (sn < 60) return `${Math.round(sn)} saniye`;
+        if (sn < 3600) return `${Math.round(sn / 60)} dakika`;
+        if (sn < 86400) return `${(sn / 3600).toFixed(1)} saat`;
+        return `${(sn / 86400).toFixed(1)} gün`;
+      }
+
+      function coz() {
+        const satirlar = el('#g-girdi').value.split('\n').filter((s) => s.trim());
+        const durum = el('#g-durum');
+
+        if (!satirlar.length) {
+          durum.className = 'arac-durum hata';
+          durum.textContent = 'Önce günlük satırlarını yapıştırın.';
+          el('#g-sonuc').hidden = true;
+          el('#g-bulgu-blok').hidden = true;
+          el('#g-seviye-blok').hidden = true;
+          return;
+        }
+
+        const olaylar = [];
+        const bicimler = new Set();
+        let tanimayan = 0;
+
+        for (const s of satirlar) {
+          const z = zamanBul(s);
+          if (!z) {
+            tanimayan++;
+            continue;
+          }
+          bicimler.add(z.bicim);
+          olaylar.push({ zaman: z.zaman, satir: s, seviye: seviyeBul(s) });
+        }
+
+        if (!olaylar.length) {
+          durum.className = 'arac-durum hata';
+          durum.textContent =
+            'Hiçbir satırda tanınan bir zaman damgası bulunamadı. 5. bölümdeki biçimlere bakın.';
+          el('#g-sonuc').hidden = true;
+          el('#g-bulgu-blok').hidden = true;
+          el('#g-seviye-blok').hidden = true;
+          return;
+        }
+
+        olaylar.sort((a, b) => a.zaman - b.zaman);
+        const ilk = olaylar[0].zaman;
+        const son = olaylar[olaylar.length - 1].zaman;
+        const aralik = son - ilk;
+
+        /* --- histogram ---------------------------------------------------- */
+        const KOVA = 60;
+        const kovaGenislik = Math.max(1000, Math.ceil(aralik / KOVA));
+        const kovalar = new Array(KOVA).fill(0).map(() => ({ toplam: 0, hata: 0 }));
+
+        for (const o of olaylar) {
+          const i = Math.min(KOVA - 1, Math.floor((o.zaman - ilk) / kovaGenislik));
+          kovalar[i].toplam++;
+          if (o.seviye === 'hata' || o.seviye === 'kritik') kovalar[i].hata++;
+        }
+
+        const enYuksek = Math.max(...kovalar.map((k) => k.toplam), 1);
+        el('#g-histogram').innerHTML = kovalar
+          .map((k, i) => {
+            const t = new Date(ilk.getTime() + i * kovaGenislik);
+            const yukseklik = (k.toplam / enYuksek) * 100;
+            const hataliMi = k.hata > 0;
+            return (
+              `<div class="g-sutun" title="${zamanYaz(t)} — ${k.toplam} olay${k.hata ? `, ${k.hata} hata` : ''}"` +
+              `${k.toplam === 0 ? ' data-bos="evet"' : ''}${hataliMi ? ' data-hata="evet"' : ''}>` +
+              `<i style="height:${Math.max(k.toplam ? 3 : 0, yukseklik)}%"></i></div>`
+            );
+          })
+          .join('');
+
+        el('#g-eksen').innerHTML =
+          `<span>${zamanYaz(ilk)}</span>` +
+          `<span>${sureYaz(aralik)} · kova ${sureYaz(kovaGenislik)}</span>` +
+          `<span>${zamanYaz(son)}</span>`;
+
+        el('#g-sonuc').hidden = false;
+        el('#g-olcum').innerHTML =
+          `<span>Olay: <b>${olaylar.length}</b></span>` +
+          `<span>Süre: <b>${sureYaz(aralik)}</b></span>` +
+          `<span>Ortalama: <b>${(olaylar.length / Math.max(1, aralik / 60000)).toFixed(1)}/dk</b></span>` +
+          `<span>Biçim: <b>${[...bicimler].join(', ')}</b></span>` +
+          (tanimayan ? `<span>Zamansız satır: <b>${tanimayan}</b></span>` : '');
+
+        /* --- bulgular ------------------------------------------------------ */
+        const bulgular = [];
+
+        // Sessiz boşluklar: ortalama aralığın belirgin katı
+        const araliklar = [];
+        for (let i = 1; i < olaylar.length; i++) {
+          araliklar.push({ ms: olaylar[i].zaman - olaylar[i - 1].zaman, i });
+        }
+        if (araliklar.length) {
+          const sirali = [...araliklar].sort((a, b) => a.ms - b.ms);
+          const ortanca = sirali[Math.floor(sirali.length / 2)].ms;
+          const esik = Math.max(ortanca * 10, 60000);
+          const bosluklar = araliklar.filter((a) => a.ms > esik).sort((a, b) => b.ms - a.ms).slice(0, 3);
+
+          for (const b of bosluklar) {
+            bulgular.push([
+              'uyari',
+              `<b>${sureYaz(b.ms)} sessizlik.</b> ` +
+                `${zamanYaz(olaylar[b.i - 1].zaman)} ile ${zamanYaz(olaylar[b.i].zaman)} arasında ` +
+                `hiç kayıt yok — tipik aralık ${sureYaz(ortanca)}. Servis durmuş, günlük dönmüş ya da ` +
+                `makine yeniden başlamış olabilir.` +
+                `<div class="g-ornek">${kacir(olaylar[b.i].satir.slice(0, 150))}</div>`,
+            ]);
+          }
+        }
+
+        // Ani sıçrama: bir kova, öncekilerin ortalamasının belirgin katı
+        const doluKovalar = kovalar.map((k, i) => ({ ...k, i })).filter((k) => k.toplam > 0);
+        if (doluKovalar.length > 4) {
+          const ortalama = olaylar.length / doluKovalar.length;
+          const sicramalar = doluKovalar
+            .filter((k) => k.toplam > ortalama * 3 && k.toplam > 5)
+            .sort((a, b) => b.toplam - a.toplam)
+            .slice(0, 2);
+          for (const s of sicramalar) {
+            const t = new Date(ilk.getTime() + s.i * kovaGenislik);
+            bulgular.push([
+              'hata',
+              `<b>Ani yoğunlaşma: ${zamanYaz(t)}</b> civarında ${s.toplam} olay ` +
+                `(ortalama ${ortalama.toFixed(1)}). Olayın başlangıcı büyük olasılıkla burası; ` +
+                `incelemeye bu pencereden başlayın.`,
+            ]);
+          }
+        }
+
+        // İlk hata
+        const ilkHata = olaylar.find((o) => o.seviye === 'hata' || o.seviye === 'kritik');
+        if (ilkHata) {
+          const gecen = ilkHata.zaman - ilk;
+          bulgular.push([
+            'hata',
+            `<b>İlk hata: ${zamanYaz(ilkHata.zaman)}</b> (günlüğün başından ${sureYaz(gecen)} sonra). ` +
+              `Kök nedeni ararken bundan <i>önceki</i> satırlara bakın — hata genelde sonucu, ` +
+              `sebebi değildir.` +
+              `<div class="g-ornek">${kacir(ilkHata.satir.slice(0, 180))}</div>`,
+          ]);
+        }
+
+        // Zaman sıçraması geriye: saat kayması ya da karışık kaynak
+        const geriye = satirlar
+          .map((s) => zamanBul(s))
+          .filter(Boolean)
+          .some((z, i, dizi) => i > 0 && z.zaman - dizi[i - 1].zaman < -60000);
+        if (geriye) {
+          bulgular.push([
+            'uyari',
+            '<b>Zaman damgaları sırasız.</b> Satırlar zaman içinde geriye gidiyor. Bu ya birden ' +
+              'çok makinenin günlüğünün birleştirilmiş olmasından ya da saat eşitlemesi ' +
+              'bozukluğundan gelir. İkisi de kök neden analizini yanıltır — birleştirmeden önce ' +
+              'saatlerin doğru olduğunu doğrulayın.',
+          ]);
+        }
+
+        if (bulgular.length) {
+          el('#g-bulgu-blok').hidden = false;
+          el('#g-bulgular').innerHTML =
+            '<ul class="g-liste">' +
+            bulgular.map(([tip, m]) => `<li data-tip="${tip}">${m}</li>`).join('') +
+            '</ul>';
+        } else {
+          el('#g-bulgu-blok').hidden = true;
+        }
+
+        /* --- seviye dağılımı ---------------------------------------------- */
+        const sayim = {};
+        for (const o of olaylar) sayim[o.seviye] = (sayim[o.seviye] || 0) + 1;
+
+        el('#g-seviye-blok').hidden = false;
+        el('#g-seviyeler').innerHTML = ['kritik', 'hata', 'uyari', 'bilgi', 'ayrinti']
+          .filter((s) => sayim[s])
+          .map(
+            (s) =>
+              `<div class="g-seviye" data-seviye="${s}">` +
+              `<b>${sayim[s]}</b><span>${SEVIYE_ADI[s]}</span>` +
+              `<i>%${Math.round((sayim[s] / olaylar.length) * 100)}</i></div>`
+          )
+          .join('');
+
+        el('#g-ilkHata').innerHTML = ilkHata
+          ? `Hata ve kritik satırların oranı <b>%${Math.round(((sayim.hata || 0) + (sayim.kritik || 0)) / olaylar.length * 100)}</b>. ` +
+            `Bu oran normalde tek haneli olur; iki hanedeyse ya gerçekten bir arıza sürüyor ya da ` +
+            `günlük seviyesi yanlış ayarlanmış.`
+          : 'Hata ya da kritik seviyeli satır bulunamadı.';
+
+        durum.className = 'arac-durum ok';
+        durum.textContent =
+          `${olaylar.length} olay çözümlendi (${sureYaz(aralik)}).` +
+          (tanimayan ? ` ${tanimayan} satırda zaman damgası bulunamadı ve atlandı.` : '');
+      }
+
+      /* --- olaylar ----------------------------------------------------------- */
+      el('#g-coz').addEventListener('click', coz);
+
+      el('#g-temizle').addEventListener('click', () => {
+        el('#g-girdi').value = '';
+        coz();
+      });
+
+      el('#g-ornek').addEventListener('click', () => {
+        const t0 = new Date();
+        t0.setHours(9, 0, 0, 0);
+        const iki = (n) => String(n).padStart(2, '0');
+        const damga = (sn) => {
+          const t = new Date(t0.getTime() + sn * 1000);
+          return `${t.getFullYear()}-${iki(t.getMonth() + 1)}-${iki(t.getDate())}T` +
+            `${iki(t.getHours())}:${iki(t.getMinutes())}:${iki(t.getSeconds())}+03:00`;
+        };
+
+        const satirlar = [];
+        // Normal işleyiş
+        for (let i = 0; i < 25; i++) {
+          satirlar.push(`${damga(i * 20)} sunucu01 uygulama INFO  İstek tamamlandı /api/siparis 200 ${40 + i}ms`);
+        }
+        // Sessizlik — servis durmuş
+        for (let i = 0; i < 3; i++) {
+          satirlar.push(`${damga(1800 + i * 15)} sunucu01 uygulama INFO  İstek tamamlandı /api/saglik 200 12ms`);
+        }
+        // Ani sıçrama ve hatalar
+        for (let i = 0; i < 40; i++) {
+          const seviye = i % 3 === 0 ? 'ERROR' : 'WARN';
+          const ileti =
+            i % 3 === 0
+              ? 'Veri tabanı bağlantısı alınamadı: connection timed out'
+              : 'Bağlantı havuzu doldu, yeniden deneniyor';
+          satirlar.push(`${damga(1900 + i * 4)} sunucu01 uygulama ${seviye} ${ileti}`);
+        }
+        // Toparlanma
+        for (let i = 0; i < 12; i++) {
+          satirlar.push(`${damga(2100 + i * 25)} sunucu01 uygulama INFO  İstek tamamlandı /api/siparis 200 ${55 + i}ms`);
+        }
+
+        el('#g-girdi').value = satirlar.join('\n');
+        coz();
+      });
+    })();
+  </script>
+
+  <style>
+    .arac-dugmeler {
+      display: flex;
+      gap: 10px;
+      flex-wrap: wrap;
+      margin-top: 4px;
+    }
+    .g-histogram {
+      display: flex;
+      align-items: flex-end;
+      gap: 2px;
+      height: 150px;
+      border: 1px solid var(--line);
+      border-radius: 11px;
+      padding: 12px 10px;
+      background: var(--paper);
+    }
+    .g-sutun {
+      flex: 1;
+      min-width: 0;
+      height: 100%;
+      display: flex;
+      align-items: flex-end;
+    }
+    .g-sutun i {
+      display: block;
+      width: 100%;
+      background: var(--indigo);
+      border-radius: 2px 2px 0 0;
+      min-height: 2px;
+    }
+    .g-sutun[data-bos] i {
+      background: var(--line);
+      height: 2px !important;
+    }
+    .g-sutun[data-hata] i {
+      background: light-dark(#dc2626, #f87171);
+    }
+    .g-sutun:hover i {
+      opacity: 0.75;
+    }
+    .g-eksen {
+      display: flex;
+      justify-content: space-between;
+      gap: 12px;
+      font-size: 11.5px;
+      color: var(--muted);
+      margin-top: 7px;
+      font-family: var(--mono, ui-monospace, monospace);
+      flex-wrap: wrap;
+    }
+    .g-liste {
+      list-style: none;
+      margin: 0;
+      padding: 0;
+      display: grid;
+      gap: 13px;
+    }
+    .g-liste li {
+      font-size: 13.5px;
+      line-height: 1.62;
+      color: var(--ink-soft);
+      border-left: 2px solid var(--line);
+      padding-left: 13px;
+    }
+    .g-liste li[data-tip='hata'] {
+      border-left-color: light-dark(#dc2626, #f87171);
+    }
+    .g-liste li[data-tip='uyari'] {
+      border-left-color: light-dark(#f0c33c, #a97f1c);
+    }
+    .g-ornek {
+      font-family: var(--mono, ui-monospace, monospace);
+      font-size: 11.5px;
+      background: var(--tint);
+      border-radius: 7px;
+      padding: 7px 10px;
+      margin-top: 7px;
+      overflow-x: auto;
+      white-space: pre;
+      color: var(--muted);
+    }
+    .g-seviyeler {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(min(120px, 100%), 1fr));
+      gap: 10px;
+    }
+    .g-seviye {
+      border: 1px solid var(--line);
+      border-radius: 11px;
+      padding: 12px 14px;
+      display: grid;
+      gap: 1px;
+    }
+    .g-seviye b {
+      font-size: 22px;
+      font-family: var(--mono, ui-monospace, monospace);
+      letter-spacing: -0.02em;
+    }
+    .g-seviye span {
+      font-size: 12.5px;
+      color: var(--muted);
+    }
+    .g-seviye i {
+      font-style: normal;
+      font-size: 11.5px;
+      color: var(--muted);
+    }
+    .g-seviye[data-seviye='kritik'] b,
+    .g-seviye[data-seviye='hata'] b {
+      color: light-dark(#dc2626, #f87171);
+    }
+    .g-seviye[data-seviye='uyari'] b {
+      color: light-dark(#b45309, #fbbf24);
+    }
+    .g-kaydir {
+      overflow-x: auto;
+    }
+    .g-tablo {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 13px;
+      min-width: 520px;
+    }
+    .g-tablo th,
+    .g-tablo td {
+      text-align: left;
+      padding: 9px 12px;
+      border-bottom: 1px solid var(--line);
+      vertical-align: top;
+      line-height: 1.55;
+    }
+    .g-tablo th {
+      color: var(--muted);
+      font-size: 11.5px;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+    }
+    .g-tablo code {
+      font-size: 12px;
+      white-space: nowrap;
+    }
+  </style>
+</Base>

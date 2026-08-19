@@ -1,0 +1,440 @@
+---
+import Base from '../../layouts/Base.astro';
+---
+
+<Base
+  baslik="Sanallaştırma yoğunlaştırma planlayıcı"
+  aciklama="Kaç sunucu barındırma düğümü gerekir? vCPU fazla tahsisi, bellek şişirme, N+1 dayanıklılık ve bakım penceresi birlikte hesaplanır."
+  aramaya={true}
+  kategori="Araç"
+>
+  <div class="arama-bas">
+    <div class="kap">
+      <nav class="kirinti" aria-label="Kırıntı yolu" style="padding-top:0">
+        <a href="/">Ana sayfa</a><span class="ayrac">/</span><a href="/araclar">Araçlar</a><span
+          class="ayrac">/</span
+        ><span aria-current="page">Yoğunlaştırma planlayıcı</span>
+      </nav>
+      <h1>Sanallaştırma yoğunlaştırma planlayıcı</h1>
+      <p style="color:var(--muted);font-size:14px;margin-top:8px;max-width:66ch">
+        Yeni küme kaç düğüm olmalı? Soruyu "toplam vCPU / çekirdek" diye cevaplamak, bir düğüm
+        bakıma alındığında sıkışan bir küme üretir. Fazla tahsis oranını, bellek gerçeğini ve
+        N+1 payını birlikte hesaplayın.
+      </p>
+    </div>
+  </div>
+
+  <div class="kap arac-sayfa">
+    <section class="arac-blok">
+      <h2 class="arac-h2"><span class="arac-no">1</span> Sanal makineler</h2>
+      <div class="arac-alanlar">
+        <label class="arac-alan"
+          >Sanal makine sayısı
+          <input id="v-adet" type="number" min="1" max="10000" value="60" />
+        </label>
+        <label class="arac-alan"
+          >Ortalama vCPU
+          <input id="v-vcpu" type="number" min="1" max="128" step="0.5" value="4" />
+        </label>
+        <label class="arac-alan"
+          >Ortalama bellek (GB)
+          <input id="v-bellek" type="number" min="0.5" max="1024" step="0.5" value="12" />
+        </label>
+        <label class="arac-alan"
+          >Ortalama CPU kullanımı (%)
+          <input id="v-kullanim" type="number" min="1" max="100" value="18" />
+          <small>Tahsis değil, gerçekten kullanılan. İzleme aracınızdan alın.</small>
+        </label>
+        <label class="arac-alan"
+          >Ortalama disk (GB)
+          <input id="v-disk" type="number" min="1" max="100000" value="180" />
+        </label>
+        <label class="arac-alan"
+          >İş yükü tipi
+          <select id="v-tip">
+            <option value="genel">Karışık — dosya, uygulama, altyapı</option>
+            <option value="vdi">Sanal masaüstü</option>
+            <option value="veritabani">Veri tabanı ve gecikme duyarlı</option>
+            <option value="test">Geliştirme ve test</option>
+          </select>
+        </label>
+      </div>
+    </section>
+
+    <section class="arac-blok">
+      <h2 class="arac-h2"><span class="arac-no">2</span> Barındırma düğümü</h2>
+      <div class="arac-alanlar">
+        <label class="arac-alan"
+          >Yuva başına çekirdek
+          <input id="v-cekirdek" type="number" min="1" max="128" value="32" />
+        </label>
+        <label class="arac-alan"
+          >Yuva sayısı
+          <input id="v-yuva" type="number" min="1" max="8" value="2" />
+        </label>
+        <label class="arac-alan"
+          >Düğüm belleği (GB)
+          <input id="v-dugumBellek" type="number" min="16" max="12288" value="512" />
+        </label>
+        <label class="arac-alan"
+          >Hipervizör payı (%)
+          <input id="v-pay" type="number" min="0" max="40" value="8" />
+          <small>Hipervizörün kendi tükettiği CPU ve bellek.</small>
+        </label>
+        <label class="arac-alan"
+          >Dayanıklılık
+          <select id="v-dayaniklilik">
+            <option value="0">Yok — düğüm arızasında sanal makineler durur</option>
+            <option value="1" selected>N+1 — bir düğüm kaybını taşır</option>
+            <option value="2">N+2 — bakım sırasında arıza da taşınır</option>
+          </select>
+        </label>
+        <label class="arac-alan"
+          >Hedef CPU doluluğu (%)
+          <input id="v-hedef" type="number" min="30" max="95" value="70" />
+          <small>Tepe anlarında pay bırakmak için.</small>
+        </label>
+      </div>
+      <p class="arac-durum" id="v-durum" role="status" aria-live="polite"></p>
+    </section>
+
+    <section class="arac-blok">
+      <h2 class="arac-h2"><span class="arac-no">3</span> Sonuç</h2>
+      <div class="v-kartlar" id="v-kartlar"></div>
+      <div class="v-cubuklar" id="v-cubuklar"></div>
+    </section>
+
+    <section class="arac-blok">
+      <h2 class="arac-h2"><span class="arac-no">4</span> Değerlendirme</h2>
+      <div id="v-bulgular"></div>
+    </section>
+
+    <section class="arac-blok">
+      <h2 class="arac-h2"><span class="arac-no">5</span> Yoğunlaştırmanın kuralları</h2>
+      <ul class="v-ipuclari">
+        <li>
+          <b>CPU fazla tahsis edilir, bellek edilmez.</b> Sanal makineler aynı anda tepe
+          yapmadığı için vCPU sayısı fiziksel çekirdeği kat kat aşabilir. Bellek öyle değildir:
+          şişirme (ballooning) ve takas devreye girdiği anda performans uçurumdan düşer. Pratikte
+          düğüm sayısını bellek belirler, CPU değil.
+        </li>
+        <li>
+          <b>N+1, "bir düğüm fazla al" demek değildir.</b> Kalan düğümler bir düğümün yükünü de
+          taşıyabilmelidir. Dört düğümlü bir kümede N+1, her düğümün en fazla %75 dolu olması
+          anlamına gelir. Küme küçüldükçe bu pay pahalılaşır: iki düğümde N+1, %50 boş
+          kapasitedir.
+        </li>
+        <li>
+          <b>Bakım da bir düğüm kaybıdır.</b> Yama günü bir düğümü boşaltırsınız; o gün bir arıza
+          olursa N+1 tükenmiş olur. Kritik kümelerde N+2 bu yüzden vardır.
+        </li>
+        <li>
+          <b>NUMA sınırını aşan sanal makine yavaşlar.</b> Bir yuvadaki çekirdek sayısından fazla
+          vCPU veren bir sanal makine, belleğe uzak düğümden erişmek zorunda kalır ve gecikme
+          artar. Büyük sanal makineleri NUMA sınırına oturtun ya da bilerek geniş yapın.
+        </li>
+        <li>
+          <b>Fazla vCPU, performansı düşürür.</b> Sezgiye aykırı ama doğrudur: gereğinden çok
+          vCPU verilen bir sanal makine, zamanlayıcının bütün vCPU'lara aynı anda yer bulmasını
+          bekler (co-stop). 4 vCPU ile daha hızlı çalışan 8 vCPU'lu makineler sahada sık görülür.
+        </li>
+      </ul>
+    </section>
+  </div>
+
+  <script>
+    (() => {
+      const el = (s) => document.querySelector(s);
+      const say = (s) => Number(el(s).value) || 0;
+
+      /* İş yükü tipine göre makul fazla tahsis üst sınırı ve bellek tekilleştirme kazancı */
+      const TIPLER = {
+        genel: { enFazlaOran: 6, tekillestirme: 0.05, ad: 'Karışık' },
+        vdi: { enFazlaOran: 10, tekillestirme: 0.25, ad: 'Sanal masaüstü' },
+        veritabani: { enFazlaOran: 2, tekillestirme: 0, ad: 'Veri tabanı' },
+        test: { enFazlaOran: 12, tekillestirme: 0.1, ad: 'Geliştirme ve test' },
+      };
+
+      function hesapla() {
+        const adet = say('#v-adet');
+        const vcpu = say('#v-vcpu');
+        const bellek = say('#v-bellek');
+        const kullanim = say('#v-kullanim') / 100;
+        const disk = say('#v-disk');
+        const tip = TIPLER[el('#v-tip').value];
+
+        const cekirdek = say('#v-cekirdek');
+        const yuva = say('#v-yuva');
+        const dugumBellek = say('#v-dugumBellek');
+        const pay = 1 - say('#v-pay') / 100;
+        const yedek = Number(el('#v-dayaniklilik').value);
+        const hedef = say('#v-hedef') / 100;
+
+        const dugumCekirdek = cekirdek * yuva;
+        const kullanilirCekirdek = dugumCekirdek * pay;
+        const kullanilirBellek = dugumBellek * pay;
+
+        /* --- talep -------------------------------------------------------- */
+        const toplamVcpu = adet * vcpu;
+        // Gerçek CPU talebi tahsise değil kullanıma bağlıdır; hedef doluluk payı eklenir
+        const gercekCekirdek = (toplamVcpu * kullanim) / hedef;
+        const toplamBellek = adet * bellek * (1 - tip.tekillestirme);
+        const toplamDisk = adet * disk;
+
+        /* --- düğüm sayısı ------------------------------------------------- */
+        const cpuIcin = Math.ceil(gercekCekirdek / kullanilirCekirdek);
+        const bellekIcin = Math.ceil(toplamBellek / kullanilirBellek);
+        const calisanDugum = Math.max(1, cpuIcin, bellekIcin);
+        const toplamDugum = calisanDugum + yedek;
+        const darBogaz = bellekIcin > cpuIcin ? 'bellek' : cpuIcin > bellekIcin ? 'CPU' : 'ikisi de';
+
+        const fazlaTahsisOrani = toplamVcpu / (calisanDugum * kullanilirCekirdek);
+        const dugumBasinaVm = Math.ceil(adet / calisanDugum);
+
+        // Bir düğüm kaybında kalanların doluluğu
+        const arizaDoluluk =
+          toplamDugum > 1 ? (toplamBellek / ((toplamDugum - 1) * kullanilirBellek)) * 100 : Infinity;
+
+        el('#v-kartlar').innerHTML = [
+          { b: 'Toplam düğüm', d: String(toplamDugum), n: `${calisanDugum} çalışan + ${yedek} yedek` },
+          {
+            b: 'Düğüm başına VM',
+            d: String(dugumBasinaVm),
+            n: `Dar boğaz: ${darBogaz}`,
+          },
+          {
+            b: 'vCPU : çekirdek',
+            d: `${fazlaTahsisOrani.toFixed(1)}:1`,
+            n: `${tip.ad} için üst sınır ${tip.enFazlaOran}:1`,
+          },
+          {
+            b: 'Toplam bellek',
+            d: `${Math.round(toplamBellek).toLocaleString('tr-TR')} GB`,
+            n: tip.tekillestirme
+              ? `%${Math.round(tip.tekillestirme * 100)} tekilleştirme sonrası`
+              : 'Tekilleştirme varsayılmadı',
+          },
+          {
+            b: 'Toplam disk',
+            d: toplamDisk >= 1024 ? `${(toplamDisk / 1024).toFixed(1)} TB` : `${toplamDisk} GB`,
+            n: 'Anlık görüntü ve yedek hariç',
+          },
+          {
+            b: 'Arızada doluluk',
+            d: Number.isFinite(arizaDoluluk) ? `%${Math.round(arizaDoluluk)}` : '—',
+            n: 'Bir düğüm kaybında bellek doluluğu',
+          },
+        ]
+          .map(
+            (k) =>
+              `<div class="v-kart"><span class="v-kart-b">${k.b}</span>` +
+              `<b class="v-kart-d">${k.d}</b><span class="v-kart-n">${k.n}</span></div>`
+          )
+          .join('');
+
+        /* --- çubuklar ----------------------------------------------------- */
+        const cpuDoluluk = (gercekCekirdek / (calisanDugum * kullanilirCekirdek)) * 100;
+        const bellekDoluluk = (toplamBellek / (calisanDugum * kullanilirBellek)) * 100;
+
+        el('#v-cubuklar').innerHTML = [
+          ['CPU (normal işletim)', cpuDoluluk, `${gercekCekirdek.toFixed(1)} / ${(calisanDugum * kullanilirCekirdek).toFixed(1)} çekirdek`],
+          ['Bellek (normal işletim)', bellekDoluluk, `${Math.round(toplamBellek)} / ${Math.round(calisanDugum * kullanilirBellek)} GB`],
+          ...(Number.isFinite(arizaDoluluk)
+            ? [['Bellek (bir düğüm arızalı)', arizaDoluluk, `${Math.round(toplamBellek)} / ${Math.round((toplamDugum - 1) * kullanilirBellek)} GB`]]
+            : []),
+        ]
+          .map(([ad, yuzde, alt]) => {
+            const kritik = yuzde > 90;
+            return (
+              `<div class="v-cubuk"${kritik ? ' data-kritik="evet"' : ''}>` +
+              `<div class="v-cubuk-ust"><span>${ad}</span><b>%${Math.round(yuzde)}</b></div>` +
+              `<div class="v-ray"><i style="width:${Math.min(100, yuzde)}%"></i></div>` +
+              `<span class="v-cubuk-alt">${alt}</span></div>`
+            );
+          })
+          .join('');
+
+        /* --- değerlendirme ------------------------------------------------ */
+        const bulgular = [];
+
+        if (fazlaTahsisOrani > tip.enFazlaOran) {
+          bulgular.push([
+            'hata',
+            `<b>Fazla tahsis oranı yüksek (${fazlaTahsisOrani.toFixed(1)}:1).</b> ` +
+              `${tip.ad} iş yükü için ${tip.enFazlaOran}:1 üst sınır kabul edilir. ` +
+              `Bu orandan sonra sanal makineler CPU beklemeye (ready time) girer; kullanıcı ` +
+              `bunu "sunucu yavaş" diye bildirir ama izleme aracında CPU boş görünür.`,
+          ]);
+        }
+
+        if (vcpu > cekirdek) {
+          bulgular.push([
+            'uyari',
+            `<b>Sanal makineler NUMA sınırını aşıyor.</b> Ortalama ${vcpu} vCPU, yuva başına ` +
+              `${cekirdek} çekirdekten fazla. Bu makineler belleğe uzak yuvadan erişmek zorunda ` +
+              `kalır ve gecikme belirgin artar. Ya makineleri küçültün ya da düğümü daha çok ` +
+              `çekirdekli seçin.`,
+          ]);
+        }
+
+        if (yedek === 0) {
+          bulgular.push([
+            'hata',
+            '<b>Dayanıklılık payı yok.</b> Bir düğüm arızalandığında üzerindeki sanal makineler ' +
+              'başlatılacak yer bulamaz. Tek düğümlük pay, kümenin en ucuz sigortasıdır.',
+          ]);
+        } else if (Number.isFinite(arizaDoluluk) && arizaDoluluk > 95) {
+          bulgular.push([
+            'hata',
+            `<b>N+${yedek} yeterli değil.</b> Bir düğüm kaybında bellek doluluğu ` +
+              `%${Math.round(arizaDoluluk)}'e çıkıyor; sanal makineler başlatılamaz. ` +
+              `Bir düğüm daha ekleyin ya da düğüm belleğini büyütün.`,
+          ]);
+        } else if (Number.isFinite(arizaDoluluk) && arizaDoluluk > 85) {
+          bulgular.push([
+            'uyari',
+            `<b>Arıza payı dar.</b> Bir düğüm kaybında bellek %${Math.round(arizaDoluluk)} dolu ` +
+              `olur. Çalışır ama bakım penceresinde aynı anda bir arıza yaşanırsa küme sıkışır.`,
+          ]);
+        } else {
+          bulgular.push([
+            'ok',
+            `<b>Dayanıklılık payı yeterli.</b> Bir düğüm kaybında bellek doluluğu ` +
+              `%${Math.round(arizaDoluluk)} — sanal makineler sorunsuz taşınır.`,
+          ]);
+        }
+
+        if (toplamDugum <= 2 && yedek > 0) {
+          bulgular.push([
+            'uyari',
+            `<b>Küçük kümede yedek pahalıdır.</b> ${toplamDugum} düğümlük bir kümede N+${yedek}, ` +
+              `kapasitenin yarısını boş bırakmak demektir. Daha küçük ama daha çok düğüm ` +
+              `(ör. iki büyük yerine dört orta) aynı dayanıklılığı daha ucuza verir.`,
+          ]);
+        }
+
+        if (kullanim > 0.6) {
+          bulgular.push([
+            'uyari',
+            `<b>Ortalama CPU kullanımı yüksek (%${Math.round(kullanim * 100)}).</b> ` +
+              `Bu iş yükünde fazla tahsisin faydası azalır; yoğunlaştırma beklediğiniz kadar ` +
+              `kazandırmaz. Ölçümün gerçekten <i>ortalama</i> olduğundan emin olun — tepe değerini ` +
+              `girmek düğüm sayısını gereksiz şişirir.`,
+          ]);
+        }
+
+        el('#v-bulgular').innerHTML =
+          '<ul class="v-liste">' +
+          bulgular.map(([tip2, m]) => `<li data-tip="${tip2}">${m}</li>`).join('') +
+          '</ul>';
+
+        const durum = el('#v-durum');
+        const hataSayisi = bulgular.filter(([t]) => t === 'hata').length;
+        durum.className = 'arac-durum ' + (hataSayisi ? 'hata' : 'ok');
+        durum.textContent = hataSayisi
+          ? `${toplamDugum} düğüm hesaplandı ama ${hataSayisi} ciddi sorun var.`
+          : `${toplamDugum} düğüm yeterli (${calisanDugum} çalışan + ${yedek} yedek).`;
+      }
+
+      document
+        .querySelectorAll('.arac-alan input, .arac-alan select')
+        .forEach((g) => g.addEventListener('input', hesapla));
+      document.querySelectorAll('.arac-alan select').forEach((g) => g.addEventListener('change', hesapla));
+
+      hesapla();
+    })();
+  </script>
+
+  <style>
+    .v-kartlar {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(min(165px, 100%), 1fr));
+      gap: 10px;
+      margin-bottom: 18px;
+    }
+    .v-kart {
+      border: 1px solid var(--line);
+      border-radius: 11px;
+      padding: 13px 15px;
+      display: grid;
+      gap: 3px;
+      background: var(--paper);
+    }
+    .v-kart-b {
+      font-size: 11.5px;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+      color: var(--muted);
+    }
+    .v-kart-d {
+      font-size: 22px;
+      letter-spacing: -0.02em;
+      font-family: var(--mono, ui-monospace, monospace);
+      color: var(--indigo-metin);
+    }
+    .v-kart-n {
+      font-size: 12px;
+      color: var(--muted);
+      line-height: 1.45;
+    }
+    .v-cubuklar {
+      display: grid;
+      gap: 14px;
+    }
+    .v-cubuk-ust {
+      display: flex;
+      justify-content: space-between;
+      font-size: 13px;
+      margin-bottom: 5px;
+    }
+    .v-ray {
+      height: 9px;
+      border-radius: 999px;
+      background: var(--tint);
+      overflow: hidden;
+      border: 1px solid var(--line);
+    }
+    .v-ray i {
+      display: block;
+      height: 100%;
+      background: var(--indigo);
+    }
+    .v-cubuk[data-kritik] .v-ray i {
+      background: light-dark(#dc2626, #f87171);
+    }
+    .v-cubuk[data-kritik] .v-cubuk-ust b {
+      color: light-dark(#dc2626, #f87171);
+    }
+    .v-cubuk-alt {
+      font-size: 12px;
+      color: var(--muted);
+      margin-top: 4px;
+      display: block;
+    }
+    .v-liste,
+    .v-ipuclari {
+      list-style: none;
+      margin: 0;
+      padding: 0;
+      display: grid;
+      gap: 12px;
+    }
+    .v-liste li,
+    .v-ipuclari li {
+      font-size: 13.5px;
+      line-height: 1.62;
+      color: var(--ink-soft);
+      border-left: 2px solid var(--line);
+      padding-left: 13px;
+    }
+    .v-liste li[data-tip='hata'] {
+      border-left-color: light-dark(#dc2626, #f87171);
+    }
+    .v-liste li[data-tip='uyari'] {
+      border-left-color: light-dark(#f0c33c, #a97f1c);
+    }
+    .v-liste li[data-tip='ok'] {
+      border-left-color: light-dark(#16a34a, #4ade80);
+    }
+  </style>
+</Base>

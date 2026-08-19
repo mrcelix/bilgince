@@ -1,0 +1,449 @@
+---
+import Base from '../../layouts/Base.astro';
+---
+
+<Base
+  baslik="Hesap kilitleme politikası simülatörü"
+  aciklama="Kilitleme eşiği, sayaç penceresi ve süre birlikte ne üretir? Saldırganın deneme hızını ve kullanıcının kilitlenme sıklığını birlikte hesaplar."
+  aramaya={true}
+  kategori="Araç"
+>
+  <div class="arama-bas">
+    <div class="kap">
+      <nav class="kirinti" aria-label="Kırıntı yolu" style="padding-top:0">
+        <a href="/">Ana sayfa</a><span class="ayrac">/</span><a href="/araclar">Araçlar</a><span
+          class="ayrac">/</span
+        ><span aria-current="page">Kilitleme politikası</span>
+      </nav>
+      <h1>Hesap kilitleme politikası simülatörü</h1>
+      <p style="color:var(--muted);font-size:14px;margin-top:8px;max-width:66ch">
+        Kilitleme politikası iki tarafı birden keser: çok sıkı olursa yardım masası parola
+        sıfırlamaktan başka iş yapamaz, çok gevşek olursa kaba kuvvet denemesi rahatça sürer.
+        Üç değeri girin, ikisinin de sayısını görün.
+      </p>
+    </div>
+  </div>
+
+  <div class="kap arac-sayfa">
+    <section class="arac-blok">
+      <h2 class="arac-h2"><span class="arac-no">1</span> Politika</h2>
+      <div class="arac-alanlar">
+        <label class="arac-alan"
+          >Kilitleme eşiği (hatalı deneme)
+          <input id="l-esik" type="number" min="0" max="999" value="5" />
+          <small>0 yazarsanız kilitleme kapalıdır.</small>
+        </label>
+        <label class="arac-alan"
+          >Sayaç sıfırlama penceresi (dakika)
+          <input id="l-pencere" type="number" min="1" max="99999" value="15" />
+          <small>Bu süre boyunca hatalı denemeler birikir.</small>
+        </label>
+        <label class="arac-alan"
+          >Kilit süresi (dakika)
+          <input id="l-sure" type="number" min="0" max="99999" value="15" />
+          <small>0 yazarsanız kilidi yönetici açar.</small>
+        </label>
+        <label class="arac-alan"
+          >Parola uzunluğu
+          <input id="l-uzunluk" type="number" min="4" max="64" value="10" />
+        </label>
+        <label class="arac-alan"
+          >Parola alfabesi
+          <select id="l-alfabe">
+            <option value="26">Yalnızca küçük harf (26)</option>
+            <option value="52">Büyük + küçük harf (52)</option>
+            <option value="62">Harf + rakam (62)</option>
+            <option value="95" selected>Harf + rakam + simge (95)</option>
+            <option value="sozluk">Sözlük kelimesi ya da yaygın parola</option>
+          </select>
+        </label>
+        <label class="arac-alan"
+          >Hesap sayısı
+          <input id="l-hesap" type="number" min="1" max="1000000" value="500" />
+          <small>Parola püskürtme saldırısının hesabı için.</small>
+        </label>
+      </div>
+    </section>
+
+    <section class="arac-blok">
+      <h2 class="arac-h2"><span class="arac-no">2</span> Ne üretiyor?</h2>
+      <div class="l-kartlar" id="l-kartlar"></div>
+      <p class="arac-durum" id="l-durum" role="status" aria-live="polite"></p>
+    </section>
+
+    <section class="arac-blok">
+      <h2 class="arac-h2"><span class="arac-no">3</span> Değerlendirme</h2>
+      <div id="l-bulgular"></div>
+    </section>
+
+    <section class="arac-blok">
+      <h2 class="arac-h2"><span class="arac-no">4</span> Uygulama</h2>
+      <div class="l-cikti">
+        <div>
+          <span class="yan-etiket">Grup ilkesi yolu</span>
+          <div style="position:relative">
+            <pre class="kod"><code id="l-gpo"></code></pre>
+            <button class="kopyala" type="button" data-kaynak="l-gpo">Kopyala</button>
+          </div>
+        </div>
+        <div>
+          <span class="yan-etiket">PowerShell — ince ayarlı parola ilkesi</span>
+          <div style="position:relative">
+            <pre class="kod"><code id="l-ps"></code></pre>
+            <button class="kopyala" type="button" data-kaynak="l-ps">Kopyala</button>
+          </div>
+        </div>
+        <div>
+          <span class="yan-etiket">Kilitlenmeleri izleme</span>
+          <div style="position:relative">
+            <pre class="kod"><code id="l-izle"></code></pre>
+            <button class="kopyala" type="button" data-kaynak="l-izle">Kopyala</button>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="arac-blok">
+      <h2 class="arac-h2"><span class="arac-no">5</span> Sahadan notlar</h2>
+      <ul class="l-ipuclari">
+        <li>
+          <b>Kilitlenmelerin çoğu saldırı değildir.</b> Telefonda kayıtlı eski Wi-Fi parolası,
+          eşlenmiş bir posta hesabı, arka planda çalışan bir servis, haritalanmış bir ağ
+          sürücüsü… Bir kullanıcı sürekli kilitleniyorsa önce onun cihazlarına bakın.
+          <code>4740</code> olayındaki <i>Caller Computer Name</i> alanı kaynağı söyler.
+        </li>
+        <li>
+          <b>Parola püskürtme, kilitlemeyi bilerek atlar.</b> Saldırgan tek hesaba çok parola
+          denemez; <i>çok hesaba</i> bir parola dener ve pencere dolmadan durur. Kilitleme
+          politikası bu saldırıyı hiç görmez. Buna karşı çare eşik değil, aynı kaynaktan gelen
+          çok sayıda başarısız denemeyi izlemektir.
+        </li>
+        <li>
+          <b>Süresiz kilit bir hizmet reddi aracıdır.</b> Kilit süresini 0 yaparsanız, adını
+          bildiği her hesabı kilitleyebilen biri kurumu durdurabilir. Otomatik açılan makul bir
+          süre (15-30 dakika) hem saldırıyı yavaşlatır hem bu riski kaldırır.
+        </li>
+        <li>
+          <b>Uzun parola, sıkı kilitlemeden iyidir.</b> Modern rehberler (NIST 800-63B) uzunluk
+          ve sızıntı denetimini öne alır, sık parola değiştirmeyi ve aşırı sıkı kilitlemeyi
+          önermez. Eşiği düşürmek yerine parola uzunluğunu artırmak hem güvenliği hem kullanıcı
+          deneyimini iyileştirir.
+        </li>
+        <li>
+          <b>Çok adımlı doğrulama denklemi değiştirir.</b> MFA açıksa parolanın tek başına
+          kırılması yetmez; kilitleme politikasını gevşetip kullanıcıyı rahatlatabilirsiniz.
+          MFA yoksa buradaki sayılar gerçekten sizin savunmanızdır.
+        </li>
+      </ul>
+    </section>
+  </div>
+
+  <script>
+    (() => {
+      const el = (s) => document.querySelector(s);
+      const say = (s) => Number(el(s).value) || 0;
+
+      function sureYaz(saniye) {
+        if (!Number.isFinite(saniye)) return 'pratikte sonsuz';
+        const yil = saniye / 31557600;
+        if (yil > 1e9) return `${(yil / 1e9).toPrecision(3)} milyar yıl`;
+        if (yil > 1e6) return `${(yil / 1e6).toPrecision(3)} milyon yıl`;
+        if (yil > 1000) return `${Math.round(yil / 1000).toLocaleString('tr-TR')} bin yıl`;
+        if (yil > 1) return `${yil.toPrecision(3)} yıl`;
+        const gun = saniye / 86400;
+        if (gun > 1) return `${gun.toPrecision(3)} gün`;
+        const saat = saniye / 3600;
+        if (saat > 1) return `${saat.toPrecision(3)} saat`;
+        return `${Math.round(saniye / 60)} dakika`;
+      }
+
+      function hesapla() {
+        const esik = say('#l-esik');
+        const pencere = say('#l-pencere');
+        const sure = say('#l-sure');
+        const uzunluk = say('#l-uzunluk');
+        const alfabeSecim = el('#l-alfabe').value;
+        const hesap = say('#l-hesap');
+
+        /* --- saldırganın deneme hızı --------------------------------------
+           Kilitleme açıkken saldırgan her döngüde eşiğin bir eksiği kadar
+           deneme yapıp kilidi tetiklememek için beklemek zorundadır. */
+        let denemePerSaat;
+        let bekleme;
+        if (esik === 0) {
+          denemePerSaat = Infinity; // ağ hızıyla sınırlı, pratikte sınırsız
+          bekleme = 0;
+        } else {
+          // Güvenli oyun: eşiğin bir altında kal, sayaç penceresi dolsun, tekrarla
+          const guvenliDeneme = Math.max(1, esik - 1);
+          bekleme = pencere; // dakika
+          denemePerSaat = (guvenliDeneme / bekleme) * 60;
+        }
+
+        /* --- parola uzayı --------------------------------------------------- */
+        const sozlukMu = alfabeSecim === 'sozluk';
+        // Yaygın parola listeleri pratikte bu büyüklükte; sözlük saldırısının uzayı budur
+        const uzay = sozlukMu ? 1e7 : Number(alfabeSecim) ** uzunluk;
+        // Ortalama olarak uzayın yarısında bulunur
+        const ortalamaDeneme = uzay / 2;
+        const kirmaSaniye =
+          denemePerSaat === Infinity ? 0 : (ortalamaDeneme / denemePerSaat) * 3600;
+
+        /* --- parola püskürtme ------------------------------------------------
+           Saldırgan her hesaba pencere başına bir deneme yaparsa hiçbir hesap
+           kilitlenmez; kilitleme bu saldırıyı hiç görmez. */
+        const puskurtmeSaatlik = esik === 0 ? Infinity : (hesap * 60) / pencere;
+
+        /* --- kullanıcı tarafı ------------------------------------------------
+           Kilitlenen kullanıcı, kilit süresi kadar bekler ya da yardım masasını arar. */
+        const kayipDakika = sure === 0 ? 30 : Math.min(sure, 30); // süresizde çağrı ~30 dk
+
+        el('#l-kartlar').innerHTML = [
+          {
+            b: 'Saldırgan hızı',
+            d: esik === 0 ? 'sınırsız' : `${Math.round(denemePerSaat)}/saat`,
+            n: esik === 0 ? 'Kilitleme kapalı' : `${Math.max(1, esik - 1)} deneme / ${pencere} dk`,
+          },
+          {
+            b: 'Tek hesabı kırma',
+            d: esik === 0 ? 'saniyeler' : sureYaz(kirmaSaniye),
+            n: sozlukMu ? 'Yaygın parola listesinden' : `${uzunluk} karakter, ${alfabeSecim} simge`,
+          },
+          {
+            b: 'Püskürtme kapsamı',
+            d: esik === 0 ? '—' : `${Math.round(puskurtmeSaatlik).toLocaleString('tr-TR')}/saat`,
+            n: 'Kilitleme tetiklemeden denenebilen hesap',
+          },
+          {
+            b: 'Kilitlenme maliyeti',
+            d: `${kayipDakika} dk`,
+            n: sure === 0 ? 'Yönetici açana kadar' : 'Kullanıcı başına, otomatik açılır',
+          },
+        ]
+          .map(
+            (k) =>
+              `<div class="l-kart"><span class="l-kart-b">${k.b}</span>` +
+              `<b class="l-kart-d">${k.d}</b><span class="l-kart-n">${k.n}</span></div>`
+          )
+          .join('');
+
+        /* --- değerlendirme ---------------------------------------------- */
+        const bulgular = [];
+
+        if (esik === 0) {
+          bulgular.push([
+            'hata',
+            '<b>Kilitleme kapalı.</b> Saldırgan ağın izin verdiği hızda parola deneyebilir; ' +
+              'zayıf bir parola dakikalar içinde bulunur. MFA yoksa bu ayar savunulamaz.',
+          ]);
+        } else if (esik <= 3) {
+          bulgular.push([
+            'uyari',
+            `<b>Eşik çok düşük (${esik}).</b> Kullanıcı parolasını iki kez yanlış yazmaya hakkı ` +
+              `olsun ister; ${esik} deneme, arka planda çalışan tek bir eski istemci yüzünden ` +
+              `sürekli kilitlenme demektir. Yardım masası yükünü ölçmeden bu değere inmeyin.`,
+          ]);
+        } else if (esik > 20) {
+          bulgular.push([
+            'uyari',
+            `<b>Eşik yüksek (${esik}).</b> Saldırgan pencere başına ${esik - 1} deneme yapabiliyor; ` +
+              `kilitleme neredeyse hiç devreye girmiyor. 5-10 arası tipik bir dengedir.`,
+          ]);
+        } else {
+          bulgular.push([
+            'ok',
+            `<b>Eşik makul (${esik}).</b> Kullanıcıya hata payı bırakırken saldırganı ` +
+              `saatte ${Math.round(denemePerSaat)} denemeye indiriyor.`,
+          ]);
+        }
+
+        if (esik > 0 && sure === 0) {
+          bulgular.push([
+            'hata',
+            '<b>Kilit süresiz.</b> Kilidi yalnızca yönetici açabilir. Bu, adını bildiği hesapları ' +
+              'kilitleyerek kurumu durdurabilecek biri için hazır bir hizmet reddi aracıdır. ' +
+              '15-30 dakikalık otomatik açılma hem saldırıyı yavaşlatır hem bu riski kaldırır.',
+          ]);
+        }
+
+        if (esik > 0 && sure > 0 && sure < pencere) {
+          bulgular.push([
+            'uyari',
+            `<b>Kilit süresi (${sure} dk) sayaç penceresinden (${pencere} dk) kısa.</b> ` +
+              `Kilit açıldığında sayaç hâlâ dolu olabilir; kullanıcı bir hata daha yaptığında ` +
+              `anında yeniden kilitlenir. Kilit süresini pencereye eşit ya da uzun tutun.`,
+          ]);
+        }
+
+        if (esik > 0 && kirmaSaniye < 86400 * 365 && !sozlukMu) {
+          bulgular.push([
+            'hata',
+            `<b>Parola çok kısa.</b> ${uzunluk} karakterlik parola, bu kilitleme politikasıyla ` +
+              `bile ortalama ${sureYaz(kirmaSaniye)} içinde bulunur. Eşiği düşürmek yerine ` +
+              `parola uzunluğunu artırın — 12 karakter bu süreyi yüz binlerce katına çıkarır.`,
+          ]);
+        }
+
+        if (sozlukMu) {
+          bulgular.push([
+            'hata',
+            '<b>Sözlük parolası kilitlemeyle korunamaz.</b> Saldırganın deneyeceği ilk yüz ' +
+              'parola içinde olma ihtimali yüksektir; hız sınırı bunu yalnızca geciktirir. ' +
+              'Çözüm, bilinen sızmış parolaları giriş anında reddetmektir.',
+          ]);
+        }
+
+        bulgular.push([
+          'uyari',
+          `<b>Püskürtme saldırısı bu politikayı görmez.</b> Saldırgan her hesaba pencere başına ` +
+            `tek deneme yaparsa hiçbir kilit tetiklenmez ve ${Math.round(puskurtmeSaatlik).toLocaleString('tr-TR')} ` +
+            `hesabı saatte bir kez deneyebilir. Buna karşı tek çare, tek kaynaktan gelen çok ` +
+            `sayıda 4625 olayını izleyip o kaynağı engellemektir.`,
+        ]);
+
+        el('#l-bulgular').innerHTML =
+          '<ul class="l-liste">' +
+          bulgular.map(([tip, m]) => `<li data-tip="${tip}">${m}</li>`).join('') +
+          '</ul>';
+
+        const hataSayisi = bulgular.filter(([t]) => t === 'hata').length;
+        const durum = el('#l-durum');
+        durum.className = 'arac-durum ' + (hataSayisi ? 'hata' : 'ok');
+        durum.textContent = hataSayisi
+          ? `${hataSayisi} ciddi sorun var — 3. bölüme bakın.`
+          : 'Politika dengeli görünüyor.';
+
+        /* --- uygulama komutları ------------------------------------------ */
+        el('#l-gpo').textContent =
+          `Bilgisayar Yapılandırması\n` +
+          `  └ Windows Ayarları\n` +
+          `     └ Güvenlik Ayarları\n` +
+          `        └ Hesap İlkeleri\n` +
+          `           └ Hesap Kilitleme İlkesi\n\n` +
+          `Hesap kilitleme eşiği .......... ${esik} geçersiz oturum açma denemesi\n` +
+          `Hesap kilitleme süresi ......... ${sure} dakika${sure === 0 ? '  (yönetici açar)' : ''}\n` +
+          `Hesap kilitleme sayacını sıfırla ${pencere} dakika sonra\n\n` +
+          `# Etki alanı genelinde yalnızca Default Domain Policy üzerinden uygulanır.\n` +
+          `# Başka bir GPO'ya yazarsanız sessizce yok sayılır — en sık yapılan hata budur.`;
+
+        el('#l-ps').textContent =
+          `# Etki alanı genelindeki mevcut ilkeyi oku\n` +
+          `Get-ADDefaultDomainPasswordPolicy |\n` +
+          `    Select-Object LockoutThreshold, LockoutDuration, LockoutObservationWindow,\n` +
+          `        MinPasswordLength, PasswordHistoryCount\n\n` +
+          `# Belirli bir gruba ayrı ilke (ince ayarlı parola ilkesi)\n` +
+          `New-ADFineGrainedPasswordPolicy -Name 'Yoneticiler' -Precedence 10 \`\n` +
+          `    -LockoutThreshold ${esik} \`\n` +
+          `    -LockoutDuration (New-TimeSpan -Minutes ${sure || 30}) \`\n` +
+          `    -LockoutObservationWindow (New-TimeSpan -Minutes ${pencere}) \`\n` +
+          `    -MinPasswordLength ${Math.max(uzunluk, 14)} \`\n` +
+          `    -ComplexityEnabled $true -PasswordHistoryCount 24\n\n` +
+          `Add-ADFineGrainedPasswordPolicySubject -Identity 'Yoneticiler' \`\n` +
+          `    -Subjects 'Domain Admins'`;
+
+        el('#l-izle').textContent =
+          `# Son 24 saatte kilitlenen hesaplar ve kilidi tetikleyen makine\n` +
+          `Get-WinEvent -ErrorAction SilentlyContinue -FilterHashtable @{\n` +
+          `    LogName = 'Security'; ID = 4740; StartTime = (Get-Date).AddHours(-24)\n` +
+          `} | ForEach-Object {\n` +
+          `    $x = [xml]$_.ToXml()\n` +
+          `    [pscustomobject]@{\n` +
+          `        Zaman   = $_.TimeCreated\n` +
+          `        Hesap   = $x.Event.EventData.Data[0].'#text'\n` +
+          `        Kaynak  = $x.Event.EventData.Data[1].'#text'\n` +
+          `    }\n` +
+          `} | Format-Table -AutoSize\n\n` +
+          `# Püskürtme belirtisi: tek kaynaktan çok sayıda 4625\n` +
+          `Get-WinEvent -ErrorAction SilentlyContinue -FilterHashtable @{\n` +
+          `    LogName = 'Security'; ID = 4625; StartTime = (Get-Date).AddHours(-1)\n` +
+          `} | ForEach-Object { ([xml]$_.ToXml()).Event.EventData.Data[19].'#text' } |\n` +
+          `    Group-Object | Sort-Object Count -Descending | Select-Object -First 10\n\n` +
+          `# Bir hesabın hangi denetleyicide kilitlendiğini bul\n` +
+          `Search-ADAccount -LockedOut | Select-Object Name, LastLogonDate`;
+      }
+
+      document
+        .querySelectorAll('.arac-alan input, .arac-alan select')
+        .forEach((g) => g.addEventListener('input', hesapla));
+      el('#l-alfabe').addEventListener('change', hesapla);
+
+      document.querySelectorAll('.kopyala').forEach((d) => {
+        d.addEventListener('click', async () => {
+          try {
+            await navigator.clipboard.writeText(el(`#${d.dataset.kaynak}`).textContent);
+            d.textContent = 'Kopyalandı';
+            setTimeout(() => (d.textContent = 'Kopyala'), 1600);
+          } catch {
+            /* pano izni yoksa kullanıcı elle seçer */
+          }
+        });
+      });
+
+      hesapla();
+    })();
+  </script>
+
+  <style>
+    .l-kartlar {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(min(170px, 100%), 1fr));
+      gap: 10px;
+      margin-bottom: 14px;
+    }
+    .l-kart {
+      border: 1px solid var(--line);
+      border-radius: 11px;
+      padding: 13px 15px;
+      display: grid;
+      gap: 3px;
+      background: var(--paper);
+    }
+    .l-kart-b {
+      font-size: 11.5px;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+      color: var(--muted);
+    }
+    .l-kart-d {
+      font-size: 21px;
+      letter-spacing: -0.02em;
+      font-family: var(--mono, ui-monospace, monospace);
+      color: var(--indigo-metin);
+    }
+    .l-kart-n {
+      font-size: 12px;
+      color: var(--muted);
+      line-height: 1.45;
+    }
+    .l-cikti {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr);
+      gap: 18px;
+    }
+    .l-liste,
+    .l-ipuclari {
+      list-style: none;
+      margin: 0;
+      padding: 0;
+      display: grid;
+      gap: 12px;
+    }
+    .l-liste li,
+    .l-ipuclari li {
+      font-size: 13.5px;
+      line-height: 1.62;
+      color: var(--ink-soft);
+      border-left: 2px solid var(--line);
+      padding-left: 13px;
+    }
+    .l-liste li[data-tip='hata'] {
+      border-left-color: light-dark(#dc2626, #f87171);
+    }
+    .l-liste li[data-tip='uyari'] {
+      border-left-color: light-dark(#f0c33c, #a97f1c);
+    }
+    .l-liste li[data-tip='ok'] {
+      border-left-color: light-dark(#16a34a, #4ade80);
+    }
+  </style>
+</Base>

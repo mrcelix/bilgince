@@ -1,0 +1,685 @@
+---
+import Base from '../../layouts/Base.astro';
+---
+
+<Base
+  baslik="Yapılandırma farkı görüntüleyici"
+  aciklama="İki yapılandırma dosyasını satır satır karşılaştırır, taşınan blokları ayırt eder ve farkı birleşik yama biçiminde verir. Her şey tarayıcıda."
+  aramaya={true}
+  kategori="Araç"
+>
+  <div class="arama-bas">
+    <div class="kap">
+      <nav class="kirinti" aria-label="Kırıntı yolu" style="padding-top:0">
+        <a href="/">Ana sayfa</a><span class="ayrac">/</span><a href="/araclar">Araçlar</a><span
+          class="ayrac">/</span
+        ><span aria-current="page">Fark görüntüleyici</span>
+      </nav>
+      <h1>Yapılandırma farkı görüntüleyici</h1>
+      <p style="color:var(--muted);font-size:14px;margin-top:8px;max-width:66ch">
+        "Çalışan sunucuda ne farklı?" sorusunun cevabı genelde üç satırdır ve onları gözle
+        bulmak yarım saat sürer. İki sürümü yapıştırın. Yapılandırma dosyaları çoğu zaman parola
+        ve anahtar içerir; bu araç hiçbir şeyi göndermez, karşılaştırma tarayıcınızda yapılır.
+      </p>
+    </div>
+  </div>
+
+  <div class="kap arac-sayfa">
+    <section class="arac-blok">
+      <h2 class="arac-h2"><span class="arac-no">1</span> İki sürüm</h2>
+      <div class="f-girisler">
+        <div class="arac-alan">
+          <label for="f-sol">Eski / referans</label>
+          <textarea id="f-sol" rows="12" spellcheck="false"></textarea>
+        </div>
+        <div class="arac-alan">
+          <label for="f-sag">Yeni / karşılaştırılan</label>
+          <textarea id="f-sag" rows="12" spellcheck="false"></textarea>
+        </div>
+      </div>
+      <div class="f-secenekler">
+        <label class="f-sec"
+          ><input type="checkbox" id="f-bosluk" checked />
+          <span>Satır başı/sonu boşluklarını yok say</span>
+        </label>
+        <label class="f-sec"
+          ><input type="checkbox" id="f-yorum" />
+          <span>Yorum satırlarını yok say <i>(# ve ; ile başlayanlar)</i></span>
+        </label>
+        <label class="f-sec"
+          ><input type="checkbox" id="f-bosSatir" checked />
+          <span>Boş satırları yok say</span>
+        </label>
+        <label class="f-sec"
+          ><input type="checkbox" id="f-buyukKucuk" />
+          <span>Büyük/küçük harf farkını yok say</span>
+        </label>
+      </div>
+      <div class="arac-dugmeler">
+        <button type="button" class="dg" id="f-karsilastir">Karşılaştır</button>
+        <button type="button" class="dg dg-hayalet" id="f-ornek">Örnek doldur</button>
+        <button type="button" class="dg dg-hayalet" id="f-degis">Yerlerini değiştir</button>
+        <button type="button" class="dg dg-hayalet" id="f-temizle">Temizle</button>
+      </div>
+      <p class="arac-durum" id="f-durum" role="status" aria-live="polite"></p>
+    </section>
+
+    <section class="arac-blok" id="f-sonuc" hidden>
+      <h2 class="arac-h2"><span class="arac-no">2</span> Fark</h2>
+      <div class="arac-olcum" id="f-olcum"></div>
+      <div class="f-gorunum">
+        <label class="f-radyo"
+          ><input type="radio" name="f-gorunum" value="satir" checked /> <span>Satır satır</span></label
+        >
+        <label class="f-radyo"
+          ><input type="radio" name="f-gorunum" value="yanyana" /> <span>Yan yana</span></label
+        >
+        <label class="f-radyo"
+          ><input type="radio" name="f-gorunum" value="sadeceFark" /> <span>Sadece değişenler</span></label
+        >
+      </div>
+      <div class="f-kaydir">
+        <div class="f-cikti" id="f-cikti"></div>
+      </div>
+    </section>
+
+    <section class="arac-blok" id="f-yama-blok" hidden>
+      <h2 class="arac-h2"><span class="arac-no">3</span> Birleşik yama</h2>
+      <p class="arac-not" style="margin-top:0">
+        Değişiklik kaydına ya da onay talebine yapıştırılacak biçim.
+      </p>
+      <div style="position:relative">
+        <pre class="kod"><code id="f-yama"></code></pre>
+        <button class="kopyala" type="button" id="f-yama-kop">Kopyala</button>
+      </div>
+    </section>
+
+    <section class="arac-blok">
+      <h2 class="arac-h2"><span class="arac-no">4</span> Yapılandırma karşılaştırırken</h2>
+      <ul class="f-ipuclari">
+        <li>
+          <b>Önce normalleştirin.</b> Boşluk, satır sırası ve yorum farkları gerçek farkı gizler.
+          Yukarıdaki seçenekler bunun içindir; ciddi bir karşılaştırmada anahtarları sıralayıp
+          öyle bakmak daha da temizdir.
+        </li>
+        <li>
+          <b>Satır sonu karakteri sessiz bir fark kaynağıdır.</b> Windows'ta düzenlenen bir dosya
+          CRLF, Linux'ta düzenlenen LF olur; içerik aynı olsa bile bazı araçlar her satırı
+          değişmiş gösterir. Araç bunu kendisi normalleştiriyor.
+        </li>
+        <li>
+          <b>Taşınan blok, değişen blok değildir.</b> Bir bölümün yerini değiştirmek fark
+          çıktısında büyük bir silme + büyük bir ekleme olarak görünür. Panik etmeden önce
+          silinenle eklenenin aynı olup olmadığına bakın — araç bunu ölçüp söylüyor.
+        </li>
+        <li>
+          <b>Çalışan yapılandırma ile diskteki dosya aynı değildir.</b> Çoğu servis yapılandırmayı
+          başlangıçta okur; dosyayı değiştirdiğinizde davranış hemen değişmez. Karşılaştırmayı
+          <code>nginx -T</code>, <code>sshd -T</code>, <code>Get-SmbServerConfiguration</code> gibi
+          <i>etkin</i> yapılandırmayı basan komutların çıktısıyla yapmak daha doğrudur.
+        </li>
+        <li>
+          <b>Sırrı yanlışlıkla paylaşmayın.</b> Yapılandırma farkını bir bilet sistemine
+          yapıştırmadan önce parola, anahtar ve bağlantı dizesi içerip içermediğine bakın.
+          Fark çıktısı, tam dosyadan daha az dikkatle paylaşılır — kazaların çoğu böyle olur.
+        </li>
+      </ul>
+    </section>
+  </div>
+
+  <script>
+    (() => {
+      const el = (s) => document.querySelector(s);
+      const kacir = (s) =>
+        String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+
+      /* --- normalleştirme ---------------------------------------------------- */
+      function satirlar(metin) {
+        // CRLF ve tek başına CR, LF'e indirgenir — sahte fark üretmesin
+        return metin.replace(/\r\n?/g, '\n').split('\n');
+      }
+
+      /** Karşılaştırma için satırın anahtarını üretir; görüntülenen metin değişmez. */
+      function anahtar(satir) {
+        let s = satir;
+        if (el('#f-bosluk').checked) s = s.trim().replace(/[ \t]+/g, ' ');
+        if (el('#f-buyukKucuk').checked) s = s.toLowerCase();
+        return s;
+      }
+
+      function atlanirMi(satir) {
+        const t = satir.trim();
+        if (el('#f-bosSatir').checked && t === '') return true;
+        if (el('#f-yorum').checked && (t.startsWith('#') || t.startsWith(';'))) return true;
+        return false;
+      }
+
+      /* --- Myers fark algoritması --------------------------------------------
+         En kısa düzenleme betiğini bulur: sonuçta silme + ekleme sayısı en azdır.
+         Basit "satır satır karşılaştır" yaklaşımından farkı, araya bir satır
+         eklendiğinde sonraki her satırı değişmiş göstermemesidir. */
+      function myers(a, b) {
+        const N = a.length;
+        const M = b.length;
+        const enFazla = N + M;
+        const V = new Map([[1, 0]]);
+        const iz = [];
+
+        for (let d = 0; d <= enFazla; d++) {
+          iz.push(new Map(V));
+          for (let k = -d; k <= d; k += 2) {
+            let x;
+            if (k === -d || (k !== d && (V.get(k - 1) ?? 0) < (V.get(k + 1) ?? 0))) {
+              x = V.get(k + 1) ?? 0;
+            } else {
+              x = (V.get(k - 1) ?? 0) + 1;
+            }
+            let y = x - k;
+            // Ortak parçayı olabildiğince ilerlet
+            while (x < N && y < M && a[x] === b[y]) {
+              x++;
+              y++;
+            }
+            V.set(k, x);
+            if (x >= N && y >= M) return geriIzle(iz, a, b, d);
+          }
+        }
+        return [];
+      }
+
+      function geriIzle(iz, a, b, d) {
+        const islemler = [];
+        let x = a.length;
+        let y = b.length;
+
+        for (let D = d; D > 0; D--) {
+          const V = iz[D];
+          const k = x - y;
+          const oncekiK =
+            k === -D || (k !== D && (V.get(k - 1) ?? -1) < (V.get(k + 1) ?? -1)) ? k + 1 : k - 1;
+          const oncekiX = V.get(oncekiK);
+          const oncekiY = oncekiX - oncekiK;
+
+          while (x > oncekiX && y > oncekiY) {
+            islemler.push({ t: 'ayni', i: x - 1, j: y - 1 });
+            x--;
+            y--;
+          }
+          if (x === oncekiX) {
+            islemler.push({ t: 'ekle', j: y - 1 });
+            y--;
+          } else {
+            islemler.push({ t: 'sil', i: x - 1 });
+            x--;
+          }
+        }
+        while (x > 0) {
+          islemler.push({ t: 'ayni', i: x - 1, j: y - 1 });
+          x--;
+          y--;
+        }
+        return islemler.reverse();
+      }
+
+      /* --- çizim ------------------------------------------------------------- */
+      let sonIslemler = null;
+      let sonSol = null;
+      let sonSag = null;
+
+      function karsilastir() {
+        const solHam = satirlar(el('#f-sol').value);
+        const sagHam = satirlar(el('#f-sag').value);
+        const durum = el('#f-durum');
+
+        if (!el('#f-sol').value.trim() && !el('#f-sag').value.trim()) {
+          durum.className = 'arac-durum hata';
+          durum.textContent = 'Karşılaştırmak için iki sürümü de girin.';
+          el('#f-sonuc').hidden = true;
+          el('#f-yama-blok').hidden = true;
+          return;
+        }
+
+        // Atlanan satırlar karşılaştırmaya girmez ama numaraları korunur
+        const sol = solHam.map((s, i) => ({ metin: s, no: i + 1, atlanir: atlanirMi(s) }));
+        const sag = sagHam.map((s, i) => ({ metin: s, no: i + 1, atlanir: atlanirMi(s) }));
+        const solSuz = sol.filter((s) => !s.atlanir);
+        const sagSuz = sag.filter((s) => !s.atlanir);
+
+        if (solSuz.length + sagSuz.length > 6000) {
+          durum.className = 'arac-durum hata';
+          durum.textContent =
+            `${solSuz.length + sagSuz.length} satır — tarayıcıda karşılaştırmak için fazla. ` +
+            `Dosyaları bölün ya da ilgili bölümü yapıştırın.`;
+          return;
+        }
+
+        const islemler = myers(solSuz.map((s) => anahtar(s.metin)), sagSuz.map((s) => anahtar(s.metin)));
+
+        sonIslemler = islemler;
+        sonSol = solSuz;
+        sonSag = sagSuz;
+
+        const silinen = islemler.filter((o) => o.t === 'sil');
+        const eklenen = islemler.filter((o) => o.t === 'ekle');
+
+        // Taşınan blok: silinen bir satırın aynısı başka yerde eklenmişse
+        const eklenenAnahtar = new Set(eklenen.map((o) => anahtar(sagSuz[o.j].metin)));
+        const tasinan = silinen.filter((o) => eklenenAnahtar.has(anahtar(solSuz[o.i].metin))).length;
+
+        el('#f-sonuc').hidden = false;
+        el('#f-olcum').innerHTML =
+          `<span>Silinen: <b>${silinen.length}</b></span>` +
+          `<span>Eklenen: <b>${eklenen.length}</b></span>` +
+          `<span>Değişmeyen: <b>${islemler.filter((o) => o.t === 'ayni').length}</b></span>` +
+          (tasinan ? `<span>Taşınmış olabilir: <b>${tasinan}</b></span>` : '') +
+          (sol.length - solSuz.length + (sag.length - sagSuz.length)
+            ? `<span>Yok sayılan: <b>${sol.length - solSuz.length + (sag.length - sagSuz.length)}</b></span>`
+            : '');
+
+        if (!silinen.length && !eklenen.length) {
+          durum.className = 'arac-durum ok';
+          durum.textContent = 'İki sürüm birbirinin aynı — seçili yok sayma kuralları uygulandıktan sonra.';
+        } else {
+          durum.className = 'arac-durum';
+          durum.textContent =
+            `${silinen.length} satır silinmiş, ${eklenen.length} satır eklenmiş.` +
+            (tasinan
+              ? ` ${tasinan} satır başka bir yere taşınmış görünüyor — bunlar gerçek bir değişiklik olmayabilir.`
+              : '');
+        }
+
+        ciz();
+        yamaYaz();
+      }
+
+      function ciz() {
+        const gorunum = document.querySelector('input[name="f-gorunum"]:checked').value;
+        const kap = el('#f-cikti');
+        kap.dataset.gorunum = gorunum;
+
+        if (gorunum === 'yanyana') {
+          kap.innerHTML = yanYanaCiz();
+          return;
+        }
+
+        const satirlar = [];
+        let sonAyniMi = false;
+        for (const o of sonIslemler) {
+          if (o.t === 'ayni') {
+            if (gorunum === 'sadeceFark') {
+              if (!sonAyniMi) satirlar.push('<div class="f-satir f-atla">⋯</div>');
+              sonAyniMi = true;
+              continue;
+            }
+            satirlar.push(
+              `<div class="f-satir"><i>${sonSol[o.i].no}</i><i>${sonSag[o.j].no}</i>` +
+                `<u> </u><span>${kacir(sonSol[o.i].metin) || '&nbsp;'}</span></div>`
+            );
+          } else if (o.t === 'sil') {
+            sonAyniMi = false;
+            satirlar.push(
+              `<div class="f-satir f-sil"><i>${sonSol[o.i].no}</i><i></i>` +
+                `<u>−</u><span>${kacir(sonSol[o.i].metin) || '&nbsp;'}</span></div>`
+            );
+          } else {
+            sonAyniMi = false;
+            satirlar.push(
+              `<div class="f-satir f-ekle"><i></i><i>${sonSag[o.j].no}</i>` +
+                `<u>+</u><span>${kacir(sonSag[o.j].metin) || '&nbsp;'}</span></div>`
+            );
+          }
+        }
+        kap.innerHTML = satirlar.join('') || '<div class="f-satir f-atla">Fark yok</div>';
+      }
+
+      function yanYanaCiz() {
+        // Silme ve ekleme çiftlerini aynı satıra hizala
+        const cikti = [];
+        let i = 0;
+        while (i < sonIslemler.length) {
+          const o = sonIslemler[i];
+          if (o.t === 'ayni') {
+            cikti.push(
+              `<div class="f-cift"><span class="f-yan"><i>${sonSol[o.i].no}</i>${kacir(sonSol[o.i].metin) || '&nbsp;'}</span>` +
+                `<span class="f-yan"><i>${sonSag[o.j].no}</i>${kacir(sonSag[o.j].metin) || '&nbsp;'}</span></div>`
+            );
+            i++;
+            continue;
+          }
+          // Ardışık silme ve eklemeleri topla
+          const silmeler = [];
+          const eklemeler = [];
+          while (i < sonIslemler.length && sonIslemler[i].t === 'sil') silmeler.push(sonIslemler[i++]);
+          while (i < sonIslemler.length && sonIslemler[i].t === 'ekle') eklemeler.push(sonIslemler[i++]);
+
+          const enFazla = Math.max(silmeler.length, eklemeler.length);
+          for (let n = 0; n < enFazla; n++) {
+            const s = silmeler[n];
+            const e = eklemeler[n];
+            cikti.push(
+              `<div class="f-cift">` +
+                (s
+                  ? `<span class="f-yan f-sil"><i>${sonSol[s.i].no}</i>${kacir(sonSol[s.i].metin) || '&nbsp;'}</span>`
+                  : `<span class="f-yan f-yok"></span>`) +
+                (e
+                  ? `<span class="f-yan f-ekle"><i>${sonSag[e.j].no}</i>${kacir(sonSag[e.j].metin) || '&nbsp;'}</span>`
+                  : `<span class="f-yan f-yok"></span>`) +
+                `</div>`
+            );
+          }
+        }
+        return cikti.join('');
+      }
+
+      /** Birleşik yama biçimi — üç satır bağlamla. */
+      function yamaYaz() {
+        const BAGLAM = 3;
+        const parcalar = [];
+        let n = 0;
+
+        while (n < sonIslemler.length) {
+          if (sonIslemler[n].t === 'ayni') {
+            n++;
+            continue;
+          }
+          // Değişiklik bloğunun sınırlarını bul
+          let bas = Math.max(0, n - BAGLAM);
+          let son = n;
+          while (son < sonIslemler.length) {
+            if (sonIslemler[son].t !== 'ayni') {
+              son++;
+              continue;
+            }
+            // Arada BAGLAM*2'den fazla aynı satır varsa blok biter
+            let ayniSayisi = 0;
+            let ileri = son;
+            while (ileri < sonIslemler.length && sonIslemler[ileri].t === 'ayni') {
+              ayniSayisi++;
+              ileri++;
+            }
+            if (ayniSayisi > BAGLAM * 2 || ileri >= sonIslemler.length) {
+              son += Math.min(ayniSayisi, BAGLAM);
+              break;
+            }
+            son = ileri;
+          }
+
+          const dilim = sonIslemler.slice(bas, son);
+          const solNo = dilim.find((o) => o.t !== 'ekle');
+          const sagNo = dilim.find((o) => o.t !== 'sil');
+          const solBas = solNo ? sonSol[solNo.i].no : 0;
+          const sagBas = sagNo ? sonSag[sagNo.j].no : 0;
+          const solAdet = dilim.filter((o) => o.t !== 'ekle').length;
+          const sagAdet = dilim.filter((o) => o.t !== 'sil').length;
+
+          parcalar.push(`@@ -${solBas},${solAdet} +${sagBas},${sagAdet} @@`);
+          for (const o of dilim) {
+            if (o.t === 'ayni') parcalar.push(' ' + sonSol[o.i].metin);
+            else if (o.t === 'sil') parcalar.push('-' + sonSol[o.i].metin);
+            else parcalar.push('+' + sonSag[o.j].metin);
+          }
+          n = son;
+        }
+
+        if (!parcalar.length) {
+          el('#f-yama-blok').hidden = true;
+          return;
+        }
+        el('#f-yama-blok').hidden = false;
+        el('#f-yama').textContent =
+          '--- eski\n+++ yeni\n' + parcalar.join('\n');
+      }
+
+      /* --- olaylar ----------------------------------------------------------- */
+      el('#f-karsilastir').addEventListener('click', karsilastir);
+
+      document
+        .querySelectorAll('.f-sec input')
+        .forEach((k) => k.addEventListener('change', () => sonIslemler && karsilastir()));
+
+      document
+        .querySelectorAll('input[name="f-gorunum"]')
+        .forEach((r) => r.addEventListener('change', () => sonIslemler && ciz()));
+
+      el('#f-degis').addEventListener('click', () => {
+        const a = el('#f-sol').value;
+        el('#f-sol').value = el('#f-sag').value;
+        el('#f-sag').value = a;
+        if (sonIslemler) karsilastir();
+      });
+
+      el('#f-temizle').addEventListener('click', () => {
+        el('#f-sol').value = '';
+        el('#f-sag').value = '';
+        sonIslemler = null;
+        el('#f-sonuc').hidden = true;
+        el('#f-yama-blok').hidden = true;
+        el('#f-durum').textContent = '';
+      });
+
+      el('#f-ornek').addEventListener('click', () => {
+        el('#f-sol').value = [
+          '# nginx — çalışan sunucu',
+          'worker_processes auto;',
+          '',
+          'events {',
+          '    worker_connections 1024;',
+          '}',
+          '',
+          'http {',
+          '    sendfile on;',
+          '    keepalive_timeout 65;',
+          '    client_max_body_size 1m;',
+          '',
+          '    server {',
+          '        listen 80;',
+          '        server_name ornek.com.tr;',
+          '        root /var/www/ornek;',
+          '',
+          '        location / {',
+          '            try_files $uri $uri/ =404;',
+          '        }',
+          '    }',
+          '}',
+        ].join('\n');
+
+        el('#f-sag').value = [
+          '# nginx — yeni sunucu',
+          'worker_processes auto;',
+          'worker_rlimit_nofile 8192;',
+          '',
+          'events {',
+          '    worker_connections 4096;',
+          '}',
+          '',
+          'http {',
+          '    sendfile on;',
+          '    keepalive_timeout 30;',
+          '    client_max_body_size 25m;',
+          '    server_tokens off;',
+          '',
+          '    server {',
+          '        listen 443 ssl http2;',
+          '        server_name ornek.com.tr;',
+          '        root /var/www/ornek;',
+          '',
+          '        ssl_certificate     /etc/ssl/ornek.pem;',
+          '        ssl_certificate_key /etc/ssl/ornek.key;',
+          '',
+          '        location / {',
+          '            try_files $uri $uri/ =404;',
+          '        }',
+          '    }',
+          '}',
+        ].join('\n');
+        karsilastir();
+      });
+
+      el('#f-yama-kop').addEventListener('click', async (e) => {
+        try {
+          await navigator.clipboard.writeText(el('#f-yama').textContent);
+          e.currentTarget.textContent = 'Kopyalandı';
+          setTimeout(() => (e.currentTarget.textContent = 'Kopyala'), 1600);
+        } catch {
+          /* pano izni yoksa kullanıcı elle seçer */
+        }
+      });
+    })();
+  </script>
+
+  <style>
+    .f-girisler {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(min(260px, 100%), 1fr));
+      gap: 14px;
+    }
+    .f-secenekler {
+      display: grid;
+      gap: 9px;
+      margin: 14px 0;
+    }
+    .f-sec {
+      display: inline-flex;
+      align-items: baseline;
+      gap: 8px;
+      font-size: 13px;
+      color: var(--ink-soft);
+      cursor: pointer;
+      line-height: 1.5;
+    }
+    .f-sec i {
+      font-style: normal;
+      color: var(--muted);
+      font-size: 12px;
+    }
+    .arac-dugmeler {
+      display: flex;
+      gap: 10px;
+      flex-wrap: wrap;
+    }
+    .f-gorunum {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      margin: 12px 0;
+    }
+    .f-radyo {
+      display: inline-flex;
+      align-items: center;
+      gap: 7px;
+      border: 1px solid var(--line);
+      border-radius: 999px;
+      padding: 6px 13px;
+      font-size: 12.5px;
+      color: var(--muted);
+      cursor: pointer;
+      background: var(--paper);
+    }
+    .f-radyo input {
+      position: absolute;
+      opacity: 0;
+      pointer-events: none;
+    }
+    .f-radyo:has(input:checked) {
+      border-color: var(--indigo);
+      color: var(--indigo-metin);
+      background: var(--tint);
+    }
+    .f-kaydir {
+      border: 1px solid var(--line);
+      border-radius: 11px;
+      overflow: auto;
+      max-height: 560px;
+      background: var(--paper);
+    }
+    .f-cikti {
+      font-family: var(--mono, ui-monospace, monospace);
+      font-size: 12.5px;
+      line-height: 1.65;
+      min-width: max-content;
+    }
+    .f-satir {
+      display: grid;
+      grid-template-columns: 44px 44px 20px 1fr;
+      align-items: baseline;
+    }
+    .f-satir i {
+      font-style: normal;
+      color: var(--muted);
+      font-size: 11px;
+      text-align: right;
+      padding-right: 9px;
+      user-select: none;
+    }
+    .f-satir u {
+      text-decoration: none;
+      text-align: center;
+      color: var(--muted);
+      user-select: none;
+    }
+    .f-satir span {
+      white-space: pre;
+      padding-right: 14px;
+    }
+    .f-sil {
+      background: light-dark(#fef2f2, #2a1616);
+    }
+    .f-sil u,
+    .f-sil span {
+      color: light-dark(#991b1b, #fca5a5);
+    }
+    .f-ekle {
+      background: light-dark(#f0fdf4, #0f2a1c);
+    }
+    .f-ekle u,
+    .f-ekle span {
+      color: light-dark(#166534, #86efac);
+    }
+    .f-atla {
+      color: var(--muted);
+      text-align: center;
+      padding: 3px 0;
+      background: var(--tint);
+      display: block;
+    }
+    .f-cift {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+      border-bottom: 1px solid color-mix(in srgb, var(--line) 45%, transparent);
+    }
+    .f-yan {
+      display: block;
+      white-space: pre;
+      overflow-x: auto;
+      padding: 0 10px 0 0;
+      min-width: 0;
+    }
+    .f-yan i {
+      font-style: normal;
+      display: inline-block;
+      width: 40px;
+      color: var(--muted);
+      font-size: 11px;
+      text-align: right;
+      padding-right: 10px;
+      user-select: none;
+    }
+    .f-yok {
+      background: var(--tint);
+    }
+    .f-ipuclari {
+      list-style: none;
+      margin: 0;
+      padding: 0;
+      display: grid;
+      gap: 12px;
+    }
+    .f-ipuclari li {
+      font-size: 13.5px;
+      line-height: 1.62;
+      color: var(--ink-soft);
+      border-left: 2px solid var(--line);
+      padding-left: 13px;
+    }
+  </style>
+</Base>

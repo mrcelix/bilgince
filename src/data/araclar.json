@@ -331,5 +331,59 @@
     "etiket": "yeni",
     "cevrimici": false,
     "grup": "Windows & Operasyon"
+  },
+  {
+    "slug": "fark-goruntuleyici",
+    "ad": "Yapılandırma farkı görüntüleyici",
+    "ozet": "İki yapılandırmayı satır satır karşılaştırır, taşınan blokları ayırt eder, birleşik yama üretir.",
+    "ikon": "terminal",
+    "etiket": "yeni",
+    "cevrimici": false,
+    "grup": "Metin, Kod & Zaman"
+  },
+  {
+    "slug": "dns-gecis-planlayici",
+    "ad": "DNS geçiş planlayıcı",
+    "ozet": "TTL'yi ne zaman düşüreceğinizi, kesintinin süresini ve eski sunucuyu ne zaman kapatacağınızı saat saat verir.",
+    "ikon": "kure",
+    "etiket": "yeni",
+    "cevrimici": false,
+    "grup": "Ağ & DNS"
+  },
+  {
+    "slug": "kilitleme-politikasi",
+    "ad": "Hesap kilitleme politikası simülatörü",
+    "ozet": "Eşik, pencere ve süre birlikte ne üretir? Saldırgan hızını ve kullanıcı maliyetini yan yana hesaplar.",
+    "ikon": "kalkan",
+    "etiket": "yeni",
+    "cevrimici": false,
+    "grup": "Windows & Operasyon"
+  },
+  {
+    "slug": "vm-yogunlastirma",
+    "ad": "Sanallaştırma yoğunlaştırma planlayıcı",
+    "ozet": "Kaç düğüm gerekir? Fazla tahsis, bellek gerçeği ve N+1 payı birlikte hesaplanır.",
+    "ikon": "sunucu",
+    "etiket": "yeni",
+    "cevrimici": false,
+    "grup": "Kapasite & Süre"
+  },
+  {
+    "slug": "gunluk-zaman-cizelgesi",
+    "ad": "Günlük zaman çizelgesi çıkarıcı",
+    "ozet": "Ham günlükten zaman damgalarını çıkarır, yoğunluğu çizer, sessiz boşlukları ve sıçramaları işaretler.",
+    "ikon": "akis",
+    "etiket": "yeni",
+    "cevrimici": false,
+    "grup": "Metin, Kod & Zaman"
+  },
+  {
+    "slug": "tls-yapilandirma",
+    "ad": "TLS yapılandırma danışmanı",
+    "ozet": "En eski istemciyi seçin: açılacak protokoller, şifre paketleri, bedeli ve hazır sunucu yapılandırması.",
+    "ikon": "kalkan",
+    "etiket": "yeni",
+    "cevrimici": false,
+    "grup": "Kimlik & Sertifika"
   }
 ]

@@ -1,0 +1,478 @@
+---
+import Base from '../../layouts/Base.astro';
+---
+
+<Base
+  baslik="DNS geçiş planlayıcı"
+  aciklama="Sunucu taşırken TTL'yi ne zaman düşüreceğinizi, kesintinin ne kadar süreceğini ve eski sunucuyu ne zaman kapatabileceğinizi saat saat planlar."
+  aramaya={true}
+  kategori="Araç"
+>
+  <div class="arama-bas">
+    <div class="kap">
+      <nav class="kirinti" aria-label="Kırıntı yolu" style="padding-top:0">
+        <a href="/">Ana sayfa</a><span class="ayrac">/</span><a href="/araclar">Araçlar</a><span
+          class="ayrac">/</span
+        ><span aria-current="page">DNS geçiş planlayıcı</span>
+      </nav>
+      <h1>DNS geçiş planlayıcı</h1>
+      <p style="color:var(--muted);font-size:14px;margin-top:8px;max-width:66ch">
+        DNS değişikliği "anında" olmaz: dünyanın her yerindeki çözümleyiciler eski cevabı TTL
+        süresince önbellekte tutar. Geçişi bir gün önce planlamamanın bedeli, kullanıcıların bir
+        kısmının saatlerce eski sunucuya düşmesidir. Değerleri girin, takvimi çıkarın.
+      </p>
+    </div>
+  </div>
+
+  <div class="kap arac-sayfa">
+    <section class="arac-blok">
+      <h2 class="arac-h2"><span class="arac-no">1</span> Geçiş</h2>
+      <div class="arac-alanlar">
+        <label class="arac-alan"
+          >Alan adı
+          <input id="d-alan" type="text" spellcheck="false" value="ornek.com.tr" />
+        </label>
+        <label class="arac-alan"
+          >Şu anki TTL (saniye)
+          <input id="d-ttl" type="number" min="30" max="604800" value="86400" />
+          <small><code>dig +noall +answer ornek.com.tr</code> çıktısındaki sayı.</small>
+        </label>
+        <label class="arac-alan"
+          >Geçiş sırasındaki TTL (saniye)
+          <input id="d-yeniTtl" type="number" min="30" max="86400" value="300" />
+          <small>Geçiş penceresinde kullanılacak kısa değer.</small>
+        </label>
+        <label class="arac-alan"
+          >Geçiş sonrası TTL (saniye)
+          <input id="d-sonTtl" type="number" min="60" max="604800" value="3600" />
+        </label>
+        <label class="arac-alan"
+          >Kayıt türü
+          <select id="d-tur">
+            <option value="A">A / AAAA — web sunucusu</option>
+            <option value="MX">MX — posta sunucusu</option>
+            <option value="CNAME">CNAME — takma ad</option>
+            <option value="NS">NS — ad sunucusu devri</option>
+          </select>
+        </label>
+        <label class="arac-alan"
+          >Geçiş anı
+          <input id="d-an" type="datetime-local" />
+          <small>Kesintinin en az hissedileceği saati seçin.</small>
+        </label>
+      </div>
+      <label class="d-sec">
+        <input type="checkbox" id="d-cift" checked />
+        <span
+          >Geçiş süresince iki sunucu da çalışacak
+          <i>(kesintisiz geçiş — mümkünse her zaman böyle yapın)</i></span
+        >
+      </label>
+      <p class="arac-durum" id="d-durum" role="status" aria-live="polite"></p>
+    </section>
+
+    <section class="arac-blok">
+      <h2 class="arac-h2"><span class="arac-no">2</span> Takvim</h2>
+      <ol class="d-takvim" id="d-takvim"></ol>
+    </section>
+
+    <section class="arac-blok">
+      <h2 class="arac-h2"><span class="arac-no">3</span> Doğrulama komutları</h2>
+      <div style="position:relative">
+        <pre class="kod"><code id="d-komut"></code></pre>
+        <button class="kopyala" type="button" id="d-komut-kop">Kopyala</button>
+      </div>
+    </section>
+
+    <section class="arac-blok">
+      <h2 class="arac-h2"><span class="arac-no">4</span> Türe özel uyarılar</h2>
+      <div id="d-uyarilar"></div>
+    </section>
+
+    <section class="arac-blok">
+      <h2 class="arac-h2"><span class="arac-no">5</span> TTL neden bu kadar önemli?</h2>
+      <ul class="d-ipuclari">
+        <li>
+          <b>TTL bir söz, bir tahmin değil.</b> Çözümleyici cevabı TTL süresince tutar ve o süre
+          bitene kadar size hiç sormaz. 86400 saniyelik (24 saat) bir TTL, değişikliğinizin bazı
+          kullanıcılara <i>tam bir gün</i> ulaşmayacağı anlamına gelir.
+        </li>
+        <li>
+          <b>TTL düşürmenin de TTL'si vardır.</b> Bu en çok gözden kaçan noktadır: TTL'yi 300'e
+          indirdiğinizde bu yeni değer, ancak <i>eski</i> TTL dolduktan sonra herkese ulaşır.
+          Yani kısa TTL'ye geçişi, geçişten en az eski TTL kadar önce yapmalısınız.
+        </li>
+        <li>
+          <b>Herkes TTL'ye uymaz.</b> Bazı kurumsal çözümleyiciler ve ev tipi yönlendiriciler
+          kendi alt/üst sınırlarını uygular; tarayıcılar da ayrı bir önbellek tutar. Gerçek
+          hayatta hesapladığınız sürenin bir miktar üstünü beklemek gerekir.
+        </li>
+        <li>
+          <b>Negatif önbellek ayrı bir tuzaktır.</b> "Kayıt yok" cevabı da önbelleğe alınır ve
+          süresini SOA kaydındaki son alan belirler. Kaydı önce silip sonra eklerseniz, bu
+          arada yapılan sorgular "yok" cevabını uzun süre saklayabilir. Kaydı silmeyin,
+          <i>değiştirin</i>.
+        </li>
+        <li>
+          <b>Geçiş sonrası TTL'yi yükseltmeyi unutmayın.</b> Kalıcı 300 saniyelik TTL, ad
+          sunucularınıza gereksiz yük bindirir ve kısa bir DNS kesintisinde siteniz hemen
+          erişilemez olur. İş bitince makul bir değere (3600) dönün.
+        </li>
+      </ul>
+    </section>
+  </div>
+
+  <script>
+    (() => {
+      const el = (s) => document.querySelector(s);
+      const say = (s) => Number(el(s).value) || 0;
+
+      function sureYaz(saniye) {
+        if (saniye < 60) return `${saniye} saniye`;
+        if (saniye < 3600) return `${Math.round(saniye / 60)} dakika`;
+        if (saniye < 86400) {
+          const sa = Math.floor(saniye / 3600);
+          const dk = Math.round((saniye % 3600) / 60);
+          return dk ? `${sa} saat ${dk} dakika` : `${sa} saat`;
+        }
+        const gun = Math.floor(saniye / 86400);
+        const sa = Math.round((saniye % 86400) / 3600);
+        return sa ? `${gun} gün ${sa} saat` : `${gun} gün`;
+      }
+
+      const zamanYaz = (t) =>
+        t.toLocaleString('tr-TR', {
+          weekday: 'short',
+          day: 'numeric',
+          month: 'long',
+          hour: '2-digit',
+          minute: '2-digit',
+        });
+
+      const TUR_NOTLARI = {
+        A: [
+          [
+            'ok',
+            '<b>Kesintisiz geçiş mümkün.</b> Yeni sunucuyu hazır tutup eski sunucuyu geçişten ' +
+              'sonra bir süre daha açık bırakın; TTL dolana kadar bazı istekler oraya düşmeye devam eder.',
+          ],
+          [
+            'uyari',
+            '<b>Oturumlar taşınmaz.</b> Kullanıcı yeni sunucuya düştüğünde oturumu kaybolur. ' +
+              'Oturum durumu paylaşılan bir yerde (Redis, veri tabanı) değilse geçişi az kullanılan ' +
+              'bir saate alın.',
+          ],
+          [
+            'uyari',
+            '<b>Sertifika önce hazır olsun.</b> Yeni sunucuda geçerli TLS sertifikası yoksa geçiş ' +
+              'anında herkes sertifika hatası görür. Let\'s Encrypt doğrulaması DNS değişmeden ' +
+              'önce tamamlanmalı — HTTP-01 doğrulaması eski sunucuya düşeceği için DNS-01 tercih edin.',
+          ],
+        ],
+        MX: [
+          [
+            'uyari',
+            '<b>Posta kaybolmaz ama gecikir.</b> Gönderen sunucu eski MX\'e ulaşamazsa postayı ' +
+              'kuyruğa alır ve saatlerce yeniden dener. Yine de eski sunucuyu <b>en az bir hafta</b> ' +
+              'açık ve postaları yeni sunucuya iletir hâlde bırakın.',
+          ],
+          [
+            'hata',
+            '<b>SPF kaydını geçişten önce güncelleyin.</b> Yeni sunucunun IP adresi SPF\'te yoksa ' +
+              'gönderdiği postalar spam\'e düşer ya da reddedilir. SPF, MX değişikliğiyle otomatik ' +
+              'güncellenmez.',
+          ],
+          [
+            'uyari',
+            '<b>DKIM anahtarını taşıyın.</b> Yeni sunucu farklı bir anahtarla imzalıyorsa DNS\'e ' +
+              'yeni seçiciyi (selector) eklemeden geçmeyin. İki seçici bir süre birlikte durabilir.',
+          ],
+        ],
+        CNAME: [
+          [
+            'uyari',
+            '<b>Zincirleme TTL.</b> Etkin bekleme süresi, CNAME\'in TTL\'si ile hedefin TTL\'sinin ' +
+              'toplamı gibi davranır. Hedef kaydın TTL\'sini de düşürmeyi unutmayın.',
+          ],
+          [
+            'hata',
+            '<b>Kök alan adında CNAME olmaz.</b> <code>ornek.com.tr</code> için CNAME tanımlayamazsınız ' +
+              '(SOA ve NS ile çakışır). Sağlayıcınızın ALIAS/ANAME özelliğini ya da doğrudan A kaydını kullanın.',
+          ],
+        ],
+        NS: [
+          [
+            'hata',
+            '<b>Bu geçiş geri alması en zor olanıdır.</b> NS devri üst bölgede (tescil kuruluşunda) ' +
+              'yapılır ve oradaki TTL genelde 48 saattir; sizin kontrolünüzde değildir. Yeni ad ' +
+              'sunucularında <b>bütün</b> kayıtlar hazır olmadan devretmeyin.',
+          ],
+          [
+            'uyari',
+            '<b>Bölgeyi olduğu gibi taşıyın.</b> Devirden önce mevcut bölgenin tam bir dökümünü ' +
+              'alın ve yeni sağlayıcıda satır satır karşılaştırın. Unutulan tek bir TXT kaydı ' +
+              'posta doğrulamasını ya da alan adı sahipliği kanıtını bozar.',
+          ],
+          [
+            'uyari',
+            '<b>DNSSEC varsa önce kapatın.</b> İmzalı bir bölgeyi yeni sağlayıcıya devrederken ' +
+              'DS kaydı eşleşmezse alan adınız tamamen çözümlenemez hâle gelir. Devirden önce ' +
+              'DNSSEC\'i kaldırın, geçiş bitince yeniden kurun.',
+          ],
+        ],
+      };
+
+      function hesapla() {
+        const alan = el('#d-alan').value.trim() || 'ornek.com.tr';
+        const ttl = say('#d-ttl');
+        const yeniTtl = say('#d-yeniTtl');
+        const sonTtl = say('#d-sonTtl');
+        const tur = el('#d-tur').value;
+        const cift = el('#d-cift').checked;
+
+        const anMetin = el('#d-an').value;
+        const an = anMetin ? new Date(anMetin) : new Date(Date.now() + 86400000);
+
+        /* --- takvim ------------------------------------------------------ */
+        // TTL düşürme işleminin kendisi de eski TTL kadar yayılmayı bekler
+        const dusurme = new Date(an.getTime() - ttl * 1000);
+        const dogrulama = new Date(an.getTime() - 3600 * 1000);
+        const yayilmaSonu = new Date(an.getTime() + yeniTtl * 1000);
+        const kapatma = new Date(an.getTime() + yeniTtl * 1000 * (tur === 'MX' ? 168 : 4));
+        const ttlGeriAlma = new Date(an.getTime() + yeniTtl * 1000 * 4);
+
+        const adimlar = [
+          {
+            zaman: dusurme,
+            baslik: `TTL'yi ${yeniTtl} saniyeye indir`,
+            metin:
+              `Şu anki TTL ${sureYaz(ttl)}. Yeni TTL değerinin dünyaya yayılması da bu kadar ` +
+              `sürer — bu yüzden düşürme işlemi geçişten <b>${sureYaz(ttl)}</b> önce yapılmalı. ` +
+              `Bu adımı atlarsanız geçiş anında hâlâ ${sureYaz(ttl)}'lik önbellekler dolaşıyor olur.`,
+            vurgu: true,
+          },
+          {
+            zaman: dogrulama,
+            baslik: 'Yeni sunucuyu doğrula',
+            metin:
+              `Yeni sunucuyu <code>hosts</code> dosyası üzerinden ya da <code>curl --resolve</code> ` +
+              `ile doğrudan sınayın. DNS değişmeden önce her şeyin çalıştığından emin olun; ` +
+              `geçiş anı hata ayıklama zamanı değildir.`,
+          },
+          {
+            zaman: an,
+            baslik: `${tur} kaydını değiştir`,
+            metin:
+              `Kaydı <b>silmeyin, değiştirin</b>. Silip yeniden eklemek arada "kayıt yok" ` +
+              `cevabının önbelleğe girmesine yol açar ve negatif önbellek genelde daha uzun sürer.`,
+            vurgu: true,
+          },
+          {
+            zaman: yayilmaSonu,
+            baslik: 'Yayılma tamamlanmış olmalı',
+            metin:
+              `${sureYaz(yeniTtl)} sonra çözümleyicilerin neredeyse tamamı yeni cevabı almış olur. ` +
+              `${cift ? 'İki sunucu da çalıştığı için bu süre boyunca kimse kesinti yaşamaz.' : '<b>Eski sunucu kapalıysa</b> bu süre boyunca kullanıcıların bir kısmı hata alır — kesinti penceresi tam olarak budur.'}`,
+            vurgu: !cift,
+          },
+          {
+            zaman: ttlGeriAlma,
+            baslik: `TTL'yi ${sonTtl} saniyeye yükselt`,
+            metin:
+              `Geçiş bittiğine göre kısa TTL'yi tutmanın anlamı yok. Kalıcı kısa TTL hem ad ` +
+              `sunucularınıza yük bindirir hem de kısa bir DNS kesintisini anında görünür kılar.`,
+          },
+          {
+            zaman: kapatma,
+            baslik: 'Eski sunucuyu kapat',
+            metin:
+              tur === 'MX'
+                ? `Posta için acele etmeyin: bazı gönderen sunucular eski MX'i günlerce dener. ` +
+                  `Eski sunucuyu en az <b>bir hafta</b> açık ve postaları yeni sunucuya iletir ` +
+                  `hâlde bırakın; kapatmadan önce günlüklerde hiç trafik kalmadığını doğrulayın.`
+                : `Kapatmadan önce erişim günlüklerine bakın: hâlâ istek geliyorsa TTL'ye uymayan ` +
+                  `bir çözümleyici ya da sabit kodlanmış bir IP adresi var demektir.`,
+          },
+        ];
+
+        el('#d-takvim').innerHTML = adimlar
+          .map(
+            (a) =>
+              `<li class="d-adim"${a.vurgu ? ' data-vurgu="evet"' : ''}>` +
+              `<div class="d-zaman">${zamanYaz(a.zaman)}</div>` +
+              `<div class="d-govde"><b>${a.baslik}</b><p>${a.metin}</p></div>` +
+              `</li>`
+          )
+          .join('');
+
+        /* --- durum ------------------------------------------------------- */
+        const durum = el('#d-durum');
+        const hazirlikSuresi = ttl;
+        if (yeniTtl >= ttl) {
+          durum.className = 'arac-durum hata';
+          durum.textContent =
+            'Geçiş TTL\'si şu ankinden kısa olmalı — yoksa TTL düşürme adımının bir anlamı kalmıyor.';
+        } else if (!cift) {
+          durum.className = 'arac-durum hata';
+          durum.textContent =
+            `Tek sunuculu geçişte kesinti penceresi ${sureYaz(yeniTtl)}. ` +
+            `İki sunucuyu birlikte çalıştırabilirseniz bu süre sıfıra iner.`;
+        } else {
+          durum.className = 'arac-durum ok';
+          durum.textContent =
+            `Hazırlık ${sureYaz(hazirlikSuresi)} önce başlamalı; kesintisiz geçiş planlandı.`;
+        }
+
+        /* --- komutlar ---------------------------------------------------- */
+        el('#d-komut').textContent =
+          `# Şu anki TTL ve cevap (kalan süreyi görmek için otoriter olmayan sunucuya sorun)\n` +
+          `dig ${alan} ${tur} +noall +answer\n\n` +
+          `# Otoriter sunucudan doğrudan sor — önbelleği atlar, gerçek kaydı verir\n` +
+          `dig @$(dig ${alan} NS +short | head -1) ${alan} ${tur} +noall +answer\n\n` +
+          `# Farklı genel çözümleyicilerde yayılmayı izle\n` +
+          `for s in 8.8.8.8 1.1.1.1 9.9.9.9 208.67.222.222; do\n` +
+          `  printf '%-16s ' "$s"; dig @$s ${alan} ${tur} +short | tr '\\n' ' '; echo\n` +
+          `done\n\n` +
+          `# Windows tarafında\n` +
+          `Resolve-DnsName ${alan} -Type ${tur} -Server 8.8.8.8\n` +
+          `Clear-DnsClientCache   # yerel önbelleği temizle\n\n` +
+          `# Yeni sunucuyu DNS değişmeden sına\n` +
+          `curl -sSI --resolve ${alan}:443:YENI.IP.ADRESI https://${alan}/\n\n` +
+          `# Negatif önbellek süresi SOA'nın son alanındadır\n` +
+          `dig ${alan} SOA +short`;
+
+        /* --- türe özel uyarılar ------------------------------------------ */
+        el('#d-uyarilar').innerHTML =
+          '<ul class="d-bulgular">' +
+          TUR_NOTLARI[tur].map(([tip, m]) => `<li data-tip="${tip}">${m}</li>`).join('') +
+          '</ul>';
+      }
+
+      /* --- olaylar ----------------------------------------------------------- */
+      document
+        .querySelectorAll('.arac-alan input, .arac-alan select, #d-cift')
+        .forEach((g) => g.addEventListener('input', hesapla));
+      el('#d-tur').addEventListener('change', hesapla);
+      el('#d-cift').addEventListener('change', hesapla);
+
+      el('#d-komut-kop').addEventListener('click', async (e) => {
+        try {
+          await navigator.clipboard.writeText(el('#d-komut').textContent);
+          e.currentTarget.textContent = 'Kopyalandı';
+          setTimeout(() => (e.currentTarget.textContent = 'Kopyala'), 1600);
+        } catch {
+          /* pano izni yoksa kullanıcı elle seçer */
+        }
+      });
+
+      // Öntanımlı geçiş anı: yarın gece 02:00 — en az kullanılan saat
+      const yarin = new Date();
+      yarin.setDate(yarin.getDate() + 1);
+      yarin.setHours(2, 0, 0, 0);
+      const iki = (n) => String(n).padStart(2, '0');
+      el('#d-an').value =
+        `${yarin.getFullYear()}-${iki(yarin.getMonth() + 1)}-${iki(yarin.getDate())}` +
+        `T${iki(yarin.getHours())}:${iki(yarin.getMinutes())}`;
+
+      hesapla();
+    })();
+  </script>
+
+  <style>
+    .d-sec {
+      display: inline-flex;
+      align-items: baseline;
+      gap: 8px;
+      font-size: 13px;
+      color: var(--ink-soft);
+      cursor: pointer;
+      line-height: 1.5;
+      margin-top: 12px;
+    }
+    .d-sec i {
+      font-style: normal;
+      color: var(--muted);
+      font-size: 12px;
+    }
+    .d-takvim {
+      list-style: none;
+      margin: 0;
+      padding: 0;
+      display: grid;
+      gap: 0;
+    }
+    .d-adim {
+      display: grid;
+      grid-template-columns: minmax(0, 170px) minmax(0, 1fr);
+      gap: 18px;
+      padding: 16px 0 16px 18px;
+      border-left: 2px solid var(--line);
+      position: relative;
+    }
+    .d-adim::before {
+      content: '';
+      position: absolute;
+      left: -6px;
+      top: 22px;
+      width: 10px;
+      height: 10px;
+      border-radius: 50%;
+      background: var(--line);
+      border: 2px solid var(--paper);
+    }
+    .d-adim[data-vurgu]::before {
+      background: var(--indigo);
+    }
+    .d-adim[data-vurgu] {
+      border-left-color: var(--indigo);
+    }
+    @media (max-width: 620px) {
+      .d-adim {
+        grid-template-columns: minmax(0, 1fr);
+        gap: 6px;
+      }
+    }
+    .d-zaman {
+      font-size: 12.5px;
+      color: var(--muted);
+      font-family: var(--mono, ui-monospace, monospace);
+      line-height: 1.5;
+    }
+    .d-govde b {
+      font-size: 14.5px;
+      display: block;
+      margin-bottom: 5px;
+    }
+    .d-govde p {
+      margin: 0;
+      font-size: 13.5px;
+      line-height: 1.62;
+      color: var(--ink-soft);
+    }
+    .d-bulgular,
+    .d-ipuclari {
+      list-style: none;
+      margin: 0;
+      padding: 0;
+      display: grid;
+      gap: 12px;
+    }
+    .d-bulgular li,
+    .d-ipuclari li {
+      font-size: 13.5px;
+      line-height: 1.62;
+      color: var(--ink-soft);
+      border-left: 2px solid var(--line);
+      padding-left: 13px;
+    }
+    .d-bulgular li[data-tip='hata'] {
+      border-left-color: light-dark(#dc2626, #f87171);
+    }
+    .d-bulgular li[data-tip='uyari'] {
+      border-left-color: light-dark(#f0c33c, #a97f1c);
+    }
+    .d-bulgular li[data-tip='ok'] {
+      border-left-color: light-dark(#16a34a, #4ade80);
+    }
+  </style>
+</Base>
