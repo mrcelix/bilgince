@@ -1,0 +1,992 @@
+---
+import Base from '../../layouts/Base.astro';
+---
+
+<Base
+  baslik="Docker Compose denetleyici"
+  aciklama="compose.yml dosyanızı yapıştırın; açıkta kalan veritabanı portu, ana makineye sızdıran bağlama, sınırsız bellek ve dönmeyen günlük gibi üretimde canınızı yakacak ayarları işaretler."
+  aramaya={true}
+  kategori="Araç"
+>
+  <div class="arama-bas">
+    <div class="kap">
+      <nav class="kirinti" aria-label="Kırıntı yolu" style="padding-top:0">
+        <a href="/">Ana sayfa</a><span class="ayrac">/</span><a href="/araclar">Araçlar</a><span
+          class="ayrac">/</span
+        ><span aria-current="page">Compose denetleyici</span>
+      </nav>
+      <h1>Docker Compose denetleyici</h1>
+      <p style="color:var(--muted);font-size:14px;margin-top:8px;max-width:70ch">
+        Geliştirme makinesinde sorunsuz çalışan bir <code>compose.yml</code>, aynı dosyayla
+        sunucuya çıkıldığında veritabanını internete açabilir, ana makinenin diskini günlükle
+        doldurabilir ya da tek bir konteynerin belleği tüketmesine izin verebilir. Bu araç
+        dosyayı ayrıştırıp bu farkı yaratan ayarları sıralar. Her bulgunun neden önemli
+        olduğu ve nasıl düzeltileceği yanında yazıyor.
+      </p>
+    </div>
+  </div>
+
+  <div class="kap arac-sayfa">
+    <section class="arac-blok">
+      <h2 class="arac-h2"><span class="arac-no">1</span> Compose dosyası</h2>
+      <textarea id="c-girdi" class="arac-metin" rows="16" spellcheck="false"
+        placeholder="services:&#10;  web:&#10;    image: nginx&#10;    ports:&#10;      - 80:80"
+      ></textarea>
+      <div class="arac-dugmeler">
+        <button type="button" class="dg dg-hayalet" id="c-ornek">Sorunlu örneği yükle</button>
+        <button type="button" class="dg dg-hayalet" id="c-iyi">Düzeltilmiş örneği yükle</button>
+        <button type="button" class="dg dg-hayalet" id="c-temizle">Temizle</button>
+      </div>
+      <p class="arac-durum" id="c-durum" role="status" aria-live="polite"></p>
+    </section>
+
+    <section class="arac-blok" id="c-sonuc-blok" hidden>
+      <h2 class="arac-h2"><span class="arac-no">2</span> Bulgular</h2>
+      <div class="c-ozet" id="c-ozet"></div>
+      <div class="c-bulgular" id="c-bulgular"></div>
+    </section>
+
+    <section class="arac-blok" id="c-servis-blok" hidden>
+      <h2 class="arac-h2"><span class="arac-no">3</span> Servis özeti</h2>
+      <div class="c-tablo-kap">
+        <table class="c-tablo" id="c-servisler"></table>
+      </div>
+    </section>
+
+    <section class="arac-blok">
+      <h2 class="arac-h2"><span class="arac-no">4</span> Compose'da sık yapılan hatalar</h2>
+      <ul class="c-ipuclari">
+        <li>
+          <b><code>depends_on</code> hazır olmayı beklemez.</b> Yalnızca başlatma sırasını
+          belirler; veritabanı konteyneri ayağa kalkar kalkmaz uygulama başlar, ama Postgres
+          henüz bağlantı kabul etmiyordur. Uygulama çöker, <code>restart</code> varsa döngüye
+          girer. Çözüm: veritabanına <code>healthcheck</code> ekleyip
+          <code>condition: service_healthy</code> kullanmak — ya da uygulamanın kendisine
+          yeniden deneme koymak, ki asıl doğrusu budur.
+        </li>
+        <li>
+          <b>Kısa port sözdizimi tüm arayüzlere bağlanır.</b> <code>- 5432:5432</code> yazınca
+          Docker <code>0.0.0.0:5432</code> dinler ve — bu en can alıcı kısım — kuralı
+          <code>iptables</code>'ın <code>DOCKER</code> zincirine yazar. Sunucudaki
+          <code>ufw</code> ya da <code>firewalld</code> kuralları bu zincirden sonra
+          çalışmadığı için güvenlik duvarı kapalı görünse bile port açıktır. Yalnızca yerel
+          erişim isteniyorsa <code>- 127.0.0.1:5432:5432</code> yazın.
+        </li>
+        <li>
+          <b>Öntanımlı günlük sürücüsü dönmez.</b> <code>json-file</code> sınırsız büyür;
+          gürültülü bir konteyner haftalar içinde diski doldurup ana makinedeki her şeyi
+          durdurur. Her servise <code>logging.options.max-size</code> ve
+          <code>max-file</code> verin ya da arka plan programında öntanımlıyı değiştirin.
+        </li>
+        <li>
+          <b><code>latest</code> etiketi geri dönüşü imkânsızlaştırır.</b> Sorun çıktığında
+          hangi sürümden hangisine geçildiğini bilemezsiniz, çünkü etiket aynı kaldı.
+          Sürüm sabitleyin; kritik servislerde <code>image@sha256:…</code> özetiyle
+          sabitlemek daha da güvenlidir.
+        </li>
+        <li>
+          <b>Bellek sınırı yoksa komşu servisleri de kaybedersiniz.</b> Sızıntı yapan tek bir
+          konteyner ana makinenin belleğini tüketir; çekirdeğin OOM katili en çok bellek
+          kullanan işlemi öldürür ve bu genelde yanlış konteyner olur. <code>mem_limit</code>
+          koyulduğunda yalnızca suçlu ölür.
+        </li>
+        <li>
+          <b><code>version:</code> alanı artık okunmuyor.</b> Compose Specification bu alanı
+          kaldırdı; Compose v2 görürse uyarı basar. Silin — dosyanın davranışı değişmez.
+        </li>
+      </ul>
+    </section>
+  </div>
+
+  <script>
+    (() => {
+      const el = (s) => document.querySelector(s);
+
+      /* ================= YAML alt kümesi çözücü =================
+         Compose dosyaları YAML'ın küçük bir bölümünü kullanır: haritalar,
+         listeler, satır içi diziler ve düz skalerler. Tam bir YAML
+         ayrıştırıcısı yerine bu alt kümeyi çözen bir okuyucu yazıldı;
+         çapa, birleştirme ve blok metin gibi özellikler desteklenmiyor. */
+
+      /** Satırı anahtar/değer diye böler. Tırnak içindeki iki nokta ayraç
+          sayılmaz, ayrıca ayraç olması için ardından boşluk gelmelidir —
+          böylece "image: nginx:1.27" doğru bölünür. */
+      function anahtarAyir(metin) {
+        let tirnak = null;
+        for (let k = 0; k < metin.length; k++) {
+          const h = metin[k];
+          if (tirnak) {
+            if (h === tirnak) tirnak = null;
+            continue;
+          }
+          if (h === '"' || h === "'") {
+            tirnak = h;
+            continue;
+          }
+          if (h === ':' && (k + 1 === metin.length || /\s/.test(metin[k + 1]))) {
+            return {
+              anahtar: metin.slice(0, k).trim().replace(/^["']|["']$/g, ''),
+              deger: metin.slice(k + 1).trim(),
+            };
+          }
+        }
+        return null;
+      }
+
+      function skalar(ham) {
+        const t = String(ham).trim();
+        if (t === '') return null;
+        if ((t[0] === '"' && t.endsWith('"')) || (t[0] === "'" && t.endsWith("'"))) {
+          return t.slice(1, -1);
+        }
+        if (t.startsWith('[') && t.endsWith(']')) {
+          const ic = t.slice(1, -1).trim();
+          return ic === '' ? [] : ic.split(',').map((p) => skalar(p));
+        }
+        if (t.startsWith('{') && t.endsWith('}')) {
+          const nesne = {};
+          const ic = t.slice(1, -1).trim();
+          if (ic === '') return nesne;
+          for (const parca of ic.split(',')) {
+            const ay = anahtarAyir(parca.trim());
+            if (ay) nesne[ay.anahtar] = skalar(ay.deger);
+          }
+          return nesne;
+        }
+        if (/^(true|false)$/i.test(t)) return t.toLowerCase() === 'true';
+        if (/^-?\d+(\.\d+)?$/.test(t)) return Number(t);
+        return t;
+      }
+
+      function yamlCoz(metin) {
+        const satirlar = [];
+        const hatalar = [];
+
+        metin.split(/\r?\n/).forEach((ham, dizin) => {
+          // Yorumu at, ama dize içindeki # işaretine dokunma
+          let govde = ham;
+          let tirnak = null;
+          for (let k = 0; k < govde.length; k++) {
+            const h = govde[k];
+            if (tirnak) {
+              if (h === tirnak) tirnak = null;
+            } else if (h === '"' || h === "'") {
+              tirnak = h;
+            } else if (h === '#' && (k === 0 || /\s/.test(govde[k - 1]))) {
+              govde = govde.slice(0, k);
+              break;
+            }
+          }
+          if (!govde.trim()) return;
+          if (/^\t/.test(govde)) {
+            hatalar.push({ no: dizin + 1, mesaj: 'YAML sekme karakteriyle girinti kabul etmez.' });
+            govde = govde.replace(/^\t+/, (m) => ' '.repeat(m.length * 2));
+          }
+          satirlar.push({
+            no: dizin + 1,
+            girinti: govde.length - govde.trimStart().length,
+            metin: govde.trim(),
+          });
+        });
+
+        let i = 0;
+
+        function dugum(enAzGirinti) {
+          if (i >= satirlar.length || satirlar[i].girinti < enAzGirinti) return null;
+
+          // Liste
+          if (satirlar[i].metin === '-' || satirlar[i].metin.startsWith('- ')) {
+            const liste = [];
+            const kendi = satirlar[i].girinti;
+            while (
+              i < satirlar.length &&
+              satirlar[i].girinti === kendi &&
+              (satirlar[i].metin === '-' || satirlar[i].metin.startsWith('- '))
+            ) {
+              const s = satirlar[i];
+              const kalan = s.metin === '-' ? '' : s.metin.slice(2).trim();
+              if (kalan === '') {
+                i++;
+                liste.push(dugum(kendi + 1));
+                continue;
+              }
+              const ay = anahtarAyir(kalan);
+              if (ay) {
+                /* "- ad: deger" bir harita ögesidir. Satırı "- " olmadan,
+                   ögenin iç girintisinde yeniden yazıp harita çözücüsüne
+                   devrediyoruz; ögenin sonraki alanları da aynı girintide
+                   olduğu için tek geçişte toplanıyor. */
+                satirlar[i] = { no: s.no, girinti: kendi + 2, metin: kalan };
+                liste.push(dugum(kendi + 2));
+              } else {
+                liste.push(skalar(kalan));
+                i++;
+              }
+            }
+            return liste;
+          }
+
+          // Harita
+          const nesne = {};
+          const kendi = satirlar[i].girinti;
+          while (i < satirlar.length && satirlar[i].girinti === kendi) {
+            const ay = anahtarAyir(satirlar[i].metin);
+            if (!ay) {
+              hatalar.push({
+                no: satirlar[i].no,
+                mesaj: `Anahtar bulunamadı: "${satirlar[i].metin}"`,
+              });
+              i++;
+              continue;
+            }
+            const satirNo = satirlar[i].no;
+            i++;
+            nesne[ay.anahtar] = ay.deger === '' ? dugum(kendi + 1) : skalar(ay.deger);
+            /* Bulguların satır numarası gösterebilmesi için her anahtarın
+               satırı "@anahtar" adıyla yanına yazılır. Anahtarlar
+               dolaşılırken bu adlar ayıklanmalı — anahtarlar() bunu yapar. */
+            nesne['@' + ay.anahtar] = satirNo;
+          }
+          return nesne;
+        }
+
+        const kok = dugum(0);
+        return { kok, hatalar };
+      }
+
+      /** Bir haritanın gerçek anahtarları — satır numarası kayıtları hariç. */
+      function anahtarlar(nesne) {
+        if (!nesne || typeof nesne !== 'object' || Array.isArray(nesne)) return [];
+        return Object.keys(nesne).filter((a) => !a.startsWith('@'));
+      }
+
+      /* ================= denetimler ================= */
+
+      const VERITABANI = /^(postgres|mysql|mariadb|mongo|redis|memcached|elasticsearch|opensearch|cassandra|clickhouse|rabbitmq|couchdb|influxdb|neo4j)/i;
+      const GIZLI_ANAHTAR = /(PASS|PASSWORD|SECRET|TOKEN|APIKEY|API_KEY|PRIVATE_KEY|ACCESS_KEY|CREDENTIAL)/i;
+      const TEHLIKELI_YETENEK = /^(SYS_ADMIN|NET_ADMIN|SYS_PTRACE|SYS_MODULE|ALL)$/i;
+
+      /** environment hem liste hem harita yazılabilir; ikisini de eşleştir. */
+      function ortamCiftleri(ortam) {
+        if (!ortam) return [];
+        if (Array.isArray(ortam)) {
+          return ortam
+            .filter((s) => typeof s === 'string')
+            .map((s) => {
+              const k = s.indexOf('=');
+              return k === -1 ? { ad: s, deger: '' } : { ad: s.slice(0, k), deger: s.slice(k + 1) };
+            });
+        }
+        return anahtarlar(ortam).map((a) => ({ ad: a, deger: String(ortam[a] ?? '') }));
+      }
+
+      /** Kısa port sözdizimini çözer: "127.0.0.1:8080:80/tcp" */
+      function portCoz(deger) {
+        if (deger && typeof deger === 'object' && !Array.isArray(deger)) {
+          return {
+            arayuz: deger.host_ip ? String(deger.host_ip) : null,
+            anaMakine: deger.published != null ? String(deger.published) : null,
+            konteyner: deger.target != null ? String(deger.target) : null,
+          };
+        }
+        const m = String(deger).replace(/\/(tcp|udp)$/i, '').split(':');
+        if (m.length === 3) return { arayuz: m[0], anaMakine: m[1], konteyner: m[2] };
+        if (m.length === 2) return { arayuz: null, anaMakine: m[0], konteyner: m[1] };
+        return { arayuz: null, anaMakine: null, konteyner: m[0] };
+      }
+
+      function bellekSiniriVar(servis) {
+        if (servis.mem_limit) return true;
+        const sinir = servis.deploy?.resources?.limits;
+        return !!(sinir && (sinir.memory || sinir.memory === 0));
+      }
+
+      function denetle(kok) {
+        const bulgular = [];
+        const ekle = (duzey, servis, baslik, aciklama, cozum, satir) =>
+          bulgular.push({ duzey, servis, baslik, aciklama, cozum, satir: satir ?? null });
+
+        if (!kok || typeof kok !== 'object') {
+          ekle('kritik', null, 'Dosya çözümlenemedi', 'Girdi boş ya da YAML değil.', '', null);
+          return { bulgular, servisler: [] };
+        }
+
+        if (kok.version !== undefined) {
+          ekle(
+            'bilgi',
+            null,
+            'version alanı artık yok sayılıyor',
+            'Compose Specification bu alanı kaldırdı. Compose v2 dosyayı okur ama uyarı basar; ' +
+              'alan davranışı hiçbir biçimde etkilemiyor.',
+            'version satırını silin.',
+            kok['@version']
+          );
+        }
+
+        const servisler = kok.services;
+        if (!servisler || typeof servisler !== 'object') {
+          ekle(
+            'kritik',
+            null,
+            'services bölümü yok',
+            'Compose dosyasının kökünde en az bir servis tanımlayan services haritası olmalı.',
+            'services: altına servislerinizi girintileyin.',
+            null
+          );
+          return { bulgular, servisler: [] };
+        }
+
+        const adlar = anahtarlar(servisler);
+        const ozetler = [];
+
+        for (const ad of adlar) {
+          const s = servisler[ad];
+          const satir = servisler['@' + ad];
+          if (!s || typeof s !== 'object') {
+            ekle('kritik', ad, 'Servis gövdesi boş', 'Servisin altında hiçbir ayar yok.', '', satir);
+            continue;
+          }
+
+          const imaj = typeof s.image === 'string' ? s.image : null;
+
+          /* --- imaj ve sürüm --- */
+          if (!imaj && !s.build) {
+            ekle(
+              'kritik',
+              ad,
+              'Ne image ne build var',
+              'Compose bu servisi başlatamaz; neyin çalıştırılacağı belirtilmemiş.',
+              'image: ya da build: ekleyin.',
+              satir
+            );
+          }
+          if (imaj) {
+            const ozetli = imaj.includes('@sha256:');
+            // Etiket ararken kayıt defteri portundaki iki noktayı sayma
+            const sonEgik = imaj.lastIndexOf('/');
+            const sonIkiNokta = imaj.lastIndexOf(':');
+            const etiket = sonIkiNokta > sonEgik ? imaj.slice(sonIkiNokta + 1) : null;
+            if (!ozetli && (!etiket || etiket === 'latest')) {
+              ekle(
+                'uyari',
+                ad,
+                etiket ? 'latest etiketi kullanılıyor' : 'İmaj etiketsiz',
+                'Etiketsiz imaj latest anlamına gelir. Sunucuda docker compose pull çalıştığında ' +
+                  'imaj sessizce değişir; sorun çıktığında hangi sürümden hangisine geçildiği ' +
+                  'bilinemez, geri dönülemez.',
+                `image: ${imaj.split(':')[0]}:1.2.3 gibi sabit sürüm, kritik servislerde @sha256 özeti kullanın.`,
+                s['@image']
+              );
+            }
+          }
+
+          /* --- ayrıcalık --- */
+          if (s.privileged === true) {
+            ekle(
+              'kritik',
+              ad,
+              'privileged: true',
+              'Konteyner ana makinenin tüm aygıtlarına erişir ve çekirdek yetenek kısıtları kalkar. ' +
+                'Konteynerdeki bir açık doğrudan ana makinede kök yetkisine dönüşür.',
+              'Gerçekten gereken yeteneği cap_add ile tek tek verin; genelde bir tanesi yetiyor.',
+              s['@privileged']
+            );
+          }
+          if (s.pid === 'host') {
+            ekle(
+              'kritik',
+              ad,
+              'pid: host',
+              'Konteyner ana makinenin süreç listesini görür ve komşu süreçlere sinyal gönderebilir. ' +
+                'Süreç yalıtımı tamamen kalkar.',
+              'pid: host satırını kaldırın.',
+              s['@pid']
+            );
+          }
+          for (const y of [].concat(s.cap_add ?? [])) {
+            if (TEHLIKELI_YETENEK.test(String(y))) {
+              ekle(
+                'kritik',
+                ad,
+                `cap_add: ${y}`,
+                String(y).toUpperCase() === 'ALL'
+                  ? 'Tüm çekirdek yetenekleri veriliyor; privileged ile aynı kapıya çıkar.'
+                  : `${y} yeteneği konteynerin ana makine çekirdeğiyle doğrudan iş yapmasına izin verir ` +
+                    've yalıtımdan çıkmak için sık kullanılan bir yoldur.',
+                'Bu yetenek olmadan deneyin; gerçekten gerekiyorsa servisi ayrı bir ana makineye alın.',
+                s['@cap_add']
+              );
+            }
+          }
+
+          /* --- bağlamalar --- */
+          const birimler = [].concat(s.volumes ?? []).filter((v) => typeof v === 'string');
+          for (const v of birimler) {
+            const kaynak = v.split(':')[0];
+            if (/docker\.sock$/.test(kaynak)) {
+              ekle(
+                'kritik',
+                ad,
+                'Docker soketi konteynere bağlanmış',
+                'Docker soketine erişen bir konteyner ana makinede ayrıcalıklı yeni konteyner ' +
+                  'başlatabilir; bu, ana makinede kök yetkisiyle eşdeğerdir. Yalıtım diye bir şey kalmaz.',
+                'Soket yerine Docker API vekili (örneğin salt okunur bir socket-proxy) kullanın ' +
+                  've yalnızca gereken uç noktalara izin verin.',
+                s['@volumes']
+              );
+            } else if (/^\/(etc|usr|boot|sys|proc)(\/|$)/.test(kaynak) || kaynak === '/') {
+              ekle(
+                'uyari',
+                ad,
+                `Sistem dizini bağlanmış: ${kaynak}`,
+                'Ana makinenin sistem dizinleri konteynere açılmış. Yazılabilir bağlandıysa ' +
+                  'konteyner ana makinenin yapılandırmasını değiştirebilir.',
+                `En azından salt okunur yapın: ${v}:ro`,
+                s['@volumes']
+              );
+            }
+          }
+
+          /* --- ağ ve portlar --- */
+          if (s.network_mode === 'host') {
+            ekle(
+              'uyari',
+              ad,
+              'network_mode: host',
+              'Konteyner ana makinenin ağ yığınını paylaşır. ports eşlemeleri sessizce yok sayılır ' +
+                've servis dinlediği her portu doğrudan ana makinede açar.',
+              'Köprü ağı kullanıp gereken portları açıkça eşleyin.',
+              s['@network_mode']
+            );
+          }
+
+          const portlar = [].concat(s.ports ?? []).filter((p) => p != null);
+          for (const p of portlar) {
+            const { arayuz, anaMakine, konteyner } = portCoz(p);
+            if (!anaMakine) continue;
+            const veritabaniMi = imaj && VERITABANI.test(imaj.split('/').pop());
+            if (!arayuz && veritabaniMi) {
+              ekle(
+                'kritik',
+                ad,
+                `Veritabanı portu tüm arayüzlerde açık: ${anaMakine}`,
+                'Kısa sözdizimi 0.0.0.0 demektir; sunucunun genel IP\'si varsa veritabanı ' +
+                  'internetten erişilebilir. Üstelik Docker kuralı iptables DOCKER zincirine ' +
+                  'yazdığı için ufw/firewalld kapalı görünse bile port açık kalır.',
+                `- 127.0.0.1:${anaMakine}:${konteyner} yazın; uygulama aynı Compose ağındaysa portu hiç açmayın.`,
+                s['@ports']
+              );
+            } else if (!arayuz) {
+              ekle(
+                'bilgi',
+                ad,
+                `Port tüm arayüzlerde açık: ${anaMakine}`,
+                'Kısa sözdizimi 0.0.0.0 üzerinden yayımlar. Servisin dışarıdan erişilmesi ' +
+                  'gerekiyorsa sorun yok; gerekmiyorsa gereksiz yüzey.',
+                `Yalnızca yerelden erişilecekse: - 127.0.0.1:${anaMakine}:${konteyner}`,
+                s['@ports']
+              );
+            }
+          }
+
+          /* --- dayanıklılık --- */
+          if (!s.restart && !s.deploy?.restart_policy) {
+            ekle(
+              'uyari',
+              ad,
+              'restart politikası yok',
+              'Ana makine yeniden başladığında ya da süreç çöktüğünde konteyner tekrar ayağa kalkmaz. ' +
+                'Geliştirmede fark edilmez, sunucuda servis sessizce kaybolur.',
+              'restart: unless-stopped — elle durdurulan konteyneri yeniden başlatmadığı için ' +
+                'bakım sırasında sürpriz yapmaz.',
+              satir
+            );
+          }
+
+          if (!s.logging) {
+            ekle(
+              'uyari',
+              ad,
+              'Günlük döndürme ayarlanmamış',
+              'Öntanımlı json-file sürücüsü sınırsız büyür. Gürültülü tek bir servis ana makinenin ' +
+                'diskini doldurur ve o makinedeki bütün konteynerler durur.',
+              'logging: { driver: json-file, options: { max-size: "10m", max-file: "3" } }',
+              satir
+            );
+          }
+
+          if (!bellekSiniriVar(s)) {
+            ekle(
+              'uyari',
+              ad,
+              'Bellek sınırı yok',
+              'Sızıntı yapan konteyner ana makinenin belleğini tüketir. Çekirdeğin OOM katili ' +
+                'en çok bellek kullanan süreci öldürür ve bu çoğu zaman suçlu servis değil, ' +
+                'yanındaki masum servis olur.',
+              'mem_limit: 512m (Compose v2 tek makinede bunu doğrudan uygular).',
+              satir
+            );
+          }
+
+          /* --- sırlar --- */
+          for (const { ad: ortamAd, deger } of ortamCiftleri(s.environment)) {
+            if (!GIZLI_ANAHTAR.test(ortamAd)) continue;
+            const d = String(deger).trim();
+            if (d === '' || /^\$\{?[A-Za-z_]/.test(d)) continue;
+            ekle(
+              'kritik',
+              ad,
+              `Sır dosyaya gömülmüş: ${ortamAd}`,
+              'Değer doğrudan compose dosyasında yazılı. Dosya sürüm deposuna girdiği anda sır ' +
+                'geçmişte kalır; sonradan silinse bile eski işlemelerden okunabilir.',
+              `${ortamAd}: \${${ortamAd}} yazıp değeri .env dosyasına alın ya da Docker secrets kullanın.`,
+              s['@environment']
+            );
+          }
+
+          /* --- bağımlılıklar --- */
+          const bagimliListe = Array.isArray(s.depends_on)
+            ? s.depends_on
+            : anahtarlar(s.depends_on ?? {});
+          for (const b of bagimliListe) {
+            const hedef = servisler[b];
+            const kosullu =
+              !Array.isArray(s.depends_on) && s.depends_on?.[b]?.condition === 'service_healthy';
+            if (kosullu) continue;
+            if (hedef && typeof hedef === 'object' && hedef.healthcheck) {
+              ekle(
+                'bilgi',
+                ad,
+                `depends_on: ${b} koşulsuz`,
+                `${b} servisinin healthcheck tanımı var ama beklenmiyor. depends_on tek başına ` +
+                  'yalnızca başlatma sırasını belirler, hazır olmayı beklemez.',
+                `depends_on:\n  ${b}:\n    condition: service_healthy`,
+                s['@depends_on']
+              );
+            } else if (hedef && typeof hedef === 'object') {
+              ekle(
+                'uyari',
+                ad,
+                `depends_on: ${b} hazır olmayı beklemiyor`,
+                'depends_on konteynerin başlatılmasını bekler, servisin bağlantı kabul etmesini ' +
+                  'değil. Veritabanı henüz açılmamışken uygulama başlar ve çöker.',
+                `${b} servisine healthcheck ekleyip condition: service_healthy kullanın; ` +
+                  'ayrıca uygulamaya yeniden bağlanma mantığı koyun.',
+                s['@depends_on']
+              );
+            } else {
+              ekle(
+                'kritik',
+                ad,
+                `Tanımsız servise bağımlılık: ${b}`,
+                'depends_on içinde adı geçen servis dosyada yok; Compose başlatmayı reddeder.',
+                'Adı düzeltin ya da satırı kaldırın.',
+                s['@depends_on']
+              );
+            }
+          }
+
+          /* --- küçük notlar --- */
+          if (s.links) {
+            ekle(
+              'uyari',
+              ad,
+              'links kullanılıyor',
+              'links eski sürümlerden kalma; Compose ağlarında servisler zaten adlarıyla ' +
+                'birbirini bulur. Ayrıca links başlatma sırası da dayattığı için gizli bağımlılık yaratır.',
+              'links satırını silin; servis adıyla bağlanın.',
+              s['@links']
+            );
+          }
+          if (s.container_name) {
+            ekle(
+              'bilgi',
+              ad,
+              'container_name sabitlenmiş',
+              'Sabit ad verildiğinde aynı servisin birden çok kopyası çalıştırılamaz; ' +
+                'docker compose up --scale hata verir.',
+              'Ölçekleme ihtimali varsa container_name kullanmayın.',
+              s['@container_name']
+            );
+          }
+          if (!s.user) {
+            ekle(
+              'bilgi',
+              ad,
+              'Kök kullanıcı olarak çalışıyor',
+              'Imajda USER tanımlı değilse süreç konteyner içinde kök olarak çalışır. ' +
+                'Bağlanan birimlere kök sahipliğinde dosyalar yazar ve yalıtımdan çıkmayı kolaylaştırır.',
+              'user: "1000:1000" verin ya da imajda USER tanımlayın.',
+              satir
+            );
+          }
+
+          ozetler.push({
+            ad,
+            imaj: imaj ?? (s.build ? 'build' : '—'),
+            portlar: portlar.map((p) => {
+              const c = portCoz(p);
+              return c.anaMakine ? `${c.arayuz ? c.arayuz + ':' : ''}${c.anaMakine}` : '—';
+            }),
+            restart: s.restart ?? (s.deploy?.restart_policy ? 'deploy' : null),
+            bellek: s.mem_limit ?? s.deploy?.resources?.limits?.memory ?? null,
+            saglik: !!s.healthcheck,
+          });
+        }
+
+        const sira = { kritik: 0, uyari: 1, bilgi: 2 };
+        bulgular.sort((a, b) => sira[a.duzey] - sira[b.duzey] || (a.satir ?? 0) - (b.satir ?? 0));
+        return { bulgular, servisler: ozetler };
+      }
+
+      /* ================= arayüz ================= */
+
+      const kacir = (m) =>
+        String(m).replace(/[&<>]/g, (k) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;' })[k]);
+
+      const ETIKET = { kritik: 'Kritik', uyari: 'Uyarı', bilgi: 'Bilgi' };
+
+      function ciz() {
+        const metin = el('#c-girdi').value;
+        const durum = el('#c-durum');
+        const sonucBlok = el('#c-sonuc-blok');
+        const servisBlok = el('#c-servis-blok');
+
+        if (!metin.trim()) {
+          durum.className = 'arac-durum';
+          durum.textContent = '';
+          sonucBlok.hidden = true;
+          servisBlok.hidden = true;
+          return;
+        }
+
+        const { kok, hatalar } = yamlCoz(metin);
+        const { bulgular, servisler } = denetle(kok);
+
+        const tumu = hatalar
+          .map((h) => ({
+            duzey: 'kritik',
+            servis: null,
+            baslik: 'YAML hatası',
+            aciklama: h.mesaj,
+            cozum: '',
+            satir: h.no,
+          }))
+          .concat(bulgular);
+
+        const say = { kritik: 0, uyari: 0, bilgi: 0 };
+        tumu.forEach((b) => say[b.duzey]++);
+
+        sonucBlok.hidden = false;
+        el('#c-ozet').innerHTML = ['kritik', 'uyari', 'bilgi']
+          .map(
+            (d) =>
+              `<div class="c-sayac c-${d}"><b>${say[d]}</b><span>${ETIKET[d]}</span></div>`
+          )
+          .join('');
+
+        el('#c-bulgular').innerHTML = tumu.length
+          ? tumu
+              .map(
+                (b) =>
+                  `<article class="c-bulgu c-${b.duzey}">` +
+                  `<header><span class="c-rozet">${ETIKET[b.duzey]}</span>` +
+                  (b.servis ? `<span class="c-servis">${kacir(b.servis)}</span>` : '') +
+                  (b.satir ? `<span class="c-satir">satır ${b.satir}</span>` : '') +
+                  `<h3>${kacir(b.baslik)}</h3></header>` +
+                  `<p>${kacir(b.aciklama)}</p>` +
+                  (b.cozum ? `<pre class="c-cozum">${kacir(b.cozum)}</pre>` : '') +
+                  `</article>`
+              )
+              .join('')
+          : '<p class="arac-not">Denetimlerin hiçbiri tetiklenmedi.</p>';
+
+        servisBlok.hidden = servisler.length === 0;
+        if (servisler.length) {
+          el('#c-servisler').innerHTML =
+            '<thead><tr><th>Servis</th><th>İmaj</th><th>Yayımlanan port</th>' +
+            '<th>Yeniden başlatma</th><th>Bellek sınırı</th><th>Sağlık denetimi</th></tr></thead><tbody>' +
+            servisler
+              .map(
+                (s) =>
+                  `<tr><td><b>${kacir(s.ad)}</b></td><td><code>${kacir(s.imaj)}</code></td>` +
+                  `<td>${s.portlar.length ? kacir(s.portlar.join(', ')) : '—'}</td>` +
+                  `<td>${s.restart ? kacir(s.restart) : '<span class="c-yok">yok</span>'}</td>` +
+                  `<td>${s.bellek ? kacir(s.bellek) : '<span class="c-yok">yok</span>'}</td>` +
+                  `<td>${s.saglik ? 'var' : '<span class="c-yok">yok</span>'}</td></tr>`
+              )
+              .join('') +
+            '</tbody>';
+        }
+
+        durum.className = 'arac-durum ' + (say.kritik ? 'hata' : say.uyari ? 'uyari' : 'ok');
+        durum.textContent = say.kritik
+          ? `${say.kritik} kritik bulgu var; bu dosya bu hâliyle sunucuya çıkmamalı.`
+          : say.uyari
+            ? `Kritik bulgu yok, ${say.uyari} uyarı var.`
+            : `${servisler.length} servis denetlendi, kritik ya da uyarı düzeyinde bulgu yok.`;
+      }
+
+      const ORNEK_SORUNLU = `version: "3.8"
+
+services:
+  db:
+    image: postgres
+    ports:
+      - 5432:5432
+    environment:
+      POSTGRES_PASSWORD: parola123
+      POSTGRES_DB: uygulama
+    volumes:
+      - ./veri:/var/lib/postgresql/data
+
+  api:
+    image: kayit.ornek.com/uygulama:latest
+    container_name: api
+    depends_on:
+      - db
+    ports:
+      - 8080:8080
+    environment:
+      - DATABASE_URL=postgres://uygulama:parola123@db:5432/uygulama
+      - JWT_SECRET=cok-gizli-anahtar
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+    privileged: true
+
+  yonetim:
+    image: nginx:1.27
+    network_mode: host
+    links:
+      - api
+    cap_add:
+      - SYS_ADMIN
+`;
+
+      const ORNEK_IYI = `services:
+  db:
+    image: postgres:16.4-alpine
+    restart: unless-stopped
+    user: "999:999"
+    mem_limit: 1g
+    ports:
+      - 127.0.0.1:5432:5432
+    environment:
+      POSTGRES_PASSWORD: \${POSTGRES_PASSWORD}
+      POSTGRES_DB: uygulama
+    volumes:
+      - db-veri:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U uygulama"]
+      interval: 10s
+      retries: 5
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  api:
+    image: kayit.ornek.com/uygulama:2.4.1
+    restart: unless-stopped
+    user: "1000:1000"
+    mem_limit: 512m
+    depends_on:
+      db:
+        condition: service_healthy
+    ports:
+      - 127.0.0.1:8080:8080
+    environment:
+      DATABASE_URL: \${DATABASE_URL}
+      JWT_SECRET: \${JWT_SECRET}
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+volumes:
+  db-veri:
+`;
+
+      el('#c-girdi').addEventListener('input', ciz);
+      el('#c-ornek').addEventListener('click', () => {
+        el('#c-girdi').value = ORNEK_SORUNLU;
+        ciz();
+      });
+      el('#c-iyi').addEventListener('click', () => {
+        el('#c-girdi').value = ORNEK_IYI;
+        ciz();
+      });
+      el('#c-temizle').addEventListener('click', () => {
+        el('#c-girdi').value = '';
+        ciz();
+      });
+
+      ciz();
+    })();
+  </script>
+
+  <style>
+    .arac-metin {
+      width: 100%;
+      font-family: var(--mono, ui-monospace, monospace);
+      font-size: 13px;
+      line-height: 1.6;
+      padding: 12px 14px;
+      border: 1px solid var(--line);
+      border-radius: 11px;
+      background: var(--paper);
+      color: var(--ink);
+      resize: vertical;
+      tab-size: 2;
+    }
+    .arac-metin:focus {
+      outline: none;
+      border-color: var(--indigo);
+      box-shadow: 0 0 0 3px var(--tint);
+    }
+    .c-ozet {
+      display: flex;
+      gap: 10px;
+      flex-wrap: wrap;
+      margin-bottom: 16px;
+    }
+    .c-sayac {
+      border: 1px solid var(--line);
+      border-radius: 11px;
+      padding: 10px 16px;
+      display: grid;
+      gap: 1px;
+      min-width: 88px;
+      background: var(--paper);
+    }
+    .c-sayac b {
+      font-size: 22px;
+      line-height: 1.1;
+    }
+    .c-sayac span {
+      font-size: 12px;
+      color: var(--muted);
+    }
+    .c-sayac.c-kritik b {
+      color: light-dark(#b91c1c, #f87171);
+    }
+    .c-sayac.c-uyari b {
+      color: light-dark(#b45309, #fbbf24);
+    }
+    .c-sayac.c-bilgi b {
+      color: light-dark(#1d4ed8, #93c5fd);
+    }
+    .c-bulgular {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr);
+      gap: 10px;
+    }
+    .c-bulgu {
+      border: 1px solid var(--line);
+      border-left-width: 3px;
+      border-radius: 11px;
+      padding: 13px 15px;
+      background: var(--paper);
+      min-width: 0;
+    }
+    .c-bulgu.c-kritik {
+      border-left-color: light-dark(#dc2626, #ef4444);
+    }
+    .c-bulgu.c-uyari {
+      border-left-color: light-dark(#d97706, #f59e0b);
+    }
+    .c-bulgu.c-bilgi {
+      border-left-color: light-dark(#2563eb, #60a5fa);
+    }
+    .c-bulgu header {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      flex-wrap: wrap;
+      margin-bottom: 6px;
+    }
+    .c-bulgu h3 {
+      font-size: 14.5px;
+      margin: 0;
+      flex-basis: 100%;
+    }
+    .c-rozet {
+      font-size: 11px;
+      font-weight: 700;
+      padding: 2px 8px;
+      border-radius: 999px;
+      background: var(--tint);
+      color: var(--indigo-metin);
+    }
+    .c-servis {
+      font-size: 11.5px;
+      font-family: var(--mono, ui-monospace, monospace);
+      color: var(--ink-soft);
+    }
+    .c-satir {
+      font-size: 11.5px;
+      color: var(--muted);
+    }
+    .c-bulgu p {
+      font-size: 13.5px;
+      line-height: 1.62;
+      color: var(--ink-soft);
+      margin: 0;
+    }
+    .c-cozum {
+      margin: 9px 0 0;
+      font-size: 12.5px;
+      font-family: var(--mono, ui-monospace, monospace);
+      background: var(--tint);
+      border-radius: 8px;
+      padding: 9px 11px;
+      white-space: pre-wrap;
+      overflow-x: auto;
+      color: var(--ink);
+    }
+    .c-tablo-kap {
+      overflow-x: auto;
+    }
+    .c-tablo {
+      width: 100%;
+      min-width: 620px;
+      border-collapse: collapse;
+      font-size: 13px;
+    }
+    .c-tablo th,
+    .c-tablo td {
+      text-align: left;
+      padding: 9px 12px;
+      border-bottom: 1px solid var(--line);
+      vertical-align: top;
+    }
+    .c-tablo th {
+      font-size: 12px;
+      color: var(--muted);
+      font-weight: 600;
+      white-space: nowrap;
+    }
+    .c-tablo code {
+      font-size: 12px;
+    }
+    .c-yok {
+      color: light-dark(#b45309, #fbbf24);
+    }
+    .c-ipuclari {
+      list-style: none;
+      margin: 0;
+      padding: 0;
+      display: grid;
+      gap: 12px;
+    }
+    .c-ipuclari li {
+      font-size: 13.5px;
+      line-height: 1.62;
+      color: var(--ink-soft);
+      border-left: 2px solid var(--line);
+      padding-left: 13px;
+    }
+  </style>
+</Base>

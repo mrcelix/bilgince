@@ -628,5 +628,50 @@
     "etiket": "yeni",
     "cevrimici": false,
     "grup": "Erişilebilirlik & Arayüz"
+  },
+  {
+    "slug": "compose-denetleyici",
+    "ad": "Docker Compose denetleyici",
+    "ozet": "Açıkta kalan veritabanı portu, ana makineye sızdıran bağlama, dönmeyen günlük ve sınırsız bellek.",
+    "ikon": "kutu",
+    "etiket": "yeni",
+    "cevrimici": false,
+    "grup": "Bulut & Konteyner"
+  },
+  {
+    "slug": "bitlocker-planlayici",
+    "ad": "BitLocker dağıtım planlayıcı",
+    "ozet": "TPM durumuna göre koruyucu bileşimi, anahtar saklama yeri, GPO ayarları ve kurtarma ekranı tetikleyicileri.",
+    "ikon": "kalkan",
+    "etiket": "yeni",
+    "cevrimici": false,
+    "grup": "Windows & Operasyon"
+  },
+  {
+    "slug": "dhcp-kapsam",
+    "ad": "DHCP kapsam ve kira süresi planlayıcı",
+    "ozet": "Kira süresinin havuzu nasıl tükettiğini hesaplar, kapsam sınırlarını ve yük devretme bölüşümünü verir.",
+    "ikon": "dugum",
+    "etiket": "yeni",
+    "cevrimici": false,
+    "grup": "Ağ & DNS"
+  },
+  {
+    "slug": "ssh-sertlestirme",
+    "ad": "SSH sertleştirme: üret ve denetle",
+    "ozet": "sshd_config üretir ya da mevcut dosyanızı denetler; parolayı gerçekten kapatan ayarları gösterir.",
+    "ikon": "terminal",
+    "etiket": "yeni",
+    "cevrimici": false,
+    "grup": "Kimlik & Sertifika"
+  },
+  {
+    "slug": "kurtarma-hedefi",
+    "ad": "Kurtarma hedefi (RPO / RTO) planlayıcı",
+    "ozet": "Kesinti süresini adım adım ayırır, hangi çoğaltma teknolojisinin yettiğini ve hattın kapasitesini hesaplar.",
+    "ikon": "akis",
+    "etiket": "yeni",
+    "cevrimici": false,
+    "grup": "Kapasite & Süre"
   }
 ]

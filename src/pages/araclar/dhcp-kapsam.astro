@@ -1,0 +1,766 @@
+---
+import Base from '../../layouts/Base.astro';
+---
+
+<Base
+  baslik="DHCP kapsam ve kira süresi planlayıcı"
+  aciklama="Ağınıza kaç adres sığdığını, kira süresinin havuzu nasıl tükettiğini ve yük devretme bölüşümünü hesaplar; kapsam komutlarını üretir."
+  aramaya={true}
+  kategori="Araç"
+>
+  <div class="arama-bas">
+    <div class="kap">
+      <nav class="kirinti" aria-label="Kırıntı yolu" style="padding-top:0">
+        <a href="/">Ana sayfa</a><span class="ayrac">/</span><a href="/araclar">Araçlar</a><span
+          class="ayrac">/</span
+        ><span aria-current="page">DHCP kapsam</span>
+      </nav>
+      <h1>DHCP kapsam ve kira süresi planlayıcı</h1>
+      <p style="color:var(--muted);font-size:14px;margin-top:8px;max-width:70ch">
+        DHCP havuzu genelde cihaz sayısına bakılarak seçilir, oysa havuzu tüketen şey
+        eşzamanlı cihaz sayısı değil kira süresidir: ağdan ayrılan cihaz adresini kirası
+        bitene kadar tutar. Misafir ağında sekiz günlük öntanımlı kira, gün içinde iki yüz
+        kişinin uğradığı bir ofiste /24 ağı bitirir. Bu araç o ilişkiyi sayıya döker.
+      </p>
+    </div>
+  </div>
+
+  <div class="kap arac-sayfa">
+    <section class="arac-blok">
+      <h2 class="arac-h2"><span class="arac-no">1</span> Ağ ve cihazlar</h2>
+      <div class="arac-alanlar">
+        <label class="arac-alan"
+          >Ağ (CIDR)
+          <input type="text" id="d-cidr" value="10.20.30.0/24" spellcheck="false" />
+        </label>
+        <label class="arac-alan"
+          >Profil
+          <select id="d-profil">
+            <option value="ofis" selected>Ofis — masaüstü ve dizüstü</option>
+            <option value="misafir">Misafir kablosuz — cihazlar gelip geçiyor</option>
+            <option value="uretim">Üretim / saha — cihazlar sabit</option>
+            <option value="sunucu">Sunucu ağı — çoğunlukla sabit adres</option>
+          </select>
+        </label>
+        <label class="arac-alan"
+          >Sabit adresli cihaz (ağ geçidi, sunucu, yazıcı, anahtar)
+          <input type="number" id="d-sabit" value="12" min="0" step="1" />
+        </label>
+        <label class="arac-alan"
+          >Eşzamanlı DHCP istemcisi (yoğun anda)
+          <input type="number" id="d-eszamanli" value="120" min="0" step="1" />
+        </label>
+        <label class="arac-alan"
+          >Gün içinde ağa giren tekil cihaz
+          <input type="number" id="d-gunluk" value="160" min="0" step="1" />
+        </label>
+        <label class="arac-alan"
+          >Yoğun pencere (saat)
+          <input type="number" id="d-pencere" value="10" min="1" max="24" step="1" />
+        </label>
+        <label class="arac-alan"
+          >Büyüme payı (%)
+          <input type="number" id="d-buyume" value="30" min="0" max="300" step="5" />
+        </label>
+        <label class="arac-alan"
+          >Yük devretme
+          <select id="d-failover">
+            <option value="yok" selected>Yok — tek DHCP sunucusu</option>
+            <option value="denge">Yük dengeleme (50/50)</option>
+            <option value="yedek">Etkin–yedek (hot standby)</option>
+          </select>
+        </label>
+      </div>
+      <p class="arac-durum" id="d-durum" role="status" aria-live="polite"></p>
+    </section>
+
+    <section class="arac-blok">
+      <h2 class="arac-h2"><span class="arac-no">2</span> Adres bütçesi</h2>
+      <div class="d-kartlar" id="d-butce"></div>
+      <div class="d-cubuk" id="d-cubuk" role="img" aria-label="Adres kullanım oranı"></div>
+      <p class="arac-not" id="d-cubuk-not"></p>
+    </section>
+
+    <section class="arac-blok">
+      <h2 class="arac-h2"><span class="arac-no">3</span> Kira süresi</h2>
+      <div class="d-kira" id="d-kira"></div>
+    </section>
+
+    <section class="arac-blok">
+      <h2 class="arac-h2"><span class="arac-no">4</span> Kapsam düzeni</h2>
+      <div class="d-tablo-kap">
+        <table class="d-tablo" id="d-duzen"></table>
+      </div>
+      <p class="arac-not">
+        Sabit adresleri havuzun <b>dışında</b> tutmak, DHCP ayırmalarını (reservation)
+        havuzun <b>içinde</b> tutmak yaygın ve doğru düzendir: ayırma bir kira olduğu için
+        adresin havuza ait olması gerekir, elle verilen sabit adres ise sunucunun hiç
+        bilmediği bir adrestir ve havuzdan çıkarılmazsa çakışma üretir.
+      </p>
+    </section>
+
+    <section class="arac-blok">
+      <h2 class="arac-h2"><span class="arac-no">5</span> Komutlar</h2>
+      <div style="position:relative">
+        <pre class="kod d-cikti"><code id="d-komut"></code></pre>
+        <button class="kopyala" type="button" data-kaynak="d-komut">Kopyala</button>
+      </div>
+    </section>
+
+    <section class="arac-blok">
+      <h2 class="arac-h2"><span class="arac-no">6</span> Dikkat</h2>
+      <ul class="d-ipuclari" id="d-uyarilar"></ul>
+    </section>
+  </div>
+
+  <script>
+    (() => {
+      const el = (s) => document.querySelector(s);
+
+      /* ---------------- CIDR ---------------- */
+      function cidrCoz(metin) {
+        const m = /^\s*(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})\s*\/\s*(\d{1,2})\s*$/.exec(metin);
+        if (!m) return null;
+        const sekizli = [+m[1], +m[2], +m[3], +m[4]];
+        const uzunluk = +m[5];
+        if (sekizli.some((s) => s > 255) || uzunluk > 32) return null;
+        const adres = sekizli.reduce((t, s) => t * 256 + s, 0);
+        // Maske hesabında << kullanılmaz: 32 bitlik kaydırma JavaScript'te
+        // işaretli tam sayı taşması yapar ve /0 yanlış çıkar.
+        const boyut = 2 ** (32 - uzunluk);
+        const ag = Math.floor(adres / boyut) * boyut;
+        return { ag, uzunluk, boyut, girilenAdres: adres };
+      }
+
+      const metneCevir = (sayi) =>
+        [(sayi >>> 24) & 255, (sayi >>> 16) & 255, (sayi >>> 8) & 255, sayi & 255].join('.');
+
+      /** Kullanılabilir konak sayısı: ağ ve yayın adresleri düşülür.
+          /31 noktadan noktaya bağlantılarda iki adresin ikisi de kullanılır. */
+      function konakSayisi(uzunluk, boyut) {
+        if (uzunluk === 32) return 1;
+        if (uzunluk === 31) return 2;
+        return boyut - 2;
+      }
+
+      /* ---------------- kira süresi ----------------
+         Havuzu tüketen şey eşzamanlı cihaz sayısı değil, kira süresi boyunca
+         havuzda tutulan adres sayısıdır. Ağdan ayrılan cihaz adresini kirası
+         bitene kadar bırakmaz — DHCPRELEASE gönderen istemci azınlıktadır.
+
+         Kullanılan yaklaşım: yoğun pencerede cihazlar düzgün dağılmış varsayılır.
+         Kira süresi K saat ise, herhangi bir anda son K saatte ağa girmiş tüm
+         cihazlar adres tutuyordur:
+
+             tutulan ≈ eşzamanlı + (tekil / pencere) × K
+
+         Bu bir üst sınır değil, makul bir tahmindir; gerçek dağılım öğle arası
+         gibi tepe noktalarında daha yüksek olabilir. Sonuç günlük tekil cihaz
+         sayısıyla sınırlanır: bir cihaz gün içinde genelde tek adres tutar.
+      -------------------------------------------------- */
+      function tutulanAdres(esZamanli, gunlukTekil, pencereSaat, kiraSaat) {
+        const gecici = Math.max(0, gunlukTekil - esZamanli);
+        const tahmin = esZamanli + (gecici / Math.max(1, pencereSaat)) * kiraSaat;
+        return Math.min(Math.max(esZamanli, gunlukTekil), Math.ceil(tahmin));
+      }
+
+      /** Havuza sığan en uzun kira süresi (saat). */
+      function enUzunKira(havuz, esZamanli, gunlukTekil, pencereSaat) {
+        const gecici = Math.max(0, gunlukTekil - esZamanli);
+        if (gecici === 0) return Infinity; // ayrılan cihaz yok, kira havuzu tüketmez
+        if (havuz <= esZamanli) return 0;
+        return ((havuz - esZamanli) * pencereSaat) / gecici;
+      }
+
+      const PROFIL_KIRA = {
+        ofis: { saat: 192, ad: '8 gün', not: 'Windows DHCP öntanımlısı. Masaüstlerin adresi değişmez, günlük yenileme trafiği azdır.' },
+        misafir: { saat: 2, ad: '2 saat', not: 'Cihazlar kısa süre kalır; adres hızla havuza dönmeli.' },
+        uretim: { saat: 336, ad: '14 gün', not: 'Sabit cihazlarda uzun kira, sunucu erişilemez olduğunda dayanıklılık sağlar.' },
+        sunucu: { saat: 720, ad: '30 gün', not: 'Adres kararlılığı, havuz baskısından daha önemlidir.' },
+      };
+
+      function kiraOner(profil, havuz, esZamanli, gunlukTekil, pencereSaat) {
+        const istenen = PROFIL_KIRA[profil];
+        const sinir = enUzunKira(havuz, esZamanli, gunlukTekil, pencereSaat);
+
+        if (sinir === Infinity) {
+          return {
+            saat: istenen.saat,
+            ad: istenen.ad,
+            gerekce: istenen.not,
+            sinir: null,
+            kisitlandi: false,
+          };
+        }
+        if (istenen.saat <= sinir) {
+          return {
+            saat: istenen.saat,
+            ad: istenen.ad,
+            gerekce: `${istenen.not} Havuz bu süreyi kaldırıyor: hesaplanan üst sınır ${bicimSaat(sinir)}.`,
+            sinir,
+            kisitlandi: false,
+          };
+        }
+        /* Uygulanabilir en kısa kira. Daha kısası teknik olarak yazılabilir
+           ama işletilemez: istemci kiranın yarısında yenileme ister, yani
+           15 dakikalık kira her cihazdan 7–8 dakikada bir istek demektir.
+           Sunucu yükü ve kablosuz ağlarda yeniden ilişkilendirme gürültüsü
+           bu noktadan sonra kabul edilemez düzeye çıkar. */
+        const EN_KISA_KIRA = 0.25;
+
+        if (sinir < EN_KISA_KIRA) {
+          /* Ya havuz sürekli bağlı cihazları bile tutamıyor ya da hesaplanan
+             üst sınır uygulanabilir en kısa kiranın altında. İki durumda da
+             kira süresiyle oynamak çare değil: adresler ayrılan cihazlarda
+             değil, havuzun mutlak darlığında tükeniyor. */
+          return {
+            saat: EN_KISA_KIRA,
+            ad: bicimSaat(EN_KISA_KIRA),
+            gerekce:
+              (havuz <= esZamanli
+                ? 'Havuz, sürekli bağlı cihazları bile karşılamıyor. '
+                : `Hesaplanan üst sınır ${bicimSaat(sinir)}; bu, uygulanabilir en kısa kira ` +
+                  `süresi olan ${bicimSaat(EN_KISA_KIRA)}'nın da altında. `) +
+              'Kira süresini kısaltmak bu durumu düzeltmez — istemciler kiranın yarısında ' +
+              'yenileme istediği için çok kısa süreler sunucuyu ve kablosuz ağı gereksiz ' +
+              'yükler. Ağın genişletilmesi ya da cihazların birden çok alt ağa bölünmesi ' +
+              'gerekiyor. Aşağıdaki süre yalnızca bir yer tutucudur.',
+            sinir,
+            kisitlandi: true,
+            yetersiz: true,
+          };
+        }
+
+        // Üst sınırın altında, alışılmış bir değere yuvarla
+        const adaylar = [0.5, 1, 2, 4, 8, 12, 24, 48, 72, 96, 168, 192, 336, 720];
+        const secilen = [...adaylar].reverse().find((a) => a <= sinir * 0.8) ?? EN_KISA_KIRA;
+        return {
+          saat: secilen,
+          ad: bicimSaat(secilen),
+          gerekce:
+            `Profil için alışılmış süre ${istenen.ad}, ama bu havuzda tükenme yaratır: ` +
+            `hesaplanan üst sınır ${bicimSaat(sinir)}. Sınırın %80'inde kalacak biçimde ` +
+            `${bicimSaat(secilen)} seçildi; kalan pay tepe saatlerdeki dalgalanma içindir.`,
+          sinir,
+          kisitlandi: true,
+        };
+      }
+
+      function bicimSaat(saat) {
+        if (!isFinite(saat)) return 'sınırsız';
+        if (saat < 1) return `${Math.round(saat * 60)} dakika`;
+        if (saat < 48) return `${Math.round(saat * 10) / 10} saat`;
+        const gun = saat / 24;
+        return `${Math.round(gun * 10) / 10} gün`;
+      }
+
+      /* ---------------- yük devretme ---------------- */
+      function failoverPlani(tur, havuz, gereken) {
+        if (tur === 'yok') {
+          return {
+            baslik: 'Tek sunucu',
+            aciklama:
+              'DHCP sunucusu erişilemez olduğunda mevcut kiralar süreleri boyunca çalışmayı sürdürür, ' +
+              'ama yeni cihaz adres alamaz ve kirası biten cihaz ağdan düşer. Kira süresi ne kadar ' +
+              'uzunsa kesintiyi o kadar uzun süre fark etmezsiniz — bu, uzun kiranın tek gerçek yararıdır.',
+            gereken: null,
+          };
+        }
+        if (tur === 'denge') {
+          return {
+            baslik: 'Yük dengeleme (50/50)',
+            aciklama:
+              'İki sunucu istekleri paylaşır. Eş erişilemez olduğunda hayatta kalan sunucu "partner down" ' +
+              'durumuna geçer ve MCLT (Maximum Client Lead Time, öntanımlı 1 saat) dolduktan sonra tüm ' +
+              'havuzu kullanabilir. O bir saat boyunca yalnızca kendi payından dağıtır — bu yüzden ' +
+              'havuz, tek sunucunun payıyla bile kritik anı geçirebilecek kadar geniş olmalı.',
+            gereken:
+              `Tek sunucunun payı ${Math.ceil(havuz / 2)} adres; MCLT penceresinde bu sayı ` +
+              `${gereken} adreslik ihtiyacı ${Math.ceil(havuz / 2) >= gereken ? 'karşılıyor' : 'KARŞILAMIYOR'}.`,
+          };
+        }
+        return {
+          baslik: 'Etkin–yedek',
+          aciklama:
+            'Etkin sunucu tüm istekleri karşılar; yedek sunucuya havuzun küçük bir dilimi (öntanımlı %5) ' +
+            'ayrılır ve yalnızca devralma sırasında kullanılır. Devralma otomatikse yedek, MCLT sonrası ' +
+            'havuzun tamamına erişir.',
+          gereken:
+            `Yedeğe ayrılan %5 ≈ ${Math.ceil(havuz * 0.05)} adres. Devralma anında yeni cihaz akını ` +
+            `bekleniyorsa bu oran yükseltilmeli.`,
+        };
+      }
+
+      /* ---------------- uyarılar ---------------- */
+      function uyarilar(g, hesap) {
+        const liste = [];
+
+        if (hesap.doluluk > 80) {
+          liste.push(
+            `Havuz doluluğu %${hesap.doluluk.toFixed(0)}. %80 üzerinde tek bir etkinlik ` +
+              '(misafir kalabalığı, yeni cihaz partisi) havuzu bitirir. Ya daha geniş bir ağ ' +
+              'ya da daha kısa kira gerekiyor.'
+          );
+        }
+        if (hesap.gereken > hesap.havuz) {
+          liste.push(
+            `Havuz yetmiyor: ${hesap.havuz} adres var, ${hesap.gereken} gerekiyor. ` +
+              `Ağı /${Math.max(1, hesap.onerilenUzunluk)} genişletmek ${hesap.onerilenHavuz} adres verir.`
+          );
+        }
+        if (g.profil === 'misafir' && hesap.kira.saat > 8) {
+          liste.push(
+            'Misafir ağında uzun kira, havuzu ayrılmış cihazlarla doldurur. Ayrıca aynı adresi ' +
+              'gün içinde farklı kişilere veren bir ağda uzun kira, günlük kayıtlarında adres–kişi ' +
+              'eşlemesini zorlaştırır.'
+          );
+        }
+        if (g.failover !== 'yok') {
+          liste.push(
+            'Yük devretme ilişkisi kurulduğunda iki sunucunun saatleri en fazla bir dakika sapmalı. ' +
+              'Windows DHCP yük devretmesi zaman farkına duyarlıdır ve fark büyüdüğünde ilişki ' +
+              'kendiliğinden bozulur.'
+          );
+          liste.push(
+            'Kapsam seçenekleri (DNS, ağ geçidi, NTP) iki sunucuda da aynı olmalı. Yük devretme ' +
+              'yalnızca kiraları eşitler, seçenekleri değil — bu, sessizce yanlış DNS dağıtan ' +
+              'ikinci sunucuların klasik nedenidir.'
+          );
+        }
+        liste.push(
+          'DHCP sunucusu farklı bir alt ağdaysa yönlendiricide DHCP aktarımı (ip helper-address) ' +
+            'tanımlı olmalı. Aktarım yoksa istemci hiç yanıt almaz; sorun DHCP sunucusunda ' +
+            'aranırken çoğu zaman yönlendiricidedir.'
+        );
+        liste.push(
+          'Çakışma algılamayı 1–2 denemeye ayarlayın. Sunucu adresi dağıtmadan önce ping atar; ' +
+            'bu, elle verilmiş ve havuzdan çıkarılmamış adresleri yakalar. Bedeli her dağıtımda ' +
+            'birkaç yüz milisaniyedir.'
+        );
+        if (g.profil === 'ofis' || g.profil === 'uretim') {
+          liste.push(
+            'DNS güncellemesini DHCP sunucusunun yapmasını istiyorsanız ayrılmış bir hizmet hesabı ' +
+              'tanımlayın. Sunucu hesabıyla güncelleme yapıldığında kayıtların sahipliği sunucuda ' +
+              'kalır ve ikinci DHCP sunucusu aynı kaydı güncelleyemez.'
+          );
+        }
+        if (g.profil === 'uretim' || g.profil === 'sunucu') {
+          liste.push(
+            'Ağdan önyükleme (PXE) varsa 66 ve 67 numaralı seçenekler UEFI ve eski BIOS istemcilerinde ' +
+              'farklı önyükleme dosyaları ister. Tek bir değer ikisini birden karşılamaz; istemci ' +
+              'sınıfına göre ayrı ilke tanımlayın.'
+          );
+        }
+        return liste;
+      }
+
+      /* ---------------- komutlar ---------------- */
+      function komutUret(g, h) {
+        const kiraSaniye = Math.round(h.kira.saat * 3600);
+        const gun = Math.floor(kiraSaniye / 86400);
+        const saat = Math.floor((kiraSaniye % 86400) / 3600);
+        const dakika = Math.floor((kiraSaniye % 3600) / 60);
+
+        const satirlar = [
+          '# --- Windows Server DHCP ---',
+          `Add-DhcpServerv4Scope -Name "${h.ad}" \``,
+          `  -StartRange ${h.havuzBas} -EndRange ${h.havuzSon} \``,
+          `  -SubnetMask ${h.maske} \``,
+          `  -LeaseDuration ${gun}.${String(saat).padStart(2, '0')}:${String(dakika).padStart(2, '0')}:00 \``,
+          '  -State Active',
+          '',
+          '# Sabit adres bloğu havuzun dışında tutulduğu için ayrıca dışlamaya gerek yok,',
+          '# ama havuz içinde elle verilmiş adres varsa dışlanmalı:',
+          `# Add-DhcpServerv4ExclusionRange -ScopeId ${h.agAdresi} -StartRange ... -EndRange ...`,
+          '',
+          `Set-DhcpServerv4OptionValue -ScopeId ${h.agAdresi} \``,
+          `  -Router ${h.agGecidi} \``,
+          '  -DnsServer 10.0.0.10, 10.0.0.11 \\',
+          '  -DnsDomain "ornek.local"',
+          '',
+          '# Çakışma algılama: elle verilip havuzdan çıkarılmamış adresleri yakalar',
+          'Set-DhcpServerv4DnsSetting -ComputerName $env:COMPUTERNAME -DynamicUpdates OnClientRequest',
+          'Set-DhcpServerSetting -ConflictDetectionAttempts 2',
+          '',
+        ];
+
+        if (g.failover === 'denge') {
+          satirlar.push(
+            '# Yük devretme — yük dengeleme',
+            `Add-DhcpServerv4Failover -Name "${h.ad}-failover" \``,
+            `  -PartnerServer dhcp02.ornek.local -ScopeId ${h.agAdresi} \``,
+            '  -LoadBalancePercent 50 -MaxClientLeadTime 01:00:00 \\',
+            '  -AutoStateTransition $true -StateSwitchInterval 01:00:00 \\',
+            '  -SharedSecret (Read-Host "Paylaşılan sır" -AsSecureString)',
+            ''
+          );
+        } else if (g.failover === 'yedek') {
+          satirlar.push(
+            '# Yük devretme — etkin–yedek',
+            `Add-DhcpServerv4Failover -Name "${h.ad}-failover" \``,
+            `  -PartnerServer dhcp02.ornek.local -ScopeId ${h.agAdresi} \``,
+            '  -ServerRole Active -ReservePercent 5 -MaxClientLeadTime 01:00:00 \\',
+            '  -AutoStateTransition $true -StateSwitchInterval 01:00:00 \\',
+            '  -SharedSecret (Read-Host "Paylaşılan sır" -AsSecureString)',
+            ''
+          );
+        }
+
+        satirlar.push(
+          '# Doğrulama: havuz doluluğu izlenmeli, doluluk sessizce artar',
+          `Get-DhcpServerv4ScopeStatistics -ScopeId ${h.agAdresi} |`,
+          '  Select-Object ScopeId, Free, InUse, PercentageInUse',
+          '',
+          '# --- Yönlendirici (DHCP sunucusu başka alt ağdaysa) ---',
+          '# Cisco IOS',
+          `interface Vlan${g.vlan ?? 'X'}`,
+          ` ip address ${h.agGecidi} ${h.maske}`,
+          ' ip helper-address 10.0.0.10',
+          ' ip helper-address 10.0.0.11',
+          '!',
+          '# İki adres yazmak yük devretmenin çalışması için gereklidir:',
+          '# yönlendirici isteği ikisine birden aktarır, biri yanıtlamazsa diğeri yanıtlar.'
+        );
+
+        return satirlar.join('\n');
+      }
+
+      /* ---------------- hesap ---------------- */
+      function hesapla(g) {
+        const cidr = cidrCoz(g.cidr);
+        if (!cidr) return null;
+
+        const konak = konakSayisi(cidr.uzunluk, cidr.boyut);
+        const agAdresi = metneCevir(cidr.ag);
+        const maske = metneCevir(cidr.uzunluk === 0 ? 0 : (0xffffffff << (32 - cidr.uzunluk)) >>> 0);
+        const agGecidi = metneCevir(cidr.ag + 1);
+
+        // Sabit blok: ağ geçidi dahil, alt uçta tutulur
+        const sabitBlok = Math.max(1, g.sabit);
+        const havuz = Math.max(0, konak - sabitBlok);
+
+        const buyumeCarpani = 1 + g.buyume / 100;
+        const esZamanli = Math.ceil(g.esZamanli * buyumeCarpani);
+        const gunlukTekil = Math.ceil(g.gunlukTekil * buyumeCarpani);
+
+        const kira = kiraOner(g.profil, havuz, esZamanli, gunlukTekil, g.pencere);
+        const gereken = tutulanAdres(esZamanli, gunlukTekil, g.pencere, kira.saat);
+        const doluluk = havuz > 0 ? (gereken / havuz) * 100 : 100;
+
+        // Yetmiyorsa hangi önek yeterdi?
+        let onerilenUzunluk = cidr.uzunluk;
+        let onerilenHavuz = havuz;
+        while (onerilenUzunluk > 8 && onerilenHavuz < gereken * 1.25) {
+          onerilenUzunluk--;
+          onerilenHavuz = konakSayisi(onerilenUzunluk, 2 ** (32 - onerilenUzunluk)) - sabitBlok;
+        }
+
+        const havuzBasSayi = cidr.ag + sabitBlok + 1;
+        const havuzSonSayi = cidr.ag + cidr.boyut - 2;
+
+        return {
+          ad: `${agAdresi}_${cidr.uzunluk}`,
+          agAdresi,
+          maske,
+          agGecidi,
+          uzunluk: cidr.uzunluk,
+          toplam: cidr.boyut,
+          konak,
+          sabitBlok,
+          havuz,
+          havuzBas: metneCevir(havuzBasSayi),
+          havuzSon: metneCevir(havuzSonSayi),
+          sabitBas: metneCevir(cidr.ag + 1),
+          sabitSon: metneCevir(cidr.ag + sabitBlok),
+          yayin: metneCevir(cidr.ag + cidr.boyut - 1),
+          esZamanli,
+          gunlukTekil,
+          kira,
+          gereken,
+          doluluk,
+          onerilenUzunluk,
+          onerilenHavuz,
+        };
+      }
+
+      /* ================= arayüz ================= */
+      const kacir = (m) =>
+        String(m).replace(/[&<>]/g, (k) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;' })[k]);
+      const sayi = (n) => n.toLocaleString('tr-TR');
+
+      function ciz() {
+        const g = {
+          cidr: el('#d-cidr').value,
+          profil: el('#d-profil').value,
+          sabit: Math.max(0, +el('#d-sabit').value || 0),
+          esZamanli: Math.max(0, +el('#d-eszamanli').value || 0),
+          gunlukTekil: Math.max(0, +el('#d-gunluk').value || 0),
+          pencere: Math.max(1, +el('#d-pencere').value || 1),
+          buyume: Math.max(0, +el('#d-buyume').value || 0),
+          failover: el('#d-failover').value,
+        };
+
+        const durum = el('#d-durum');
+        const h = hesapla(g);
+        if (!h) {
+          durum.className = 'arac-durum hata';
+          durum.textContent = 'Ağı 10.20.30.0/24 biçiminde girin.';
+          return;
+        }
+
+        el('#d-butce').innerHTML = [
+          ['Ağdaki toplam adres', sayi(h.toplam), `/${h.uzunluk} öneki`],
+          ['Kullanılabilir konak', sayi(h.konak), 'ağ ve yayın adresleri düşüldü'],
+          ['Sabit adres bloğu', sayi(h.sabitBlok), `${h.sabitBas} – ${h.sabitSon}`],
+          ['DHCP havuzu', sayi(h.havuz), `${h.havuzBas} – ${h.havuzSon}`],
+          ['Gereken adres', sayi(h.gereken), `${h.kira.ad} kira ile, büyüme payı dahil`],
+          [
+            'Doluluk',
+            `%${h.doluluk.toFixed(0)}`,
+            h.doluluk > 80 ? 'eşiğin üzerinde' : 'kabul edilebilir',
+          ],
+        ]
+          .map(
+            ([ad, deger, alt], i) =>
+              `<div class="d-kart${i === 5 && h.doluluk > 80 ? ' d-kart-uyari' : ''}">` +
+              `<span class="d-kart-ad">${kacir(ad)}</span>` +
+              `<b>${kacir(deger)}</b><span class="d-kart-alt">${kacir(alt)}</span></div>`
+          )
+          .join('');
+
+        const oran = Math.min(100, h.doluluk);
+        el('#d-cubuk').innerHTML =
+          `<div class="d-dolu${h.doluluk > 80 ? ' d-dolu-uyari' : ''}" style="width:${oran}%"></div>` +
+          `<div class="d-esik" style="left:80%" title="%80 eşiği"></div>`;
+        el('#d-cubuk-not').textContent =
+          `${sayi(h.gereken)} / ${sayi(h.havuz)} adres. Çizgi %80 eşiğini gösteriyor: ` +
+          'bu noktadan sonra tek bir olağandışı gün havuzu bitirebilir.';
+
+        const fo = failoverPlani(g.failover, h.havuz, h.gereken);
+        el('#d-kira').innerHTML =
+          `<div class="d-kira-ana"><span>Önerilen kira süresi</span><b>${kacir(h.kira.ad)}</b></div>` +
+          `<p>${kacir(h.kira.gerekce)}</p>` +
+          (h.kira.sinir !== null && isFinite(h.kira.sinir)
+            ? `<p class="d-hesap">Üst sınır hesabı: havuz ${sayi(h.havuz)} adres, sürekli bağlı ` +
+              `${sayi(h.esZamanli)} cihaz kalıcı olarak adres tutuyor. Geriye ${sayi(h.havuz - h.esZamanli)} ` +
+              `adres kalıyor ve gün içinde gelip giden ${sayi(Math.max(0, h.gunlukTekil - h.esZamanli))} ` +
+              `cihaz ${g.pencere} saate yayılıyor — saatte ` +
+              `${((Math.max(0, h.gunlukTekil - h.esZamanli)) / g.pencere).toFixed(1)} cihaz. ` +
+              `Bu hızda ${bicimSaat(h.kira.sinir)} sonunda havuz dolar.</p>`
+            : '<p class="d-hesap">Gelip giden cihaz olmadığı için kira süresi havuzu tüketmiyor; ' +
+              'süre adres kararlılığına göre seçilebilir.</p>') +
+          `<div class="d-fo"><b>${kacir(fo.baslik)}</b><p>${kacir(fo.aciklama)}</p>` +
+          (fo.gereken ? `<p class="d-hesap">${kacir(fo.gereken)}</p>` : '') +
+          '</div>';
+
+        el('#d-duzen').innerHTML =
+          '<thead><tr><th>Aralık</th><th>Kullanım</th><th>Adet</th><th>Not</th></tr></thead><tbody>' +
+          [
+            [h.agAdresi, 'Ağ adresi', '1', 'Konağa verilemez'],
+            [
+              `${h.sabitBas} – ${h.sabitSon}`,
+              'Sabit adresler',
+              sayi(h.sabitBlok),
+              'Ağ geçidi, anahtarlar, yazıcılar. Havuzun dışında.',
+            ],
+            [
+              `${h.havuzBas} – ${h.havuzSon}`,
+              'DHCP havuzu',
+              sayi(h.havuz),
+              'DHCP ayırmaları da bu aralıkta tanımlanır.',
+            ],
+            [h.yayin, 'Yayın adresi', '1', 'Konağa verilemez'],
+          ]
+            .map(
+              ([a, b, c, d]) =>
+                `<tr><td><code>${kacir(a)}</code></td><td>${kacir(b)}</td>` +
+                `<td>${kacir(c)}</td><td class="d-not">${kacir(d)}</td></tr>`
+            )
+            .join('') +
+          '</tbody>';
+
+        el('#d-komut').textContent = komutUret(g, h);
+
+        const uy = uyarilar(g, h);
+        el('#d-uyarilar').innerHTML = uy.map((x) => `<li>${kacir(x)}</li>`).join('');
+
+        durum.className =
+          'arac-durum ' + (h.gereken > h.havuz ? 'hata' : h.doluluk > 80 ? 'uyari' : 'ok');
+        durum.textContent =
+          h.gereken > h.havuz
+            ? `Havuz yetmiyor: ${sayi(h.havuz)} adres var, ${sayi(h.gereken)} gerekiyor. ` +
+              `/${h.onerilenUzunluk} öneki ${sayi(h.onerilenHavuz)} adres verirdi.`
+            : h.doluluk > 80
+              ? `Havuz sığıyor ama doluluk %${h.doluluk.toFixed(0)}; büyüme payı tükenmek üzere.`
+              : `${sayi(h.havuz)} adreslik havuz, ${h.kira.ad} kira ile ${sayi(h.gereken)} adres ` +
+                `tutulacak — %${h.doluluk.toFixed(0)} doluluk.`;
+      }
+
+      document
+        .querySelectorAll('#d-cidr, #d-profil, #d-sabit, #d-eszamanli, #d-gunluk, #d-pencere, #d-buyume, #d-failover')
+        .forEach((d) => {
+          d.addEventListener('input', ciz);
+          d.addEventListener('change', ciz);
+        });
+
+      document.querySelectorAll('.kopyala').forEach((d) => {
+        d.addEventListener('click', async () => {
+          try {
+            await navigator.clipboard.writeText(el(`#${d.dataset.kaynak}`).textContent);
+            d.textContent = 'Kopyalandı';
+            setTimeout(() => (d.textContent = 'Kopyala'), 1600);
+          } catch {
+            /* pano izni yoksa kullanıcı elle seçer */
+          }
+        });
+      });
+
+      ciz();
+    })();
+  </script>
+
+  <style>
+    .d-kartlar {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(min(190px, 100%), 1fr));
+      gap: 10px;
+      margin-bottom: 16px;
+    }
+    .d-kart {
+      border: 1px solid var(--line);
+      border-radius: 11px;
+      padding: 12px 14px;
+      background: var(--paper);
+      display: grid;
+      gap: 2px;
+      min-width: 0;
+    }
+    .d-kart-uyari {
+      border-color: light-dark(#d97706, #f59e0b);
+    }
+    .d-kart-ad {
+      font-size: 11.5px;
+      color: var(--muted);
+    }
+    .d-kart b {
+      font-size: 21px;
+      line-height: 1.15;
+    }
+    .d-kart-alt {
+      font-size: 11.5px;
+      color: var(--muted);
+      line-height: 1.4;
+    }
+    .d-cubuk {
+      position: relative;
+      height: 14px;
+      border-radius: 999px;
+      background: var(--tint);
+      overflow: hidden;
+      border: 1px solid var(--line);
+    }
+    .d-dolu {
+      height: 100%;
+      background: light-dark(#2563eb, #3b82f6);
+      transition: width 0.2s;
+    }
+    .d-dolu-uyari {
+      background: light-dark(#d97706, #f59e0b);
+    }
+    .d-esik {
+      position: absolute;
+      top: 0;
+      bottom: 0;
+      width: 2px;
+      background: light-dark(#0f172a, #e2e8f0);
+      opacity: 0.55;
+    }
+    .d-kira {
+      border: 1px solid var(--line);
+      border-radius: 12px;
+      padding: 16px 18px;
+      background: var(--paper);
+    }
+    .d-kira-ana {
+      display: flex;
+      align-items: baseline;
+      gap: 12px;
+      flex-wrap: wrap;
+      margin-bottom: 10px;
+    }
+    .d-kira-ana span {
+      font-size: 12px;
+      color: var(--muted);
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+    }
+    .d-kira-ana b {
+      font-size: 24px;
+      color: var(--indigo-metin);
+    }
+    .d-kira p {
+      font-size: 13.5px;
+      line-height: 1.62;
+      color: var(--ink-soft);
+      margin: 0 0 9px;
+    }
+    .d-hesap {
+      border-left: 2px solid var(--line);
+      padding-left: 12px;
+      font-size: 13px;
+    }
+    .d-fo {
+      margin-top: 14px;
+      padding-top: 14px;
+      border-top: 1px solid var(--line);
+    }
+    .d-fo b {
+      font-size: 14px;
+      display: block;
+      margin-bottom: 6px;
+    }
+    .d-tablo-kap {
+      overflow-x: auto;
+    }
+    .d-tablo {
+      width: 100%;
+      min-width: 620px;
+      border-collapse: collapse;
+      font-size: 13px;
+    }
+    .d-tablo th,
+    .d-tablo td {
+      text-align: left;
+      padding: 9px 12px;
+      border-bottom: 1px solid var(--line);
+      vertical-align: top;
+    }
+    .d-tablo th {
+      font-size: 12px;
+      color: var(--muted);
+      font-weight: 600;
+    }
+    .d-not {
+      color: var(--ink-soft);
+      line-height: 1.55;
+    }
+    .d-cikti {
+      max-height: 520px;
+      overflow: auto;
+    }
+    .d-ipuclari {
+      list-style: none;
+      margin: 0;
+      padding: 0;
+      display: grid;
+      gap: 12px;
+    }
+    .d-ipuclari li {
+      font-size: 13.5px;
+      line-height: 1.62;
+      color: var(--ink-soft);
+      border-left: 2px solid var(--line);
+      padding-left: 13px;
+    }
+  </style>
+</Base>

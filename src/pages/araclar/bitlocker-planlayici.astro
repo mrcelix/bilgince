@@ -1,0 +1,831 @@
+---
+import Base from '../../layouts/Base.astro';
+---
+
+<Base
+  baslik="BitLocker dağıtım planlayıcı"
+  aciklama="Cihaz türü, TPM durumu ve kimlik altyapınıza göre koruyucu bileşimini, kurtarma anahtarı saklama yerini, GPO ayarlarını ve komutları üretir."
+  aramaya={true}
+  kategori="Araç"
+>
+  <div class="arama-bas">
+    <div class="kap">
+      <nav class="kirinti" aria-label="Kırıntı yolu" style="padding-top:0">
+        <a href="/">Ana sayfa</a><span class="ayrac">/</span><a href="/araclar">Araçlar</a><span
+          class="ayrac">/</span
+        ><span aria-current="page">BitLocker planlayıcı</span>
+      </nav>
+      <h1>BitLocker dağıtım planlayıcı</h1>
+      <p style="color:var(--muted);font-size:14px;margin-top:8px;max-width:70ch">
+        BitLocker'ı açmak kolaydır; sorun bir yıl sonra bir bellenim güncellemesinden sonra
+        kurtarma ekranıyla karşılaşıp anahtarı bulamadığınızda çıkar. Bu araç cihaz türü,
+        TPM durumu ve kimlik altyapınıza göre hangi koruyucu bileşiminin gerektiğini,
+        anahtarın nereye yedekleneceğini ve hangi işlemlerin kurtarma ekranı tetikleyeceğini
+        söyler.
+      </p>
+    </div>
+  </div>
+
+  <div class="kap arac-sayfa">
+    <section class="arac-blok">
+      <h2 class="arac-h2"><span class="arac-no">1</span> Ortam</h2>
+      <div class="arac-alanlar">
+        <label class="arac-alan"
+          >Cihaz türü
+          <select id="b-cihaz">
+            <option value="dizustu" selected>Dizüstü — cihaz sahadan çıkıyor</option>
+            <option value="masaustu">Masaüstü — ofiste sabit</option>
+            <option value="sunucu">Fiziksel sunucu — kilitli kabinet</option>
+            <option value="sanal">Sanal makine</option>
+            <option value="kiosk">Kiosk / vardiya cihazı — ortak kullanım</option>
+          </select>
+        </label>
+        <label class="arac-alan"
+          >TPM
+          <select id="b-tpm">
+            <option value="2.0" selected>TPM 2.0 var</option>
+            <option value="1.2">TPM 1.2 var</option>
+            <option value="yok">TPM yok ya da devre dışı</option>
+          </select>
+        </label>
+        <label class="arac-alan"
+          >Kimlik altyapısı
+          <select id="b-kimlik">
+            <option value="ad" selected>Etki alanı (AD DS)</option>
+            <option value="hibrit">Hibrit — AD + Entra ID</option>
+            <option value="entra">Yalnızca Entra ID (Intune)</option>
+            <option value="yok">Çalışma grubu — merkezî yönetim yok</option>
+          </select>
+        </label>
+        <label class="arac-alan"
+          >Disk durumu
+          <select id="b-disk">
+            <option value="yeni" selected>Yeni kurulum — disk hiç kullanılmadı</option>
+            <option value="kullanilmis">Kullanımdaki cihaz — disk daha önce doluydu</option>
+          </select>
+        </label>
+        <label class="arac-alan"
+          >Veri hassasiyeti
+          <select id="b-hassasiyet">
+            <option value="normal" selected>Normal kurumsal veri</option>
+            <option value="yuksek">Kişisel veri / düzenlemeye tabi</option>
+          </select>
+        </label>
+        <label class="arac-alan"
+          >Uzaktan yeniden başlatma gerekiyor mu?
+          <select id="b-uzaktan">
+            <option value="hayir" selected>Hayır — kullanıcı başında</option>
+            <option value="evet">Evet — yamalar gece uygulanıyor</option>
+          </select>
+        </label>
+      </div>
+      <p class="arac-durum" id="b-durum" role="status" aria-live="polite"></p>
+    </section>
+
+    <section class="arac-blok">
+      <h2 class="arac-h2"><span class="arac-no">2</span> Karar</h2>
+      <div class="b-kartlar" id="b-kararlar"></div>
+    </section>
+
+    <section class="arac-blok">
+      <h2 class="arac-h2"><span class="arac-no">3</span> Grup ilkesi ayarları</h2>
+      <p class="arac-not" style="margin-top:0" id="b-gpo-not"></p>
+      <div class="b-tablo-kap">
+        <table class="b-tablo" id="b-gpo"></table>
+      </div>
+    </section>
+
+    <section class="arac-blok">
+      <h2 class="arac-h2"><span class="arac-no">4</span> Komutlar</h2>
+      <div style="position:relative">
+        <pre class="kod b-cikti"><code id="b-komut"></code></pre>
+        <button class="kopyala" type="button" data-kaynak="b-komut">Kopyala</button>
+      </div>
+    </section>
+
+    <section class="arac-blok">
+      <h2 class="arac-h2"><span class="arac-no">5</span> Kurtarma ekranı tetikleyicileri</h2>
+      <p class="arac-not" style="margin-top:0">
+        Aşağıdaki işlemler yapılırken BitLocker askıya alınmazsa cihaz açılışta kurtarma
+        anahtarı ister. Kullanıcı anahtarı bulamazsa cihaz kullanılamaz hâle gelir — bu,
+        BitLocker dağıtımlarında en sık yaşanan olaydır.
+      </p>
+      <div class="b-tablo-kap">
+        <table class="b-tablo" id="b-riskler"></table>
+      </div>
+    </section>
+
+    <section class="arac-blok">
+      <h2 class="arac-h2"><span class="arac-no">6</span> Dağıtımdan önce</h2>
+      <ol class="b-liste" id="b-onkosul"></ol>
+    </section>
+  </div>
+
+  <script>
+    (() => {
+      const el = (s) => document.querySelector(s);
+
+      /* ---------------------------------------------------------------
+         Koruyucu seçimi.
+
+         TPM tek başına diski çalınmaya karşı korur, açılan cihaza karşı
+         korumaz: makineyi bulan kişi düğmeye bastığında Windows açılır,
+         çünkü TPM bütünlük ölçümleri tuttuğu sürece anahtarı kendiliğinden
+         verir. Önyükleme öncesi kimlik doğrulaması (PIN ya da USB) tam da
+         bu boşluğu kapatır. Bu yüzden karar "TPM var mı" değil, "cihaz
+         gözetimsiz kalıyor mu" sorusuna bağlanır.
+      --------------------------------------------------------------- */
+      function koruyucuSec(g) {
+        const gerekce = [];
+        const uyarilar = [];
+        let ana;
+
+        const gozetimsiz = g.cihaz === 'dizustu' || g.cihaz === 'kiosk';
+        const fizikselGuvenli = g.cihaz === 'sunucu' || g.cihaz === 'masaustu';
+
+        if (g.tpm === 'yok') {
+          ana = 'Parola koruyucu (başlangıç parolası)';
+          gerekce.push(
+            'TPM olmadığı için donanıma bağlı koruyucu kurulamaz; anahtar yalnızca kullanıcının ' +
+              'bildiği bir sırla korunabilir.'
+          );
+          uyarilar.push(
+            'TPM olmadan BitLocker öntanımlı olarak açılmaz. "TPM olmadan BitLocker\'a izin ver" ' +
+              'ilkesi etkinleştirilmeli.'
+          );
+          uyarilar.push(
+            'Parola koruyucu kaba kuvvete TPM kadar dayanıklı değildir: TPM yanlış denemeleri ' +
+              'sayıp kilitlenirken, parola çevrimdışı denenebilir. Parola en az 12 karakter olmalı.'
+          );
+          if (g.tpm === 'yok' && g.cihaz === 'sanal') {
+            uyarilar.push(
+              'Sanal makinelerde çözüm sanal TPM eklemektir: Hyper-V 2. nesil makinelerde ' +
+                'Güvenlik sekmesinden TPM etkinleştirilir. Bu, ana makinede Ana Bilgisayar ' +
+                'Koruyucu hizmeti ya da yerel anahtar koruyucu gerektirir.'
+            );
+          }
+        } else if (gozetimsiz || g.hassasiyet === 'yuksek') {
+          ana = 'TPM + PIN';
+          gerekce.push(
+            gozetimsiz
+              ? 'Cihaz gözetimsiz kalabildiği için önyükleme öncesi kimlik doğrulaması şart. ' +
+                  'TPM tek başına kullanıldığında cihazı bulan kişi düğmeye basınca masaüstüne kadar gelir.'
+              : 'Düzenlemeye tabi veride önyükleme öncesi doğrulama, doğrudan bellek erişimi ve ' +
+                  'soğuk önyükleme saldırılarına karşı tek pratik savunmadır.'
+          );
+          if (g.tpm === '1.2') {
+            uyarilar.push(
+              'TPM 1.2 yalnızca SHA-1 destekler ve Secure Boot ile PCR 7 profilini kullanamaz. ' +
+                'Çalışır, ama cihaz yenileme planına alınmalı.'
+            );
+          }
+          if (g.cihaz === 'kiosk') {
+            uyarilar.push(
+              'Ortak kullanılan cihazda PIN de ortak olur ve zamanla herkes tarafından bilinir. ' +
+                'Gerçek koruma isteniyorsa kişiselleştirilmiş TPM + USB anahtar ya da ' +
+                'cihaz başına ayrı PIN gerekir.'
+            );
+          }
+        } else if (fizikselGuvenli) {
+          ana = 'Yalnızca TPM';
+          gerekce.push(
+            'Cihaz fiziksel olarak korunan bir alanda kaldığı için asıl tehdit diskin sökülüp ' +
+              'başka makinede okunmasıdır; TPM tek başına bunu engeller.'
+          );
+          gerekce.push(
+            'Kullanıcıdan bir şey istenmediği için yardım masası yükü ve unutulan PIN sorunu oluşmaz.'
+          );
+          uyarilar.push(
+            'Yalnızca TPM, açık cihaza karşı koruma sağlamaz. Kabinet kilidi ya da ofis erişim ' +
+              'denetimi bu kararın dayanağıdır; o denetim zayıflarsa karar da geçersizleşir.'
+          );
+        } else {
+          ana = 'TPM + PIN';
+          gerekce.push('Cihaz türü belirsiz kaldığında güvenli varsayılan önyükleme öncesi doğrulamadır.');
+        }
+
+        // Uzaktan yeniden başlatma PIN ile çakışır
+        let cozum = null;
+        if (g.uzaktan === 'evet' && ana.includes('PIN')) {
+          cozum =
+            'PIN gereken cihaz uzaktan yeniden başlatılırsa kullanıcı gelene kadar açılış ekranında bekler. ' +
+            'İki çözüm var: kurumsal ağda Ağ Kilidi Açma (Network Unlock) kurmak — WDS rolü, DHCP ve ' +
+            'bir sertifika gerektirir, cihaz güvenilen ağdayken PIN sorulmadan açılır — ya da yamayı ' +
+            'yeniden başlatma gerektirmeyecek şekilde planlayıp yeniden başlatmayı kullanıcıya bırakmak.';
+          uyarilar.push(
+            'Ağ Kilidi Açma yalnızca kablolu ağda ve UEFI DHCP sürücüsü olan cihazlarda çalışır; ' +
+              'kablosuzla bağlanan dizüstülerde işe yaramaz.'
+          );
+        }
+
+        return { ana, gerekce, uyarilar, cozum };
+      }
+
+      /* ---------------------------------------------------------------
+         Şifreleme yöntemi ve kapsamı.
+
+         XTS-AES yalnızca sabit ve işletim sistemi sürücüleri içindir.
+         Taşınabilir sürücü başka bir makinede okunacaksa AES-CBC gerekir,
+         çünkü XTS eski Windows sürümlerinde çözülemez.
+      --------------------------------------------------------------- */
+      function sifrelemeSec(g) {
+        const yontem = g.hassasiyet === 'yuksek' ? 'XTS-AES 256' : 'XTS-AES 128';
+        const yontemGerekce =
+          g.hassasiyet === 'yuksek'
+            ? '256 bit, düzenlemeye tabi veride denetçilerin beklediği ayardır. Ölçülebilir başarım ' +
+              'farkı modern işlemcilerde donanım hızlandırma sayesinde ihmal edilebilir düzeydedir.'
+            : '128 bit kurumsal veri için yeterlidir ve öntanımlıdır. 256 bite geçmek için diskin ' +
+              'yeniden şifrelenmesi gerekir, bu yüzden karar baştan verilmelidir.';
+
+        const kapsam = g.disk === 'yeni' ? 'Yalnızca kullanılan alan' : 'Tüm disk';
+        const kapsamGerekce =
+          g.disk === 'yeni'
+            ? 'Disk hiç kullanılmadığı için boş alanda kurtarılabilir veri yok; yalnızca kullanılan ' +
+              'alanı şifrelemek saatler kazandırır ve sonuç aynı derecede güvenlidir.'
+            : 'Disk daha önce doluydu. Yalnızca kullanılan alan seçilirse silinmiş dosyalar boş alanda ' +
+              'şifresiz kalır ve adli araçlarla okunabilir. Bu cihazlarda tüm disk şifrelenmeli.';
+
+        return { yontem, yontemGerekce, kapsam, kapsamGerekce };
+      }
+
+      /* --------------------------------------------------------------- */
+      function kurtarmaSec(g) {
+        if (g.kimlik === 'ad') {
+          return {
+            yer: 'Active Directory bilgisayar nesnesi',
+            gerekce:
+              'Kurtarma parolası bilgisayar nesnesinin altında msFVE-RecoveryInformation olarak saklanır. ' +
+              'Yardım masası, bilgisayar nesnesini okuma yetkisiyle anahtarı bulabilir.',
+            uyari:
+              'Kritik ayar: "BitLocker kurtarma bilgileri AD DS\'de depolanana kadar BitLocker\'ı ' +
+              'etkinleştirme" seçeneği işaretlenmeli. İşaretlenmezse yedekleme başarısız olsa bile ' +
+              'şifreleme başlar ve anahtarsız cihaz üretirsiniz.',
+          };
+        }
+        if (g.kimlik === 'entra') {
+          return {
+            yer: 'Entra ID cihaz nesnesi (Intune ile)',
+            gerekce:
+              'Anahtar cihaz nesnesine yazılır; yönetici Intune ya da Entra yönetim merkezinden görür. ' +
+              'Kullanıcı da kendi cihazının anahtarını hesabından görebilir.',
+            uyari:
+              'Kullanıcının kendi anahtarını görmesi çoğu senaryoda istenir, ama düzenlemeye tabi ' +
+              'ortamlarda kapatılması gerekebilir — bu ayar Entra cihaz ayarlarındadır. Ayrıca cihaz ' +
+              'Entra\'dan silinirse anahtar da gider; cihaz nesnesi silinmeden önce anahtar dışa aktarılmalı.',
+          };
+        }
+        if (g.kimlik === 'hibrit') {
+          return {
+            yer: 'Hem AD hem Entra ID',
+            gerekce:
+              'Hibrit katılımlı cihazlarda iki yedek de tutulabilir; hangi konsolun kullanıldığından ' +
+              'bağımsız olarak anahtar bulunur.',
+            uyari:
+              'İki tarafa da yazılıyor olması ikisinin de güncel olduğu anlamına gelmez. Anahtar ' +
+              'döndürüldükten sonra iki kayıt da denetlenmeli; yalnız birine yazan cihazlar dağıtımın ' +
+              'en sinsi boşluğudur.',
+          };
+        }
+        return {
+          yer: 'Merkezî yedek yok — elle saklama',
+          gerekce:
+            'Çalışma grubunda otomatik yedekleme yapılamaz. Kurtarma parolası ayrı bir ortama ' +
+            'yazılmalı: parola kasası, kilitli dolapta basılı kopya ya da ayrı bir şifreli sürücü.',
+          uyari:
+            'Anahtarı şifrelenen cihazın kendisinde saklamak koruma sağlamaz. Diski açamayan biri ' +
+            'anahtar dosyasına da ulaşamaz — ama siz de ulaşamazsınız.',
+        };
+      }
+
+      /* --------------------------------------------------------------- */
+      function gpoUret(g) {
+        const kok = 'Bilgisayar Yapılandırması > Yönetim Şablonları > Windows Bileşenleri > BitLocker Sürücü Şifrelemesi';
+        const s = sifrelemeSec(g);
+        const koruyucu = koruyucuSec(g);
+        const satirlar = [];
+
+        satirlar.push({
+          yol: kok,
+          ayar: 'Sürücü şifreleme yöntemini ve şifre gücünü seçin (Windows 10 1511 ve üzeri)',
+          deger: `İşletim sistemi sürücüleri: ${s.yontem}`,
+          neden:
+            'Ayar şifrelemeden önce uygulanmalı. Sonradan değiştirilirse yalnızca yeni şifrelenen ' +
+            'sürücülere etki eder; mevcut cihazlar eski yöntemde kalır.',
+        });
+
+        satirlar.push({
+          yol: `${kok} > İşletim Sistemi Sürücüleri`,
+          ayar: 'Başlangıçta ek kimlik doğrulaması iste',
+          deger:
+            koruyucu.ana === 'Yalnızca TPM'
+              ? 'Etkin — TPM ile başlangıç PIN\'i: TPM\'e izin ver'
+              : koruyucu.ana === 'TPM + PIN'
+                ? 'Etkin — TPM ile başlangıç PIN\'i: PIN iste'
+                : 'Etkin — "Uyumlu TPM olmadan BitLocker\'a izin ver" işaretli',
+          neden:
+            koruyucu.ana === 'TPM + PIN'
+              ? 'PIN\'i zorunlu kılan ayar budur. İşaretlenmezse kullanıcılar PIN\'siz şifreleyebilir ' +
+                've dağıtım karışık hâle gelir.'
+              : 'Koruyucu bileşimini merkezden sabitler; kullanıcı farklı bir bileşim seçemez.',
+        });
+
+        if (g.hassasiyet === 'yuksek' || koruyucu.ana === 'TPM + PIN') {
+          satirlar.push({
+            yol: `${kok} > İşletim Sistemi Sürücüleri`,
+            ayar: 'Başlangıç PIN\'i için gelişmiş PIN\'lere izin ver',
+            deger: 'Etkin',
+            neden:
+              'Yalnızca rakam yerine harf ve simge kullanılabilmesini sağlar. Uyarı: bazı bellenimler ' +
+              'önyüklemede yalnızca sayısal tuş takımını sunar; harfli PIN girilemeyebilir. ' +
+              'Dağıtımdan önce donanımda sınayın.',
+          });
+          satirlar.push({
+            yol: `${kok} > İşletim Sistemi Sürücüleri`,
+            ayar: 'En düşük PIN uzunluğunu yapılandır',
+            deger: g.hassasiyet === 'yuksek' ? '8' : '6',
+            neden:
+              'Öntanımlı 6 hanedir. TPM yanlış denemede kilitlendiği için PIN çok uzun olmak zorunda ' +
+              'değil, ama 4 haneye düşürmek TPM kilitleme eşiğinden önce denenebilecek alanı daraltır.',
+          });
+        }
+
+        const kurtarma = kurtarmaSec(g);
+        if (g.kimlik === 'ad' || g.kimlik === 'hibrit') {
+          satirlar.push({
+            yol: `${kok} > İşletim Sistemi Sürücüleri`,
+            ayar: 'BitLocker korumalı işletim sistemi sürücüleri nasıl kurtarılabilir?',
+            deger:
+              'Etkin · "BitLocker kurtarma bilgilerini AD DS\'de depola: Kurtarma parolaları ve anahtar ' +
+              'paketleri" · "AD DS\'de depolanana kadar BitLocker\'ı etkinleştirme" işaretli',
+            neden: kurtarma.uyari,
+          });
+        }
+
+        satirlar.push({
+          yol: `${kok} > İşletim Sistemi Sürücüleri`,
+          ayar: 'İşletim sistemi sürücülerinde donanım tabanlı şifreleme kullanımını yapılandır',
+          deger: 'Devre dışı',
+          neden:
+            'Kendi kendini şifreleyen disklerin donanım şifrelemesinde ciddi kusurlar bulundu; ' +
+            'birçok modelde ana parola boş bırakılmıştı. Windows 1903\'ten beri öntanımlı olarak ' +
+            'yazılım şifrelemesi kullanılıyor, ama ayarı açıkça kapatmak eski cihazları da kapsar.',
+        });
+
+        satirlar.push({
+          yol: kok,
+          ayar: 'Sabit veri sürücülerinde şifrelemeyi zorla',
+          deger: g.hassasiyet === 'yuksek' ? 'Etkin' : 'Kuruma göre',
+          neden:
+            'İşletim sistemi sürücüsü şifreliyken ikinci bir veri diski açıkta kalabilir. Veri ' +
+            'sürücüsünün otomatik kilidi açılabilmesi için işletim sistemi sürücüsünün şifreli olması şart.',
+        });
+
+        if (g.disk === 'kullanilmis') {
+          satirlar.push({
+            yol: kok,
+            ayar: 'Sürücülerde kullanılan alan boyutunda şifrelemeyi zorla',
+            deger: 'Devre dışı — tüm disk şifrelensin',
+            neden: sifrelemeSec(g).kapsamGerekce,
+          });
+        }
+
+        return satirlar;
+      }
+
+      /* --------------------------------------------------------------- */
+      function komutUret(g) {
+        const s = sifrelemeSec(g);
+        const koruyucu = koruyucuSec(g);
+        const yontemKod = s.yontem === 'XTS-AES 256' ? 'XtsAes256' : 'XtsAes128';
+        const kapsamKod = s.kapsam === 'Tüm disk' ? '' : ' -UsedSpaceOnly';
+
+        const satirlar = [
+          '# Durum denetimi — şifrelemeden önce her zaman bakılır',
+          'Get-BitLockerVolume | Select-Object MountPoint, VolumeStatus, EncryptionPercentage, ProtectionStatus',
+          '',
+          '# TPM hazır mı?',
+          'Get-Tpm | Select-Object TpmPresent, TpmReady, TpmEnabled, TpmActivated, LockoutCount',
+          '',
+        ];
+
+        if (g.cihaz === 'sunucu') {
+          satirlar.push(
+            '# Sunucularda BitLocker bir özelliktir; kurulumu yeniden başlatma ister.',
+            '# Bu adım atlanırsa Enable-BitLocker "cmdlet bulunamadı" hatası verir.',
+            'Install-WindowsFeature BitLocker -IncludeAllSubFeature -IncludeManagementTools -Restart',
+            ''
+          );
+        }
+
+        if (koruyucu.ana === 'TPM + PIN') {
+          satirlar.push(
+            '# PIN\'i betiğe düz metin yazmayın; istem güvenli dizeye alır.',
+            '$pin = Read-Host "Başlangıç PIN\'i" -AsSecureString',
+            `Enable-BitLocker -MountPoint C: -EncryptionMethod ${yontemKod}${kapsamKod} \``,
+            '  -TpmAndPinProtector -Pin $pin -SkipHardwareTest'
+          );
+        } else if (koruyucu.ana === 'Yalnızca TPM') {
+          satirlar.push(
+            `Enable-BitLocker -MountPoint C: -EncryptionMethod ${yontemKod}${kapsamKod} \``,
+            '  -TpmProtector -SkipHardwareTest'
+          );
+        } else {
+          satirlar.push(
+            '# TPM yok: ilkede "Uyumlu TPM olmadan BitLocker\'a izin ver" etkin olmalı.',
+            '$parola = Read-Host "Başlangıç parolası" -AsSecureString',
+            `Enable-BitLocker -MountPoint C: -EncryptionMethod ${yontemKod}${kapsamKod} \``,
+            '  -PasswordProtector -Password $parola'
+          );
+        }
+
+        satirlar.push(
+          '',
+          '# Kurtarma parolası koruyucusu ayrıca eklenmeli — tek koruyucuyla kalmayın.',
+          'Add-BitLockerKeyProtector -MountPoint C: -RecoveryPasswordProtector',
+          ''
+        );
+
+        if (g.kimlik === 'ad' || g.kimlik === 'hibrit') {
+          satirlar.push(
+            '# AD DS yedeklemesi. Kimlik (ID) kurtarma parolası koruyucusunundur, TPM\'inki değil.',
+            '$koruyucu = (Get-BitLockerVolume -MountPoint C:).KeyProtector |',
+            '  Where-Object KeyProtectorType -eq "RecoveryPassword"',
+            'Backup-BitLockerKeyProtector -MountPoint C: -KeyProtectorId $koruyucu.KeyProtectorId',
+            '',
+            '# Yedeklendiğini doğrula: AD nesnesinde kurtarma bilgisi görünmeli',
+            'Get-ADObject -Filter "objectClass -eq \'msFVE-RecoveryInformation\'" `',
+            '  -SearchBase (Get-ADComputer $env:COMPUTERNAME).DistinguishedName -Properties * |',
+            '  Select-Object Name, whenCreated',
+            ''
+          );
+        }
+        if (g.kimlik === 'entra' || g.kimlik === 'hibrit') {
+          satirlar.push(
+            '# Entra ID yedeklemesi (Intune ile yönetilen cihazlarda ilke bunu kendisi yapar)',
+            'BackupToAAD-BitLockerKeyProtector -MountPoint C: `',
+            '  -KeyProtectorId ((Get-BitLockerVolume -MountPoint C:).KeyProtector |',
+            '    Where-Object KeyProtectorType -eq "RecoveryPassword").KeyProtectorId',
+            ''
+          );
+        }
+        if (g.kimlik === 'yok') {
+          satirlar.push(
+            '# Merkezî yedek yok: kurtarma parolasını cihaz dışına çıkarın.',
+            '# Dosyayı şifrelenen diskte bırakmayın — kurtarma anında erişilemez olur.',
+            '(Get-BitLockerVolume -MountPoint C:).KeyProtector |',
+            '  Where-Object KeyProtectorType -eq "RecoveryPassword" |',
+            '  Select-Object KeyProtectorId, RecoveryPassword |',
+            '  Export-Csv -Path "\\\\yedek-sunucu\\anahtarlar\\$env:COMPUTERNAME.csv" -NoTypeInformation -Encoding UTF8',
+            ''
+          );
+        }
+
+        satirlar.push(
+          '# İlerlemeyi izle',
+          'while ((Get-BitLockerVolume -MountPoint C:).VolumeStatus -ne "FullyEncrypted") {',
+          '  $v = Get-BitLockerVolume -MountPoint C:',
+          '  Write-Host ("%{0} — {1}" -f $v.EncryptionPercentage, $v.VolumeStatus)',
+          '  Start-Sleep -Seconds 30',
+          '}',
+          '',
+          '# Bellenim, TPM ya da önyükleme yapılandırması güncellenmeden ÖNCE:',
+          '# RebootCount 1 demek, bir sonraki açılıştan sonra koruma kendiliğinden geri gelir.',
+          'Suspend-BitLocker -MountPoint C: -RebootCount 1',
+          '',
+          '# Askıya alma unutulmuşsa korumayı elle geri aç',
+          'Resume-BitLocker -MountPoint C:'
+        );
+
+        return satirlar.join('\n');
+      }
+
+      /* --------------------------------------------------------------- */
+      function riskler(g) {
+        const ortak = [
+          [
+            'UEFI bellenim güncellemesi',
+            'Bellenim ölçümleri (PCR 0) değişir, TPM anahtarı vermez.',
+            'Suspend-BitLocker -RebootCount 1 çalıştırın; güncelleme sonrası koruma kendiliğinden döner.',
+          ],
+          [
+            'Secure Boot açılması ya da kapatılması',
+            'Secure Boot açıkken PCR 7 profili, kapalıyken PCR 0/2/4/11 kullanılır. Profil değişince mühür bozulur.',
+            'Ayarı değiştirmeden önce askıya alın. Secure Boot dağıtımdan önce kararlaştırılmalı.',
+          ],
+          [
+            'TPM temizleme ya da anakart değişimi',
+            'Anahtarı saran TPM gider; mühürlenmiş anahtar geri gelmez.',
+            'Kurtarma parolasıyla açıp yeniden şifreleyin. Anakart değişimi öncesi anahtarı elde bulundurun.',
+          ],
+          [
+            'Önyükleme sırasının değiştirilmesi ya da PXE önyükleme',
+            'Önyükleme yolu ölçümü değişir; ağdan önyükleme denemesi bile tetikleyebilir.',
+            'Görüntü dağıtımı yapılacaksa önce askıya alın; kalıcı değişiklikte bir kez kurtarma girip devam edin.',
+          ],
+          [
+            'Windows özellik güncellemesi',
+            'Kurulum önyükleme bileşenlerini değiştirir. Windows bunu genelde kendisi askıya alır, ama her senaryoda değil.',
+            'Büyük güncellemelerden önce anahtarın yedeklendiğini doğrulayın — asıl koruma budur.',
+          ],
+        ];
+
+        if (g.cihaz === 'dizustu') {
+          ortak.push([
+            'Yerleştirme istasyonuna takma ya da çıkarma',
+            'Bazı modellerde yerleştirme birimi önyüklemede ölçülen aygıt listesini değiştirir.',
+            'Cihazı hep aynı durumda (takılı ya da çıkarılmış) yeniden başlatın; model bazında sınayın.',
+          ]);
+        }
+        if (g.cihaz === 'sanal') {
+          ortak.push([
+            'Sanal makinenin başka ana makineye taşınması',
+            'Sanal TPM anahtar koruyucusu ana makineye bağlıysa hedef makinede çözülemez.',
+            'Ana Bilgisayar Koruyucu hizmetiyle korumalı doku kurun ya da anahtar koruyucusunu kümedeki ' +
+              'tüm düğümlerde aynı yapın.',
+          ]);
+          ortak.push([
+            'Anlık görüntüden geri dönme',
+            'Sanal TPM durumu ile disk durumu arasındaki uyum bozulabilir.',
+            'BitLocker\'lı sanal makinelerde anlık görüntü yerine yedek kullanın.',
+          ]);
+        }
+        if (g.uzaktan === 'evet') {
+          ortak.push([
+            'Gece uygulanan yamalar sonrası yeniden başlatma',
+            'PIN gerektiren cihaz açılış ekranında bekler; sabah kullanıcı gelene kadar erişilemez.',
+            'Ağ Kilidi Açma kurun ya da yeniden başlatmayı kullanıcının onayına bağlayın.',
+          ]);
+        }
+        return ortak;
+      }
+
+      /* --------------------------------------------------------------- */
+      function onkosullar(g) {
+        const liste = [
+          'Pilot grup seçin: en az üç farklı donanım modelinden birer cihaz. Bellenim davranışı ' +
+            'modelden modele değişir ve asıl sürprizler burada çıkar.',
+          'Kurtarma anahtarı arama yordamını yazın ve yardım masasıyla prova edin. Kurtarma ekranındaki ' +
+            'sekiz haneli anahtar kimliğiyle doğru kaydı bulabildiklerini görün.',
+        ];
+        if (g.kimlik === 'ad' || g.kimlik === 'hibrit') {
+          liste.push(
+            'AD şemasında msFVE-RecoveryInformation sınıfının bulunduğunu doğrulayın (Windows Server ' +
+              '2008\'den beri var, ama çok eski ormanlarda genişletme gerekebilir).'
+          );
+          liste.push(
+            'Yardım masasına yalnızca kurtarma bilgisini okuma yetkisi verin; bilgisayar nesnesinin ' +
+              'tamamı üzerinde yetki vermek gereksiz geniştir.'
+          );
+        }
+        if (g.kimlik === 'entra') {
+          liste.push(
+            'Intune\'da disk şifreleme ilkesini bir test grubuna atayıp anahtarın Entra cihaz ' +
+              'nesnesinde göründüğünü doğrulayın. Anahtar görünmeden dağıtımı genişletmeyin.'
+          );
+        }
+        if (g.tpm !== 'yok') {
+          liste.push(
+            'TPM\'in cihazlarda etkin, hazır ve sahipliği alınmış olduğunu doğrulayın: ' +
+              'Get-Tpm çıktısında TpmReady değeri True olmalı.'
+          );
+        }
+        liste.push(
+          'Şifreleme öncesi disk sağlığını denetleyin. Bozuk sektörü olan bir diskte şifreleme ' +
+            'yarıda kalırsa veri kurtarma çok zorlaşır.'
+        );
+        liste.push(
+          'Uyku ve hazırda bekletme davranışına karar verin. Hazırda bekletme dosyası şifreli ' +
+            'birimdedir, ama uyku durumunda anahtar bellekte kalır; dizüstülerde uyku yerine ' +
+            'hazırda bekletme daha güvenlidir.'
+        );
+        if (g.disk === 'kullanilmis') {
+          liste.push(
+            'Tüm disk şifrelemesi kullanımdaki cihazlarda saatler sürer. Kullanıcıya süreyi ' +
+              'bildirin ve şifreleme sırasında cihazın kapatılmasının sorun yaratmadığını söyleyin — ' +
+              'işlem kaldığı yerden devam eder.'
+          );
+        }
+        liste.push(
+          'Şifrelemenin gerçekten tamamlandığını raporlayın. VolumeStatus değeri FullyEncrypted ' +
+            've ProtectionStatus değeri On olmayan cihaz korunmuyor demektir; yalnızca "BitLocker açık" ' +
+            'demek yeterli değil.'
+        );
+        return liste;
+      }
+
+      /* ================= arayüz ================= */
+      const kacir = (m) =>
+        String(m).replace(/[&<>]/g, (k) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;' })[k]);
+
+      function ciz() {
+        const g = {
+          cihaz: el('#b-cihaz').value,
+          tpm: el('#b-tpm').value,
+          kimlik: el('#b-kimlik').value,
+          disk: el('#b-disk').value,
+          hassasiyet: el('#b-hassasiyet').value,
+          uzaktan: el('#b-uzaktan').value,
+        };
+
+        const koruyucu = koruyucuSec(g);
+        const sifre = sifrelemeSec(g);
+        const kurtarma = kurtarmaSec(g);
+
+        const kartlar = [
+          {
+            baslik: 'Koruyucu bileşimi',
+            deger: koruyucu.ana,
+            gerekce: koruyucu.gerekce,
+            uyarilar: koruyucu.uyarilar,
+            ek: koruyucu.cozum,
+          },
+          {
+            baslik: 'Şifreleme yöntemi',
+            deger: sifre.yontem,
+            gerekce: [sifre.yontemGerekce],
+            uyarilar: [],
+          },
+          {
+            baslik: 'Şifreleme kapsamı',
+            deger: sifre.kapsam,
+            gerekce: [sifre.kapsamGerekce],
+            uyarilar: [],
+          },
+          {
+            baslik: 'Kurtarma anahtarı',
+            deger: kurtarma.yer,
+            gerekce: [kurtarma.gerekce],
+            uyarilar: [kurtarma.uyari],
+          },
+        ];
+
+        el('#b-kararlar').innerHTML = kartlar
+          .map(
+            (k) =>
+              `<article class="b-kart">` +
+              `<h3>${kacir(k.baslik)}</h3>` +
+              `<p class="b-deger">${kacir(k.deger)}</p>` +
+              k.gerekce.map((x) => `<p class="b-gerekce">${kacir(x)}</p>`).join('') +
+              (k.uyarilar ?? [])
+                .map((x) => `<p class="b-uyari">${kacir(x)}</p>`)
+                .join('') +
+              (k.ek ? `<p class="b-ek">${kacir(k.ek)}</p>` : '') +
+              `</article>`
+          )
+          .join('');
+
+        const gpo = gpoUret(g);
+        el('#b-gpo-not').textContent =
+          `${gpo.length} ayar. İlkeyi cihazlara uygulamadan önce şifreleme yapılmamış olmalı; ` +
+          'şifreleme başladıktan sonra değiştirilen ayarların çoğu mevcut birimlere etki etmez.';
+        el('#b-gpo').innerHTML =
+          '<thead><tr><th>Ayar</th><th>Değer</th><th>Neden</th></tr></thead><tbody>' +
+          gpo
+            .map(
+              (a) =>
+                `<tr><td><b>${kacir(a.ayar)}</b><br><span class="b-yol">${kacir(a.yol)}</span></td>` +
+                `<td>${kacir(a.deger)}</td><td class="b-neden">${kacir(a.neden)}</td></tr>`
+            )
+            .join('') +
+          '</tbody>';
+
+        el('#b-komut').textContent = komutUret(g);
+
+        el('#b-riskler').innerHTML =
+          '<thead><tr><th>İşlem</th><th>Neden tetikler</th><th>Ne yapmalı</th></tr></thead><tbody>' +
+          riskler(g)
+            .map(
+              ([a, b, c]) =>
+                `<tr><td><b>${kacir(a)}</b></td><td class="b-neden">${kacir(b)}</td>` +
+                `<td class="b-neden">${kacir(c)}</td></tr>`
+            )
+            .join('') +
+          '</tbody>';
+
+        el('#b-onkosul').innerHTML = onkosullar(g)
+          .map((x) => `<li>${kacir(x)}</li>`)
+          .join('');
+
+        const durum = el('#b-durum');
+        durum.className = 'arac-durum ' + (g.tpm === 'yok' || g.kimlik === 'yok' ? 'uyari' : 'ok');
+        durum.textContent =
+          g.tpm === 'yok'
+            ? 'TPM olmadan BitLocker çalışır ama koruma düzeyi belirgin biçimde düşer; ' +
+              'cihaz yenileme planına alınmalı.'
+            : g.kimlik === 'yok'
+              ? 'Merkezî anahtar yedeği olmadan ilerlemek en riskli seçenek: anahtarı kaybeden ' +
+                'kullanıcının verisi geri gelmez.'
+              : `${koruyucu.ana} · ${sifre.yontem} · ${sifre.kapsam} · anahtar ${kurtarma.yer.toLocaleLowerCase('tr')}.`;
+      }
+
+      document.querySelectorAll('#b-cihaz, #b-tpm, #b-kimlik, #b-disk, #b-hassasiyet, #b-uzaktan')
+        .forEach((d) => d.addEventListener('change', ciz));
+
+      document.querySelectorAll('.kopyala').forEach((d) => {
+        d.addEventListener('click', async () => {
+          try {
+            await navigator.clipboard.writeText(el(`#${d.dataset.kaynak}`).textContent);
+            d.textContent = 'Kopyalandı';
+            setTimeout(() => (d.textContent = 'Kopyala'), 1600);
+          } catch {
+            /* pano izni yoksa kullanıcı elle seçer */
+          }
+        });
+      });
+
+      ciz();
+    })();
+  </script>
+
+  <style>
+    .b-kartlar {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(min(300px, 100%), 1fr));
+      gap: 12px;
+    }
+    .b-kart {
+      border: 1px solid var(--line);
+      border-radius: 12px;
+      padding: 14px 16px;
+      background: var(--paper);
+      min-width: 0;
+    }
+    .b-kart h3 {
+      font-size: 12px;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      color: var(--muted);
+      margin: 0 0 6px;
+      font-weight: 600;
+    }
+    .b-deger {
+      font-size: 17px;
+      font-weight: 700;
+      margin: 0 0 8px;
+      color: var(--indigo-metin);
+    }
+    .b-gerekce,
+    .b-uyari,
+    .b-ek {
+      font-size: 13px;
+      line-height: 1.6;
+      margin: 0 0 7px;
+      color: var(--ink-soft);
+    }
+    .b-uyari {
+      border-left: 2px solid light-dark(#d97706, #f59e0b);
+      padding-left: 10px;
+    }
+    .b-ek {
+      border-left: 2px solid light-dark(#2563eb, #60a5fa);
+      padding-left: 10px;
+    }
+    .b-tablo-kap {
+      overflow-x: auto;
+    }
+    .b-tablo {
+      width: 100%;
+      min-width: 700px;
+      border-collapse: collapse;
+      font-size: 13px;
+    }
+    .b-tablo th,
+    .b-tablo td {
+      text-align: left;
+      padding: 10px 12px;
+      border-bottom: 1px solid var(--line);
+      vertical-align: top;
+    }
+    .b-tablo th {
+      font-size: 12px;
+      color: var(--muted);
+      font-weight: 600;
+    }
+    .b-yol {
+      font-size: 11px;
+      color: var(--muted);
+      line-height: 1.45;
+      display: inline-block;
+      margin-top: 3px;
+    }
+    .b-neden {
+      color: var(--ink-soft);
+      line-height: 1.55;
+    }
+    .b-cikti {
+      max-height: 520px;
+      overflow: auto;
+    }
+    .b-liste {
+      margin: 0;
+      padding-left: 20px;
+      display: grid;
+      gap: 10px;
+    }
+    .b-liste li {
+      font-size: 13.5px;
+      line-height: 1.62;
+      color: var(--ink-soft);
+    }
+  </style>
+</Base>

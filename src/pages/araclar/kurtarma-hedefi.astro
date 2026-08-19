@@ -1,0 +1,648 @@
+---
+import Base from '../../layouts/Base.astro';
+---
+
+<Base
+  baslik="Kurtarma hedefi (RPO / RTO) planlayıcı"
+  aciklama="Hedeflediğiniz veri kaybı ve kesinti süresine hangi teknolojinin yettiğini hesaplar; geri yükleme süresini adım adım ayırır ve hattın çoğaltmaya yetip yetmediğini gösterir."
+  aramaya={true}
+  kategori="Araç"
+>
+  <div class="arama-bas">
+    <div class="kap">
+      <nav class="kirinti" aria-label="Kırıntı yolu" style="padding-top:0">
+        <a href="/">Ana sayfa</a><span class="ayrac">/</span><a href="/araclar">Araçlar</a><span
+          class="ayrac">/</span
+        ><span aria-current="page">Kurtarma hedefi</span>
+      </nav>
+      <h1>Kurtarma hedefi (RPO / RTO) planlayıcı</h1>
+      <p style="color:var(--muted);font-size:14px;margin-top:8px;max-width:70ch">
+        "Dört saatte ayağa kalkarız" cümlesi çoğu zaman yalnızca geri yükleme süresini
+        kapsar; oysa saat, olayın fark edildiği anda başlar ve kullanıcı yeniden
+        çalışabildiğinde durur. Bu araç iki hedefi ayrı ayrı ele alır: ne kadar veri
+        kaybetmeyi göze aldığınız (RPO) hangi çoğaltma teknolojisini gerektirir, ne kadar
+        kesintiyi göze aldığınız (RTO) ise gerçekte hangi adımlara bölünür.
+      </p>
+    </div>
+  </div>
+
+  <div class="kap arac-sayfa">
+    <section class="arac-blok">
+      <h2 class="arac-h2"><span class="arac-no">1</span> Hedefler ve ortam</h2>
+      <div class="arac-alanlar">
+        <label class="arac-alan"
+          >Hedef RPO — kabul edilen veri kaybı
+          <select id="k-rpo">
+            <option value="0">Sıfır — hiç kayıp olmamalı</option>
+            <option value="1">1 dakika</option>
+            <option value="15" selected>15 dakika</option>
+            <option value="60">1 saat</option>
+            <option value="240">4 saat</option>
+            <option value="1440">24 saat</option>
+          </select>
+        </label>
+        <label class="arac-alan"
+          >Hedef RTO — kabul edilen kesinti
+          <select id="k-rto">
+            <option value="0.25">15 dakika</option>
+            <option value="1">1 saat</option>
+            <option value="4" selected>4 saat</option>
+            <option value="8">8 saat</option>
+            <option value="24">24 saat</option>
+            <option value="72">3 gün</option>
+          </select>
+        </label>
+        <label class="arac-alan"
+          >Veri boyutu (GB)
+          <input type="number" id="k-boyut" value="800" min="1" step="10" />
+        </label>
+        <label class="arac-alan"
+          >Günlük değişim oranı (%)
+          <input type="number" id="k-degisim" value="3" min="0.1" max="100" step="0.1" />
+        </label>
+        <label class="arac-alan"
+          >Geri yükleme hızı (MB/s)
+          <input type="number" id="k-hiz" value="120" min="1" step="10" />
+        </label>
+        <label class="arac-alan"
+          >İkinci siteye hat (Mbit/s)
+          <input type="number" id="k-bant" value="200" min="1" step="10" />
+        </label>
+        <label class="arac-alan"
+          >Siteler arası mesafe
+          <select id="k-mesafe">
+            <option value="0">Aynı bina / aynı veri merkezi</option>
+            <option value="50" selected>Aynı şehir (≈50 km)</option>
+            <option value="450">Farklı şehir (≈450 km)</option>
+            <option value="2000">Farklı ülke (≈2000 km)</option>
+          </select>
+        </label>
+        <label class="arac-alan"
+          >DNS TTL (saniye)
+          <input type="number" id="k-ttl" value="300" min="0" step="30" />
+        </label>
+        <label class="arac-alan"
+          >Nöbet düzeni
+          <select id="k-nobet">
+            <option value="7x24">7×24 nöbet, çağrı zinciri var</option>
+            <option value="mesai" selected>Mesai saatleri, dışında çağrı</option>
+            <option value="yok">Nöbet yok</option>
+          </select>
+        </label>
+      </div>
+      <p class="arac-durum" id="k-durum" role="status" aria-live="polite"></p>
+    </section>
+
+    <section class="arac-blok">
+      <h2 class="arac-h2"><span class="arac-no">2</span> RPO — hangi teknoloji yeter?</h2>
+      <div class="k-karar" id="k-rpo-karar"></div>
+    </section>
+
+    <section class="arac-blok">
+      <h2 class="arac-h2"><span class="arac-no">3</span> RTO — süre nereye gidiyor?</h2>
+      <div class="k-tablo-kap">
+        <table class="k-tablo" id="k-rto-tablo"></table>
+      </div>
+      <div class="k-cubuk" id="k-rto-cubuk" role="img" aria-label="Kurtarma süresi dağılımı"></div>
+      <div class="k-karar" id="k-rto-karar" style="margin-top:16px"></div>
+    </section>
+
+    <section class="arac-blok">
+      <h2 class="arac-h2"><span class="arac-no">4</span> Hat yeterli mi?</h2>
+      <div class="k-karar" id="k-hat"></div>
+    </section>
+
+    <section class="arac-blok">
+      <h2 class="arac-h2"><span class="arac-no">5</span> Yapılacaklar</h2>
+      <ol class="k-liste" id="k-adimlar"></ol>
+    </section>
+
+    <section class="arac-blok">
+      <h2 class="arac-h2"><span class="arac-no">6</span> Bu hesabın kör noktaları</h2>
+      <ul class="k-ipuclari">
+        <li>
+          <b>Çoğaltma yedek değildir.</b> Eşzamanlı çoğaltma bir donanım arızasına karşı
+          korur; silinen tabloya, şifreleyen fidye yazılımına ya da bozuk bir dağıtıma karşı
+          korumaz — hatayı da anında ikinci siteye kopyalar. Sıfır RPO isteyen her sistemin
+          ayrıca geriye dönülebilir, değiştirilemez yedeği olmalıdır.
+        </li>
+        <li>
+          <b>RTO saati sizin fark ettiğinizde değil, olay olduğunda başlar.</b> Aradaki
+          süre izlemenizin kalitesidir. Beş dakikada uyarı üreten bir izleme ile
+          "kullanıcı aradı" arasındaki fark, çoğu kurumda toplam kesintinin en büyük
+          kalemidir.
+        </li>
+        <li>
+          <b>Geri yükleme hızı kâğıt üzerinde ölçülmez.</b> Yedek deposunun okuma hızı, ağ,
+          hedef diskin yazma hızı ve — çoğu zaman en yavaş halka — çok sayıda küçük dosyanın
+          birer birer yazılması hız düşürür. Ölçülmüş bir tatbikat rakamı yoksa buradaki
+          hesap iyimserdir.
+        </li>
+        <li>
+          <b>Sıfır RPO mesafeye çarpar.</b> Eşzamanlı çoğaltmada her yazma işlemi ikinci
+          sitenin onayını bekler; ışık cam lifinde saniyede yaklaşık 200 bin km gittiği için
+          her 100 km gidiş–dönüşe yaklaşık 1 ms ekler. 450 km uzaklıktaki bir site için bu
+          <b>en az</b> 4,5 ms demektir; gerçek fiber güzergâhı kuş uçuşundan uzun olduğu ve
+          aradaki yükselteçlerle anahtarlar da gecikme eklediği için ölçülen değer genelde
+          bunun bir buçuk iki katıdır. Çoğu işlem yoğun veritabanı bunu kaldıramaz.
+        </li>
+        <li>
+          <b>Tatbikat yapılmamış plan, plan değil belgedir.</b> Yedeğin alınmış olması geri
+          yüklenebildiği anlamına gelmez. En az yılda bir kez, gerçek bir geri yükleme
+          yapılmalı ve süre ölçülmelidir; buradaki tahminlerin yerini o ölçüm alır.
+        </li>
+        <li>
+          <b>Bağımlılıklar tek tek değil, birlikte kurtarılır.</b> Uygulama dört saatte
+          döner ama kimlik sağlayıcısı sekiz saatte dönüyorsa gerçek RTO sekiz saattir.
+          Hedefi sistem başına değil, hizmet zinciri başına belirleyin.
+        </li>
+      </ul>
+    </section>
+  </div>
+
+  <script>
+    (() => {
+      const el = (s) => document.querySelector(s);
+
+      /* ================= RPO merdiveni =================
+         Her teknolojinin gerçekçi olarak sağlayabildiği en küçük RPO. */
+      const RPO_MERDIVEN = [
+        {
+          enAz: 0,
+          ad: 'Eşzamanlı çoğaltma (senkron)',
+          aciklama:
+            'Her yazma işlemi iki sitede de kalıcı olmadan uygulamaya onay dönmez. Site kaybında ' +
+            'tek bir işlem bile kaybolmaz.',
+          bedel:
+            'Her yazmaya ağ gidiş–dönüşü eklenir; mesafe doğrudan başarıma yansır. Ayrıca ikinci ' +
+            'site erişilemez olduğunda birincinin de durması ya da korumasız devam etmesi gerekir — ' +
+            'bu kararın önceden verilmiş olması şart.',
+        },
+        {
+          enAz: 1,
+          ad: 'Eşzamansız çoğaltma (asenkron)',
+          aciklama:
+            'Yazmalar hemen onaylanır, ikinci siteye sürekli akar. Gecikme genelde saniyeler ' +
+            'düzeyindedir ve başarım cezası yoktur.',
+          bedel:
+            'Site kaybında akışta bekleyen işlemler kaybolur. Kayıp miktarı hattın anlık ' +
+            'doluluğuna bağlıdır; yoğun saatte tahmin edilenden büyük olabilir.',
+        },
+        {
+          enAz: 5,
+          ad: 'Günlük nakli / sürekli anlık görüntü',
+          aciklama:
+            'Veritabanı işlem günlükleri ya da depolama anlık görüntüleri belirli aralıklarla ' +
+            'ikinci siteye taşınır. Aralık RPO\'yu belirler.',
+          bedel:
+            'Devralma elle ya da yarı otomatiktir; günlüklerin uygulanması ek süre ister. ' +
+            'Anlık görüntüler aynı depolama birimindeyse depolama arızasına karşı koruma sağlamaz.',
+        },
+        {
+          enAz: 60,
+          ad: 'Saatlik artımlı yedek',
+          aciklama:
+            'Saat başı değişen bloklar alınır. Yedekleme altyapısı dışında ek teknoloji gerekmez.',
+          bedel:
+            'Geri yükleme, tam yedek üzerine artımlıların sırayla uygulanmasını gerektirir; ' +
+            'zincir uzadıkça geri yükleme süresi büyür ve zincirdeki tek bir bozuk halka ' +
+            'sonrakileri kullanılamaz kılar.',
+        },
+        {
+          enAz: 1440,
+          ad: 'Günlük yedek',
+          aciklama: 'Klasik gecelik yedekleme penceresi. En basit ve en ucuz seçenek.',
+          bedel:
+            'En kötü durumda bir günlük veri kaybedilir. Yedek gece 2\'de alınıyorsa akşam 6\'da ' +
+            'olan bir olayda 16 saatlik iş kaybolur — "24 saat RPO" cümlesi bu gerçeği gizler.',
+        },
+      ];
+
+      function rpoTeknoloji(hedefDakika) {
+        // Hedefi karşılayan en ucuz (en yüksek enAz değerli) seçenek
+        const uygun = RPO_MERDIVEN.filter((t) => t.enAz <= hedefDakika);
+        return uygun[uygun.length - 1] ?? RPO_MERDIVEN[0];
+      }
+
+      /* ================= RTO ayrıştırması ================= */
+
+      /** Fark etme süresi izleme ve nöbet düzenine bağlıdır. */
+      function farkEtmeDakika(nobet) {
+        if (nobet === '7x24') return 5;
+        if (nobet === 'mesai') return 45;
+        return 240;
+      }
+
+      function rtoAdimlari(g) {
+        const boyutMB = g.boyut * 1024;
+        const geriYuklemeDk = boyutMB / g.hiz / 60;
+
+        /* Yönlendirme süresi DNS TTL'ine bağlıdır: önbelleğe almış istemciler
+           kayıt değişse de TTL dolana kadar eski adrese gider. Ortalama değil
+           en kötü durum alınır, çünkü RTO en kötü durumu tanımlar. */
+        const yonlendirmeDk = g.ttl / 60;
+
+        return [
+          {
+            ad: 'Fark etme',
+            dakika: farkEtmeDakika(g.nobet),
+            not:
+              g.nobet === '7x24'
+                ? 'İzleme uyarısı ve nöbetçinin yanıtı.'
+                : g.nobet === 'mesai'
+                  ? 'Mesai dışında olay, çağrı zinciri devreye girene kadar bekler.'
+                  : 'Nöbet yoksa olay çoğu zaman kullanıcı şikâyetiyle öğrenilir.',
+          },
+          {
+            ad: 'Karar',
+            dakika: 20,
+            not: 'Onarmaya mı çalışılacak, devralma mı yapılacak? Bu karar geciktiğinde ' +
+              'süre iki kez harcanır: önce onarım denenir, sonra yine devralınır.',
+          },
+          {
+            ad: 'Hazırlık',
+            dakika: g.rtoHedef <= 1 ? 5 : 30,
+            not:
+              g.rtoHedef <= 1
+                ? 'Bekleyen sistem zaten ayakta; yalnızca etkinleştirme.'
+                : 'Hedef sunucunun sağlanması, depolamanın bağlanması, ağın açılması.',
+          },
+          {
+            ad: 'Geri yükleme',
+            dakika: geriYuklemeDk,
+            not: `${g.boyut} GB / ${g.hiz} MB/s. Ölçülmüş bir tatbikat rakamı yoksa bu değer iyimserdir.`,
+          },
+          {
+            ad: 'Doğrulama',
+            dakika: 25,
+            not: 'Servis ayağa kalktı mı, veri tutarlı mı, uygulama gerçekten çalışıyor mu? ' +
+              'Atlanırsa bozuk bir sistem üretime alınır.',
+          },
+          {
+            ad: 'Yönlendirme',
+            dakika: yonlendirmeDk,
+            not: `DNS TTL ${g.ttl} saniye. Kaydı değiştirseniz de önbelleğe almış istemciler ` +
+              'TTL dolana kadar eski adrese gitmeyi sürdürür.',
+          },
+        ];
+      }
+
+      /* ================= hat yeterliliği =================
+         Eşzamansız çoğaltmada ve artımlı yedekte belirleyici olan, günlük
+         değişimin hatta sığıp sığmadığıdır. Sığmıyorsa gecikme her gün birikir
+         ve RPO hedefi ne yazılırsa yazılsın tutmaz. */
+      function hatDegerlendir(g) {
+        const gunlukDegisimGB = g.boyut * (g.degisim / 100);
+        // GB → Mbit: 1 GB = 1024 MB = 8192 Mbit
+        const gunlukMbit = gunlukDegisimGB * 8192;
+        // Hattın tamamı çoğaltmaya ayrılamaz; %50 kullanılabilir varsayıldı.
+        const kullanilabilirMbps = g.bant * 0.5;
+        const gerekliMbps = gunlukMbit / 86400;
+        const aktarimSaat = gunlukMbit / kullanilabilirMbps / 3600;
+
+        return {
+          gunlukDegisimGB,
+          gerekliMbps,
+          kullanilabilirMbps,
+          aktarimSaat,
+          yeterli: gerekliMbps <= kullanilabilirMbps,
+          doluluk: (gerekliMbps / kullanilabilirMbps) * 100,
+        };
+      }
+
+      /** Eşzamanlı çoğaltmada mesafeden gelen yazma gecikmesi.
+          Işık, cam lifinde vakumdakinin yaklaşık üçte ikisi hızla ilerler;
+          yaklaşık 200 km/ms. Gidiş–dönüş olduğu için mesafe iki kez katedilir.
+
+          Sonuç kuramsal bir ALT SINIRDIR: gerçek güzergâh kuş uçuşundan uzundur ve
+          aradaki cihazlar da gecikme ekler. Ölçülen değer genelde bunun 1,5–2 katıdır. */
+      function senkronGecikmeMs(km) {
+        return (km * 2) / 200;
+      }
+
+      /* ================= arayüz ================= */
+      const kacir = (m) =>
+        String(m).replace(/[&<>]/g, (k) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;' })[k]);
+
+      function sureBicim(dakika) {
+        if (dakika < 1) return `${Math.round(dakika * 60)} sn`;
+        if (dakika < 90) return `${Math.round(dakika)} dk`;
+        const saat = dakika / 60;
+        if (saat < 48) return `${Math.round(saat * 10) / 10} sa`;
+        return `${Math.round((saat / 24) * 10) / 10} gün`;
+      }
+
+      function ciz() {
+        const g = {
+          rpoHedef: +el('#k-rpo').value,
+          rtoHedef: +el('#k-rto').value,
+          boyut: Math.max(1, +el('#k-boyut').value || 1),
+          degisim: Math.max(0.1, +el('#k-degisim').value || 0.1),
+          hiz: Math.max(1, +el('#k-hiz').value || 1),
+          bant: Math.max(1, +el('#k-bant').value || 1),
+          mesafe: +el('#k-mesafe').value,
+          ttl: Math.max(0, +el('#k-ttl').value || 0),
+          nobet: el('#k-nobet').value,
+        };
+
+        /* --- RPO --- */
+        const tek = rpoTeknoloji(g.rpoHedef);
+        let rpoUyari = '';
+        if (g.rpoHedef === 0) {
+          const gecikme = senkronGecikmeMs(g.mesafe);
+          rpoUyari =
+            g.mesafe === 0
+              ? 'Aynı veri merkezinde eşzamanlı çoğaltma başarım açısından sorunsuzdur — ama iki kopya ' +
+                'aynı yangın, aynı elektrik kesintisi ve aynı su baskınıyla birlikte gider. Sıfır RPO ' +
+                'burada felaket kurtarma değil, yüksek erişilebilirlik demektir.'
+              : `${g.mesafe} km mesafede eşzamanlı çoğaltma her yazma işlemine en az ` +
+                `${gecikme.toFixed(1)} ms ekler — bu yalnızca ışık hızından gelen kuramsal alt sınır; ` +
+                'gerçek güzergâh ve aradaki cihazlar yüzünden ölçülen değer genelde 1,5–2 katı olur. ' +
+                (gecikme > 5
+                  ? 'Bu, işlem yoğun veritabanları için genelde kabul edilemez; eşzamansız çoğaltma ' +
+                    've bir kaç saniyelik RPO gerçekçi seçenektir.'
+                  : 'Bu mesafede eşzamanlı çoğaltma çoğu iş yükü için uygulanabilir.');
+        }
+
+        el('#k-rpo-karar').innerHTML =
+          `<div class="k-ana"><span>Hedef RPO</span><b>${sureBicim(g.rpoHedef || 0.017)}</b></div>` +
+          `<div class="k-secim">${kacir(tek.ad)}</div>` +
+          `<p>${kacir(tek.aciklama)}</p>` +
+          `<p class="k-bedel"><b>Bedeli:</b> ${kacir(tek.bedel)}</p>` +
+          (rpoUyari ? `<p class="k-uyari">${kacir(rpoUyari)}</p>` : '') +
+          (g.rpoHedef >= 1440
+            ? '<p class="k-uyari">24 saatlik RPO, "en fazla 24 saat" demektir; olay yedekten hemen ' +
+              'önce olursa kayıp neredeyse sıfır, hemen sonra olursa tam 24 saattir. Ortalama ' +
+              'beklenen kayıp 12 saat civarındadır ve iş birimine bu şekilde anlatılmalıdır.</p>'
+            : '');
+
+        /* --- RTO --- */
+        const adimlar = rtoAdimlari(g);
+        const toplam = adimlar.reduce((t, a) => t + a.dakika, 0);
+        const hedefDk = g.rtoHedef * 60;
+
+        el('#k-rto-tablo').innerHTML =
+          '<thead><tr><th>Adım</th><th>Süre</th><th>Neden</th></tr></thead><tbody>' +
+          adimlar
+            .map(
+              (a) =>
+                `<tr><td><b>${kacir(a.ad)}</b></td><td class="k-sure">${sureBicim(a.dakika)}</td>` +
+                `<td class="k-not">${kacir(a.not)}</td></tr>`
+            )
+            .join('') +
+          `<tr class="k-toplam"><td><b>Toplam</b></td><td class="k-sure"><b>${sureBicim(toplam)}</b></td>` +
+          `<td class="k-not">Hedef: ${sureBicim(hedefDk)}</td></tr>` +
+          '</tbody>';
+
+        const renkler = ['#6366f1', '#8b5cf6', '#0ea5e9', '#f59e0b', '#10b981', '#ef4444'];
+        el('#k-rto-cubuk').innerHTML = adimlar
+          .map(
+            (a, i) =>
+              `<div class="k-dilim" style="width:${(a.dakika / toplam) * 100}%;background:${renkler[i]}" ` +
+              `title="${kacir(a.ad)}: ${sureBicim(a.dakika)}"></div>`
+          )
+          .join('');
+
+        const enBuyuk = [...adimlar].sort((a, b) => b.dakika - a.dakika)[0];
+        const gerekliHiz = (() => {
+          const digerleri = toplam - adimlar[3].dakika;
+          const kalanDk = hedefDk - digerleri;
+          if (kalanDk <= 0) return null;
+          return (g.boyut * 1024) / (kalanDk * 60);
+        })();
+
+        el('#k-rto-karar').innerHTML =
+          toplam <= hedefDk
+            ? `<div class="k-ana k-ok"><span>Hesaplanan RTO</span><b>${sureBicim(toplam)}</b></div>` +
+              `<p>Hedefin altında kalıyor. En büyük kalem <b>${kacir(enBuyuk.ad)}</b> ` +
+              `(${sureBicim(enBuyuk.dakika)}); iyileştirme yapılacaksa oradan başlanmalı.</p>` +
+              '<p class="k-bedel"><b>Ama:</b> bu bir tahmindir. Rakamın anlamı, yılda en az bir kez ' +
+              'gerçek geri yükleme yapıp süreyi ölçtüğünüzde başlar.</p>'
+            : `<div class="k-ana k-hata"><span>Hesaplanan RTO</span><b>${sureBicim(toplam)}</b></div>` +
+              `<p>Hedef ${sureBicim(hedefDk)} tutmuyor; aradaki fark ${sureBicim(toplam - hedefDk)}. ` +
+              `En büyük kalem <b>${kacir(enBuyuk.ad)}</b> (${sureBicim(enBuyuk.dakika)}).</p>` +
+              '<p class="k-bedel"><b>Seçenekler:</b> ' +
+              (gerekliHiz
+                ? `geri yükleme hızını ${Math.ceil(gerekliHiz)} MB/s'e çıkarmak, `
+                : 'geri yükleme adımını tümüyle ortadan kaldırmak (sıcak bekleyen kopya), ') +
+              (g.nobet !== '7x24'
+                ? 'nöbet düzenini iyileştirerek fark etme süresini kısaltmak, '
+                : '') +
+              (g.ttl > 60 ? `DNS TTL'ini ${g.ttl} saniyeden 60'a indirmek, ` : '') +
+              'ya da hedefi gerçekçi bir değere çekmek. Tutulamayacak bir hedefi belgede tutmak, ' +
+              'olay anında hazırlıksız yakalanmanın en yaygın nedenidir.</p>';
+
+        /* --- hat --- */
+        const hat = hatDegerlendir(g);
+        el('#k-hat').innerHTML =
+          `<div class="k-ana ${hat.yeterli ? 'k-ok' : 'k-hata'}"><span>Günlük değişim</span>` +
+          `<b>${hat.gunlukDegisimGB.toFixed(1)} GB</b></div>` +
+          `<p>Bu veriyi bir güne yaymak için sürekli <b>${hat.gerekliMbps.toFixed(1)} Mbit/s</b> ` +
+          `gerekiyor. ${g.bant} Mbit/s hattın yarısı çoğaltmaya ayrılırsa ` +
+          `<b>${hat.kullanilabilirMbps.toFixed(0)} Mbit/s</b> kullanılabilir — ` +
+          `doluluk %${hat.doluluk.toFixed(0)}.</p>` +
+          (hat.yeterli
+            ? `<p class="k-bedel">Değişimin tamamı yaklaşık ${hat.aktarimSaat.toFixed(1)} saatte ` +
+              'aktarılıyor, yani hat gün içinde açık kalıyor. Yine de değişim gün boyunca eşit ' +
+              'dağılmaz: iş saatlerindeki tepe, ortalamanın birkaç katı olabilir ve kısa süreli ' +
+              'gecikme birikmesi normaldir.</p>'
+            : '<p class="k-uyari">Hat yetmiyor. Eşzamansız çoğaltma her gün biraz daha geriye ' +
+              'düşer ve RPO hedefi ne yazılırsa yazılsın tutmaz. Bu durum sessizce ilerler: ' +
+              'çoğaltma "çalışıyor" görünür, yalnızca gecikme büyür. Ya hattı genişletin, ya ' +
+              'yalnızca kritik veriyi çoğaltın, ya da sıkıştırma ve tekilleştirmeyi devreye alın.</p>') +
+          (g.rpoHedef > 0 && g.rpoHedef < 60
+            ? `<p class="k-bedel">Hedeflenen ${sureBicim(g.rpoHedef)} RPO için çoğaltmanın ` +
+              'gecikmesi izlenmeli ve eşiği aştığında uyarı üretmeli. Çoğaltma gecikmesini ' +
+              'ölçmeyen bir kurulumda RPO bir hedef değil, temennidir.</p>'
+            : '');
+
+        /* --- adımlar --- */
+        const adimListe = [];
+        if (!hat.yeterli) {
+          adimListe.push(
+            'Önce hat sorununu çözün: bu çözülmeden diğer iyileştirmeler ölçülemez, çünkü ' +
+              'çoğaltma gecikmesi bütün hesabı geçersiz kılar.'
+          );
+        }
+        adimListe.push(
+          `Bir geri yükleme tatbikatı yapın ve gerçek hızı ölçün. Buradaki ${g.hiz} MB/s ` +
+            'varsayımının yerini o rakam almalı; çoğu kurumda ölçülen değer tahminin altında çıkar.'
+        );
+        if (toplam > hedefDk) {
+          adimListe.push(
+            `Hedefi ${sureBicim(hedefDk)} olarak tutacaksanız ${sureBicim(toplam - hedefDk)} ` +
+              `kısaltmanız gerekiyor; en büyük kalem "${enBuyuk.ad}".`
+          );
+        }
+        if (g.ttl > 300) {
+          adimListe.push(
+            `DNS TTL'i ${g.ttl} saniye. Devralma planlanan bir hafta öncesinde TTL'i 60'a ` +
+              'indirin, geçişten sonra geri yükseltin. TTL değişikliğinin kendisi de eski ' +
+              'TTL süresince yayılır — bu yüzden erken yapılmalı.'
+          );
+        }
+        if (g.rpoHedef === 0) {
+          adimListe.push(
+            'Sıfır RPO için eşzamanlı çoğaltmanın yanına, değiştirilemez (immutable) yedek ' +
+              'ekleyin. Çoğaltma mantıksal hataları da kopyalar; geriye dönüş yalnızca yedekten yapılır.'
+          );
+        }
+        adimListe.push(
+          'Bağımlılık zincirini çıkarın: kimlik sağlayıcı, DNS, sertifika yetkilisi, lisans ' +
+            'sunucusu, dosya paylaşımı. Zincirdeki en yavaş halka gerçek RTO\'nuzdur.'
+        );
+        adimListe.push(
+          'Kurtarma yordamını, o an nöbette olan kişinin uygulayabileceği ayrıntıda yazın. ' +
+            'Yordamı yazan kişi ile olay gecesi uygulayacak kişi aynı olmayacak.'
+        );
+        adimListe.push(
+          'Yedeklerin ve yordamın kendisinin de kurtarılabilir olduğunu doğrulayın: parolalar, ' +
+            'şifreleme anahtarları ve belgeler kurtarılacak sistemin içinde duruyorsa hepsi ' +
+            'birlikte kaybolur.'
+        );
+
+        el('#k-adimlar').innerHTML = adimListe.map((x) => `<li>${kacir(x)}</li>`).join('');
+
+        const durum = el('#k-durum');
+        const sorunlu = toplam > hedefDk || !hat.yeterli;
+        durum.className = 'arac-durum ' + (sorunlu ? 'uyari' : 'ok');
+        durum.textContent = sorunlu
+          ? `Hedeflerden en az biri tutmuyor: RTO ${sureBicim(toplam)} (hedef ${sureBicim(hedefDk)})` +
+            (hat.yeterli ? '.' : ', hat kapasitesi de yetersiz.')
+          : `Hedefler tutuyor: RTO ${sureBicim(toplam)}, RPO için ${tek.ad.toLocaleLowerCase('tr')} yeterli.`;
+      }
+
+      document
+        .querySelectorAll('#k-rpo, #k-rto, #k-boyut, #k-degisim, #k-hiz, #k-bant, #k-mesafe, #k-ttl, #k-nobet')
+        .forEach((d) => {
+          d.addEventListener('input', ciz);
+          d.addEventListener('change', ciz);
+        });
+
+      ciz();
+    })();
+  </script>
+
+  <style>
+    .k-karar {
+      border: 1px solid var(--line);
+      border-radius: 12px;
+      padding: 16px 18px;
+      background: var(--paper);
+    }
+    .k-ana {
+      display: flex;
+      align-items: baseline;
+      gap: 12px;
+      flex-wrap: wrap;
+      margin-bottom: 10px;
+    }
+    .k-ana span {
+      font-size: 12px;
+      color: var(--muted);
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+    }
+    .k-ana b {
+      font-size: 26px;
+      color: var(--indigo-metin);
+    }
+    .k-ana.k-ok b {
+      color: light-dark(#047857, #34d399);
+    }
+    .k-ana.k-hata b {
+      color: light-dark(#b91c1c, #f87171);
+    }
+    .k-secim {
+      font-size: 16px;
+      font-weight: 700;
+      margin-bottom: 8px;
+    }
+    .k-karar p {
+      font-size: 13.5px;
+      line-height: 1.64;
+      color: var(--ink-soft);
+      margin: 0 0 9px;
+    }
+    .k-karar p:last-child {
+      margin-bottom: 0;
+    }
+    .k-bedel {
+      border-left: 2px solid var(--line);
+      padding-left: 12px;
+    }
+    .k-uyari {
+      border-left: 2px solid light-dark(#d97706, #f59e0b);
+      padding-left: 12px;
+    }
+    .k-tablo-kap {
+      overflow-x: auto;
+    }
+    .k-tablo {
+      width: 100%;
+      min-width: 600px;
+      border-collapse: collapse;
+      font-size: 13px;
+    }
+    .k-tablo th,
+    .k-tablo td {
+      text-align: left;
+      padding: 10px 12px;
+      border-bottom: 1px solid var(--line);
+      vertical-align: top;
+    }
+    .k-tablo th {
+      font-size: 12px;
+      color: var(--muted);
+      font-weight: 600;
+    }
+    .k-sure {
+      white-space: nowrap;
+      font-variant-numeric: tabular-nums;
+    }
+    .k-not {
+      color: var(--ink-soft);
+      line-height: 1.55;
+    }
+    .k-toplam td {
+      border-bottom: 0;
+      border-top: 2px solid var(--line);
+    }
+    .k-cubuk {
+      display: flex;
+      height: 16px;
+      border-radius: 999px;
+      overflow: hidden;
+      margin-top: 14px;
+      border: 1px solid var(--line);
+    }
+    .k-dilim {
+      height: 100%;
+    }
+    .k-liste {
+      margin: 0;
+      padding-left: 20px;
+      display: grid;
+      gap: 10px;
+    }
+    .k-liste li {
+      font-size: 13.5px;
+      line-height: 1.62;
+      color: var(--ink-soft);
+    }
+    .k-ipuclari {
+      list-style: none;
+      margin: 0;
+      padding: 0;
+      display: grid;
+      gap: 12px;
+    }
+    .k-ipuclari li {
+      font-size: 13.5px;
+      line-height: 1.62;
+      color: var(--ink-soft);
+      border-left: 2px solid var(--line);
+      padding-left: 13px;
+    }
+  </style>
+</Base>

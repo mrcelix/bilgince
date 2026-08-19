@@ -1,0 +1,955 @@
+---
+import Base from '../../layouts/Base.astro';
+---
+
+<Base
+  baslik="SSH sertleştirme: yapılandırma üret ve denetle"
+  aciklama="sshd_config üretir ya da mevcut dosyanızı denetler; parola girişini gerçekten kapatan ayarları, zayıf algoritmaları ve ilk-değer-kazanır tuzağını gösterir."
+  aramaya={true}
+  kategori="Araç"
+>
+  <div class="arama-bas">
+    <div class="kap">
+      <nav class="kirinti" aria-label="Kırıntı yolu" style="padding-top:0">
+        <a href="/">Ana sayfa</a><span class="ayrac">/</span><a href="/araclar">Araçlar</a><span
+          class="ayrac">/</span
+        ><span aria-current="page">SSH sertleştirme</span>
+      </nav>
+      <h1>SSH sertleştirme</h1>
+      <p style="color:var(--muted);font-size:14px;margin-top:8px;max-width:70ch">
+        <code>PasswordAuthentication no</code> yazmak parola girişini kapatmaya çoğu zaman
+        yetmez: PAM üzerinden çalışan klavye etkileşimli doğrulama açıksa parola sorulmaya
+        devam eder. Bu araç hem güvenli bir <code>sshd_config</code> üretir hem de elinizdeki
+        dosyayı bu tür sessiz boşluklara karşı denetler.
+      </p>
+    </div>
+  </div>
+
+  <div class="kap arac-sayfa">
+    <div class="s-sekmeler" role="tablist">
+      <button type="button" class="s-sekme s-etkin" id="s-sekme-uret" role="tab" aria-selected="true">
+        Yapılandırma üret
+      </button>
+      <button type="button" class="s-sekme" id="s-sekme-denetle" role="tab" aria-selected="false">
+        Mevcut dosyayı denetle
+      </button>
+    </div>
+
+    <!-- ÜRETİM -->
+    <div id="s-uret-bolum">
+      <section class="arac-blok">
+        <h2 class="arac-h2"><span class="arac-no">1</span> Sunucu profili</h2>
+        <div class="arac-alanlar">
+          <label class="arac-alan"
+            >OpenSSH sürümü
+            <select id="s-surum">
+              <option value="9" selected>9.x — güncel dağıtımlar</option>
+              <option value="8">8.x — RHEL 9, Ubuntu 22.04</option>
+              <option value="7">7.x — eski sistemler</option>
+            </select>
+          </label>
+          <label class="arac-alan"
+            >Sunucunun rolü
+            <select id="s-rol">
+              <option value="ic" selected>İç ağ sunucusu</option>
+              <option value="internet">İnternete açık</option>
+              <option value="bastion">Atlama sunucusu (bastion)</option>
+            </select>
+          </label>
+          <label class="arac-alan"
+            >Kimlik doğrulama
+            <select id="s-dogrulama">
+              <option value="anahtar" selected>Yalnızca ortak anahtar</option>
+              <option value="anahtar-mfa">Ortak anahtar + ikinci etken</option>
+              <option value="parola">Parola da gerekli</option>
+            </select>
+          </label>
+          <label class="arac-alan"
+            >Kök erişimi
+            <select id="s-kok">
+              <option value="yok" selected>Kapalı — sudo kullanılıyor</option>
+              <option value="anahtar">Yalnızca anahtarla (otomasyon için)</option>
+              <option value="acik">Açık</option>
+            </select>
+          </label>
+          <label class="arac-alan"
+            >İzin verilen grup
+            <input type="text" id="s-grup" value="ssh-kullanicilari" spellcheck="false" />
+          </label>
+          <label class="arac-alan"
+            >Port
+            <input type="number" id="s-port" value="22" min="1" max="65535" step="1" />
+          </label>
+        </div>
+        <p class="arac-durum" id="s-durum" role="status" aria-live="polite"></p>
+      </section>
+
+      <section class="arac-blok">
+        <h2 class="arac-h2"><span class="arac-no">2</span> sshd_config</h2>
+        <div style="position:relative">
+          <pre class="kod s-cikti"><code id="s-config"></code></pre>
+          <button class="kopyala" type="button" data-kaynak="s-config">Kopyala</button>
+        </div>
+      </section>
+
+      <section class="arac-blok">
+        <h2 class="arac-h2"><span class="arac-no">3</span> Uygulama</h2>
+        <div style="position:relative">
+          <pre class="kod s-cikti"><code id="s-uygula"></code></pre>
+          <button class="kopyala" type="button" data-kaynak="s-uygula">Kopyala</button>
+        </div>
+      </section>
+    </div>
+
+    <!-- DENETİM -->
+    <div id="s-denetle-bolum" hidden>
+      <section class="arac-blok">
+        <h2 class="arac-h2"><span class="arac-no">1</span> Mevcut sshd_config</h2>
+        <textarea id="s-girdi" class="arac-metin" rows="16" spellcheck="false"
+          placeholder="/etc/ssh/sshd_config içeriğini yapıştırın"></textarea>
+        <div class="arac-dugmeler">
+          <button type="button" class="dg dg-hayalet" id="s-ornek">Sorunlu örneği yükle</button>
+          <button type="button" class="dg dg-hayalet" id="s-bosalt">Temizle</button>
+        </div>
+        <p class="arac-durum" id="s-denetim-durum" role="status" aria-live="polite"></p>
+      </section>
+
+      <section class="arac-blok" id="s-bulgu-blok" hidden>
+        <h2 class="arac-h2"><span class="arac-no">2</span> Bulgular</h2>
+        <div class="s-bulgular" id="s-bulgular"></div>
+      </section>
+    </div>
+
+    <section class="arac-blok">
+      <h2 class="arac-h2">Bilinmesi gerekenler</h2>
+      <ul class="s-ipuclari">
+        <li>
+          <b><code>Include</code> satırının yeri her şeyi değiştirir.</b> sshd_config'de bir
+          anahtar için <b>ilk okunan değer</b> geçerlidir, sonrakiler yok sayılır. Ubuntu ve
+          Debian dosyanın en üstüne <code>Include /etc/ssh/sshd_config.d/*.conf</code> koyar;
+          bu yüzden bulut görüntülerinin bıraktığı
+          <code>60-cloudimg-settings.conf</code> dosyası, sizin ana dosyada yazdığınız her
+          şeyi ezer. Değişikliğinizin uygulandığını <code>sshd -T</code> çıktısından
+          doğrulayın — dosyaya bakmak yanıltır.
+        </li>
+        <li>
+          <b>Parola girişini kapatmak tek satır değildir.</b>
+          <code>PasswordAuthentication no</code> yazsanız da
+          <code>KbdInteractiveAuthentication yes</code> (eski adıyla
+          <code>ChallengeResponseAuthentication</code>) açıksa PAM parola sorar ve giriş
+          çalışır. İkisini de kapatın; MFA kullanacaksanız
+          <code>AuthenticationMethods</code> ile açıkça tanımlayın.
+        </li>
+        <li>
+          <b>OpenSSH 8.8 <code>ssh-rsa</code> imzasını kapattı.</b> Bu, anahtar türünü değil
+          SHA-1 imza algoritmasını ilgilendirir: RSA anahtarınız çalışmayı sürdürür, ama
+          istemci <code>rsa-sha2-256</code> ya da <code>rsa-sha2-512</code> desteklemiyorsa
+          giriş reddedilir. Eski Git istemcileri ve gömülü aygıtlar bu yüzden bir gecede
+          bağlanamaz hâle geldi.
+        </li>
+        <li>
+          <b>Ubuntu 22.10 ve sonrasında <code>Port</code> yok sayılabilir.</b> SSH soket
+          etkinleştirmeyle (<code>ssh.socket</code>) başlatıldığında dinlenen portu systemd
+          belirler; sshd_config'deki <code>Port</code> satırı etkisizdir. Portu değiştirmek
+          için <code>systemctl edit ssh.socket</code> ile <code>ListenStream</code>
+          düzenlenir.
+        </li>
+        <li>
+          <b>Portu değiştirmek güvenlik değil, gürültü azaltmadır.</b> Otomatik tarayıcıların
+          günlüğü doldurmasını engeller; hedefli bir saldırganı bir dakika bile
+          yavaşlatmaz. Yararlıdır, ama bir denetim maddesi olarak sayılmaz.
+        </li>
+        <li>
+          <b>Yeniden başlatmadan önce açık oturumunuzu kapatmayın.</b>
+          <code>sshd -t</code> ile sözdizimini sınayın, <code>reload</code> kullanın ve
+          <b>ikinci bir oturum açıp</b> girebildiğinizi doğrulayın. Yanlış yapılandırmayla
+          kendinizi dışarıda bırakmanın tek panzehiri, hâlâ açık duran o ilk oturumdur.
+        </li>
+      </ul>
+    </section>
+  </div>
+
+  <script>
+    (() => {
+      const el = (s) => document.querySelector(s);
+
+      /* ================= algoritma kümeleri ================= */
+      const ALGORITMA = {
+        9: {
+          kex: 'sntrup761x25519-sha512@openssh.com,curve25519-sha256,curve25519-sha256@libssh.org,diffie-hellman-group16-sha512',
+          sifre: 'chacha20-poly1305@openssh.com,aes256-gcm@openssh.com,aes128-gcm@openssh.com,aes256-ctr',
+          mac: 'hmac-sha2-256-etm@openssh.com,hmac-sha2-512-etm@openssh.com,umac-128-etm@openssh.com',
+          anahtar: 'ssh-ed25519,rsa-sha2-512,rsa-sha2-256',
+          not: 'sntrup761 kuantum sonrası dayanıklı melez anahtar değişimidir; OpenSSH 9.0\'dan beri öntanımlıdır. Bugün kaydedilip yarın çözülmeye çalışılan trafiğe karşı korur.',
+        },
+        8: {
+          kex: 'curve25519-sha256,curve25519-sha256@libssh.org,diffie-hellman-group16-sha512',
+          sifre: 'chacha20-poly1305@openssh.com,aes256-gcm@openssh.com,aes128-gcm@openssh.com,aes256-ctr',
+          mac: 'hmac-sha2-256-etm@openssh.com,hmac-sha2-512-etm@openssh.com,umac-128-etm@openssh.com',
+          anahtar: 'ssh-ed25519,rsa-sha2-512,rsa-sha2-256',
+          not: '8.5 ve üzeri sntrup761 destekler ama öntanımlı değildir; 8.x çizgisinde curve25519 güvenli seçimdir.',
+        },
+        7: {
+          kex: 'curve25519-sha256@libssh.org,diffie-hellman-group-exchange-sha256',
+          sifre: 'chacha20-poly1305@openssh.com,aes256-gcm@openssh.com,aes256-ctr,aes128-ctr',
+          mac: 'hmac-sha2-256-etm@openssh.com,hmac-sha2-512-etm@openssh.com',
+          anahtar: 'ssh-ed25519,rsa-sha2-512,rsa-sha2-256,ssh-rsa',
+          not: '7.x artık desteklenmiyor ve yalnızca yükseltme yapılamayan sistemler için verildi. ssh-rsa listede kaldı çünkü bu sürümde rsa-sha2 desteği her istemcide yok.',
+        },
+      };
+
+      const ZAYIF = [
+        [/\bdiffie-hellman-group1-sha1\b/, 'kritik', 'group1-sha1 anahtar değişimi 1024 bitlik sabit asal kullanır ve devlet ölçeğinde kırılabilir kabul edilir.'],
+        [/\bdiffie-hellman-group14-sha1\b/, 'uyari', 'group14-sha1 SHA-1 özet kullanır; modern istemcilerin hepsi SHA-256 karşılığını destekler.'],
+        [/\bdiffie-hellman-group-exchange-sha1\b/, 'uyari', 'SHA-1 tabanlı anahtar değişimi; sha256 karşılığıyla değiştirin.'],
+        [/\bhmac-sha1\b/, 'uyari', 'hmac-sha1 bütünlük denetimi SHA-1\'e dayanır ve ETM değildir.'],
+        [/\bhmac-md5/, 'kritik', 'MD5 tabanlı bütünlük denetimi kırık kabul edilir.'],
+        [/\b3des-cbc\b/, 'kritik', '3DES 64 bitlik blok kullanır; uzun oturumlarda Sweet32 saldırısına açıktır.'],
+        [/\barcfour/, 'kritik', 'RC4 kırık bir akış şifresidir.'],
+        [/\b(aes\d+-cbc)\b/, 'uyari', 'CBC kipi SSH\'ta geçmişte oturum içi saldırılara konu oldu; GCM ya da CTR tercih edilmeli.'],
+        [/\bssh-dss\b/, 'kritik', 'DSA 1024 bitle sınırlıdır ve OpenSSH 7.0\'dan beri öntanımlı olarak kapalıdır.'],
+      ];
+
+      /* ================= üretim ================= */
+      function configUret(g) {
+        const a = ALGORITMA[g.surum];
+        const s = [];
+        const y = (satir) => s.push(satir);
+
+        y('# ------------------------------------------------------------------');
+        y('# sshd_config — sertleştirilmiş yapılandırma');
+        y('#');
+        y('# ÖNEMLİ: Bu dosyada bir anahtarın İLK okunan değeri geçerlidir.');
+        y('# Dağıtımınız üstte bir Include satırı tutuyorsa oradaki dosyalar');
+        y('# buradaki her şeyi ezer. Uygulanan gerçek yapılandırmayı görmek için:');
+        y('#   sshd -T | sort');
+        y('# ------------------------------------------------------------------');
+        y('');
+
+        if (g.port !== 22) {
+          y(`Port ${g.port}`);
+          y('# Not: Ubuntu 22.10 ve sonrasında SSH soket etkinleştirmeyle başlıyorsa');
+          y('# bu satır yok sayılır. Portu systemd tarafında değiştirin:');
+          y('#   systemctl edit ssh.socket   →   ListenStream= ve ListenStream=' + g.port);
+          y('# SELinux açıksa portu ayrıca tanıtın:');
+          y(`#   semanage port -a -t ssh_port_t -p tcp ${g.port}`);
+          y('');
+        }
+
+        y('# --- ana bilgisayar anahtarları ---');
+        y('HostKey /etc/ssh/ssh_host_ed25519_key');
+        y('HostKey /etc/ssh/ssh_host_rsa_key');
+        y('# ECDSA anahtarı bilerek listelenmedi: NIST eğrilerine duyulan güven');
+        y('# tartışmalı ve ed25519 her yönden daha iyi bir seçenek.');
+        y('');
+
+        y('# --- kimlik doğrulama ---');
+        y(
+          g.kok === 'yok'
+            ? 'PermitRootLogin no'
+            : g.kok === 'anahtar'
+              ? 'PermitRootLogin prohibit-password'
+              : 'PermitRootLogin yes'
+        );
+        if (g.kok === 'acik') {
+          y('# UYARI: Kök oturumu doğrudan açıldığında hangi kişinin ne yaptığı kayıtlardan');
+          y('# ayırt edilemez. Denetlenebilirlik için sudo tercih edilmeli.');
+        }
+        y('PubkeyAuthentication yes');
+        y(
+          g.dogrulama === 'parola'
+            ? 'PasswordAuthentication yes'
+            : 'PasswordAuthentication no'
+        );
+        y(
+          g.dogrulama === 'anahtar-mfa'
+            ? 'KbdInteractiveAuthentication yes'
+            : g.dogrulama === 'parola'
+              ? 'KbdInteractiveAuthentication yes'
+              : 'KbdInteractiveAuthentication no'
+        );
+        if (g.dogrulama === 'anahtar') {
+          y('# Bu iki satır birlikte anlamlıdır: yalnızca PasswordAuthentication no');
+          y('# yazmak yetmez, PAM üzerinden klavye etkileşimli parola yolu açık kalır.');
+        }
+        if (g.dogrulama === 'anahtar-mfa') {
+          y('AuthenticationMethods publickey,keyboard-interactive');
+          y('# Virgül "ve" demektir: önce anahtar, sonra ikinci etken. Boşlukla ayrılsaydı');
+          y('# "veya" olurdu ve tek etkenle giriş mümkün kalırdı.');
+        }
+        y('PermitEmptyPasswords no');
+        y('UsePAM yes');
+        y('# UsePAM kapatılırsa hesap kilidi, oturum sınırları ve günlükleme çalışmaz.');
+        y('');
+
+        y('# --- kim girebilir ---');
+        if (g.grup.trim()) {
+          y(`AllowGroups ${g.grup.trim()}`);
+          y('# Listeye alınmayan hiç kimse giremez. Yeni yönetici eklerken bu grubu');
+          y('# güncellemeyi unutmak, "anahtarım doğru ama giremiyorum" vakalarının');
+          y('# en yaygın nedenidir.');
+        }
+        y('');
+
+        y('# --- kaba kuvvete karşı ---');
+        y('MaxAuthTries 3');
+        y(`LoginGraceTime ${g.rol === 'internet' ? '20' : '30'}`);
+        y(`MaxStartups ${g.rol === 'internet' ? '5:50:20' : '10:30:60'}`);
+        y('# MaxStartups "başlangıç:oran:üst sınır" demektir: eşiği aşan yarım açık');
+        y('# bağlantılar verilen olasılıkla reddedilir. Bağlantı tüketen saldırılara karşıdır.');
+        y('');
+
+        y('# --- yönlendirme ---');
+        if (g.rol === 'bastion') {
+          y('AllowTcpForwarding yes');
+          y('# Atlama sunucusunun tek işi budur; kapatılamaz.');
+          y('AllowAgentForwarding no');
+          y('# Aracı yönlendirme, atlama sunucusuna girebilen birinin sizin anahtarınızı');
+          y('# kullanmasına izin verir. Yerine ProxyJump kullanın: anahtar istemcide kalır.');
+          y('PermitTunnel no');
+          y('X11Forwarding no');
+          y('GatewayPorts no');
+        } else {
+          y('AllowTcpForwarding no');
+          y('AllowAgentForwarding no');
+          y('X11Forwarding no');
+          y('PermitTunnel no');
+          y('GatewayPorts no');
+          y('# Yönlendirme kapalıyken sunucu, iç ağa açılan bir kapı olarak kullanılamaz.');
+        }
+        y('');
+
+        y('# --- oturum ---');
+        y('ClientAliveInterval 300');
+        y('ClientAliveCountMax 2');
+        y('# Kopan oturumlar 10 dakikada temizlenir; sahipsiz kalan uçbirimler kapanır.');
+        y('TCPKeepAlive no');
+        y('# Uygulama düzeyindeki ClientAlive varken TCP keepalive gereksizdir ve');
+        y('# sahtelenebilir.');
+        y('');
+
+        y('# --- algoritmalar ---');
+        y(`# ${a.not}`);
+        y(`KexAlgorithms ${a.kex}`);
+        y(`Ciphers ${a.sifre}`);
+        y(`MACs ${a.mac}`);
+        y(`HostKeyAlgorithms ${a.anahtar}`);
+        y(`PubkeyAcceptedAlgorithms ${a.anahtar}`);
+        if (g.surum !== '7') {
+          y('# ssh-rsa (SHA-1 imzası) bilerek listede yok. RSA anahtarları çalışmayı');
+          y('# sürdürür; kesilen yalnızca SHA-1 imzasıdır. Çok eski bir istemci');
+          y('# bağlanamıyorsa çözüm listeye ssh-rsa eklemek değil, istemciyi yükseltmektir.');
+        }
+        y('');
+
+        y('# --- diğer ---');
+        y('PrintMotd no');
+        y('Banner none');
+        y('# Sürüm bilgisi veren afişler saldırgana bilgi verir, savunmaya katkısı yoktur.');
+        y('Subsystem sftp internal-sftp');
+        y('LogLevel VERBOSE');
+        y('# VERBOSE, giriş yapan anahtarın parmak izini kaydeder. Bir olay incelemesinde');
+        y('# "hangi anahtarla girildi" sorusunun yanıtı yalnızca bu düzeyde bulunur.');
+
+        if (g.rol === 'internet') {
+          y('');
+          y('# --- internete açık sunucu için ek not ---');
+          y('# sshd tek başına yeterli değil: fail2ban ya da eşdeğeri bir kilitleme');
+          y('# aracıyla, mümkünse ağ düzeyinde kaynak IP kısıtlamasıyla birlikte kullanın.');
+          y('# En iyisi SSH portunu internete hiç açmamak; VPN ya da atlama sunucusu arkasına almak.');
+        }
+
+        return s.join('\n');
+      }
+
+      function uygulaUret(g) {
+        return [
+          '# 1) Anahtar üret (istemcide)',
+          'ssh-keygen -t ed25519 -C "ad.soyad@kurum"',
+          '# ed25519 kısa, hızlı ve güçlüdür. RSA gerekiyorsa en az 4096 bit:',
+          '# ssh-keygen -t rsa -b 4096',
+          '',
+          '# 2) Anahtarı sunucuya taşı (parola girişi hâlâ açıkken)',
+          `ssh-copy-id -p ${g.port} kullanici@sunucu`,
+          '',
+          '# 3) Yeni yapılandırmayı ayrı bir dosyaya koy — ana dosyayı bozmadan',
+          'sudo install -m 600 -o root -g root /dev/null /etc/ssh/sshd_config.d/99-sertlestirme.conf',
+          'sudo nano /etc/ssh/sshd_config.d/99-sertlestirme.conf',
+          '',
+          '# 4) Include satırı var mı ve NEREDE? İlk değer kazandığı için yeri önemli.',
+          'grep -n "^Include" /etc/ssh/sshd_config',
+          '',
+          '# 5) Sözdizimini sına — bu adım atlanırsa servis açılmayabilir',
+          'sudo sshd -t',
+          '',
+          '# 6) Uygulanan GERÇEK yapılandırmayı gör (dosyaya bakmak yanıltır)',
+          'sudo sshd -T | sort | grep -E "^(passwordauthentication|kbdinteractive|permitrootlogin|allowgroups|port|ciphers|macs|kexalgorithms)"',
+          '',
+          '# 7) Yeniden yükle — restart değil, reload. Mevcut oturumlar kopmaz.',
+          'sudo systemctl reload ssh 2>/dev/null || sudo systemctl reload sshd',
+          '',
+          '# 8) BU OTURUMU KAPATMADAN ikinci bir oturum aç ve girebildiğini doğrula',
+          `ssh -p ${g.port} kullanici@sunucu "echo giris basarili"`,
+          '',
+          '# Girilemiyorsa hâlâ açık olan ilk oturumdan geri al:',
+          'sudo rm /etc/ssh/sshd_config.d/99-sertlestirme.conf && sudo systemctl reload ssh',
+        ].join('\n');
+      }
+
+      /* ================= denetim ================= */
+
+      /* sshd yönergelerin çoğunda İLK okunan değeri kullanır, sonrakileri
+         sessizce atar. Ama bir bölümü birikimlidir: aşağıdakiler birden çok
+         kez yazılabilir ve hepsi geçerlidir. Bunları yinelenen saymak yanlış
+         alarm üretir — örneğin her sunucuda iki HostKey satırı bulunur. */
+      const BIRIKIMLI = new Set([
+        'hostkey', 'hostcertificate', 'port', 'listenaddress',
+        'acceptenv', 'setenv', 'include', 'match', 'subsystem',
+      ]);
+
+      /** sshd_config'i okur. Birikimli olmayan bir anahtar birden çok kez
+          geçerse ilk değer geçerlidir — sonrakiler kaydedilir ama
+          "yok sayıldı" işaretlenir. */
+      function configCoz(metin) {
+        const kayitlar = [];
+        const ilkGorulen = new Map();
+        let matchBlogu = null;
+
+        metin.split(/\r?\n/).forEach((ham, dizin) => {
+          const govde = ham.replace(/^\s+/, '');
+          if (!govde || govde.startsWith('#')) return;
+          const m = /^(\S+)\s*(?:=|\s)\s*(.*)$/.exec(govde);
+          if (!m) return;
+          const anahtar = m[1];
+          const deger = m[2].replace(/\s+#.*$/, '').trim();
+          const kucuk = anahtar.toLowerCase();
+
+          if (kucuk === 'match') {
+            matchBlogu = deger;
+            kayitlar.push({ anahtar, deger, kucuk, satir: dizin + 1, blok: null, yokSayildi: false });
+            return;
+          }
+
+          /* Match bloğu içindeki ayarlar yalnızca eşleşen bağlantılara uygulanır;
+             genel geçerlilik denetimlerinde ayrı tutulmalı. */
+          const yokSayildi =
+            matchBlogu === null && ilkGorulen.has(kucuk) && !BIRIKIMLI.has(kucuk);
+          if (matchBlogu === null && !ilkGorulen.has(kucuk)) {
+            ilkGorulen.set(kucuk, dizin + 1);
+          }
+          kayitlar.push({
+            anahtar,
+            deger,
+            kucuk,
+            satir: dizin + 1,
+            blok: matchBlogu,
+            yokSayildi,
+          });
+        });
+
+        return { kayitlar, ilkGorulen };
+      }
+
+      /** Genel (Match dışı) ve yok sayılmamış ilk değeri döndürür. */
+      function etkinDeger(cozum, anahtar) {
+        const k = cozum.kayitlar.find(
+          (x) => x.kucuk === anahtar.toLowerCase() && x.blok === null && !x.yokSayildi
+        );
+        return k ?? null;
+      }
+
+      function configDenetle(metin) {
+        const cozum = configCoz(metin);
+        const bulgular = [];
+        const ekle = (duzey, baslik, aciklama, cozumMetni, satir) =>
+          bulgular.push({ duzey, baslik, aciklama, cozum: cozumMetni, satir: satir ?? null });
+
+        if (cozum.kayitlar.length === 0) {
+          ekle('bilgi', 'Okunacak yönerge bulunamadı', 'Dosya boş ya da tümüyle yorum satırı.', '', null);
+          return bulgular;
+        }
+
+        const parola = etkinDeger(cozum, 'PasswordAuthentication');
+        const klavye =
+          etkinDeger(cozum, 'KbdInteractiveAuthentication') ??
+          etkinDeger(cozum, 'ChallengeResponseAuthentication');
+        const yontemler = etkinDeger(cozum, 'AuthenticationMethods');
+
+        const evetMi = (k) => k && /^yes$/i.test(k.deger);
+
+        if (evetMi(parola) && !yontemler) {
+          ekle(
+            'uyari',
+            'Parola ile giriş açık',
+            'PasswordAuthentication yes. Kaba kuvvet denemeleri internete açık sunucularda ' +
+              'dakikada onlarca kez gelir; parola politikası ne olursa olsun yüzey gereksizdir.',
+            'PasswordAuthentication no — önce anahtarınızla girebildiğinizi doğrulayın.',
+            parola.satir
+          );
+        }
+
+        if (parola && /^no$/i.test(parola.deger) && evetMi(klavye) && !yontemler) {
+          ekle(
+            'kritik',
+            'Parola girişi kapatılmış görünüyor ama açık',
+            'PasswordAuthentication no yazılmış, fakat ' +
+              `${klavye.anahtar} yes olduğu için PAM üzerinden parola sorulmaya devam eder. ` +
+              'Bu, sertleştirilmiş sanılan sunucularda en sık rastlanan sessiz boşluktur.',
+            'KbdInteractiveAuthentication no (eski sürümlerde ChallengeResponseAuthentication no). ' +
+              'İkinci etken kullanılacaksa AuthenticationMethods ile açıkça tanımlayın.',
+            klavye.satir
+          );
+        }
+
+        if (yontemler && /publickey\s+keyboard-interactive/i.test(yontemler.deger)) {
+          ekle(
+            'kritik',
+            'AuthenticationMethods boşlukla ayrılmış',
+            'Boşluk "veya" demektir: tek başına anahtarla ya da tek başına ikinci etkenle giriş ' +
+              'kabul edilir. İkisinin birden istenmesi için virgül gerekir.',
+            'AuthenticationMethods publickey,keyboard-interactive',
+            yontemler.satir
+          );
+        }
+
+        const kok = etkinDeger(cozum, 'PermitRootLogin');
+        if (evetMi(kok)) {
+          ekle(
+            'kritik',
+            'Kök oturumu doğrudan açılabiliyor',
+            'PermitRootLogin yes. Kök parolası ya da anahtarı ele geçiren biri doğrudan sisteme ' +
+              'girer; ayrıca hangi kişinin ne yaptığı kayıtlardan ayırt edilemez.',
+            'PermitRootLogin no (otomasyon gerekiyorsa prohibit-password ve komut kısıtlı anahtar).',
+            kok.satir
+          );
+        } else if (kok && /^prohibit-password|without-password$/i.test(kok.deger)) {
+          ekle(
+            'bilgi',
+            'Kök yalnızca anahtarla girebiliyor',
+            'prohibit-password, parolayla kök girişini engeller ama anahtarla girişe izin verir. ' +
+              'Otomasyon için kabul edilebilir; kişisel erişimde sudo tercih edilmeli.',
+            'command="..." ve from="..." kısıtlarıyla sınırlanmış özel bir anahtar kullanın.',
+            kok.satir
+          );
+        }
+
+        const bosParola = etkinDeger(cozum, 'PermitEmptyPasswords');
+        if (evetMi(bosParola)) {
+          ekle(
+            'kritik',
+            'Boş parolaya izin veriliyor',
+            'PermitEmptyPasswords yes. Parolası ayarlanmamış bir hesap doğrudan giriş kabul eder.',
+            'PermitEmptyPasswords no',
+            bosParola.satir
+          );
+        }
+
+        const pam = etkinDeger(cozum, 'UsePAM');
+        if (pam && /^no$/i.test(pam.deger)) {
+          ekle(
+            'uyari',
+            'UsePAM kapalı',
+            'PAM devre dışıyken hesap kilitleri, oturum sınırları ve pek çok günlükleme mekanizması ' +
+              'çalışmaz. Kilitlenmiş bir hesap SSH ile girebilir hâle gelebilir.',
+            'UsePAM yes',
+            pam.satir
+          );
+        }
+
+        // Zayıf algoritmalar
+        for (const alan of ['Ciphers', 'MACs', 'KexAlgorithms', 'HostKeyAlgorithms', 'PubkeyAcceptedAlgorithms', 'PubkeyAcceptedKeyTypes']) {
+          const k = etkinDeger(cozum, alan);
+          if (!k) continue;
+          for (const [desen, duzey, neden] of ZAYIF) {
+            const m = desen.exec(k.deger);
+            if (m) {
+              ekle(
+                duzey,
+                `${alan} içinde zayıf algoritma: ${m[0]}`,
+                neden,
+                `${m[0]} girdisini listeden çıkarın.`,
+                k.satir
+              );
+            }
+          }
+          if (/\bssh-rsa\b/.test(k.deger) && alan !== 'Ciphers' && alan !== 'MACs') {
+            ekle(
+              'uyari',
+              `${alan} içinde ssh-rsa var`,
+              'ssh-rsa, RSA anahtarının SHA-1 ile imzalanması demektir. OpenSSH 8.8 bunu öntanımlı ' +
+                'olarak kapattı. Listeye elle eklenmişse büyük olasılıkla eski bir istemciyi çalıştırmak ' +
+                'için yapılmıştır ve o istemci düzeltilene kadar açık kalacaktır.',
+              'rsa-sha2-512 ve rsa-sha2-256 yeterlidir; istemciyi yükseltin.',
+              k.satir
+            );
+          }
+        }
+
+        // Yönlendirme
+        const x11 = etkinDeger(cozum, 'X11Forwarding');
+        if (evetMi(x11)) {
+          ekle(
+            'bilgi',
+            'X11 yönlendirme açık',
+            'Grafik uygulama çalıştırılmayacaksa gereksiz bir yüzeydir; istemci tarafında da ' +
+              'güven gerektirir.',
+            'X11Forwarding no',
+            x11.satir
+          );
+        }
+        const aracı = etkinDeger(cozum, 'AllowAgentForwarding');
+        if (!aracı || evetMi(aracı)) {
+          ekle(
+            'uyari',
+            'Aracı yönlendirme açık',
+            'Öntanımlı değer yes. Sunucuya kök erişimi olan biri, oturumunuz açıkken sizin ' +
+              'anahtarınızı kullanarak başka sistemlere geçebilir. Atlama sunucularında bu, ' +
+              'tam da savunulmak istenen şeyi kırar.',
+            'AllowAgentForwarding no ve istemcide ProxyJump kullanın — anahtar istemcide kalır.',
+            aracı?.satir
+          );
+        }
+        const kapi = etkinDeger(cozum, 'GatewayPorts');
+        if (evetMi(kapi)) {
+          ekle(
+            'uyari',
+            'GatewayPorts açık',
+            'Uzak yönlendirmeyle açılan portlar tüm arayüzlere bağlanır; kullanıcı farkında olmadan ' +
+              'bir iç servisi dışarı açabilir.',
+            'GatewayPorts no',
+            kapi.satir
+          );
+        }
+
+        // Kaba kuvvet
+        const deneme = etkinDeger(cozum, 'MaxAuthTries');
+        if (deneme && +deneme.deger > 4) {
+          ekle(
+            'bilgi',
+            `MaxAuthTries ${deneme.deger}`,
+            'Her bağlantıda çok sayıda denemeye izin vermek, tek oturumda daha fazla parola ' +
+              'denenebilmesi demektir. Anahtar kullanan istemciler zaten birkaç anahtar dener; ' +
+              '3–4 arası yeterlidir.',
+            'MaxAuthTries 3',
+            deneme.satir
+          );
+        }
+
+        // Erişim listesi
+        const izinli = ['AllowUsers', 'AllowGroups', 'DenyUsers', 'DenyGroups'].some((a) =>
+          etkinDeger(cozum, a)
+        );
+        if (!izinli) {
+          ekle(
+            'bilgi',
+            'Erişim listesi tanımlı değil',
+            'Kabuğu olan her yerel hesap SSH ile girebilir. Hizmet hesapları çoğaldıkça bu liste ' +
+              'sessizce genişler.',
+            'AllowGroups ssh-kullanicilari — ve o gruba yalnızca girmesi gerekenleri alın.',
+            null
+          );
+        }
+
+        // Yok sayılan yinelenen satırlar
+        const yinelenen = cozum.kayitlar.filter((k) => k.yokSayildi);
+        for (const k of yinelenen) {
+          ekle(
+            'uyari',
+            `Yinelenen yönerge yok sayılıyor: ${k.anahtar}`,
+            `Bu anahtar ${cozum.ilkGorulen.get(k.kucuk)}. satırda zaten tanımlanmış. sshd ilk ` +
+              'okuduğu değeri kullanır, sonrakileri sessizce atar — dosyaya bakan kişi son ' +
+              'satırın geçerli olduğunu sanır.',
+            `Yalnızca ${cozum.ilkGorulen.get(k.kucuk)}. satırdaki değeri düzenleyin, bu satırı silin.`,
+            k.satir
+          );
+        }
+
+        // Include konumu
+        const dahil = cozum.kayitlar.find((k) => k.kucuk === 'include');
+        if (dahil) {
+          const oncekiAyar = cozum.kayitlar.filter(
+            (k) => k.satir < dahil.satir && k.kucuk !== 'include'
+          ).length;
+          ekle(
+            oncekiAyar > 0 ? 'bilgi' : 'uyari',
+            `Include satırı ${dahil.satir}. satırda`,
+            oncekiAyar > 0
+              ? `Include'dan önce ${oncekiAyar} yönerge var; onlar dahil edilen dosyalara göre ` +
+                'öncelikli. Bu dosyadaki sıra bilinçli seçilmiş olmalı.'
+              : 'Include dosyanın başında. Dahil edilen dosyalardaki her ayar, aşağıdaki satırları ' +
+                'ezer. Bulut görüntülerinin bıraktığı dosyalar bu yüzden fark edilmeden ' +
+                'PasswordAuthentication yes geri getirebilir.',
+            `Gerçekte uygulanan değerleri görmek için: sshd -T | sort`,
+            dahil.satir
+          );
+        }
+
+        const sira = { kritik: 0, uyari: 1, bilgi: 2 };
+        bulgular.sort((a, b) => sira[a.duzey] - sira[b.duzey] || (a.satir ?? 0) - (b.satir ?? 0));
+        return bulgular;
+      }
+
+      /* ================= arayüz ================= */
+      const kacir = (m) =>
+        String(m).replace(/[&<>]/g, (k) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;' })[k]);
+      const ETIKET = { kritik: 'Kritik', uyari: 'Uyarı', bilgi: 'Bilgi' };
+
+      function girdiTopla() {
+        return {
+          surum: el('#s-surum').value,
+          rol: el('#s-rol').value,
+          dogrulama: el('#s-dogrulama').value,
+          kok: el('#s-kok').value,
+          grup: el('#s-grup').value,
+          port: +el('#s-port').value || 22,
+        };
+      }
+
+      function cizUret() {
+        const g = girdiTopla();
+        el('#s-config').textContent = configUret(g);
+        el('#s-uygula').textContent = uygulaUret(g);
+
+        const durum = el('#s-durum');
+        const zayifSecim = g.dogrulama === 'parola' || g.kok === 'acik' || g.surum === '7';
+        durum.className = 'arac-durum ' + (zayifSecim ? 'uyari' : 'ok');
+        durum.textContent = zayifSecim
+          ? 'Seçimlerden biri güvenliği düşürüyor; üretilen dosyada nedeni yorum olarak açıklandı.'
+          : `OpenSSH ${g.surum}.x için yapılandırma hazır. Uygulamadan önce açık oturumunuzu kapatmayın.`;
+      }
+
+      function cizDenetle() {
+        const metin = el('#s-girdi').value;
+        const durum = el('#s-denetim-durum');
+        const blok = el('#s-bulgu-blok');
+
+        if (!metin.trim()) {
+          durum.className = 'arac-durum';
+          durum.textContent = '';
+          blok.hidden = true;
+          return;
+        }
+
+        const bulgular = configDenetle(metin);
+        const say = { kritik: 0, uyari: 0, bilgi: 0 };
+        bulgular.forEach((b) => say[b.duzey]++);
+
+        blok.hidden = false;
+        el('#s-bulgular').innerHTML = bulgular
+          .map(
+            (b) =>
+              `<article class="s-bulgu s-${b.duzey}">` +
+              `<header><span class="s-rozet">${ETIKET[b.duzey]}</span>` +
+              (b.satir ? `<span class="s-satir">satır ${b.satir}</span>` : '') +
+              `<h3>${kacir(b.baslik)}</h3></header>` +
+              `<p>${kacir(b.aciklama)}</p>` +
+              (b.cozum ? `<pre class="s-cozum">${kacir(b.cozum)}</pre>` : '') +
+              `</article>`
+          )
+          .join('');
+
+        durum.className = 'arac-durum ' + (say.kritik ? 'hata' : say.uyari ? 'uyari' : 'ok');
+        durum.textContent = say.kritik
+          ? `${say.kritik} kritik, ${say.uyari} uyarı, ${say.bilgi} bilgi düzeyinde bulgu.`
+          : say.uyari
+            ? `Kritik bulgu yok; ${say.uyari} uyarı, ${say.bilgi} bilgi.`
+            : `Kritik ya da uyarı düzeyinde bulgu yok (${say.bilgi} bilgi notu).`;
+      }
+
+      const ORNEK_KOTU = `Include /etc/ssh/sshd_config.d/*.conf
+
+Port 22
+PermitRootLogin yes
+PasswordAuthentication no
+KbdInteractiveAuthentication yes
+UsePAM yes
+MaxAuthTries 6
+X11Forwarding yes
+GatewayPorts yes
+Ciphers aes256-ctr,aes128-cbc,3des-cbc
+MACs hmac-sha2-256,hmac-sha1
+KexAlgorithms curve25519-sha256,diffie-hellman-group14-sha1
+HostKeyAlgorithms ssh-ed25519,ssh-rsa
+AuthenticationMethods publickey keyboard-interactive
+PasswordAuthentication yes
+Subsystem sftp internal-sftp
+`;
+
+      // Sekmeler
+      el('#s-sekme-uret').addEventListener('click', () => {
+        el('#s-uret-bolum').hidden = false;
+        el('#s-denetle-bolum').hidden = true;
+        el('#s-sekme-uret').classList.add('s-etkin');
+        el('#s-sekme-denetle').classList.remove('s-etkin');
+        el('#s-sekme-uret').setAttribute('aria-selected', 'true');
+        el('#s-sekme-denetle').setAttribute('aria-selected', 'false');
+      });
+      el('#s-sekme-denetle').addEventListener('click', () => {
+        el('#s-uret-bolum').hidden = true;
+        el('#s-denetle-bolum').hidden = false;
+        el('#s-sekme-denetle').classList.add('s-etkin');
+        el('#s-sekme-uret').classList.remove('s-etkin');
+        el('#s-sekme-denetle').setAttribute('aria-selected', 'true');
+        el('#s-sekme-uret').setAttribute('aria-selected', 'false');
+      });
+
+      document
+        .querySelectorAll('#s-surum, #s-rol, #s-dogrulama, #s-kok, #s-grup, #s-port')
+        .forEach((d) => {
+          d.addEventListener('input', cizUret);
+          d.addEventListener('change', cizUret);
+        });
+
+      el('#s-girdi').addEventListener('input', cizDenetle);
+      el('#s-ornek').addEventListener('click', () => {
+        el('#s-girdi').value = ORNEK_KOTU;
+        cizDenetle();
+      });
+      el('#s-bosalt').addEventListener('click', () => {
+        el('#s-girdi').value = '';
+        cizDenetle();
+      });
+
+      document.querySelectorAll('.kopyala').forEach((d) => {
+        d.addEventListener('click', async () => {
+          try {
+            await navigator.clipboard.writeText(el(`#${d.dataset.kaynak}`).textContent);
+            d.textContent = 'Kopyalandı';
+            setTimeout(() => (d.textContent = 'Kopyala'), 1600);
+          } catch {
+            /* pano izni yoksa kullanıcı elle seçer */
+          }
+        });
+      });
+
+      cizUret();
+    })();
+  </script>
+
+  <style>
+    .s-sekmeler {
+      display: flex;
+      gap: 6px;
+      margin-bottom: 20px;
+      border-bottom: 1px solid var(--line);
+    }
+    .s-sekme {
+      appearance: none;
+      background: none;
+      border: 0;
+      border-bottom: 2px solid transparent;
+      padding: 9px 14px;
+      font-size: 14px;
+      font-family: inherit;
+      color: var(--muted);
+      cursor: pointer;
+      margin-bottom: -1px;
+    }
+    .s-sekme:hover {
+      color: var(--ink);
+    }
+    .s-sekme.s-etkin {
+      color: var(--indigo-metin);
+      border-bottom-color: var(--indigo);
+      font-weight: 600;
+    }
+    .arac-metin {
+      width: 100%;
+      font-family: var(--mono, ui-monospace, monospace);
+      font-size: 13px;
+      line-height: 1.6;
+      padding: 12px 14px;
+      border: 1px solid var(--line);
+      border-radius: 11px;
+      background: var(--paper);
+      color: var(--ink);
+      resize: vertical;
+    }
+    .arac-metin:focus {
+      outline: none;
+      border-color: var(--indigo);
+      box-shadow: 0 0 0 3px var(--tint);
+    }
+    .s-cikti {
+      max-height: 560px;
+      overflow: auto;
+    }
+    .s-bulgular {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr);
+      gap: 10px;
+    }
+    .s-bulgu {
+      border: 1px solid var(--line);
+      border-left-width: 3px;
+      border-radius: 11px;
+      padding: 13px 15px;
+      background: var(--paper);
+      min-width: 0;
+    }
+    .s-bulgu.s-kritik {
+      border-left-color: light-dark(#dc2626, #ef4444);
+    }
+    .s-bulgu.s-uyari {
+      border-left-color: light-dark(#d97706, #f59e0b);
+    }
+    .s-bulgu.s-bilgi {
+      border-left-color: light-dark(#2563eb, #60a5fa);
+    }
+    .s-bulgu header {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      flex-wrap: wrap;
+      margin-bottom: 6px;
+    }
+    .s-bulgu h3 {
+      font-size: 14.5px;
+      margin: 0;
+      flex-basis: 100%;
+    }
+    .s-rozet {
+      font-size: 11px;
+      font-weight: 700;
+      padding: 2px 8px;
+      border-radius: 999px;
+      background: var(--tint);
+      color: var(--indigo-metin);
+    }
+    .s-satir {
+      font-size: 11.5px;
+      color: var(--muted);
+    }
+    .s-bulgu p {
+      font-size: 13.5px;
+      line-height: 1.62;
+      color: var(--ink-soft);
+      margin: 0;
+    }
+    .s-cozum {
+      margin: 9px 0 0;
+      font-size: 12.5px;
+      font-family: var(--mono, ui-monospace, monospace);
+      background: var(--tint);
+      border-radius: 8px;
+      padding: 9px 11px;
+      white-space: pre-wrap;
+      overflow-x: auto;
+      color: var(--ink);
+    }
+    .s-ipuclari {
+      list-style: none;
+      margin: 0;
+      padding: 0;
+      display: grid;
+      gap: 12px;
+    }
+    .s-ipuclari li {
+      font-size: 13.5px;
+      line-height: 1.62;
+      color: var(--ink-soft);
+      border-left: 2px solid var(--line);
+      padding-left: 13px;
+    }
+  </style>
+</Base>
